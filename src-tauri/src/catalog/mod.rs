@@ -6,8 +6,11 @@ use walkdir::WalkDir;
 use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
 
 pub mod cache;
+mod portable;
 mod registry;
+pub mod scan_settings;
 mod start_apps;
+mod steam;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -42,13 +45,20 @@ pub enum SourceKind {
     StartMenu,
     StartApps,
     Msix,
+    Steam,
+    Portable,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UninstallTarget {
-    Command { executable: String, arguments: String },
-    Msix { package_full_name: String },
+    Command {
+        executable: String,
+        arguments: String,
+    },
+    Msix {
+        package_full_name: String,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -82,28 +92,230 @@ pub struct AppInfo {
     pub shortcut_icon_path: Option<String>,
 }
 
-pub fn discover_apps() -> Vec<AppInfo> {
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanProgress {
+    pub stage: String,
+    pub location: Option<String>,
+    pub completed_roots: usize,
+    pub total_roots: usize,
+}
+
+pub fn discover_apps_with(
+    settings: &scan_settings::ScanSettings,
+    progress: impl Fn(ScanProgress),
+    is_cancelled: impl Fn() -> bool + Sync,
+) -> Vec<AppInfo> {
+    progress(ScanProgress {
+        stage: "Windows applications".into(),
+        location: None,
+        completed_roots: 0,
+        total_roots: 0,
+    });
     let (mut apps, registry_metadata) = scan_registry();
     apps.extend(scan_start_menu());
     apps.extend(start_apps::scan());
+    if is_cancelled() {
+        return sanitize(apps);
+    }
+
+    let steam_libraries = steam::installed_libraries();
+    progress(ScanProgress {
+        stage: "Steam libraries".into(),
+        location: None,
+        completed_roots: 0,
+        total_roots: steam_libraries.len(),
+    });
+    for (index, library) in steam_libraries.iter().enumerate() {
+        if is_cancelled() {
+            break;
+        }
+        progress(ScanProgress {
+            stage: "Steam libraries".into(),
+            location: Some(library.to_string_lossy().into_owned()),
+            completed_roots: index,
+            total_roots: steam_libraries.len(),
+        });
+        apps.extend(steam::scan_library(library).into_iter().map(steam_app));
+    }
+
+    let mut roots = if settings.auto_scan_fixed_drives {
+        crate::platform::windows::drives::fixed_drive_roots()
+    } else {
+        Vec::new()
+    };
+    roots.extend(
+        settings
+            .included_paths
+            .iter()
+            .map(PathBuf::from)
+            .filter(|path| path.is_dir()),
+    );
+    roots.sort_by_cached_key(|path| path.to_string_lossy().to_lowercase());
+    roots.dedup_by(|left, right| {
+        left.to_string_lossy()
+            .eq_ignore_ascii_case(&right.to_string_lossy())
+    });
+    let mut excluded = default_portable_exclusions();
+    excluded.extend(settings.excluded_paths.iter().map(PathBuf::from));
+    excluded.extend(steam_libraries);
+    progress(ScanProgress {
+        stage: "Portable applications".into(),
+        location: None,
+        completed_roots: 0,
+        total_roots: roots.len(),
+    });
+    let portable_paths = std::thread::scope(|scope| {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        for root in &roots {
+            let sender = sender.clone();
+            let excluded = &excluded;
+            let is_cancelled = &is_cancelled;
+            scope.spawn(move || {
+                let paths = portable::discover_executables(
+                    std::slice::from_ref(root),
+                    excluded,
+                    is_cancelled,
+                );
+                let _ = sender.send((root.to_path_buf(), paths));
+            });
+        }
+        drop(sender);
+        let mut paths = Vec::new();
+        for (index, (root, found)) in receiver.into_iter().enumerate() {
+            progress(ScanProgress {
+                stage: "Portable applications".into(),
+                location: Some(root.to_string_lossy().into_owned()),
+                completed_roots: index + 1,
+                total_roots: roots.len(),
+            });
+            paths.extend(found);
+        }
+        paths
+    });
+    apps.extend(portable_paths.into_iter().filter_map(portable_app));
     attach_registry_metadata(&mut apps, &registry_metadata);
     enrich_local_metadata(&mut apps);
     sanitize(apps)
 }
 
+fn steam_app(game: steam::SteamGame) -> AppInfo {
+    let path = format!("steam://rungameid/{}", game.app_id);
+    AppInfo {
+        id: stable_id(&path),
+        category: AppCategory::Games,
+        name: game.name,
+        path,
+        icon_base64: None,
+        launch_kind: LaunchKind::Executable,
+        source_kind: SourceKind::Steam,
+        description: None,
+        version: None,
+        publisher: None,
+        install_location: Some(game.install_dir.to_string_lossy().into_owned()),
+        can_uninstall: false,
+        uninstall: None,
+        resolved_path: find_executable(&game.install_dir.to_string_lossy())
+            .map(|path| path.to_string_lossy().into_owned()),
+        shortcut_icon_path: None,
+    }
+}
+
+fn portable_app(path: PathBuf) -> Option<AppInfo> {
+    let metadata = crate::platform::windows::executable_metadata::read(&path);
+    let has_metadata = metadata.product_name.is_some()
+        || metadata.description.is_some()
+        || metadata.publisher.is_some();
+    let stem = path.file_stem()?.to_string_lossy().trim().to_string();
+    let parent_matches = path
+        .parent()
+        .and_then(Path::file_name)
+        .is_some_and(|parent| {
+            normalized_portable_name(&parent.to_string_lossy()) == normalized_portable_name(&stem)
+        });
+    if !has_metadata && !parent_matches {
+        return None;
+    }
+    let name = metadata
+        .product_name
+        .clone()
+        .filter(|value| !is_generic_product_name(value))
+        .unwrap_or_else(|| clean_portable_name(&stem));
+    if is_maintenance_entry(&name, &path.to_string_lossy(), None) {
+        return None;
+    }
+    let mut app = make_app(name, path.clone());
+    app.source_kind = SourceKind::Portable;
+    app.description = metadata.description;
+    app.version = metadata.version;
+    app.publisher = metadata.publisher;
+    app.install_location = path
+        .parent()
+        .map(|value| value.to_string_lossy().into_owned());
+    Some(app)
+}
+
+fn is_generic_product_name(value: &str) -> bool {
+    ["godot engine", "electron", "chromium", "application"]
+        .iter()
+        .any(|generic| value.trim().eq_ignore_ascii_case(generic))
+}
+
+fn normalized_portable_name(value: &str) -> String {
+    clean_portable_name(value)
+        .chars()
+        .filter(|character| character.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+fn clean_portable_name(value: &str) -> String {
+    let trimmed = value.trim();
+    let version_start = trimmed
+        .char_indices()
+        .find(|(index, character)| {
+            *index > 0 && character.is_ascii_digit() && trimmed[..*index].ends_with(['-', '_', ' '])
+        })
+        .map(|(index, _)| index.saturating_sub(1));
+    version_start
+        .map_or(trimmed, |index| &trimmed[..index])
+        .replace(['_', '-'], " ")
+        .trim()
+        .to_string()
+}
+
+fn default_portable_exclusions() -> Vec<PathBuf> {
+    [
+        "WINDIR",
+        "ProgramFiles",
+        "ProgramFiles(x86)",
+        "ProgramData",
+        "APPDATA",
+        "LOCALAPPDATA",
+    ]
+    .into_iter()
+    .filter_map(env::var_os)
+    .map(PathBuf::from)
+    .collect()
+}
+
 fn scan_registry() -> (Vec<AppInfo>, Vec<registry::RegistryMetadata>) {
     let mut apps = Vec::new();
     let mut metadata = Vec::new();
-    let scans = [registry::scan(
-        HKEY_LOCAL_MACHINE,
-        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-    ), registry::scan(
-        HKEY_LOCAL_MACHINE,
-        r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
-    ), registry::scan(
-        HKEY_CURRENT_USER,
-        r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
-    )];
+    let scans = [
+        registry::scan(
+            HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+        ),
+        registry::scan(
+            HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+        ),
+        registry::scan(
+            HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
+        ),
+    ];
     for scan in scans {
         apps.extend(scan.apps);
         metadata.extend(scan.metadata);
@@ -122,16 +334,29 @@ fn attach_registry_metadata(apps: &mut [AppInfo], metadata: &[registry::Registry
             .iter()
             .filter(|record| registry_metadata_matches(app, record))
             .collect::<Vec<_>>();
-        let Some(first) = matches.first() else { continue };
-        if !matches.iter().all(|record| record.uninstall == first.uninstall) {
+        let Some(first) = matches.first() else {
+            continue;
+        };
+        if !matches
+            .iter()
+            .all(|record| record.uninstall == first.uninstall)
+        {
             continue;
         }
         app.uninstall = Some(first.uninstall.clone());
         app.can_uninstall = true;
-        if app.description.is_none() { app.description = first.description.clone(); }
-        if app.version.is_none() { app.version = first.version.clone(); }
-        if app.publisher.is_none() { app.publisher = first.publisher.clone(); }
-        if app.install_location.is_none() { app.install_location = first.install_location.clone(); }
+        if app.description.is_none() {
+            app.description = first.description.clone();
+        }
+        if app.version.is_none() {
+            app.version = first.version.clone();
+        }
+        if app.publisher.is_none() {
+            app.publisher = first.publisher.clone();
+        }
+        if app.install_location.is_none() {
+            app.install_location = first.install_location.clone();
+        }
     }
 }
 
@@ -140,7 +365,9 @@ fn registry_metadata_matches(app: &AppInfo, record: &registry::RegistryMetadata)
         return false;
     }
     match (&app.publisher, &record.publisher) {
-        (Some(app_publisher), Some(record_publisher)) => app_publisher.eq_ignore_ascii_case(record_publisher),
+        (Some(app_publisher), Some(record_publisher)) => {
+            app_publisher.eq_ignore_ascii_case(record_publisher)
+        }
         _ => true,
     }
 }
@@ -148,23 +375,14 @@ fn registry_metadata_matches(app: &AppInfo, record: &registry::RegistryMetadata)
 pub fn sanitize(apps: Vec<AppInfo>) -> Vec<AppInfo> {
     deduplicate(
         apps.into_iter()
-            .filter(|app| {
-                !is_maintenance_entry(
-                    &app.name,
-                    &app.path,
-                    app.resolved_path.as_deref(),
-                )
-            })
+            .filter(|app| !is_maintenance_entry(&app.name, &app.path, app.resolved_path.as_deref()))
             .collect(),
     )
 }
 
 fn enrich_local_metadata(apps: &mut [AppInfo]) {
     for app in apps {
-        let target = app
-            .resolved_path
-            .as_deref()
-            .unwrap_or(&app.path);
+        let target = app.resolved_path.as_deref().unwrap_or(&app.path);
         let path = Path::new(target);
         if !path
             .extension()
@@ -204,7 +422,11 @@ fn icon_source(app: &AppInfo) -> Option<String> {
     app.shortcut_icon_path
         .clone()
         .filter(|path| Path::new(path).is_file())
-        .or_else(|| app.resolved_path.clone().filter(|path| Path::new(path).is_file()))
+        .or_else(|| {
+            app.resolved_path
+                .clone()
+                .filter(|path| Path::new(path).is_file())
+        })
         .or_else(|| (app.launch_kind != LaunchKind::AppUserModelId).then(|| app.path.clone()))
 }
 
@@ -213,7 +435,9 @@ pub fn hydrate_missing_icons(apps: &mut [AppInfo]) {
         app.icon_base64 = if app.launch_kind == LaunchKind::AppUserModelId {
             crate::platform::windows::icon_extractor::extract_app_id_icon(&app.path)
         } else {
-            icon_source(app).and_then(|path| crate::platform::windows::icon_extractor::extract_icon(Path::new(&path)))
+            icon_source(app).and_then(|path| {
+                crate::platform::windows::icon_extractor::extract_icon(Path::new(&path))
+            })
         };
     }
 }
@@ -241,15 +465,21 @@ fn scan_start_menu() -> Vec<AppInfo> {
             let path = entry.into_path();
             let name = path.file_stem()?.to_string_lossy().trim().to_string();
             let details = crate::platform::windows::shortcut::resolve(&path);
-            let target = details.target.as_ref().map(|value| value.to_string_lossy().into_owned());
-            (!name.is_empty() && !is_maintenance_entry(&name, &path.to_string_lossy(), target.as_deref()))
-                .then(|| {
-                    let mut app = make_app(name, path);
-                    app.source_kind = SourceKind::StartMenu;
-                    app.resolved_path = target;
-                    app.shortcut_icon_path = details.icon_location.map(|value| value.to_string_lossy().into_owned());
-                    app
-                })
+            let target = details
+                .target
+                .as_ref()
+                .map(|value| value.to_string_lossy().into_owned());
+            (!name.is_empty()
+                && !is_maintenance_entry(&name, &path.to_string_lossy(), target.as_deref()))
+            .then(|| {
+                let mut app = make_app(name, path);
+                app.source_kind = SourceKind::StartMenu;
+                app.resolved_path = target;
+                app.shortcut_icon_path = details
+                    .icon_location
+                    .map(|value| value.to_string_lossy().into_owned());
+                app
+            })
         })
         .collect()
 }
@@ -259,7 +489,10 @@ fn make_app(name: String, path: PathBuf) -> AppInfo {
     let normalized = path.to_lowercase();
     let id = format!("{:x}", Sha256::digest(normalized.as_bytes()));
     let category = classify(&name, &path);
-    let launch_kind = if Path::new(&path).extension().is_some_and(|extension| extension.eq_ignore_ascii_case("lnk")) {
+    let launch_kind = if Path::new(&path)
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("lnk"))
+    {
         LaunchKind::Shortcut
     } else {
         LaunchKind::Executable
@@ -284,30 +517,110 @@ fn make_app(name: String, path: PathBuf) -> AppInfo {
 }
 
 fn stable_id(identity: &str) -> String {
-    format!("{:x}", Sha256::digest(identity.trim().to_lowercase().as_bytes()))
+    format!(
+        "{:x}",
+        Sha256::digest(identity.trim().to_lowercase().as_bytes())
+    )
 }
 
 fn classify(name: &str, path: &str) -> AppCategory {
     let value = format!("{name} {path}").to_lowercase();
     let contains = |keywords: &[&str]| keywords.iter().any(|keyword| value.contains(keyword));
 
-    if contains(&["steam", "battle.net", "epic games", "gog", "game", "minecraft", "roblox", "backpack battles", "warcraft"]) {
+    if contains(&[
+        "steam",
+        "battle.net",
+        "epic games",
+        "gog",
+        "game",
+        "minecraft",
+        "roblox",
+        "backpack battles",
+        "warcraft",
+    ]) {
         AppCategory::Games
-    } else if contains(&["claude", "chatgpt", "openai", "codex", "ollama", "lm studio", "gemini", "copilot", "cursor", "ai agent"] ) {
+    } else if contains(&[
+        "claude",
+        "chatgpt",
+        "openai",
+        "codex",
+        "ollama",
+        "lm studio",
+        "gemini",
+        "copilot",
+        "cursor",
+        "ai agent",
+    ]) {
         AppCategory::Ai
-    } else if contains(&["visual studio", "vscode", "code.exe", "rustrover", "pycharm", "webstorm", "intellij", "android studio", "git", "docker", "postman", "terminal"] ) {
+    } else if contains(&[
+        "visual studio",
+        "vscode",
+        "code.exe",
+        "rustrover",
+        "pycharm",
+        "webstorm",
+        "intellij",
+        "android studio",
+        "git",
+        "docker",
+        "postman",
+        "terminal",
+    ]) {
         AppCategory::Development
-    } else if contains(&["photoshop", "illustrator", "lightroom", "figma", "gimp", "inkscape", "blender", "paint", "canva"] ) {
+    } else if contains(&[
+        "photoshop",
+        "illustrator",
+        "lightroom",
+        "figma",
+        "gimp",
+        "inkscape",
+        "blender",
+        "paint",
+        "canva",
+    ]) {
         AppCategory::Editors
-    } else if contains(&["chrome", "firefox", "edge", "opera", "brave", "vivaldi", "browser"] ) {
+    } else if contains(&[
+        "chrome", "firefox", "edge", "opera", "brave", "vivaldi", "browser",
+    ]) {
         AppCategory::Browsers
-    } else if contains(&["vlc", "spotify", "foobar", "audacity", "obs", "media player", "music", "video"] ) {
+    } else if contains(&[
+        "vlc",
+        "spotify",
+        "foobar",
+        "audacity",
+        "obs",
+        "media player",
+        "music",
+        "video",
+    ]) {
         AppCategory::Media
-    } else if contains(&["discord", "telegram", "whatsapp", "slack", "teams", "zoom", "skype", "signal"] ) {
+    } else if contains(&[
+        "discord", "telegram", "whatsapp", "slack", "teams", "zoom", "skype", "signal",
+    ]) {
         AppCategory::Communication
-    } else if contains(&["character map", "command prompt", "powershell", "control panel", "computer management", "component services", "administrative tools", "registry editor", "task manager"] ) {
+    } else if contains(&[
+        "character map",
+        "command prompt",
+        "powershell",
+        "control panel",
+        "computer management",
+        "component services",
+        "administrative tools",
+        "registry editor",
+        "task manager",
+    ]) {
         AppCategory::System
-    } else if contains(&["7-zip", "winrar", "everything", "powertoys", "verifier", "configure", "utility", "uninstaller"] ) {
+    } else if contains(&[
+        "7-zip",
+        "winrar",
+        "everything",
+        "powertoys",
+        "rufus",
+        "verifier",
+        "configure",
+        "utility",
+        "uninstaller",
+    ]) {
         AppCategory::Utilities
     } else {
         AppCategory::Other
@@ -327,14 +640,14 @@ fn find_executable(location: &str) -> Option<PathBuf> {
         .into_iter()
         .filter_map(Result::ok)
         .map(|entry| entry.into_path())
-        .find(|path| is_launchable(path) && !is_noise("", &path.to_string_lossy()))
+        .find(|path| is_launchable(path) && !is_maintenance_path(&path.to_string_lossy()))
 }
 
 fn is_launchable(path: &Path) -> bool {
     path.is_file()
-        && path
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("exe") || extension.eq_ignore_ascii_case("lnk"))
+        && path.extension().is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("exe") || extension.eq_ignore_ascii_case("lnk")
+        })
 }
 
 fn clean_display_icon(value: &str) -> Option<PathBuf> {
@@ -350,9 +663,7 @@ fn clean_display_icon(value: &str) -> Option<PathBuf> {
 
 fn is_invalid_display_name(name: &str) -> bool {
     let name = name.trim();
-    name.is_empty()
-        || name.to_lowercase().starts_with("ms-resource:")
-        || name.contains('\u{fffd}')
+    name.is_empty() || name.to_lowercase().starts_with("ms-resource:") || name.contains('\u{fffd}')
 }
 
 fn is_noise(name: &str, path: &str) -> bool {
@@ -363,6 +674,12 @@ fn is_maintenance_entry(name: &str, path: &str, resolved_path: Option<&str>) -> 
     if is_invalid_display_name(name) {
         return true;
     }
+    is_maintenance_path(path)
+        || resolved_path.is_some_and(is_maintenance_path)
+        || is_maintenance_text(name)
+}
+
+fn is_maintenance_path(path: &str) -> bool {
     if Path::new(path).extension().is_some_and(|extension| {
         ["ico", "dll", "mui", "cpl"]
             .iter()
@@ -370,7 +687,11 @@ fn is_maintenance_entry(name: &str, path: &str, resolved_path: Option<&str>) -> 
     }) {
         return true;
     }
-    let value = format!("{name} {path} {}", resolved_path.unwrap_or_default()).to_lowercase();
+    is_maintenance_text(path)
+}
+
+fn is_maintenance_text(value: &str) -> bool {
+    let value = value.to_lowercase();
     [
         "uninstall",
         "unins000",
@@ -398,7 +719,10 @@ fn is_maintenance_entry(name: &str, path: &str, resolved_path: Option<&str>) -> 
 fn deduplicate(apps: Vec<AppInfo>) -> Vec<AppInfo> {
     let mut unique = Vec::<AppInfo>::new();
     for app in apps {
-        if let Some(index) = unique.iter().position(|existing| same_application(existing, &app)) {
+        if let Some(index) = unique
+            .iter()
+            .position(|existing| same_application(existing, &app))
+        {
             let existing = unique.remove(index);
             unique.insert(index, merge_app(existing, app));
         } else {
@@ -416,14 +740,24 @@ fn deduplicate(apps: Vec<AppInfo>) -> Vec<AppInfo> {
 }
 
 fn same_application(left: &AppInfo, right: &AppInfo) -> bool {
-    if left.path.eq_ignore_ascii_case(&right.path) { return true }
+    if left.path.eq_ignore_ascii_case(&right.path) {
+        return true;
+    }
     let left_identity = left.resolved_path.as_deref().unwrap_or(&left.path);
     let right_identity = right.resolved_path.as_deref().unwrap_or(&right.path);
-    if left_identity.eq_ignore_ascii_case(right_identity) { return true }
+    if left_identity.eq_ignore_ascii_case(right_identity) {
+        return true;
+    }
     let left_name = normalized_product_family(&left.name);
     let right_name = normalized_product_family(&right.name);
-    if left_name != right_name { return false }
-    if left.launch_kind == LaunchKind::AppUserModelId || right.launch_kind == LaunchKind::AppUserModelId { return true }
+    if left_name != right_name {
+        return false;
+    }
+    if left.launch_kind == LaunchKind::AppUserModelId
+        || right.launch_kind == LaunchKind::AppUserModelId
+    {
+        return true;
+    }
     match (&left.publisher, &right.publisher) {
         (Some(left), Some(right)) => left.eq_ignore_ascii_case(right),
         _ => true,
@@ -431,26 +765,74 @@ fn same_application(left: &AppInfo, right: &AppInfo) -> bool {
 }
 
 fn merge_app(left: AppInfo, right: AppInfo) -> AppInfo {
-    let (mut primary, secondary) = if candidate_score(&right) > candidate_score(&left) { (right, left) } else { (left, right) };
-    if primary.description.is_none() { primary.description = secondary.description; }
-    if primary.version.is_none() { primary.version = secondary.version; }
-    if primary.publisher.is_none() || primary.publisher.as_deref().is_some_and(|value| value.starts_with("CN=")) {
-        if secondary.publisher.as_deref().is_some_and(|value| !value.starts_with("CN=")) { primary.publisher = secondary.publisher; }
+    let prefer_right = candidate_score(&right) > candidate_score(&left)
+        || (candidate_score(&right) == candidate_score(&left)
+            && left.source_kind == SourceKind::Portable
+            && right.source_kind == SourceKind::Portable
+            && version_key(right.version.as_deref()) > version_key(left.version.as_deref()));
+    let (mut primary, secondary) = if prefer_right {
+        (right, left)
+    } else {
+        (left, right)
+    };
+    if primary.description.is_none() {
+        primary.description = secondary.description;
     }
-    if primary.install_location.is_none() { primary.install_location = secondary.install_location; }
-    if primary.icon_base64.is_none() { primary.icon_base64 = secondary.icon_base64; }
-    if primary.uninstall.is_none() { primary.uninstall = secondary.uninstall; }
+    if primary.version.is_none() {
+        primary.version = secondary.version;
+    }
+    if primary.publisher.is_none()
+        || primary
+            .publisher
+            .as_deref()
+            .is_some_and(|value| value.starts_with("CN="))
+    {
+        if secondary
+            .publisher
+            .as_deref()
+            .is_some_and(|value| !value.starts_with("CN="))
+        {
+            primary.publisher = secondary.publisher;
+        }
+    }
+    if primary.install_location.is_none() {
+        primary.install_location = secondary.install_location;
+    }
+    if primary.icon_base64.is_none() {
+        primary.icon_base64 = secondary.icon_base64;
+    }
+    if primary.uninstall.is_none() {
+        primary.uninstall = secondary.uninstall;
+    }
     primary.can_uninstall |= secondary.can_uninstall || primary.uninstall.is_some();
     primary
 }
 
+fn version_key(version: Option<&str>) -> Vec<u64> {
+    version
+        .unwrap_or_default()
+        .split(|character: char| !character.is_ascii_digit())
+        .filter_map(|segment| segment.parse().ok())
+        .collect()
+}
+
 fn normalize_name(name: &str) -> String {
-    name.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
+    name.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }
 
 fn normalized_product_family(name: &str) -> String {
     let mut value = normalize_name(name);
-    for marker in [" (64bit)", " (32bit)", " (64-bit)", " (32-bit)", " x64", " x86"] {
+    for marker in [
+        " (64bit)",
+        " (32bit)",
+        " (64-bit)",
+        " (32-bit)",
+        " x64",
+        " x86",
+    ] {
         if value.ends_with(marker) {
             value.truncate(value.len() - marker.len());
         }
@@ -472,7 +854,9 @@ fn normalized_product_family(name: &str) -> String {
 }
 
 fn version_family(name: &str) -> &str {
-    let Some((family, suffix)) = name.rsplit_once(' ') else { return name };
+    let Some((family, suffix)) = name.rsplit_once(' ') else {
+        return name;
+    };
     if !suffix.starts_with(|character: char| character.is_ascii_digit()) {
         return name;
     }
@@ -480,16 +864,30 @@ fn version_family(name: &str) -> &str {
         .split(|character: char| !character.is_ascii_digit())
         .filter(|segment| !segment.is_empty())
         .count();
-    if numeric_segments >= 2 { family } else { name }
+    if numeric_segments >= 2 {
+        family
+    } else {
+        name
+    }
 }
 
 fn candidate_score(app: &AppInfo) -> u8 {
-    match Path::new(&app.path).extension().and_then(|value| value.to_str()) {
+    if app.source_kind == SourceKind::Steam {
+        return 5;
+    }
+    match Path::new(&app.path)
+        .extension()
+        .and_then(|value| value.to_str())
+    {
         Some(extension) if extension.eq_ignore_ascii_case("lnk") => return 4,
         Some(extension) if extension.eq_ignore_ascii_case("exe") => return 3,
         _ => {}
     }
-    if app.launch_kind == LaunchKind::AppUserModelId { 2 } else { 0 }
+    if app.launch_kind == LaunchKind::AppUserModelId {
+        2
+    } else {
+        0
+    }
 }
 
 fn category_rank(category: AppCategory) -> u8 {
@@ -532,7 +930,11 @@ mod tests {
         }
     }
 
-    fn registry_metadata(name: &str, publisher: Option<&str>, executable: &str) -> registry::RegistryMetadata {
+    fn registry_metadata(
+        name: &str,
+        publisher: Option<&str>,
+        executable: &str,
+    ) -> registry::RegistryMetadata {
         registry::RegistryMetadata {
             name: name.into(),
             description: None,
@@ -552,14 +954,21 @@ mod tests {
         apps[0].launch_kind = LaunchKind::Shortcut;
         attach_registry_metadata(
             &mut apps,
-            &[registry_metadata("Steam", Some("Valve"), r"C:\Steam\uninstall.exe")],
+            &[registry_metadata(
+                "Steam",
+                Some("Valve"),
+                r"C:\Steam\uninstall.exe",
+            )],
         );
         assert!(apps[0].can_uninstall);
         assert_eq!(apps[0].publisher.as_deref(), Some("Valve"));
-        assert_eq!(apps[0].uninstall, Some(UninstallTarget::Command {
-            executable: r"C:\Steam\uninstall.exe".into(),
-            arguments: String::new(),
-        }));
+        assert_eq!(
+            apps[0].uninstall,
+            Some(UninstallTarget::Command {
+                executable: r"C:\Steam\uninstall.exe".into(),
+                arguments: String::new(),
+            })
+        );
     }
 
     #[test]
@@ -596,7 +1005,11 @@ mod tests {
         apps[0].publisher = Some("Alpha".into());
         attach_registry_metadata(
             &mut apps,
-            &[registry_metadata("Studio", Some("Beta"), r"C:\Beta\uninstall.exe")],
+            &[registry_metadata(
+                "Studio",
+                Some("Beta"),
+                r"C:\Beta\uninstall.exe",
+            )],
         );
         assert!(!apps[0].can_uninstall);
     }
@@ -680,9 +1093,27 @@ mod tests {
     }
 
     #[test]
+    fn finds_executable_inside_registered_install_location() {
+        let dir = tempfile::tempdir().unwrap();
+        let executable = dir.path().join("Warhammer 40000 Space Marine 2.exe");
+        std::fs::write(&executable, []).unwrap();
+
+        assert_eq!(
+            find_executable(&dir.path().to_string_lossy()),
+            Some(executable)
+        );
+    }
+
+    #[test]
     fn identifies_maintenance_and_resource_noise() {
-        assert!(is_noise("Удалить Ассистент", r"C:\Menu\Удалить Ассистент.lnk"));
-        assert!(is_noise("Docker Desktop", r"C:\Docker\Docker Desktop Installer.exe"));
+        assert!(is_noise(
+            "Удалить Ассистент",
+            r"C:\Menu\Удалить Ассистент.lnk"
+        ));
+        assert!(is_noise(
+            "Docker Desktop",
+            r"C:\Docker\Docker Desktop Installer.exe"
+        ));
         assert!(is_noise("Updater", r"C:\App\update.exe"));
         assert!(is_noise("Repair", r"C:\App\repair.exe"));
         assert!(is_noise("Icon", r"C:\App\app.ico"));
@@ -758,8 +1189,14 @@ mod tests {
     #[test]
     fn sanitizes_stale_maintenance_entries() {
         let apps = sanitize(vec![
-            app("Visual Studio Installer", "Microsoft.VisualStudio.Installer"),
-            app("Installation notes", "file://C:/PostgreSQL/installation-notes.html"),
+            app(
+                "Visual Studio Installer",
+                "Microsoft.VisualStudio.Installer",
+            ),
+            app(
+                "Installation notes",
+                "file://C:/PostgreSQL/installation-notes.html",
+            ),
             app("Visual Studio Code", r"C:\Code.exe"),
         ]);
         assert_eq!(
@@ -767,7 +1204,6 @@ mod tests {
             vec!["Visual Studio Code"],
         );
     }
-
 
     #[test]
     fn merges_version_suffixed_duplicate_but_not_simple_numbered_names() {
@@ -780,7 +1216,8 @@ mod tests {
             deduplicate(vec![
                 app("Editor 1", r"C:\Editor1.exe"),
                 app("Editor 2", r"C:\Editor2.exe"),
-            ]).len(),
+            ])
+            .len(),
             2,
         );
     }
@@ -795,28 +1232,61 @@ mod tests {
 
     #[test]
     fn classifies_known_application_categories() {
-        assert_eq!(classify("Battle.net", r"C:\Games\Battle.net.exe"), AppCategory::Games);
+        assert_eq!(
+            classify("Battle.net", r"C:\Games\Battle.net.exe"),
+            AppCategory::Games
+        );
         assert_eq!(classify("Claude", r"C:\Claude.exe"), AppCategory::Ai);
         assert_eq!(classify("Codex", r"C:\Codex.exe"), AppCategory::Ai);
-        assert_eq!(classify("Adobe Photoshop", r"C:\Photoshop.exe"), AppCategory::Editors);
+        assert_eq!(
+            classify("Adobe Photoshop", r"C:\Photoshop.exe"),
+            AppCategory::Editors
+        );
         assert_eq!(classify("Figma", r"C:\Figma.exe"), AppCategory::Editors);
-        assert_eq!(classify("Visual Studio Code", r"C:\Code.exe"), AppCategory::Development);
-        assert_eq!(classify("RustRover", r"C:\RustRover.exe"), AppCategory::Development);
-        assert_eq!(classify("Google Chrome", r"C:\Chrome.exe"), AppCategory::Browsers);
-        assert_eq!(classify("VLC media player", r"C:\vlc.exe"), AppCategory::Media);
-        assert_eq!(classify("Discord", r"C:\Discord.exe"), AppCategory::Communication);
-        assert_eq!(classify("7-Zip File Manager", r"C:\7zFM.exe"), AppCategory::Utilities);
-        assert_eq!(classify("Character Map", r"C:\charmap.exe"), AppCategory::System);
+        assert_eq!(
+            classify("Visual Studio Code", r"C:\Code.exe"),
+            AppCategory::Development
+        );
+        assert_eq!(
+            classify("RustRover", r"C:\RustRover.exe"),
+            AppCategory::Development
+        );
+        assert_eq!(
+            classify("Google Chrome", r"C:\Chrome.exe"),
+            AppCategory::Browsers
+        );
+        assert_eq!(
+            classify("VLC media player", r"C:\vlc.exe"),
+            AppCategory::Media
+        );
+        assert_eq!(
+            classify("Discord", r"C:\Discord.exe"),
+            AppCategory::Communication
+        );
+        assert_eq!(
+            classify("7-Zip File Manager", r"C:\7zFM.exe"),
+            AppCategory::Utilities
+        );
+        assert_eq!(
+            classify("Character Map", r"C:\charmap.exe"),
+            AppCategory::System
+        );
     }
 
     #[test]
     fn classifies_unknown_app_as_other() {
-        assert_eq!(classify("Acme Workspace", r"C:\Acme.exe"), AppCategory::Other);
+        assert_eq!(
+            classify("Acme Workspace", r"C:\Acme.exe"),
+            AppCategory::Other
+        );
     }
 
     #[test]
     fn stable_ids_ignore_windows_path_case() {
-        assert_eq!(stable_id(r"C:\Apps\Codex.exe"), stable_id(r"c:\apps\CODEX.exe"));
+        assert_eq!(
+            stable_id(r"C:\Apps\Codex.exe"),
+            stable_id(r"c:\apps\CODEX.exe")
+        );
     }
 
     #[test]
@@ -840,7 +1310,10 @@ mod tests {
         let mut cached = discovered[0].clone();
         cached.icon_base64 = Some("data:image/png;base64,cached".into());
         reuse_cached_icons(&mut discovered, &[cached]);
-        assert_eq!(discovered[0].icon_base64.as_deref(), Some("data:image/png;base64,cached"));
+        assert_eq!(
+            discovered[0].icon_base64.as_deref(),
+            Some("data:image/png;base64,cached")
+        );
     }
 
     #[test]
@@ -848,7 +1321,10 @@ mod tests {
         let mut value = app("Happ", r"C:\Menu\Happ.lnk");
         value.launch_kind = LaunchKind::Shortcut;
         value.resolved_path = Some(r"C:\Program Files\Happ\Happ.exe".into());
-        assert_eq!(icon_source(&value).as_deref(), Some(r"C:\Program Files\Happ\Happ.exe"));
+        assert_eq!(
+            icon_source(&value).as_deref(),
+            Some(r"C:\Program Files\Happ\Happ.exe")
+        );
     }
 
     #[test]
@@ -864,6 +1340,21 @@ mod tests {
         assert_eq!(apps[0].launch_kind, LaunchKind::Executable);
         assert_eq!(apps[0].publisher.as_deref(), Some("OpenAI"));
         assert_eq!(apps[0].version.as_deref(), Some("1.2.3"));
+    }
+
+    #[test]
+    fn prefers_newer_portable_version_when_duplicate_copies_exist() {
+        let mut old = app("Rufus", r"E:\Tools\rufus-3.11p.exe");
+        old.source_kind = SourceKind::Portable;
+        old.version = Some("3.11.0".into());
+        let mut current = app("Rufus", r"D:\Tools\rufus-4.11p.exe");
+        current.source_kind = SourceKind::Portable;
+        current.version = Some("4.11.2285".into());
+
+        let merged = deduplicate(vec![old, current]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].path, r"D:\Tools\rufus-4.11p.exe");
     }
 
     #[test]
@@ -884,6 +1375,9 @@ mod tests {
         packaged.launch_kind = LaunchKind::AppUserModelId;
         let merged = deduplicate(vec![desktop, packaged]);
         assert_eq!(merged.len(), 1);
-        assert_eq!(merged[0].publisher.as_deref(), Some("Advanced Micro Devices, Inc."));
+        assert_eq!(
+            merged[0].publisher.as_deref(),
+            Some("Advanced Micro Devices, Inc.")
+        );
     }
 }

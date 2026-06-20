@@ -1,25 +1,30 @@
 import { Menu, RefreshCw, Search, X } from 'lucide-react'
 import { useRef, type RefObject } from 'react'
+import type { ScanProgress } from '../../types'
 interface Props {
 	appCount: number
 	query: string
 	isRefreshing: boolean
+	scanProgress: ScanProgress | null
 	menuButtonRef: RefObject<HTMLButtonElement>
 	onOpenNavigation(): void
 	onGoHome(): void
 	onQueryChange(query: string): void
 	onRefresh(): Promise<void>
+	onCancelScan(): Promise<void>
 	showMenu: boolean
 }
 export function Header({
 	appCount,
 	query,
 	isRefreshing,
+	scanProgress,
 	menuButtonRef,
 	onOpenNavigation,
 	onGoHome,
 	onQueryChange,
 	onRefresh,
+	onCancelScan,
 	showMenu,
 }: Props) {
 	const searchRef = useRef<HTMLInputElement>(null)
@@ -59,8 +64,9 @@ export function Header({
 						</span>
 					</button>
 				</div>
-				<div className='flex flex-1 items-center gap-3 lg:justify-end'>
-					<label className='group relative flex w-full max-w-2xl items-center'>
+				<div className='flex flex-1 items-start gap-3 lg:justify-end'>
+					<div className='w-full max-w-2xl'>
+					<label className='group relative flex w-full items-center'>
 						<Search
 							className='pointer-events-none absolute left-4 text-slate-500 group-focus-within:text-blue-400'
 							size={18}
@@ -90,21 +96,21 @@ export function Header({
 							</button>
 						)}
 					</label>
+					{isRefreshing && scanProgress && (
+						<p className='mt-1.5 truncate px-1 text-xs text-blue-300' aria-live='polite'>
+							{scanProgress.stage}
+							{scanProgress.location ? ` · ${scanProgress.location}` : ''}
+							{scanProgress.totalRoots > 0 ? ` · ${scanProgress.completedRoots}/${scanProgress.totalRoots}` : ''}
+						</p>
+					)}
+					</div>
 					<button
 						type='button'
-						disabled={isRefreshing}
-						onClick={() => void onRefresh()}
-						aria-label={
-							isRefreshing
-								? 'Scanning applications'
-								: 'Scan for apps'
-						}
-						className='grid size-11 shrink-0 place-items-center rounded-xl bg-blue-500 text-white hover:bg-blue-400 focus-visible:outline-2 focus-visible:outline-blue-400 disabled:opacity-60'
+						onClick={() => void (isRefreshing ? onCancelScan() : onRefresh())}
+						aria-label={isRefreshing ? 'Cancel scan' : 'Scan for apps'}
+						className={`grid size-11 shrink-0 place-items-center rounded-xl text-white focus-visible:outline-2 ${isRefreshing ? 'bg-red-500 hover:bg-red-400 focus-visible:outline-red-300' : 'bg-blue-500 hover:bg-blue-400 focus-visible:outline-blue-400'}`}
 					>
-						<RefreshCw
-							className={isRefreshing ? 'animate-spin' : ''}
-							size={18}
-						/>
+						{isRefreshing ? <X size={18} /> : <RefreshCw size={18} />}
 					</button>
 				</div>
 			</div>

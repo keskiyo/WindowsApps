@@ -1,4 +1,7 @@
-use super::{classify, clean_display_icon, find_executable, stable_id, AppInfo, LaunchKind, SourceKind, UninstallTarget};
+use super::{
+    classify, clean_display_icon, find_executable, stable_id, AppInfo, LaunchKind, SourceKind,
+    UninstallTarget,
+};
 use winreg::RegKey;
 
 pub(super) struct RegistryValues {
@@ -29,10 +32,15 @@ pub(super) struct RegistryScan {
 }
 
 pub(super) fn scan(hive: winreg::HKEY, subkey: &str) -> RegistryScan {
-    let Ok(uninstall) = RegKey::predef(hive).open_subkey(subkey) else { return RegistryScan::default() };
+    let Ok(uninstall) = RegKey::predef(hive).open_subkey(subkey) else {
+        return RegistryScan::default();
+    };
     let mut result = RegistryScan::default();
-    for key in uninstall.enum_keys().filter_map(Result::ok)
-        .filter_map(|name| uninstall.open_subkey(name).ok()) {
+    for key in uninstall
+        .enum_keys()
+        .filter_map(Result::ok)
+        .filter_map(|name| uninstall.open_subkey(name).ok())
+    {
         let Ok(display_name) = key.get_value("DisplayName") else {
             continue;
         };
@@ -57,11 +65,19 @@ pub(super) fn scan(hive: winreg::HKEY, subkey: &str) -> RegistryScan {
 }
 
 pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
-    let path = values.display_icon.as_deref().and_then(clean_display_icon)
-        .filter(|path| super::is_launchable(path) && !super::is_noise(&values.display_name, &path.to_string_lossy()))
+    let path = values
+        .display_icon
+        .as_deref()
+        .and_then(clean_display_icon)
+        .filter(|path| {
+            super::is_launchable(path)
+                && !super::is_noise(&values.display_name, &path.to_string_lossy())
+        })
         .or_else(|| values.install_location.as_deref().and_then(find_executable))?;
     let path_text = path.to_string_lossy().trim().to_string();
-    if values.display_name.trim().is_empty() || super::is_noise(&values.display_name, &path_text) { return None }
+    if values.display_name.trim().is_empty() || super::is_noise(&values.display_name, &path_text) {
+        return None;
+    }
     let uninstall = uninstall_from_values(&values);
     let can_uninstall = uninstall.is_some();
     let name = values.display_name.trim().to_string();
@@ -71,7 +87,10 @@ pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
         name,
         path: path_text,
         icon_base64: None,
-        launch_kind: if path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("lnk")) {
+        launch_kind: if path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("lnk"))
+        {
             LaunchKind::Shortcut
         } else {
             LaunchKind::Executable
@@ -104,13 +123,21 @@ fn metadata_from_values(values: &RegistryValues) -> Option<RegistryMetadata> {
 }
 
 fn uninstall_from_values(values: &RegistryValues) -> Option<UninstallTarget> {
-    values.quiet_uninstall_string.as_deref().and_then(split_command)
+    values
+        .quiet_uninstall_string
+        .as_deref()
+        .and_then(split_command)
         .or_else(|| values.uninstall_string.as_deref().and_then(split_command))
-        .map(|(executable, arguments)| UninstallTarget::Command { executable, arguments })
+        .map(|(executable, arguments)| UninstallTarget::Command {
+            executable,
+            arguments,
+        })
 }
 
 fn clean(value: Option<String>) -> Option<String> {
-    value.map(|text| text.trim().to_string()).filter(|text| !text.is_empty())
+    value
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
 }
 
 pub(super) fn split_command(value: &str) -> Option<(String, String)> {
@@ -121,7 +148,10 @@ pub(super) fn split_command(value: &str) -> Option<(String, String)> {
     }
     let lower = value.to_ascii_lowercase();
     let end = lower.find(".exe").map(|index| index + 4)?;
-    Some((value[..end].trim().to_string(), value[end..].trim().to_string()))
+    Some((
+        value[..end].trim().to_string(),
+        value[end..].trim().to_string(),
+    ))
 }
 
 #[cfg(test)]
@@ -146,7 +176,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let icon = dir.path().join("app.ico");
         std::fs::write(&icon, []).unwrap();
-        assert!(from_values(values("Icon Resource", Some(icon.to_string_lossy().into_owned()))).is_none());
+        assert!(from_values(values(
+            "Icon Resource",
+            Some(icon.to_string_lossy().into_owned())
+        ))
+        .is_none());
     }
 
     #[test]
@@ -155,11 +189,16 @@ mod tests {
         let executable = dir.path().join("Codex.exe");
         std::fs::write(&executable, []).unwrap();
         let app = from_values(RegistryValues {
-            display_name: "Codex".into(), display_icon: Some(format!("{},0", executable.display())),
-            display_version: Some("1.2.3".into()), publisher: Some("OpenAI".into()),
-            comments: Some("Coding agent".into()), install_location: Some(r"C:\Apps".into()),
-            uninstall_string: Some(r"C:\Apps\uninstall.exe /remove".into()), quiet_uninstall_string: None,
-        }).unwrap();
+            display_name: "Codex".into(),
+            display_icon: Some(format!("{},0", executable.display())),
+            display_version: Some("1.2.3".into()),
+            publisher: Some("OpenAI".into()),
+            comments: Some("Coding agent".into()),
+            install_location: Some(r"C:\Apps".into()),
+            uninstall_string: Some(r"C:\Apps\uninstall.exe /remove".into()),
+            quiet_uninstall_string: None,
+        })
+        .unwrap();
         assert_eq!(app.version.as_deref(), Some("1.2.3"));
         assert_eq!(app.publisher.as_deref(), Some("OpenAI"));
         assert!(app.uninstall.is_some());
@@ -171,15 +210,23 @@ mod tests {
         let executable = dir.path().join("App.exe");
         std::fs::write(&executable, []).unwrap();
         let app = from_values(RegistryValues {
-            display_name: "App".into(), display_icon: Some(executable.to_string_lossy().into_owned()),
-            display_version: None, publisher: None, comments: None, install_location: None,
+            display_name: "App".into(),
+            display_icon: Some(executable.to_string_lossy().into_owned()),
+            display_version: None,
+            publisher: None,
+            comments: None,
+            install_location: None,
             uninstall_string: Some(r"C:\Apps\uninstall.exe".into()),
             quiet_uninstall_string: Some(r"C:\Apps\uninstall.exe /quiet".into()),
-        }).unwrap();
-        assert_eq!(app.uninstall, Some(UninstallTarget::Command {
-            executable: r"C:\Apps\uninstall.exe".into(),
-            arguments: "/quiet".into(),
-        }));
+        })
+        .unwrap();
+        assert_eq!(
+            app.uninstall,
+            Some(UninstallTarget::Command {
+                executable: r"C:\Apps\uninstall.exe".into(),
+                arguments: "/quiet".into(),
+            })
+        );
     }
 
     #[test]
@@ -188,17 +235,29 @@ mod tests {
         let executable = dir.path().join("App.exe");
         std::fs::write(&executable, []).unwrap();
         let app = from_values(RegistryValues {
-            display_name: "App".into(), display_icon: Some(executable.to_string_lossy().into_owned()),
-            display_version: None, publisher: None, comments: None, install_location: None,
-            uninstall_string: None, quiet_uninstall_string: Some("not a command".into()),
-        }).unwrap();
+            display_name: "App".into(),
+            display_icon: Some(executable.to_string_lossy().into_owned()),
+            display_version: None,
+            publisher: None,
+            comments: None,
+            install_location: None,
+            uninstall_string: None,
+            quiet_uninstall_string: Some("not a command".into()),
+        })
+        .unwrap();
         assert!(!app.can_uninstall);
         assert!(app.uninstall.is_none());
     }
 
     #[test]
     fn splits_quoted_uninstall_command() {
-        assert_eq!(split_command(r#""C:\Program Files\App\uninstall.exe" /remove"#), Some((r"C:\Program Files\App\uninstall.exe".into(), "/remove".into())));
+        assert_eq!(
+            split_command(r#""C:\Program Files\App\uninstall.exe" /remove"#),
+            Some((
+                r"C:\Program Files\App\uninstall.exe".into(),
+                "/remove".into()
+            ))
+        );
     }
 
     #[test]
@@ -216,10 +275,13 @@ mod tests {
         let metadata = metadata_from_values(&values).unwrap();
         assert_eq!(metadata.name, "Steam");
         assert_eq!(metadata.publisher.as_deref(), Some("Valve"));
-        assert_eq!(metadata.uninstall, UninstallTarget::Command {
-            executable: r"C:\Program Files (x86)\Steam\uninstall.exe".into(),
-            arguments: String::new(),
-        });
+        assert_eq!(
+            metadata.uninstall,
+            UninstallTarget::Command {
+                executable: r"C:\Program Files (x86)\Steam\uninstall.exe".into(),
+                arguments: String::new(),
+            }
+        );
         assert!(from_values(values).is_none());
     }
 }

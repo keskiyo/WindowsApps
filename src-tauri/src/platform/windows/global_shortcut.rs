@@ -19,19 +19,39 @@ pub struct Status {
 static STATUS: OnceLock<Mutex<Status>> = OnceLock::new();
 
 fn status_cell() -> &'static Mutex<Status> {
-    STATUS.get_or_init(|| Mutex::new(Status { available: false, label: LABEL, error: Some("Shortcut has not been registered".into()) }))
+    STATUS.get_or_init(|| {
+        Mutex::new(Status {
+            available: false,
+            label: LABEL,
+            error: Some("Shortcut has not been registered".into()),
+        })
+    })
 }
 
 pub fn status() -> Status {
-    status_cell().lock().map(|value| value.clone()).unwrap_or(Status { available: false, label: LABEL, error: Some("Shortcut status is unavailable".into()) })
+    status_cell()
+        .lock()
+        .map(|value| value.clone())
+        .unwrap_or(Status {
+            available: false,
+            label: LABEL,
+            error: Some("Shortcut status is unavailable".into()),
+        })
 }
 
 pub fn register(app: AppHandle) {
     let (sender, receiver) = mpsc::channel();
     std::thread::spawn(move || unsafe {
         let registration = RegisterHotKey(None, HOTKEY_ID, MOD_WIN | MOD_SHIFT, VK_Q.0 as u32);
-        let _ = sender.send(registration.as_ref().map(|_| ()).map_err(|error| error.to_string()));
-        if registration.is_err() { return; }
+        let _ = sender.send(
+            registration
+                .as_ref()
+                .map(|_| ())
+                .map_err(|error| error.to_string()),
+        );
+        if registration.is_err() {
+            return;
+        }
         let mut message = MSG::default();
         while GetMessageW(&mut message, None, 0, 0).as_bool() {
             if message.message == WM_HOTKEY && message.wParam.0 == HOTKEY_ID as usize {
@@ -39,11 +59,21 @@ pub fn register(app: AppHandle) {
             }
         }
     });
-    let result = receiver.recv_timeout(Duration::from_secs(1)).unwrap_or_else(|_| Err("Windows did not respond while registering the shortcut".into()));
+    let result = receiver
+        .recv_timeout(Duration::from_secs(1))
+        .unwrap_or_else(|_| Err("Windows did not respond while registering the shortcut".into()));
     if let Ok(mut current) = status_cell().lock() {
         *current = match result {
-            Ok(()) => Status { available: true, label: LABEL, error: None },
-            Err(error) => Status { available: false, label: LABEL, error: Some(format!("{LABEL} is unavailable: {error}")) },
+            Ok(()) => Status {
+                available: true,
+                label: LABEL,
+                error: None,
+            },
+            Err(error) => Status {
+                available: false,
+                label: LABEL,
+                error: Some(format!("{LABEL} is unavailable: {error}")),
+            },
         };
     }
 }

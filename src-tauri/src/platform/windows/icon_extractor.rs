@@ -17,9 +17,9 @@ use windows::Win32::System::Com::{
     CoInitializeEx, CoTaskMemFree, CoUninitialize, COINIT_APARTMENTTHREADED,
 };
 use windows::Win32::UI::Shell::{
-    IShellItemImageFactory, SHCreateItemFromIDList, SHCreateItemInKnownFolder, SHGetFileInfoW,
-    SHParseDisplayName, FOLDERID_AppsFolder, KF_FLAG_DEFAULT, SHFILEINFOW, SHGFI_ICON,
-    SHGFI_LARGEICON, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY,
+    FOLDERID_AppsFolder, IShellItemImageFactory, SHCreateItemFromIDList, SHCreateItemInKnownFolder,
+    SHGetFileInfoW, SHParseDisplayName, KF_FLAG_DEFAULT, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON,
+    SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO};
 
@@ -55,12 +55,9 @@ pub fn extract_app_id_icon(app_id: &str) -> Option<String> {
 fn extract_app_id_icon_inner(app_id: &str) -> windows::core::Result<Option<String>> {
     let wide = wide(OsStr::new(app_id));
     unsafe {
-        let factory: IShellItemImageFactory = SHCreateItemInKnownFolder(
-            &FOLDERID_AppsFolder,
-            KF_FLAG_DEFAULT,
-            PCWSTR(wide.as_ptr()),
-        )
-        .or_else(|_| apps_folder_factory(app_id))?;
+        let factory: IShellItemImageFactory =
+            SHCreateItemInKnownFolder(&FOLDERID_AppsFolder, KF_FLAG_DEFAULT, PCWSTR(wide.as_ptr()))
+                .or_else(|_| apps_folder_factory(app_id))?;
         let bitmap = factory.GetImage(
             SIZE { cx: 64, cy: 64 },
             SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK,
@@ -76,13 +73,7 @@ unsafe fn apps_folder_factory(app_id: &str) -> windows::core::Result<IShellItemI
     let display_name_wide = wide(OsStr::new(&display_name));
     let mut pidl = std::ptr::null_mut();
     unsafe {
-        SHParseDisplayName(
-            PCWSTR(display_name_wide.as_ptr()),
-            None,
-            &mut pidl,
-            0,
-            None,
-        )?;
+        SHParseDisplayName(PCWSTR(display_name_wide.as_ptr()), None, &mut pidl, 0, None)?;
     }
     let item = unsafe { SHCreateItemFromIDList::<IShellItemImageFactory>(pidl) };
     unsafe { CoTaskMemFree(Some(pidl.cast())) };
@@ -97,7 +88,11 @@ unsafe fn encode_hicon(icon: windows::Win32::UI::WindowsAndMessaging::HICON) -> 
     let mut info: ICONINFO = unsafe { zeroed() };
     unsafe { GetIconInfo(icon, &mut info).ok()? };
 
-    let bitmap_handle = if !info.hbmColor.0.is_null() { info.hbmColor } else { info.hbmMask };
+    let bitmap_handle = if !info.hbmColor.0.is_null() {
+        info.hbmColor
+    } else {
+        info.hbmMask
+    };
     let encoded = unsafe { encode_hbitmap(bitmap_handle) };
     cleanup_icon_info(&info);
     encoded
@@ -151,8 +146,13 @@ unsafe fn encode_hbitmap(bitmap_handle: windows::Win32::Graphics::Gdi::HBITMAP) 
     bgra_to_rgba(&mut pixels);
     let image = RgbaImage::from_raw(width, height, pixels)?;
     let mut png = Cursor::new(Vec::new());
-    DynamicImage::ImageRgba8(image).write_to(&mut png, ImageFormat::Png).ok()?;
-    Some(format!("data:image/png;base64,{}", STANDARD.encode(png.into_inner())))
+    DynamicImage::ImageRgba8(image)
+        .write_to(&mut png, ImageFormat::Png)
+        .ok()?;
+    Some(format!(
+        "data:image/png;base64,{}",
+        STANDARD.encode(png.into_inner())
+    ))
 }
 
 fn bgra_to_rgba(pixels: &mut [u8]) {
@@ -192,5 +192,4 @@ mod tests {
             r"shell:AppsFolder\Microsoft.WindowsCamera_8wekyb3d8bbwe!App",
         );
     }
-
 }

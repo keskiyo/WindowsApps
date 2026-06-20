@@ -5,6 +5,7 @@ export type {
 	AppSourceKind,
 	AppView,
 	CatalogSnapshot,
+	ScanProgress,
 } from './app'
 export {
 	CATEGORY_LABELS,
@@ -12,7 +13,12 @@ export {
 	categoryLabel,
 	DEFAULT_CATEGORIES,
 } from './category'
-export type { GlobalShortcutStatus, SystemClient, SystemSettings } from './system'
+export type {
+	GlobalShortcutStatus,
+	ScanSettings,
+	SystemClient,
+	SystemSettings,
+} from './system'
 export type {
 	AppCategory,
 	BuiltInCategory,

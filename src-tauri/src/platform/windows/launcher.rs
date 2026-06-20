@@ -41,7 +41,9 @@ fn validate_shell_result(result: isize) -> Result<(), String> {
     if result > 32 {
         Ok(())
     } else {
-        Err(format!("Windows Shell could not launch the application (code {result})"))
+        Err(format!(
+            "Windows Shell could not launch the application (code {result})"
+        ))
     }
 }
 

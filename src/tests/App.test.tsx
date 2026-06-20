@@ -55,9 +55,11 @@ function renderApp(
 	const client: AppsClient = {
 		getApps: vi.fn().mockResolvedValue({ apps, hasCache: true }),
 		refreshApps: vi.fn().mockResolvedValue(apps),
+		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
 		uninstallApp: vi.fn().mockResolvedValue(undefined),
 		onAppsUpdated: vi.fn().mockResolvedValue(() => undefined),
+		onScanProgress: vi.fn().mockResolvedValue(() => undefined),
 		...overrides,
 	}
 	const systemClient: SystemClient = {
@@ -65,8 +67,15 @@ function renderApp(
 			version: '0.1.0',
 			autostartEnabled: false,
 			shortcut: { available: true, label: 'Win+Shift+Q', error: null },
+			scanSettings: {
+				autoScanFixedDrives: true,
+				includedPaths: [],
+				excludedPaths: [],
+			},
+			fixedDrives: ['C:\\'],
 		}),
 		setAutostart: vi.fn().mockResolvedValue(undefined),
+		setScanSettings: vi.fn().mockImplementation(async settings => settings),
 		openTelegram: vi.fn().mockResolvedValue(undefined),
 		...systemOverrides,
 	}

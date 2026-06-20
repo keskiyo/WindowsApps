@@ -27,7 +27,7 @@ It starts from a local cache, scans only when requested, removes maintenance noi
 
 |     | Capability                | What it provides                                                                                                                                                               |
 | --- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ◈   | **Unified catalog**       | Discovers Start Menu shortcuts, registered desktop software, Windows Start Apps, and Store/MSIX packages.                                                                      |
+| ◈   | **Unified catalog**       | Discovers Start Menu shortcuts, registered software, Windows apps, Steam libraries, and portable executables across fixed local drives.                                        |
 | ◇   | **Smart cleanup**         | Filters installers, uninstallers, resource entries, broken names, and common duplicate records.                                                                                |
 | ↕   | **Flexible organization** | Automatic categories, custom categories, renaming, and moving applications. Click a category name to open it or drag the same row to reorder it.                              |
 | ★   | **Favorites and Hidden**  | Keep important apps close and move catalog noise into a reversible Hidden view.                                                                                                |
@@ -35,6 +35,7 @@ It starts from a local cache, scans only when requested, removes maintenance noi
 | ⓘ   | **Local metadata**        | Uses Windows, package, shortcut, and executable metadata. Missing information remains `Unknown` instead of being invented.                                                     |
 | ⛨   | **Safe uninstall**        | Runs the registered quiet, standard, or MSIX uninstall route directly. If Windows exposes no safe route, uninstall stays disabled; program folders are never deleted manually. |
 | ⌁   | **Background access**     | Closing the window keeps the app in the system tray. `Win+Shift+Q` or a tray click restores it.                                                                                |
+| ◎   | **Controlled scanning**   | Shows progress, supports cancellation, ignores removable/network drives, and accepts custom include/exclude folders in Settings.                                                |
 
 ## Download and install
 
@@ -42,6 +43,8 @@ It starts from a local cache, scans only when requested, removes maintenance noi
 2. Download the Windows x64 setup file ending in `-setup.exe`.
 3. Run the installer and start **Windows Apps**.
 4. Select **Scan for apps** when you are ready to build the local catalog.
+
+The scan checks permanent local drives regardless of their letters or folder names. USB and network drives are intentionally ignored.
 
 > [!IMPORTANT]
 > Version 0.1.0 is not code-signed. Microsoft Defender SmartScreen may show an "unrecognized app" warning for community builds. Always download the installer from this repository's Releases page and verify its published SHA-256 checksum.
@@ -59,6 +62,7 @@ It starts from a local cache, scans only when requested, removes maintenance noi
 
 - Application discovery and categorization happen on your computer.
 - Catalog data, icons, favorites, hidden entries, and custom categories are stored locally.
+- Fixed-drive and Steam discovery run locally; no drive inventory is uploaded.
 - Windows Apps does not send your software inventory to an external service.
 - It does not fetch online descriptions or invent missing metadata.
 - The only user-initiated web link in 0.1.0 is the Telegram contact in Settings.

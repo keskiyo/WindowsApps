@@ -5,6 +5,8 @@ export const SOURCE_LABELS = {
 	start_menu: 'Start Menu',
 	start_apps: 'Windows Start Apps',
 	msix: 'Microsoft Store / MSIX',
+	steam: 'Steam',
+	portable: 'Portable executable',
 } as const
 
 export function descriptionLabel(description: string | null): string {

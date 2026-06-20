@@ -65,11 +65,18 @@ export function App({ store = appStore, systemClient = tauriSystemClient }: AppP
 	useEffect(() => {
 		void state.load()
 		let unlisten: (() => void) | undefined
+		let unlistenProgress: (() => void) | undefined
 		void state.subscribe().then(dispose => {
 			unlisten = dispose
 		})
-		return () => unlisten?.()
-	}, [state.load, state.subscribe])
+		void state.subscribeScanProgress().then(dispose => {
+			unlistenProgress = dispose
+		})
+		return () => {
+			unlisten?.()
+			unlistenProgress?.()
+		}
+	}, [state.load, state.subscribe, state.subscribeScanProgress])
 
 	useEffect(() => {
 		if (state.error) {
@@ -108,8 +115,10 @@ export function App({ store = appStore, systemClient = tauriSystemClient }: AppP
 				appCount={state.apps.length}
 				query={state.query}
 				isRefreshing={state.isRefreshing}
+				scanProgress={state.scanProgress}
 				onQueryChange={state.setQuery}
 				onRefresh={feedback.refresh}
+				onCancelScan={state.cancelScan}
 				menuButtonRef={menuButtonRef}
 				onOpenNavigation={() => setDrawerOpen(true)}
 				onGoHome={navigation.goHome}

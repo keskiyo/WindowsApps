@@ -7,6 +7,7 @@ import type {
 	AppsClient,
 	AppView,
 	CategoryDefinition,
+	ScanProgress,
 } from '../types'
 
 export interface AppState {
@@ -14,6 +15,7 @@ export interface AppState {
 	query: string
 	isLoading: boolean
 	isRefreshing: boolean
+	scanProgress: ScanProgress | null
 	hasCache: boolean
 	error: string | null
 	activeView: AppView
@@ -33,6 +35,7 @@ export interface AppState {
 	deleteCategory(id: string): { ok: true } | { ok: false; error: string }
 	load(): Promise<void>
 	refresh(): Promise<void>
+	cancelScan(): Promise<void>
 	launch(app: AppInfo): Promise<void>
 	uninstall(id: string): Promise<void>
 	setQuery(query: string): void
@@ -45,6 +48,7 @@ export interface AppState {
 	toggleCategory(category: AppCategory): void
 	replaceApps(apps: AppInfo[]): void
 	subscribe(): Promise<() => void>
+	subscribeScanProgress(): Promise<() => void>
 }
 
 function errorMessage(error: unknown): string {
@@ -76,6 +80,7 @@ export function createAppStore(
 			query: '',
 			isLoading: true,
 			isRefreshing: false,
+			scanProgress: null,
 			hasCache: false,
 			error: null,
 			activeView: 'all',
@@ -104,8 +109,11 @@ export function createAppStore(
 					set({ error: errorMessage(error) })
 					throw error
 				} finally {
-					set({ isRefreshing: false })
+					set({ isRefreshing: false, scanProgress: null })
 				}
+			},
+			async cancelScan() {
+				await client.cancelScan()
 			},
 			async launch(app) {
 				set({ error: null })
@@ -276,6 +284,9 @@ export function createAppStore(
 			},
 			subscribe() {
 				return client.onAppsUpdated(apps => set({ apps }))
+			},
+			subscribeScanProgress() {
+				return client.onScanProgress(scanProgress => set({ scanProgress }))
 			},
 		}
 	})

@@ -26,7 +26,7 @@ export function AppInfoDialog({
 	const rows = metadataRows(app, categories)
 	return (
 		<div
-			className='fixed inset-0 z-[400] grid place-items-center bg-slate-950/78 p-4'
+			className='fixed inset-0 z-400 grid place-items-center bg-slate-950/78 p-4'
 			onMouseDown={event => {
 				if (event.currentTarget === event.target) onClose()
 			}}

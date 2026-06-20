@@ -95,7 +95,10 @@ fn string_value(data: &[u8], language: u16, code_page: u16, key: &str) -> Option
         return None;
     }
     let value = unsafe { std::slice::from_raw_parts(buffer.cast::<u16>(), length as usize) };
-    let end = value.iter().position(|character| *character == 0).unwrap_or(value.len());
+    let end = value
+        .iter()
+        .position(|character| *character == 0)
+        .unwrap_or(value.len());
     let value = String::from_utf16_lossy(&value[..end]).trim().to_string();
     (!value.is_empty()).then_some(value)
 }

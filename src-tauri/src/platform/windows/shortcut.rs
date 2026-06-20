@@ -23,9 +23,7 @@ pub fn resolve(path: &Path) -> ShortcutDetails {
 }
 
 unsafe fn resolve_inner(path: &Path) -> windows::core::Result<ShortcutDetails> {
-    let link: IShellLinkW = unsafe {
-        CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER)?
-    };
+    let link: IShellLinkW = unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER)? };
     let persist: IPersistFile = link.cast()?;
     let path_wide = wide(path.as_os_str());
     unsafe { persist.Load(PCWSTR(path_wide.as_ptr()), STGM_READ)? };
@@ -42,7 +40,10 @@ unsafe fn resolve_inner(path: &Path) -> windows::core::Result<ShortcutDetails> {
 }
 
 fn path_from_buffer(buffer: &[u16]) -> Option<PathBuf> {
-    let end = buffer.iter().position(|value| *value == 0).unwrap_or(buffer.len());
+    let end = buffer
+        .iter()
+        .position(|value| *value == 0)
+        .unwrap_or(buffer.len());
     let value = String::from_utf16_lossy(&buffer[..end]).trim().to_string();
     (!value.is_empty()).then(|| PathBuf::from(value))
 }

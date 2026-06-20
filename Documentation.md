@@ -8,7 +8,7 @@
 
 ## 1. Product scope
 
-Windows Apps is a local catalog, launcher, and organization layer for software installed on Windows. It combines several Windows discovery sources, removes maintenance noise, merges duplicate records, and exposes source-aware launch and uninstall operations through a responsive React interface.
+Windows Apps is a local catalog, launcher, and organization layer for software installed on Windows. It combines Windows discovery sources, Steam manifests, and portable executable discovery across permanent local drives, removes maintenance noise, merges duplicate records, and exposes source-aware launch and uninstall operations through a responsive React interface.
 
 The project intentionally does not provide cloud synchronization, telemetry, online metadata enrichment, automatic updates, or silent file deletion.
 
@@ -60,16 +60,23 @@ The scanner combines records from:
 - user and system Start Menu shortcuts;
 - registered desktop applications;
 - Windows Start Apps;
-- Store/MSIX application packages.
+- Store/MSIX application packages;
+- Steam libraries declared by `libraryfolders.vdf` and installed app manifests;
+- portable executables discovered on drives reported by Windows as `DRIVE_FIXED`.
+
+Removable, optical, and network drives are never included in automatic scanning. Drive letters and user folder names are not hardcoded.
 
 ### Lifecycle
 
 1. Startup reads the last sanitized catalog from the Tauri application data directory.
 2. No full scan runs automatically when a cache is unavailable; the interface asks the user first.
 3. **Scan for apps** starts native discovery on a background task.
-4. The result is sanitized, sorted, written to the local cache, and returned to the interface.
-5. Existing cached icons are reused immediately.
-6. Missing icons are hydrated asynchronously and delivered through the `apps://updated` event.
+4. Fixed local drives are traversed in parallel. Progress is delivered through `scan://progress`; the header action can cancel the operation.
+5. System directories, caches, development dependency trees, Steam libraries, maintenance tools, and configured exclusions are skipped.
+6. Portable candidates are validated using executable metadata and directory structure before entering the catalog.
+7. The result is sanitized, sorted, written to the local cache, and returned to the interface.
+8. Existing cached icons are reused immediately.
+9. Missing icons are hydrated asynchronously and delivered through the `apps://updated` event.
 
 This design keeps normal startup fast while preserving a deliberate refresh path.
 
@@ -84,7 +91,9 @@ Important rules include:
 - merge packaged and desktop records only when identity evidence is strong;
 - merge known architecture or version suffix duplicates without merging unrelated products that merely share a prefix;
 - preserve records with conflicting publishers;
-- remove installers, uninstallers, maintenance tools, resource-only names, invalid Unicode output, and stale noise.
+- remove installers, uninstallers, maintenance tools, resource-only names, invalid Unicode output, and stale noise;
+- prefer the newer version when duplicate portable copies expose the same product identity;
+- prefer Steam launch identities for Steam-managed games while merging local registry metadata when available.
 
 Deduplication is intentionally conservative: preserving two uncertain records is safer than hiding a legitimate application.
 
@@ -114,7 +123,10 @@ The following preferences remain local:
 - hidden application IDs;
 - custom categories and labels;
 - category order and collapsed state;
-- manual application-to-category assignments.
+- manual application-to-category assignments;
+- automatic fixed-drive scanning and custom included/excluded paths.
+
+Settings lists every detected permanent local drive. Additional folders and exclusions must resolve to a fixed local drive; USB and network paths are rejected.
 
 Hidden applications appear only in the **Hidden** navigation view. Restoring an item preserves its previous category and favorite state. Hiding never uninstalls or modifies the target application.
 
@@ -201,6 +213,8 @@ src-tauri/capabilities/         Tauri security capabilities
 
 Important native modules include `catalog`, `cache`, `registry`, `start_apps`, `icon_extractor`, `launcher`, `uninstaller`, `autostart`, `global_shortcut`, and `lifecycle`.
 
+Portable and game discovery are isolated in `catalog/portable.rs` and `catalog/steam.rs`; fixed-drive enumeration is isolated in `platform/windows/drives.rs`.
+
 ## 12. Development workflow
 
 ### Prerequisites
@@ -267,7 +281,7 @@ Get-FileHash $installer.FullName -Algorithm SHA256
 1. Run the complete frontend and Rust verification suite.
 2. Build the production bundles with `npm run tauri build`.
 3. Install the generated setup executable on clean Windows 10 x64 and Windows 11 x64 systems.
-4. Verify initial launch, scan, cache restart, app launch, category persistence, click-to-open and drag-to-reorder category navigation, Hidden restore, favorites, tray lifecycle, `Win+Shift+Q`, autostart, direct uninstall, and the disabled unavailable state.
+4. Verify initial launch, fixed-drive scan progress/cancellation, Steam and portable discovery, cache restart, app launch, category persistence, click-to-open and drag-to-reorder category navigation, Hidden restore, favorites, tray lifecycle, `Win+Shift+Q`, autostart, direct uninstall, and the disabled unavailable state.
 5. Generate SHA-256 checksums for every uploaded artifact.
 6. Create an annotated version tag such as `v0.1.0`.
 7. Create a GitHub Release from that tag.
@@ -282,6 +296,7 @@ Get-FileHash $installer.FullName -Algorithm SHA256
 ## Highlights
 
 - Unified and deduplicated Windows application catalog.
+- Steam and portable application discovery across permanent local drives.
 - Custom categories with direct row dragging, Favorites, and reversible Hidden items.
 - System tray lifecycle and global Win+Shift+Q shortcut.
 
@@ -332,12 +347,19 @@ Confirm that the file came from this repository's Releases page and compare its 
 
 Run a fresh scan. If the entry remains, record its displayed name, source, launch target, publisher, and resolved path before reporting it.
 
+### A portable application is missing
+
+Confirm that the executable is on a permanent local drive and is not inside a configured exclusion. Add its containing directory under **Settings > Application discovery** when automatic fixed-drive scanning is disabled. Executables without usable product metadata are included only when their filename and parent directory identify the same product; this prevents helper binaries from flooding the catalog.
+
 ## 16. Release verification checklist
 
 ### Automated
 
 - [ ] Frontend tests pass.
 - [ ] Category rows open on click and reorder when dragged by their name.
+- [ ] Steam manifests and portable executables are discovered on fixed drives.
+- [ ] USB and network drives are excluded.
+- [ ] Scan progress, cancellation, include paths, and exclude paths work.
 - [ ] TypeScript and Vite production build pass.
 - [ ] Rust tests pass.
 - [ ] Cargo check passes.

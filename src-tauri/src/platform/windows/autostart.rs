@@ -4,7 +4,8 @@ const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const VALUE_NAME: &str = "Windows Apps";
 
 fn command() -> Result<String, String> {
-    let executable = std::env::current_exe().map_err(|error| format!("Could not locate Windows Apps: {error}"))?;
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Could not locate Windows Apps: {error}"))?;
     Ok(format!(r#""{}""#, executable.display()))
 }
 
@@ -18,10 +19,12 @@ pub fn is_enabled() -> Result<bool, String> {
 }
 
 pub fn set_enabled(enabled: bool) -> Result<(), String> {
-    let (key, _) = RegKey::predef(HKEY_CURRENT_USER).create_subkey(RUN_KEY)
+    let (key, _) = RegKey::predef(HKEY_CURRENT_USER)
+        .create_subkey(RUN_KEY)
         .map_err(|error| format!("Could not open Windows startup settings: {error}"))?;
     if enabled {
-        key.set_value(VALUE_NAME, &command()?).map_err(|error| format!("Could not enable startup: {error}"))
+        key.set_value(VALUE_NAME, &command()?)
+            .map_err(|error| format!("Could not enable startup: {error}"))
     } else {
         match key.delete_value(VALUE_NAME) {
             Ok(()) => Ok(()),

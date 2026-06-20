@@ -17,8 +17,15 @@ describe('SettingsPage', () => {
 						label: 'Win+Shift+Q',
 						error: null,
 					},
+					scanSettings: {
+						autoScanFixedDrives: true,
+						includedPaths: [String.raw`D:\Games`],
+						excludedPaths: [],
+					},
+					fixedDrives: ['C:\\', 'D:\\', 'E:\\'],
 				}),
 			setAutostart: vi.fn().mockResolvedValue(undefined),
+			setScanSettings: vi.fn().mockImplementation(async settings => settings),
 			openTelegram: vi.fn().mockResolvedValue(undefined),
 		}
 		render(<SettingsPage client={client} />)
@@ -32,5 +39,17 @@ describe('SettingsPage', () => {
 			screen.getByRole('button', { name: 'Open @keskiyo on Telegram' }),
 		)
 		expect(client.openTelegram).toHaveBeenCalledOnce()
+		expect(screen.getByText('Fixed local drives')).toBeInTheDocument()
+		expect(screen.getByText('E:\\')).toBeInTheDocument()
+		await userEvent.type(
+			screen.getByRole('textbox', { name: 'Additional scan folder' }),
+			String.raw`E:\Portable`,
+		)
+		await userEvent.click(screen.getByRole('button', { name: 'Add scan folder' }))
+		expect(client.setScanSettings).toHaveBeenCalledWith({
+			autoScanFixedDrives: true,
+			includedPaths: [String.raw`D:\Games`, String.raw`E:\Portable`],
+			excludedPaths: [],
+		})
 	})
 })
