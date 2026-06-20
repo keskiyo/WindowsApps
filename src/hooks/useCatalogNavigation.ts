@@ -44,7 +44,7 @@ export function useCatalogNavigation({
 					.querySelector(`[data-category="${category}"]`)
 					?.scrollIntoView?.({
 						behavior: scrollBehavior(),
-						block: 'start',
+						block: 'center',
 					}),
 			)
 		},

@@ -10,8 +10,7 @@ export const tauriAppsClient: AppsClient = {
 			launchKind: app.launchKind,
 			path: app.path,
 		}),
-	uninstallApp: id =>
-		invoke<void>('uninstall_app', { id }),
+	uninstallApp: id => invoke<void>('uninstall_app', { id }),
 	async onAppsUpdated(handler) {
 		return listen<AppInfo[]>('apps://updated', ({ payload }) =>
 			handler(payload),

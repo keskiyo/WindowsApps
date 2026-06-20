@@ -25,16 +25,16 @@ It starts from a local cache, scans only when requested, removes maintenance noi
 
 ## Features
 
-|     | Capability                | What it provides                                                                                                                                          |
-| --- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ◈   | **Unified catalog**       | Discovers Start Menu shortcuts, registered desktop software, Windows Start Apps, and Store/MSIX packages.                                                 |
-| ◇   | **Smart cleanup**         | Filters installers, uninstallers, resource entries, broken names, and common duplicate records.                                                           |
-| ↕   | **Flexible organization** | Automatic categories, drag-and-drop category order, custom categories, renaming, and moving applications.                                                 |
-| ★   | **Favorites and Hidden**  | Keep important apps close and move catalog noise into a reversible Hidden view.                                                                           |
-| ▶   | **Native launching**      | Opens `.lnk`, `.exe`, shell targets, and packaged applications through the correct Windows mechanism.                                                     |
-| ⓘ   | **Local metadata**        | Uses Windows, package, shortcut, and executable metadata. Missing information remains `Unknown` instead of being invented.                                |
-| ⛨   | **Safe uninstall**        | Runs the registered quiet, standard, or MSIX uninstall route directly; unavailable removal stays disabled and program folders are never deleted manually. |
-| ⌁   | **Background access**     | Closing the window keeps the app in the system tray. `Win+Shift+Q` or a tray click restores it.                                                           |
+|     | Capability                | What it provides                                                                                                                                                               |
+| --- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ◈   | **Unified catalog**       | Discovers Start Menu shortcuts, registered desktop software, Windows Start Apps, and Store/MSIX packages.                                                                      |
+| ◇   | **Smart cleanup**         | Filters installers, uninstallers, resource entries, broken names, and common duplicate records.                                                                                |
+| ↕   | **Flexible organization** | Automatic categories, custom categories, renaming, and moving applications. Click a category name to open it or drag the same row to reorder it.                              |
+| ★   | **Favorites and Hidden**  | Keep important apps close and move catalog noise into a reversible Hidden view.                                                                                                |
+| ▶   | **Native launching**      | Opens `.lnk`, `.exe`, shell targets, and packaged applications through the correct Windows mechanism.                                                                          |
+| ⓘ   | **Local metadata**        | Uses Windows, package, shortcut, and executable metadata. Missing information remains `Unknown` instead of being invented.                                                     |
+| ⛨   | **Safe uninstall**        | Runs the registered quiet, standard, or MSIX uninstall route directly. If Windows exposes no safe route, uninstall stays disabled; program folders are never deleted manually. |
+| ⌁   | **Background access**     | Closing the window keeps the app in the system tray. `Win+Shift+Q` or a tray click restores it.                                                                                |
 
 ## Download and install
 
@@ -61,7 +61,7 @@ It starts from a local cache, scans only when requested, removes maintenance noi
 - Catalog data, icons, favorites, hidden entries, and custom categories are stored locally.
 - Windows Apps does not send your software inventory to an external service.
 - It does not fetch online descriptions or invent missing metadata.
-- The only user-initiated external link in 0.1.0 is the Telegram contact in Settings.
+- The only user-initiated web link in 0.1.0 is the Telegram contact in Settings.
 
 ## Keyboard and tray behavior
 
@@ -100,8 +100,11 @@ npm run tauri build
 The downloadable NSIS setup executable is generated under:
 
 ```text
-src-tauri/target/release/bundle/nsis/
+src-tauri/target/release/bundle/nsis/Windows Apps_0.1.0_x64-setup.exe
 ```
+
+Upload this NSIS setup executable as the primary GitHub Release asset. The MSI
+bundle is optional and is generated under `src-tauri/target/release/bundle/msi/`.
 
 See [Documentation.md](Documentation.md) for architecture, troubleshooting, release verification, checksums, and the complete GitHub Release procedure.
 

@@ -2,14 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast, Toaster } from 'sonner'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
-import { AppDrawer } from './components/AppDrawer'
-import { AppGrid } from './components/AppGrid'
-import { AppInfoDialog } from './components/AppInfoDialog'
-import { AppSidebar } from './components/AppSidebar'
-import { Header } from './components/Header'
-import { ScanPrompt } from './components/ScanPrompt'
-import { SettingsPage } from './components/SettingsPage'
-import { UninstallDialog } from './components/UninstallDialog'
+import { AppGrid } from './components/catalog/AppGrid'
+import { AppInfoDialog } from './components/dialogs/AppInfoDialog'
+import { UninstallDialog } from './components/dialogs/UninstallDialog'
+import { AppDrawer } from './components/navigation/AppDrawer'
+import { AppSidebar } from './components/navigation/AppSidebar'
+import { SettingsPage } from './components/settings/SettingsPage'
+import { Header } from './components/shared/Header'
+import { ScanPrompt } from './components/shared/ScanPrompt'
 import { useAppFeedback } from './hooks/useAppFeedback'
 import { useCatalogNavigation } from './hooks/useCatalogNavigation'
 import { useDesktopNavigation } from './hooks/useDesktopNavigation'
@@ -96,6 +96,7 @@ export function App({ store = appStore, systemClient = tauriSystemClient }: AppP
 		hiddenCount: state.hiddenAppIds.filter(id => state.apps.some(app => app.id === id)).length,
 		onSelectView: navigation.selectView,
 		onSelectCategory: navigation.selectCategory,
+		onReorderCategory: state.reorderCategory,
 		onCreateCategory: state.createCategory,
 	}
 
@@ -129,6 +130,7 @@ export function App({ store = appStore, systemClient = tauriSystemClient }: AppP
 					triggerRef={menuButtonRef}
 					onSelectView={navigation.selectView}
 					onSelectCategory={navigation.selectCategory}
+					onReorderCategory={state.reorderCategory}
 					onCreateCategory={state.createCategory}
 					onClose={closeDrawer}
 				/>

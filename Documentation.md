@@ -106,7 +106,7 @@ Values originate from local Windows, package, shortcut, registry, or executable 
 
 ## 7. Categories and local preferences
 
-Built-in categories provide the initial organization. Users can reorder categories, rename labels, create custom categories, collapse sections, and move individual applications. Deleting a custom category moves its applications to **Other**.
+Built-in categories provide the initial organization. A category row has two deliberate pointer behaviors: click its name to open the category, or drag the same row to change its position. No separate drag icon is required. Users can also rename labels, create custom categories, collapse sections, and move individual applications. Deleting a custom category moves its applications to **Other**.
 
 The following preferences remain local:
 
@@ -132,7 +132,7 @@ The uninstall flow follows this priority:
 2. registered standard vendor/MSI uninstall command;
 3. valid MSIX package uninstall route.
 
-If Windows exposes no concrete safe uninstall target, the menu displays **Uninstall unavailable** and does not redirect elsewhere. The application waits for the registered process, reports a non-success exit code, and refreshes the catalog after successful completion. It never treats shortcut deletion or recursive folder deletion as an uninstall operation.
+If Windows exposes no concrete safe uninstall target, the menu displays a disabled **Uninstall unavailable** item. The application waits for a directly registered process, reports a non-success exit code, and refreshes the catalog after successful completion. It never treats shortcut deletion or recursive folder deletion as an uninstall operation.
 
 ## 9. Native Windows integrations
 
@@ -181,17 +181,25 @@ Version 0.1.0 does not include a configured Authenticode signing identity. An un
 ## 11. Repository structure
 
 ```text
-public/                  Static assets and application logo
-src/components/          Focused React UI components
-src/hooks/               Reusable navigation and interaction hooks
-src/lib/                 Tauri clients, preferences, and catalog helpers
-src/store/               Zustand application state
-src/types/               Shared TypeScript contracts
-src-tauri/src/           Rust discovery and native Windows integrations
-src-tauri/capabilities/  Tauri security capabilities
+public/                         Static assets and application logo
+src/components/apps/            Application cards and action menus
+src/components/catalog/         Catalog grids and category sections
+src/components/dialogs/         Information, deletion, and uninstall dialogs
+src/components/navigation/      Sidebar, drawer, and sortable category navigation
+src/components/settings/        Settings interface
+src/components/shared/          Shared interface components
+src/hooks/                      Reusable navigation and interaction hooks
+src/lib/                        Tauri clients, preferences, and catalog helpers
+src/store/                      Zustand application state
+src/tests/                      Frontend tests grouped by feature
+src/types/                      Shared TypeScript contracts
+src-tauri/src/catalog/          Discovery, cache, registry, and Start Apps logic
+src-tauri/src/lifecycle/        Window, tray, and process lifecycle
+src-tauri/src/platform/windows/ Windows integrations and native operations
+src-tauri/capabilities/         Tauri security capabilities
 ```
 
-Important native modules include `apps_scanner`, `cache`, `icon_extractor`, `launcher`, `uninstaller`, `autostart`, `global_shortcut`, and `app_lifecycle`.
+Important native modules include `catalog`, `cache`, `registry`, `start_apps`, `icon_extractor`, `launcher`, `uninstaller`, `autostart`, `global_shortcut`, and `lifecycle`.
 
 ## 12. Development workflow
 
@@ -238,9 +246,11 @@ npm run tauri build
 Expected artifact directories:
 
 ```text
-src-tauri/target/release/bundle/nsis/   Windows x64 setup executable
-src-tauri/target/release/bundle/msi/    Optional Windows Installer package
+src-tauri/target/release/bundle/nsis/Windows Apps_0.1.0_x64-setup.exe
+src-tauri/target/release/bundle/msi/Windows Apps_0.1.0_x64_en-US.msi
 ```
+
+Use the NSIS `-setup.exe` as the primary public download. The MSI is optional.
 
 Generate the release checksum:
 
@@ -257,7 +267,7 @@ Get-FileHash $installer.FullName -Algorithm SHA256
 1. Run the complete frontend and Rust verification suite.
 2. Build the production bundles with `npm run tauri build`.
 3. Install the generated setup executable on clean Windows 10 x64 and Windows 11 x64 systems.
-4. Verify initial launch, scan, cache restart, app launch, category persistence, Hidden restore, favorites, tray lifecycle, `Win+Shift+Q`, autostart, direct uninstall, and unavailable uninstall state.
+4. Verify initial launch, scan, cache restart, app launch, category persistence, click-to-open and drag-to-reorder category navigation, Hidden restore, favorites, tray lifecycle, `Win+Shift+Q`, autostart, direct uninstall, and the disabled unavailable state.
 5. Generate SHA-256 checksums for every uploaded artifact.
 6. Create an annotated version tag such as `v0.1.0`.
 7. Create a GitHub Release from that tag.
@@ -272,7 +282,7 @@ Get-FileHash $installer.FullName -Algorithm SHA256
 ## Highlights
 
 - Unified and deduplicated Windows application catalog.
-- Custom categories, Favorites, and reversible Hidden items.
+- Custom categories with direct row dragging, Favorites, and reversible Hidden items.
 - System tray lifecycle and global Win+Shift+Q shortcut.
 
 ## Requirements
@@ -327,6 +337,7 @@ Run a fresh scan. If the entry remains, record its displayed name, source, launc
 ### Automated
 
 - [ ] Frontend tests pass.
+- [ ] Category rows open on click and reorder when dragged by their name.
 - [ ] TypeScript and Vite production build pass.
 - [ ] Rust tests pass.
 - [ ] Cargo check passes.
@@ -337,7 +348,7 @@ Run a fresh scan. If the entry remains, record its displayed name, source, launc
 
 - [ ] Installer completes and the application starts.
 - [ ] WebView2 bootstrap works when required.
-- [ ] Scan, cache, launch, direct uninstall, and unavailable uninstall state work.
+- [ ] Scan, cache, launch, direct uninstall, and the disabled unavailable state work.
 - [ ] Favorites, custom categories, and Hidden restore persist.
 - [ ] Close-to-tray, tray Open/Quit, shortcut, and autostart work.
 
@@ -345,7 +356,7 @@ Run a fresh scan. If the entry remains, record its displayed name, source, launc
 
 - [ ] Installer completes and the application starts.
 - [ ] WebView2 bootstrap works when required.
-- [ ] Scan, cache, launch, direct uninstall, and unavailable uninstall state work.
+- [ ] Scan, cache, launch, direct uninstall, and the disabled unavailable state work.
 - [ ] Favorites, custom categories, and Hidden restore persist.
 - [ ] Close-to-tray, tray Open/Quit, shortcut, and autostart work.
 

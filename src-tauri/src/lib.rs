@@ -1,15 +1,9 @@
-mod apps_scanner;
-mod app_lifecycle;
-mod autostart;
-mod cache;
-mod executable_metadata;
-mod icon_extractor;
-mod launcher;
-mod global_shortcut;
-mod shortcut;
-mod uninstaller;
+mod catalog;
+mod lifecycle;
+mod platform;
 
-use apps_scanner::{AppInfo, LaunchKind, UninstallTarget};
+use catalog::{cache, AppInfo, LaunchKind, UninstallTarget};
+use platform::windows::{autostart, global_shortcut, launcher, uninstaller};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -29,14 +23,23 @@ fn remember_uninstall_targets(apps: &[AppInfo]) {
 
 fn load_sanitized_cache(app_data_dir: &Path) -> Option<Vec<AppInfo>> {
     let original = cache::read_cache(app_data_dir)?;
-    let mut apps = apps_scanner::sanitize(original.clone());
-    for app in &mut apps {
-        app.can_uninstall = app.uninstall.is_some();
-    }
+    let apps = prepare_cached_apps(original.clone(), catalog::enrich_registered_uninstall_metadata);
     if apps != original {
         let _ = cache::write_cache(app_data_dir, &apps);
     }
     Some(apps)
+}
+
+fn prepare_cached_apps(
+    original: Vec<AppInfo>,
+    enrich_uninstall: impl FnOnce(&mut [AppInfo]),
+) -> Vec<AppInfo> {
+    let mut apps = catalog::sanitize(original);
+    enrich_uninstall(&mut apps);
+    for app in &mut apps {
+        app.can_uninstall = app.uninstall.is_some();
+    }
+    apps
 }
 
 #[derive(Serialize)]
@@ -87,9 +90,9 @@ async fn get_apps(app: tauri::AppHandle) -> Result<CatalogSnapshot, String> {
 async fn refresh_apps(app: tauri::AppHandle) -> Result<Vec<AppInfo>, String> {
     let app_data_dir = app.path().app_data_dir().map_err(|error| format!("Could not open the application data folder: {error}"))?;
     let cached = load_sanitized_cache(&app_data_dir).unwrap_or_default();
-    let mut apps = tauri::async_runtime::spawn_blocking(apps_scanner::discover_apps)
+    let mut apps = tauri::async_runtime::spawn_blocking(catalog::discover_apps)
         .await.map_err(|error| format!("Application scanning was interrupted: {error}"))?;
-    apps_scanner::reuse_cached_icons(&mut apps, &cached);
+    catalog::reuse_cached_icons(&mut apps, &cached);
     remember_uninstall_targets(&apps);
     cache::write_cache(&app_data_dir, &apps)
         .map_err(|error| format!("Could not save the application cache: {error}"))?;
@@ -99,7 +102,7 @@ async fn refresh_apps(app: tauri::AppHandle) -> Result<Vec<AppInfo>, String> {
     tauri::async_runtime::spawn(async move {
         let hydrated = tauri::async_runtime::spawn_blocking(move || {
             let mut apps = apps;
-            apps_scanner::hydrate_missing_icons(&mut apps);
+            catalog::hydrate_missing_icons(&mut apps);
             apps
         }).await;
         if let Ok(apps) = hydrated {
@@ -127,7 +130,7 @@ async fn uninstall_app(id: String) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-	let lifecycle = Arc::new(app_lifecycle::LifecycleState::default());
+	let lifecycle = Arc::new(lifecycle::LifecycleState::default());
 	let close_lifecycle = Arc::clone(&lifecycle);
 	let tray_lifecycle = Arc::clone(&lifecycle);
     tauri::Builder::default()
@@ -143,7 +146,7 @@ pub fn run() {
 		})
         .setup(move |app| {
 			global_shortcut::register(app.handle().clone());
-			if let Err(error) = app_lifecycle::setup_tray(app.handle(), Arc::clone(&tray_lifecycle)) {
+			if let Err(error) = lifecycle::setup_tray(app.handle(), Arc::clone(&tray_lifecycle)) {
 				log::error!("Could not create the system tray: {error}");
 			}
             if let Ok(app_data_dir) = app.path().app_data_dir() {
@@ -164,7 +167,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use apps_scanner::{AppCategory, SourceKind};
+    use catalog::{AppCategory, SourceKind};
 
     fn cached_app(name: &str, path: &str) -> AppInfo {
         AppInfo {
@@ -210,5 +213,19 @@ mod tests {
         cache::write_cache(dir.path(), &[app]).unwrap();
         let apps = load_sanitized_cache(dir.path()).unwrap();
         assert!(!apps[0].can_uninstall);
+    }
+
+    #[test]
+    fn enriches_cached_uninstall_data_before_recomputing_availability() {
+        let mut app = cached_app("Editor", r"C:\Editor.exe");
+        app.can_uninstall = false;
+        let apps = prepare_cached_apps(vec![app], |apps| {
+            apps[0].uninstall = Some(UninstallTarget::Command {
+                executable: r"C:\Editor\uninstall.exe".into(),
+                arguments: String::new(),
+            });
+        });
+        assert!(apps[0].can_uninstall);
+        assert!(apps[0].uninstall.is_some());
     }
 }

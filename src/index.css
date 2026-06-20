@@ -62,12 +62,21 @@ button {
 }
 
 .app-toaster [data-sonner-toast] [data-close-button] {
-	top: 0.5rem !important;
+	display: grid !important;
+	padding: 0 !important;
+	top: 50% !important;
 	right: 0.5rem !important;
 	left: auto !important;
 	width: 1.75rem !important;
 	height: 1.75rem !important;
-	transform: none !important;
+	line-height: 0 !important;
+	place-items: center !important;
+	transform: translateY(-50%) !important;
+}
+
+.app-toaster [data-sonner-toast] [data-close-button] svg {
+	display: block !important;
+	margin: 0 !important;
 }
 
 .app-shell {
