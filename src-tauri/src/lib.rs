@@ -73,22 +73,16 @@ struct SystemSettings {
 
 fn normalize_scan_settings(
     settings: catalog::scan_settings::ScanSettings,
-    fixed_drives: &[std::path::PathBuf],
 ) -> Result<catalog::scan_settings::ScanSettings, String> {
     let normalize = |values: Vec<String>| -> Result<Vec<String>, String> {
-        let roots = fixed_drives
-            .iter()
-            .map(|path| path.to_string_lossy().to_lowercase())
-            .collect::<Vec<_>>();
         let mut normalized = Vec::<String>::new();
         for value in values {
             let value = value.trim().trim_matches('"').to_string();
             if value.is_empty() {
                 continue;
             }
-            let lower = value.to_lowercase();
-            if !roots.iter().any(|root| lower.starts_with(root)) {
-                return Err(format!("Scan path is not on a fixed local drive: {value}"));
+            if !Path::new(&value).is_absolute() {
+                return Err(format!("Scan path must be an absolute path: {value}"));
             }
             if !normalized
                 .iter()
@@ -133,8 +127,7 @@ async fn set_scan_settings(
     app: tauri::AppHandle,
     settings: catalog::scan_settings::ScanSettings,
 ) -> Result<catalog::scan_settings::ScanSettings, String> {
-    let fixed_drives = platform::windows::drives::fixed_drive_roots();
-    let settings = normalize_scan_settings(settings, &fixed_drives)?;
+    let settings = normalize_scan_settings(settings)?;
     let app_data_dir = app
         .path()
         .app_data_dir()
@@ -249,6 +242,7 @@ pub fn run() {
     let close_lifecycle = Arc::clone(&lifecycle);
     let tray_lifecycle = Arc::clone(&lifecycle);
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .on_window_event(move |window, event| {
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -362,28 +356,28 @@ mod tests {
     }
 
     #[test]
-    fn normalizes_scan_paths_and_rejects_non_fixed_locations() {
+    fn normalizes_scan_paths_and_accepts_any_absolute_location() {
         let settings = catalog::scan_settings::ScanSettings {
             auto_scan_fixed_drives: true,
-            included_paths: vec![r"D:\Portable".into(), r"d:\portable".into()],
-            excluded_paths: vec![r"E:\Archives".into()],
-        };
-        let normalized = normalize_scan_settings(
-            settings,
-            &[
-                std::path::PathBuf::from(r"D:\"),
-                std::path::PathBuf::from(r"E:\"),
+            included_paths: vec![
+                r"D:\Portable".into(),
+                r"d:\portable".into(),
+                r"F:\Stick\Tools".into(),
             ],
-        )
-        .unwrap();
-        assert_eq!(normalized.included_paths, vec![r"D:\Portable"]);
-        assert_eq!(normalized.excluded_paths, vec![r"E:\Archives"]);
+            excluded_paths: vec![r"\\Server\Share".into()],
+        };
+        let normalized = normalize_scan_settings(settings).unwrap();
+        assert_eq!(
+            normalized.included_paths,
+            vec![r"D:\Portable", r"F:\Stick\Tools"]
+        );
+        assert_eq!(normalized.excluded_paths, vec![r"\\Server\Share"]);
 
         let invalid = catalog::scan_settings::ScanSettings {
             auto_scan_fixed_drives: true,
-            included_paths: vec![r"Z:\Network".into()],
+            included_paths: vec![r"relative\path".into()],
             excluded_paths: Vec::new(),
         };
-        assert!(normalize_scan_settings(invalid, &[std::path::PathBuf::from(r"C:\")]).is_err());
+        assert!(normalize_scan_settings(invalid).is_err());
     }
 }

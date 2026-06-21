@@ -76,6 +76,7 @@ function renderApp(
 		}),
 		setAutostart: vi.fn().mockResolvedValue(undefined),
 		setScanSettings: vi.fn().mockImplementation(async settings => settings),
+		pickFolder: vi.fn().mockResolvedValue(null),
 		openTelegram: vi.fn().mockResolvedValue(undefined),
 		...systemOverrides,
 	}

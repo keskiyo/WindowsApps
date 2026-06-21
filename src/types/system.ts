@@ -22,5 +22,6 @@ export interface SystemClient {
 	getSettings(): Promise<SystemSettings>
 	setAutostart(enabled: boolean): Promise<void>
 	setScanSettings(settings: ScanSettings): Promise<ScanSettings>
+	pickFolder(): Promise<string | null>
 	openTelegram(): Promise<void>
 }

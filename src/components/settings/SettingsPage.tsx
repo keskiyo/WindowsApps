@@ -1,6 +1,7 @@
 import {
 	ExternalLink,
 	FolderPlus,
+	FolderSearch,
 	FolderX,
 	HardDrive,
 	Keyboard,
@@ -62,13 +63,23 @@ export function SettingsPage({ client }: Props) {
 		}
 	}
 	function addPath(kind: 'includedPaths' | 'excludedPaths', value: string) {
-		if (!settings || !value.trim()) return
+		const trimmed = value.trim()
+		if (!settings || !trimmed) return
+		if (
+			settings.scanSettings[kind].some(
+				path => path.toLowerCase() === trimmed.toLowerCase(),
+			)
+		)
+			return
 		void saveScanSettings({
 			...settings.scanSettings,
-			[kind]: [...settings.scanSettings[kind], value.trim()],
+			[kind]: [...settings.scanSettings[kind], trimmed],
 		})
 	}
-	function removePath(kind: 'includedPaths' | 'excludedPaths', value: string) {
+	function removePath(
+		kind: 'includedPaths' | 'excludedPaths',
+		value: string,
+	) {
 		if (!settings) return
 		void saveScanSettings({
 			...settings.scanSettings,
@@ -102,30 +113,46 @@ export function SettingsPage({ client }: Props) {
 					<div className='min-w-0 flex-1'>
 						<h2 className='font-medium'>Application discovery</h2>
 						<p className='mt-1 text-sm leading-6 text-slate-500'>
-							Scan permanent local drives and Steam libraries. Removable and network drives are ignored.
+							Scan permanent local drives and Steam libraries.
+							Removable and network drives are ignored.
 						</p>
 					</div>
 					<button
 						type='button'
 						role='switch'
 						aria-label='Scan all fixed local drives'
-						aria-checked={settings?.scanSettings.autoScanFixedDrives ?? false}
+						aria-checked={
+							settings?.scanSettings.autoScanFixedDrives ?? false
+						}
 						disabled={!settings || saving}
-						onClick={() => settings && void saveScanSettings({
-							...settings.scanSettings,
-							autoScanFixedDrives: !settings.scanSettings.autoScanFixedDrives,
-						})}
+						onClick={() =>
+							settings &&
+							void saveScanSettings({
+								...settings.scanSettings,
+								autoScanFixedDrives:
+									!settings.scanSettings.autoScanFixedDrives,
+							})
+						}
 						className={`relative h-7 w-12 shrink-0 rounded-full transition focus-visible:outline-2 focus-visible:outline-blue-400 disabled:opacity-50 ${settings?.scanSettings.autoScanFixedDrives ? 'bg-blue-500' : 'bg-slate-700'}`}
 					>
-						<span className={`absolute left-1 top-1 size-5 rounded-full bg-white shadow transition-transform ${settings?.scanSettings.autoScanFixedDrives ? 'translate-x-5' : 'translate-x-0'}`} />
+						<span
+							className={`absolute left-1 top-1 size-5 rounded-full bg-white shadow transition-transform ${settings?.scanSettings.autoScanFixedDrives ? 'translate-x-5' : 'translate-x-0'}`}
+						/>
 					</button>
 				</div>
 
 				<div className='mt-5'>
-					<p className='text-xs font-semibold uppercase tracking-[.14em] text-slate-500'>Fixed local drives</p>
+					<p className='text-xs font-semibold uppercase tracking-[.14em] text-slate-500'>
+						Fixed local drives
+					</p>
 					<div className='mt-2 flex flex-wrap gap-2'>
 						{settings?.fixedDrives.map(drive => (
-							<code key={drive} className='rounded-lg border border-white/8 bg-slate-950/70 px-2.5 py-1 text-xs text-slate-300'>{drive}</code>
+							<code
+								key={drive}
+								className='rounded-lg border border-white/8 bg-slate-950/70 px-2.5 py-1 text-xs text-slate-300'
+							>
+								{drive}
+							</code>
 						))}
 					</div>
 				</div>
@@ -134,34 +161,38 @@ export function SettingsPage({ client }: Props) {
 					<PathEditor
 						label='Additional scan folder'
 						buttonLabel='Add scan folder'
+						browseLabel='Browse for scan folder'
 						value={includedPath}
 						paths={settings?.scanSettings.includedPaths ?? []}
 						icon={<FolderPlus size={16} aria-hidden='true' />}
 						disabled={!settings || saving}
 						onChange={setIncludedPath}
-						onAdd={() => {
-							addPath('includedPaths', includedPath)
+						onAdd={value => {
+							addPath('includedPaths', value)
 							setIncludedPath('')
 						}}
+						onBrowse={() => client.pickFolder()}
 						onRemove={value => removePath('includedPaths', value)}
 					/>
 					<PathEditor
 						label='Excluded folder'
 						buttonLabel='Exclude folder'
+						browseLabel='Browse for excluded folder'
 						value={excludedPath}
 						paths={settings?.scanSettings.excludedPaths ?? []}
 						icon={<FolderX size={16} aria-hidden='true' />}
 						disabled={!settings || saving}
 						onChange={setExcludedPath}
-						onAdd={() => {
-							addPath('excludedPaths', excludedPath)
+						onAdd={value => {
+							addPath('excludedPaths', value)
 							setExcludedPath('')
 						}}
+						onBrowse={() => client.pickFolder()}
 						onRemove={value => removePath('excludedPaths', value)}
 					/>
 				</div>
 			</div>
-			<div className='overflow-hidden rounded-2xl border border-white/8 bg-slate-900/55'>
+			<div className='overflow-hidden mt-5 rounded-2xl border border-white/8 bg-slate-900/55'>
 				<div className='flex items-center gap-4 border-b border-white/7 p-5'>
 					<span className='grid size-10 place-items-center rounded-xl bg-slate-950/60 text-blue-300'>
 						<Power size={19} aria-hidden='true' />
@@ -242,43 +273,62 @@ export function SettingsPage({ client }: Props) {
 interface PathEditorProps {
 	label: string
 	buttonLabel: string
+	browseLabel: string
 	value: string
 	paths: string[]
 	icon: ReactNode
 	disabled: boolean
 	onChange(value: string): void
-	onAdd(): void
+	onAdd(value: string): void
+	onBrowse(): Promise<string | null>
 	onRemove(value: string): void
 }
 
 function PathEditor(props: PathEditorProps) {
+	async function browse() {
+		if (props.disabled) return
+		const picked = await props.onBrowse()
+		if (picked) props.onAdd(picked)
+	}
 	return (
 		<div>
-			<label className='text-sm font-medium' htmlFor={props.label}>{props.label}</label>
+			<label className='text-sm font-medium' htmlFor={props.label}>
+				{props.label}
+			</label>
 			<div className='mt-2 flex gap-2'>
 				<input
 					id={props.label}
 					aria-label={props.label}
 					value={props.value}
 					onChange={event => props.onChange(event.target.value)}
+					onDoubleClick={() => void browse()}
 					placeholder='D:\\Apps'
+					title='Double-click to browse for a folder'
 					className='h-10 min-w-0 flex-1 rounded-xl border border-white/8 bg-slate-950/70 px-3 text-sm outline-none focus:border-blue-400/50 focus:ring-3 focus:ring-blue-500/10'
 				/>
 				<button
 					type='button'
-					aria-label={props.buttonLabel}
-					disabled={props.disabled || !props.value.trim()}
-					onClick={props.onAdd}
-					className='grid size-10 shrink-0 place-items-center rounded-xl bg-blue-500 text-white hover:bg-blue-400 focus-visible:outline-2 focus-visible:outline-blue-300 disabled:opacity-40'
+					aria-label={props.browseLabel}
+					disabled={props.disabled}
+					onClick={() => void browse()}
+					className='grid size-10 shrink-0 place-items-center rounded-xl border border-white/8 bg-slate-950/70 text-blue-300 hover:bg-slate-800/70 focus-visible:outline-2 focus-visible:outline-blue-300 disabled:opacity-40'
 				>
-					{props.icon}
+					<FolderSearch size={16} aria-hidden='true' />
 				</button>
 			</div>
 			<ul className='mt-2 space-y-1'>
 				{props.paths.map(path => (
-					<li key={path} className='flex items-center gap-2 rounded-lg bg-slate-950/45 px-2.5 py-2 text-xs text-slate-400'>
+					<li
+						key={path}
+						className='flex items-center gap-2 rounded-lg bg-slate-950/45 px-2.5 py-2 text-xs text-slate-400'
+					>
 						<code className='min-w-0 flex-1 truncate'>{path}</code>
-						<button type='button' aria-label={`Remove ${path}`} onClick={() => props.onRemove(path)} className='grid size-7 place-items-center rounded-md hover:bg-red-500/10 hover:text-red-300'>
+						<button
+							type='button'
+							aria-label={`Remove ${path}`}
+							onClick={() => props.onRemove(path)}
+							className='grid size-7 place-items-center rounded-md hover:bg-red-500/10 hover:text-red-300'
+						>
 							<Trash2 size={14} aria-hidden='true' />
 						</button>
 					</li>
