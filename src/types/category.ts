@@ -8,6 +8,7 @@ export const CATEGORY_ORDER = [
 	'communication',
 	'utilities',
 	'system',
+	'windows_features',
 	'other',
 ] as const
 export type BuiltInCategory = (typeof CATEGORY_ORDER)[number]
@@ -29,6 +30,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
 	communication: 'Communication',
 	utilities: 'Utilities',
 	system: 'System',
+	windows_features: 'Windows Features',
 	other: 'Other',
 }
 

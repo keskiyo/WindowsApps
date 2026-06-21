@@ -117,6 +117,8 @@ Values originate from local Windows, package, shortcut, registry, or executable 
 
 Built-in categories provide the initial organization. A category row has two deliberate pointer behaviors: click its name to open the category, or drag the same row to change its position. No separate drag icon is required. Users can also rename labels, create custom categories, collapse sections, and move individual applications. Deleting a custom category moves its applications to **Other**.
 
+The built-in **Windows Features** category groups confirmed Windows components such as File Explorer, Snipping Tool, Task Scheduler, Get Help, Remote Desktop Connection, Windows administrative consoles, accessibility tools, and inbox applications. Classification uses known display names, executable targets, and package identifiers. A generic `Microsoft` name is intentionally insufficient, so products such as Microsoft Edge, Visual Studio, Microsoft 365, Xbox, and Game Bar retain their functional categories.
+
 The following preferences remain local:
 
 - favorite application IDs;

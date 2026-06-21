@@ -37,6 +37,8 @@ It starts from a local cache, scans only when requested, removes maintenance noi
 | ⌁   | **Background access**     | Closing the window keeps the app in the system tray. `Win+Shift+Q` or a tray click restores it.                                                                                |
 | ◎   | **Controlled scanning**   | Shows progress, supports cancellation, ignores removable/network drives, and accepts custom include/exclude folders in Settings.                                                |
 
+Built-in Windows components are grouped under **Windows Features** using known names, executable targets, and package identifiers. A generic `Microsoft` label is not enough to move an app, so Edge, Visual Studio, Microsoft 365, Xbox, and Game Bar keep their functional categories.
+
 ## Download and install
 
 1. Open the [latest GitHub Release](../../releases/latest).

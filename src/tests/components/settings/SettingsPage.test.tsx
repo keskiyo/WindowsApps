@@ -42,14 +42,12 @@ describe('SettingsPage', () => {
 		expect(client.openTelegram).toHaveBeenCalledOnce()
 		expect(screen.getByText('Fixed local drives')).toBeInTheDocument()
 		expect(screen.getByText('E:\\')).toBeInTheDocument()
-		await userEvent.type(
-			screen.getByRole('textbox', { name: 'Additional scan folder' }),
-			String.raw`E:\Portable`,
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Browse for scan folder' }),
 		)
-		await userEvent.click(screen.getByRole('button', { name: 'Add scan folder' }))
 		expect(client.setScanSettings).toHaveBeenCalledWith({
 			autoScanFixedDrives: true,
-			includedPaths: [String.raw`D:\Games`, String.raw`E:\Portable`],
+			includedPaths: [String.raw`D:\Games`, String.raw`F:\Stick\Tools`],
 			excludedPaths: [],
 		})
 	})

@@ -62,7 +62,7 @@ export function CategorySection({
 			ref={drop.setNodeRef}
 			aria-labelledby={`category-${category}`}
 			data-category={category}
-			className={`relative rounded-2xl transition-colors duration-200 focus-within:z-90 ${drop.isOver ? 'bg-blue-500/7 ring-1 ring-blue-400/30' : ''}`}
+			className={`relative scroll-mt-40 rounded-2xl transition-colors duration-200 focus-within:z-90 lg:scroll-mt-24 ${drop.isOver ? 'bg-blue-500/7 ring-1 ring-blue-400/30' : ''}`}
 		>
 			<div className='mb-3 flex items-center gap-2'>
 				<button

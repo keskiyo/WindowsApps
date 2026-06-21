@@ -75,31 +75,50 @@ fn is_portable_candidate(path: &Path) -> bool {
     {
         return false;
     }
+    let stem = path
+        .file_stem()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_lowercase();
+    if super::is_installer_file_name(&stem) {
+        return false;
+    }
     let name = path
         .file_name()
         .unwrap_or_default()
         .to_string_lossy()
         .to_lowercase();
     ![
-        "setup.exe",
-        "installer",
-        "uninstall",
-        "unins000",
-        "updater",
         "update.exe",
         "repair.exe",
         "bootstrap",
         "crashpad",
         "crashreport",
         "crash_handler",
-        "vc_redist",
-        "vcredist",
+        "crashhandler",
+        "werfault",
         "dxsetup",
         "eac_launcher",
         "easyanticheat",
         "workshoputility",
         "workshop_utility",
         "workshop utility",
+        "readme",
+        "manual",
+        // background helper / service processes that ship next to a real app
+        "helper",
+        "subprocess",
+        "service",
+        "daemon",
+        "watchdog",
+        "tracing",
+        "elevated",
+        "proxy",
+        "overlay",
+        "runtime",
+        "sessionmonitor",
+        "blizzarderror",
+        "blizzardbrowser",
     ]
     .iter()
     .any(|marker| name.contains(marker))
@@ -127,6 +146,51 @@ mod tests {
         let found = discover_executables(&[root.path().to_path_buf()], &[excluded], || false);
 
         assert_eq!(found, vec![rufus]);
+    }
+
+    #[test]
+    fn rejects_installer_and_documentation_executables() {
+        assert!(!is_portable_candidate(Path::new(r"C:\Apps\setup-app.exe")));
+        assert!(!is_portable_candidate(Path::new(
+            r"C:\Apps\App-Installer.exe"
+        )));
+        assert!(!is_portable_candidate(Path::new(r"C:\Apps\Setup_x64.exe")));
+        assert!(!is_portable_candidate(Path::new(
+            r"C:\Apps\vcredist_x64.exe"
+        )));
+        assert!(!is_portable_candidate(Path::new(r"C:\Apps\unins000.exe")));
+        assert!(!is_portable_candidate(Path::new(r"C:\Apps\AppSetup.exe")));
+        assert!(!is_portable_candidate(Path::new(r"C:\Apps\readme.exe")));
+        assert!(!is_portable_candidate(Path::new(
+            r"C:\Apps\vcredist2005_x64.exe"
+        )));
+        assert!(!is_portable_candidate(Path::new(
+            r"C:\Apps\CefSharp.BrowserSubprocess.exe"
+        )));
+        assert!(!is_portable_candidate(Path::new(
+            r"C:\Apps\notification_helper.exe"
+        )));
+        assert!(!is_portable_candidate(Path::new(
+            r"C:\chrome-win\elevated_tracing_service.exe"
+        )));
+        assert!(!is_portable_candidate(Path::new(
+            r"C:\Ассистент\ast_service.exe"
+        )));
+        assert!(!is_portable_candidate(Path::new(
+            r"C:\Apps\BlizzardError.exe"
+        )));
+        assert!(!is_portable_candidate(Path::new(
+            r"C:\Apps\battlenet.overlay.runtime.exe"
+        )));
+        assert!(!is_portable_candidate(Path::new(
+            r"C:\Apps\BlizzardBrowser.exe"
+        )));
+        assert!(!is_portable_candidate(Path::new(
+            r"C:\Apps\GameSessionMonitor.exe"
+        )));
+        assert!(!is_portable_candidate(Path::new(r"C:\Apps\7z2501-x64.exe")));
+        assert!(is_portable_candidate(Path::new(r"C:\Apps\rufus-4.11p.exe")));
+        assert!(is_portable_candidate(Path::new(r"C:\Apps\Notepad.exe")));
     }
 
     #[test]

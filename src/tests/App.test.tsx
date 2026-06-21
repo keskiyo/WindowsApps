@@ -532,7 +532,7 @@ describe('App', () => {
 		).toBeInTheDocument()
 		expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
 			behavior: 'smooth',
-			block: 'center',
+			block: 'start',
 		})
 	})
 })

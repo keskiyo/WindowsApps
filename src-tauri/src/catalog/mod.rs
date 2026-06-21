@@ -24,6 +24,7 @@ pub enum AppCategory {
     Communication,
     Utilities,
     System,
+    WindowsFeatures,
     #[default]
     Other,
 }
@@ -527,7 +528,9 @@ fn classify(name: &str, path: &str) -> AppCategory {
     let value = format!("{name} {path}").to_lowercase();
     let contains = |keywords: &[&str]| keywords.iter().any(|keyword| value.contains(keyword));
 
-    if contains(&[
+    if is_windows_feature(&value) {
+        AppCategory::WindowsFeatures
+    } else if contains(&[
         "steam",
         "battle.net",
         "epic games",
@@ -602,12 +605,11 @@ fn classify(name: &str, path: &str) -> AppCategory {
         "character map",
         "command prompt",
         "powershell",
-        "control panel",
-        "computer management",
-        "component services",
-        "administrative tools",
-        "registry editor",
+        "windows terminal",
         "task manager",
+        "таблица символов",
+        "командная строка",
+        "диспетчер задач",
     ]) {
         AppCategory::System
     } else if contains(&[
@@ -627,7 +629,190 @@ fn classify(name: &str, path: &str) -> AppCategory {
     }
 }
 
+fn is_windows_feature(value: &str) -> bool {
+    const FEATURES: &[&str] = &[
+        // Windows shell, inbox applications and accessibility tools.
+        "file explorer",
+        "explorer.exe",
+        "проводник",
+        "snipping tool",
+        "snippingtool.exe",
+        "microsoft.screensketch",
+        "ножницы",
+        "get help",
+        "microsoft.gethelp",
+        "техническая поддержка",
+        "remote desktop connection",
+        "mstsc.exe",
+        "подключение к удаленному рабочему столу",
+        "calculator",
+        "microsoft.windowscalculator",
+        "калькулятор",
+        "notepad",
+        "microsoft.windowsnotepad",
+        "блокнот",
+        "microsoft paint",
+        "mspaint.exe",
+        "microsoft.paint",
+        "камера",
+        "microsoft.windowscamera",
+        "clock",
+        "microsoft.windowsalarms",
+        "часы",
+        "voice recorder",
+        "sound recorder",
+        "microsoft.windowssoundrecorder",
+        "запись голоса",
+        "звукозапись",
+        "magnifier",
+        "magnify.exe",
+        "экранная лупа",
+        "on-screen keyboard",
+        "osk.exe",
+        "экранная клавиатура",
+        "narrator",
+        "narrator.exe",
+        "экранный диктор",
+        "quick assist",
+        "microsoftcorporationii.quickassist",
+        "быстрая помощь",
+        "windows security",
+        "microsoft.sechealthui",
+        "безопасность windows",
+        "windows settings",
+        "systemsettings.exe",
+        "параметры",
+        "microsoft.windows.administrativetools",
+        "инструменты windows",
+        "windows backup",
+        "windowsbackup",
+        "архивация windows",
+        "microsoft.windowsstore",
+        "microsoft store",
+        "microsoft.windows.photos",
+        "фотографии",
+        "microsoft.bingweather",
+        "погода",
+        "microsoft.bingnews",
+        "новости",
+        "microsoft.microsoftstickynotes",
+        "sticky notes",
+        "записки",
+        "microsoft.yourphone",
+        "phone link",
+        "связь с телефоном",
+        "microsoft.windowsfeedbackhub",
+        "feedback hub",
+        "центр отзывов",
+        "microsoft.windows.shell.rundialog",
+        "выполнить",
+        "windows media player legacy",
+        "steps recorder",
+        "psr.exe",
+        "средство записи действий",
+        "memory diagnostics tool",
+        "mdsched.exe",
+        "средство проверки памяти windows",
+        "recoverydrive",
+        "recoverydrive.exe",
+        "диск восстановления",
+        "iscsi initiator",
+        "iscsicpl.exe",
+        "инициатор iscsi",
+        // Management consoles and administrative tools.
+        "computer management",
+        "compmgmt.msc",
+        "управление компьютером",
+        "print management",
+        "printmanagement.msc",
+        "управление печатью",
+        "device manager",
+        "devmgmt.msc",
+        "диспетчер устройств",
+        "disk management",
+        "diskmgmt.msc",
+        "управление дисками",
+        "event viewer",
+        "eventvwr.msc",
+        "просмотр событий",
+        "task scheduler",
+        "taskschd.msc",
+        "планировщик задач",
+        "планировщик заданий",
+        "local security policy",
+        "secpol.msc",
+        "локальная политика безопасности",
+        "group policy",
+        "gpedit.msc",
+        "групповая политика",
+        "system configuration",
+        "msconfig.exe",
+        "конфигурация системы",
+        "resource monitor",
+        "resmon.exe",
+        "монитор ресурсов",
+        "performance monitor",
+        "perfmon.msc",
+        "системный монитор",
+        "component services",
+        "comexp.msc",
+        "службы компонентов",
+        "odbc data sources",
+        "odbcad32.exe",
+        "источники данных odbc",
+        "system information",
+        "msinfo32.exe",
+        "сведения о системе",
+        "control panel",
+        "control.exe",
+        "панель управления",
+        "administrative tools",
+        "windows tools",
+        "администрирование",
+        "средства windows",
+        "registry editor",
+        "regedit.exe",
+        "редактор реестра",
+        "disk cleanup",
+        "cleanmgr.exe",
+        "очистка диска",
+        "defragment",
+        "dfrgui.exe",
+        "дефрагментация",
+        "windows defender firewall",
+        "wf.msc",
+        "брандмауэр",
+        "system restore",
+        "rstrui.exe",
+        "восстановление системы",
+        "services.msc",
+        "службы",
+        "character map",
+        "charmap.exe",
+        "таблица символов",
+        "command prompt",
+        "cmd.exe",
+        "командная строка",
+        "windows powershell",
+        "powershell.exe",
+        "windows terminal",
+        "microsoft.windowsterminal",
+        "task manager",
+        "taskmgr.exe",
+        "диспетчер задач",
+    ];
+
+    FEATURES.iter().any(|feature| value.contains(feature))
+}
+
 fn find_executable(location: &str) -> Option<PathBuf> {
+    find_executable_named(location, None)
+}
+
+/// Resolve a launchable file inside an install directory. When `name` is given,
+/// prefer the executable whose file name matches the application name (e.g. pick
+/// `Docker Desktop.exe`, not the first bundled `courgette64.exe` found in the tree).
+fn find_executable_named(location: &str, name: Option<&str>) -> Option<PathBuf> {
     let root = PathBuf::from(location.trim().trim_matches('"'));
     if is_launchable(&root) {
         return Some(root);
@@ -635,12 +820,36 @@ fn find_executable(location: &str) -> Option<PathBuf> {
     if !root.is_dir() {
         return None;
     }
-    WalkDir::new(root)
+    let target = name
+        .map(normalized_portable_name)
+        .filter(|key| !key.is_empty());
+    WalkDir::new(&root)
         .max_depth(2)
         .into_iter()
         .filter_map(Result::ok)
         .map(|entry| entry.into_path())
-        .find(|path| is_launchable(path) && !is_maintenance_path(&path.to_string_lossy()))
+        .filter(|path| is_launchable(path) && !is_maintenance_path(&path.to_string_lossy()))
+        .min_by_key(|path| {
+            let stem = path
+                .file_stem()
+                .map(|value| normalized_portable_name(&value.to_string_lossy()))
+                .unwrap_or_default();
+            let name_score = match &target {
+                Some(target) if stem == *target => 0u8,
+                Some(target)
+                    if !stem.is_empty() && (stem.contains(target) || target.contains(&stem)) =>
+                {
+                    1
+                }
+                Some(_) => 3,
+                None => 2,
+            };
+            let depth = path
+                .strip_prefix(&root)
+                .map(|relative| relative.components().count())
+                .unwrap_or(usize::MAX);
+            (name_score, depth, path.to_string_lossy().into_owned())
+        })
 }
 
 fn is_launchable(path: &Path) -> bool {
@@ -674,20 +883,124 @@ fn is_maintenance_entry(name: &str, path: &str, resolved_path: Option<&str>) -> 
     if is_invalid_display_name(name) {
         return true;
     }
-    is_maintenance_path(path)
+    is_documentation_name(name)
+        || is_maintenance_path(path)
         || resolved_path.is_some_and(is_maintenance_path)
         || is_maintenance_text(name)
 }
 
 fn is_maintenance_path(path: &str) -> bool {
-    if Path::new(path).extension().is_some_and(|extension| {
-        ["ico", "dll", "mui", "cpl"]
-            .iter()
-            .any(|value| extension.eq_ignore_ascii_case(value))
+    let path_buf = Path::new(path);
+    if path_buf.extension().is_some_and(|extension| {
+        [
+            "ico", "dll", "mui", "cpl", "chm", "pdf", "html", "htm", "txt", "rtf", "md", "url",
+            "hlp", "xml", "log", "ini",
+        ]
+        .iter()
+        .any(|value| extension.eq_ignore_ascii_case(value))
     }) {
         return true;
     }
+    if path_buf
+        .file_stem()
+        .is_some_and(|stem| is_installer_file_name(&stem.to_string_lossy()))
+    {
+        return true;
+    }
     is_maintenance_text(path)
+}
+
+/// Junk-detection for installer/updater executables by file name (stem, no extension).
+/// Splits the stem into alphanumeric tokens to catch `setup-app`, `app-installer`,
+/// `setup_x64`, and also matches glued names like `AppSetup` via prefix/suffix.
+pub(crate) fn is_installer_file_name(stem: &str) -> bool {
+    let lower = stem.to_lowercase();
+    // 7-Zip installers are named like `7z2501-x64`; the real app is `7zFM`/`7zG`/`7z`.
+    if lower.starts_with("7z")
+        && lower[2..]
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_digit())
+    {
+        return true;
+    }
+    const TOKENS: [&str; 8] = [
+        "setup",
+        "unins",
+        "unins000",
+        "updater",
+        "bootstrapper",
+        "установщик",
+        "деинсталляция",
+        "удаление",
+    ];
+    let has_token = lower
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|token| !token.is_empty())
+        // `contains` catches install/installer/instaler/installation, uninstall, and
+        // vcredist2005_x64 / vc_redist / redistributables, including misspellings.
+        .any(|token| {
+            token.contains("instal") || token.contains("redist") || TOKENS.contains(&token)
+        });
+    if has_token {
+        return true;
+    }
+    ["setup", "install", "uninstall"]
+        .iter()
+        .any(|marker| lower.ends_with(marker))
+}
+
+/// Junk-detection for documentation / website shortcut display names.
+/// Matches whole words at the start or end (so "HelpDesk Pro" survives) plus a few
+/// multi-word phrases anywhere in the normalized name.
+fn is_documentation_name(name: &str) -> bool {
+    const WORDS: [&str; 25] = [
+        "documentation",
+        "docs",
+        "readme",
+        "manual",
+        "help",
+        "faq",
+        "license",
+        "licence",
+        "eula",
+        "changelog",
+        "tutorial",
+        "website",
+        "homepage",
+        "support",
+        "samples",
+        "sample",
+        "sdk",
+        "example",
+        "examples",
+        "demo",
+        "документация",
+        "справка",
+        "руководство",
+        "лицензия",
+        "сайт",
+    ];
+    const PHRASES: [&str; 9] = [
+        "release notes",
+        "what's new",
+        "home page",
+        "getting started",
+        "visit website",
+        "support center",
+        "заметки о выпуске",
+        "что нового",
+        "веб сайт",
+    ];
+    let normalized = normalize_name(name);
+    if PHRASES.iter().any(|phrase| normalized.contains(phrase)) {
+        return true;
+    }
+    let words = normalized.split_whitespace().collect::<Vec<_>>();
+    match (words.first(), words.last()) {
+        (Some(first), Some(last)) => WORDS.contains(first) || WORDS.contains(last),
+        _ => false,
+    }
 }
 
 fn is_maintenance_text(value: &str) -> bool {
@@ -709,6 +1022,8 @@ fn is_maintenance_text(value: &str) -> bool {
         "microsoft visual c++ update",
         "hotfix",
         "security update",
+        "redistributable",
+        "subprocess",
         "kb[",
         "file://",
     ]
@@ -756,6 +1071,13 @@ fn same_application(left: &AppInfo, right: &AppInfo) -> bool {
     if left.launch_kind == LaunchKind::AppUserModelId
         || right.launch_kind == LaunchKind::AppUserModelId
     {
+        return true;
+    }
+    // A Start-Menu shortcut and a loose executable that share a product family are the
+    // same app (e.g. Firefox.lnk + firefox.exe). The shortcut wins via `candidate_score`,
+    // so the bare .exe duplicate is dropped. Publisher mismatch between a registry/shortcut
+    // label and the exe's signing metadata must not split them.
+    if left.launch_kind == LaunchKind::Shortcut || right.launch_kind == LaunchKind::Shortcut {
         return true;
     }
     match (&left.publisher, &right.publisher) {
@@ -901,7 +1223,8 @@ fn category_rank(category: AppCategory) -> u8 {
         AppCategory::Communication => 6,
         AppCategory::Utilities => 7,
         AppCategory::System => 8,
-        AppCategory::Other => 9,
+        AppCategory::WindowsFeatures => 9,
+        AppCategory::Other => 10,
     }
 }
 
@@ -1086,6 +1409,57 @@ mod tests {
     }
 
     #[test]
+    fn detects_installer_file_names_by_token() {
+        assert!(is_installer_file_name("setup-app"));
+        assert!(is_installer_file_name("app-installer"));
+        assert!(is_installer_file_name("setup_x64"));
+        assert!(is_installer_file_name("appsetup"));
+        assert!(is_installer_file_name("unins000"));
+        assert!(is_installer_file_name("vcredist_x64"));
+        assert!(is_installer_file_name("vcredist2005_x64"));
+        assert!(is_installer_file_name("vc_redist.x64"));
+        assert!(is_installer_file_name("7z2501-x64"));
+        assert!(is_installer_file_name("app_instaler"));
+        assert!(!is_installer_file_name("7zFM"));
+        assert!(!is_installer_file_name("notepad"));
+        assert!(!is_installer_file_name("setupbox"));
+        assert!(!is_installer_file_name("aida64"));
+    }
+
+    #[test]
+    fn detects_documentation_display_names() {
+        assert!(is_documentation_name("Документация AIDA64 Extreme"));
+        assert!(is_documentation_name("AIDA64 Documentation"));
+        assert!(is_documentation_name("Release Notes"));
+        assert!(is_documentation_name("What's New"));
+        assert!(is_documentation_name("Samples"));
+        assert!(is_documentation_name("MSI Afterburner SDK"));
+        assert!(is_documentation_name("Steam Support Center"));
+        assert!(!is_documentation_name("HelpDesk Pro"));
+        assert!(!is_documentation_name("AIDA64 Extreme"));
+        assert!(!is_documentation_name("Visual Studio Code"));
+    }
+
+    #[test]
+    fn maintenance_entry_filters_installers_and_doc_shortcuts() {
+        assert!(is_maintenance_entry(
+            "Документация AIDA64 Extreme",
+            r"C:\Menu\Документация AIDA64 Extreme.lnk",
+            Some(r"C:\Program Files\AIDA64\aida64.chm"),
+        ));
+        assert!(is_maintenance_entry(
+            "AIDA64 Setup",
+            r"C:\Apps\setup-app.exe",
+            None,
+        ));
+        assert!(!is_maintenance_entry(
+            "AIDA64 Extreme",
+            r"C:\Program Files\AIDA64\aida64.exe",
+            None,
+        ));
+    }
+
+    #[test]
     fn identifies_uninstaller_noise() {
         assert!(is_noise("Microsoft Visual C++ Update", r"C:\update.exe"));
         assert!(is_noise("Editor Uninstall", r"C:\uninstall.exe"));
@@ -1102,6 +1476,36 @@ mod tests {
             find_executable(&dir.path().to_string_lossy()),
             Some(executable)
         );
+    }
+
+    #[test]
+    fn prefers_named_executable_over_bundled_helpers() {
+        let dir = tempfile::tempdir().unwrap();
+        let main = dir.path().join("Docker Desktop.exe");
+        let bundled = dir.path().join("courgette64.exe");
+        std::fs::write(&bundled, []).unwrap();
+        std::fs::write(&main, []).unwrap();
+
+        assert_eq!(
+            find_executable_named(&dir.path().to_string_lossy(), Some("Docker Desktop")),
+            Some(main)
+        );
+    }
+
+    #[test]
+    fn merges_shortcut_and_executable_despite_publisher_mismatch() {
+        let mut shortcut = app("Firefox", r"C:\Menu\Firefox.lnk");
+        shortcut.launch_kind = LaunchKind::Shortcut;
+        shortcut.publisher = Some("Mozilla".into());
+        let mut executable = app("Firefox", r"D:\Apps\Firefox\firefox.exe");
+        executable.source_kind = SourceKind::Portable;
+        executable.publisher = Some("Mozilla Corporation".into());
+
+        let merged = deduplicate(vec![executable, shortcut]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].path, r"C:\Menu\Firefox.lnk");
+        assert_eq!(merged[0].launch_kind, LaunchKind::Shortcut);
     }
 
     #[test]
@@ -1197,6 +1601,11 @@ mod tests {
                 "Installation notes",
                 "file://C:/PostgreSQL/installation-notes.html",
             ),
+            app(
+                "Документация AIDA64 Extreme",
+                r"C:\Menu\Документация AIDA64.lnk",
+            ),
+            app("AIDA64 Setup", r"C:\Apps\setup-app.exe"),
             app("Visual Studio Code", r"C:\Code.exe"),
         ]);
         assert_eq!(
@@ -1269,7 +1678,98 @@ mod tests {
         );
         assert_eq!(
             classify("Character Map", r"C:\charmap.exe"),
-            AppCategory::System
+            AppCategory::WindowsFeatures
+        );
+    }
+
+    #[test]
+    fn classifies_windows_management_tools_as_windows_features() {
+        assert_eq!(
+            classify("Computer Management", r"C:\Windows\System32\compmgmt.msc"),
+            AppCategory::WindowsFeatures
+        );
+        assert_eq!(
+            classify("Управление печатью", r"C:\Menu\Управление печатью.lnk"),
+            AppCategory::WindowsFeatures
+        );
+        assert_eq!(
+            classify(
+                "Управление компьютером",
+                r"C:\Menu\Управление компьютером.lnk"
+            ),
+            AppCategory::WindowsFeatures
+        );
+        assert_eq!(
+            classify("Event Viewer", r"C:\Windows\System32\eventvwr.msc"),
+            AppCategory::WindowsFeatures
+        );
+        for (name, path) in [
+            ("Snipping Tool", r"C:\Windows\System32\SnippingTool.exe"),
+            ("Ножницы", r"C:\Menu\Ножницы.lnk"),
+            ("Task Scheduler", r"C:\Windows\System32\taskschd.msc"),
+            ("Планировщик задач", r"C:\Menu\Планировщик задач.lnk"),
+            ("Get Help", "Microsoft.GetHelp_8wekyb3d8bbwe!App"),
+            (
+                "Техническая поддержка",
+                "Microsoft.GetHelp_8wekyb3d8bbwe!App",
+            ),
+            ("File Explorer", r"C:\Windows\explorer.exe"),
+            ("Проводник", r"C:\Windows\explorer.exe"),
+            (
+                "Remote Desktop Connection",
+                r"C:\Windows\System32\mstsc.exe",
+            ),
+            (
+                "Подключение к удаленному рабочему столу",
+                r"C:\Windows\System32\mstsc.exe",
+            ),
+            (
+                "Инструменты Windows",
+                "Microsoft.Windows.AdministrativeTools",
+            ),
+            (
+                "Безопасность Windows",
+                "Microsoft.SecHealthUI_8wekyb3d8bbwe!SecHealthUI",
+            ),
+            (
+                "Средство проверки памяти Windows",
+                r"C:\Windows\System32\MdSched.exe",
+            ),
+            (
+                "Архивация Windows",
+                "MicrosoftWindows.Client.CBS_cw5n1h2txyewy!WindowsBackup",
+            ),
+        ] {
+            assert_eq!(
+                classify(name, path),
+                AppCategory::WindowsFeatures,
+                "{name} should be a Windows feature"
+            );
+        }
+    }
+
+    #[test]
+    fn microsoft_product_names_do_not_imply_windows_features() {
+        assert_eq!(
+            classify(
+                "Microsoft Edge",
+                r"C:\Program Files\Microsoft\Edge\msedge.exe"
+            ),
+            AppCategory::Browsers
+        );
+        assert_eq!(
+            classify(
+                "Microsoft Visual Studio",
+                r"C:\Program Files\Microsoft Visual Studio\devenv.exe"
+            ),
+            AppCategory::Development
+        );
+        assert_ne!(
+            classify(
+                "Microsoft 365",
+                "Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe!Microsoft.MicrosoftOfficeHub"
+            ),
+            AppCategory::WindowsFeatures
         );
     }
 

@@ -1,6 +1,6 @@
 use super::{
-    classify, clean_display_icon, find_executable, stable_id, AppInfo, LaunchKind, SourceKind,
-    UninstallTarget,
+    classify, clean_display_icon, find_executable_named, stable_id, AppInfo, LaunchKind,
+    SourceKind, UninstallTarget,
 };
 use winreg::RegKey;
 
@@ -73,7 +73,12 @@ pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
             super::is_launchable(path)
                 && !super::is_noise(&values.display_name, &path.to_string_lossy())
         })
-        .or_else(|| values.install_location.as_deref().and_then(find_executable))?;
+        .or_else(|| {
+            values
+                .install_location
+                .as_deref()
+                .and_then(|location| find_executable_named(location, Some(&values.display_name)))
+        })?;
     let path_text = path.to_string_lossy().trim().to_string();
     if values.display_name.trim().is_empty() || super::is_noise(&values.display_name, &path_text) {
         return None;
