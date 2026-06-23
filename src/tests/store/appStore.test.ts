@@ -55,8 +55,17 @@ function client(overrides: Partial<AppsClient> = {}): AppsClient {
 	return {
 		getApps: vi.fn().mockResolvedValue({ apps, hasCache: true }),
 		refreshApps: vi.fn().mockResolvedValue(apps.slice().reverse()),
+		resetCatalogCache: vi.fn().mockResolvedValue([apps[2]]),
+		hydrateVisibleIcons: vi.fn().mockResolvedValue(undefined),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
+		getUninstallPreview: vi.fn().mockResolvedValue({
+			appName: 'Visual Studio Code',
+			publisher: 'Microsoft',
+			source: 'registry',
+			mechanism: 'registered_command',
+			command: 'uninstall.exe',
+		}),
 		uninstallApp: vi.fn().mockResolvedValue(undefined),
 		onAppsUpdated: vi.fn().mockResolvedValue(() => undefined),
 		onScanProgress: vi.fn().mockResolvedValue(() => undefined),
@@ -72,10 +81,211 @@ describe('app store', () => {
 		expect(store.getState().isLoading).toBe(false)
 	})
 
+	it('keeps one app per id when cached and updated data repeats entries', async () => {
+		const duplicate = { ...apps[0] }
+		const store = createAppStore(
+			client({
+				getApps: vi.fn().mockResolvedValue({
+					apps: [apps[0], duplicate, apps[1]],
+					hasCache: true,
+				}),
+			}),
+		)
+
+		await store.getState().load()
+		store.getState().replaceApps([apps[0], duplicate, apps[1]])
+		store.getState().applyDelta({
+			generation: 1,
+			upserted: [apps[0], duplicate],
+			removedIds: [],
+			summary: { added: 0, removed: 0, updated: 0 },
+		})
+
+		expect(store.getState().apps.map(app => app.id)).toEqual([
+			'code',
+			'chrome',
+		])
+	})
+
+	it('hides visible shortcut and executable duplicates for the same product', () => {
+		const shortcut = app({
+			id: 'battle-lnk',
+			name: 'Battle.net',
+			path: String.raw`C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Battle.net\Battle.net.lnk`,
+			category: 'games',
+			launchKind: 'shortcut',
+			sourceKind: 'start_menu',
+		})
+		const executable = app({
+			id: 'battle-exe',
+			name: 'Battle.net',
+			path: String.raw`D:\Games\Battle.net\Battle.net.exe`,
+			category: 'games',
+			launchKind: 'executable',
+			sourceKind: 'portable',
+		})
+		const store = createAppStore(client())
+		store.setState({ apps: [executable, shortcut] })
+
+		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
+			'battle-lnk',
+		])
+	})
+
+	it('hides launcher executable when a game shortcut exists', () => {
+		const shortcut = app({
+			id: 'wow-lnk',
+			name: 'World of Warcraft',
+			path: String.raw`C:\ProgramData\Microsoft\Windows\Start Menu\Programs\World of Warcraft\World of Warcraft.lnk`,
+			category: 'games',
+			launchKind: 'shortcut',
+			sourceKind: 'start_menu',
+		})
+		const executable = app({
+			id: 'wow-launcher',
+			name: 'World of Warcraft Launcher',
+			path: String.raw`D:\Games\World of Warcraft\World of Warcraft Launcher.exe`,
+			category: 'games',
+			launchKind: 'executable',
+			sourceKind: 'portable',
+		})
+		const store = createAppStore(client())
+		store.setState({ apps: [executable, shortcut] })
+
+		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
+			'wow-lnk',
+		])
+	})
+
+	it('hides duplicate executable catalog entries with the same product name', () => {
+		const steam = app({
+			id: 'hearthstone-steam',
+			name: 'Hearthstone',
+			path: 'steam://rungameid/123',
+			category: 'games',
+			sourceKind: 'steam',
+		})
+		const executable = app({
+			id: 'hearthstone-exe',
+			name: 'Hearthstone',
+			path: String.raw`D:\Games\Hearthstone\Hearthstone.exe`,
+			category: 'games',
+			sourceKind: 'portable',
+		})
+		const store = createAppStore(client())
+		store.setState({ apps: [executable, steam] })
+
+		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
+			'hearthstone-steam',
+		])
+	})
+
+	it('hides cached TablePlus shortcut and versioned executable duplicates', () => {
+		const shortcut = app({
+			id: 'tableplus-lnk',
+			name: 'TablePlus',
+			path: String.raw`C:\ProgramData\Microsoft\Windows\Start Menu\Programs\TablePlus\TablePlus.lnk`,
+			category: 'other',
+			launchKind: 'shortcut',
+			sourceKind: 'start_menu',
+			publisher: 'TablePlus Inc',
+			version: '6.4.0.0',
+		})
+		const executable = app({
+			id: 'tableplus-exe',
+			name: 'TablePlus 6.4.0',
+			path: String.raw`D:\Tools\TablePlus\TablePlus.exe`,
+			category: 'other',
+			launchKind: 'executable',
+			sourceKind: 'registry',
+			publisher: 'TablePlus, Inc',
+			version: '6.4.0',
+		})
+		const store = createAppStore(client())
+		store.setState({ apps: [executable, shortcut] })
+
+		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
+			'tableplus-lnk',
+		])
+	})
+
+	it('hides shortcut and executable duplicates even when publisher spelling differs', () => {
+		const shortcut = app({
+			id: 'assistant-lnk',
+			name: 'Assistant',
+			path: String.raw`C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Assistant\Assistant.lnk`,
+			category: 'other',
+			launchKind: 'shortcut',
+			sourceKind: 'start_menu',
+			publisher: 'Vendor LLC',
+			version: '5.6.2408.0',
+		})
+		const executable = app({
+			id: 'assistant-exe',
+			name: 'Assistant 5.6.2.1',
+			path: String.raw`D:\Tools\Assistant\AstUtil.exe`,
+			category: 'other',
+			launchKind: 'executable',
+			sourceKind: 'registry',
+			publisher: 'Vendor',
+			version: '5.6.2403.1202',
+		})
+		const store = createAppStore(client())
+		store.setState({ apps: [executable, shortcut] })
+
+		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
+			'assistant-lnk',
+		])
+	})
+
+	it('keeps same-name apps when publishers conflict', () => {
+		const first = app({
+			id: 'app-a',
+			name: 'Assistant',
+			path: String.raw`D:\A\Assistant.exe`,
+			category: 'ai',
+			publisher: 'Vendor A',
+		})
+		const second = app({
+			id: 'app-b',
+			name: 'Assistant',
+			path: String.raw`D:\B\Assistant.exe`,
+			category: 'ai',
+			publisher: 'Vendor B',
+		})
+		const store = createAppStore(client())
+		store.setState({ apps: [first, second] })
+
+		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
+			'app-a',
+			'app-b',
+		])
+	})
+
 	it('filters applications case-insensitively', () => {
 		const store = createAppStore(client())
 		store.setState({ apps, query: 'CHROME' })
 		expect(selectFilteredApps(store.getState())).toEqual([apps[1]])
+	})
+
+	it('resets catalog cache through the client and replaces apps', async () => {
+		const api = client()
+		const store = createAppStore(api)
+
+		await store.getState().resetCatalogCache()
+
+		expect(api.resetCatalogCache).toHaveBeenCalledOnce()
+		expect(store.getState().apps).toEqual([apps[2]])
+		expect(store.getState().hasCache).toBe(true)
+	})
+
+	it('requests priority hydration for visible icon ids', async () => {
+		const api = client()
+		const store = createAppStore(api)
+
+		await store.getState().hydrateVisibleIcons(['code', 'chrome'])
+
+		expect(api.hydrateVisibleIcons).toHaveBeenCalledWith(['code', 'chrome'])
 	})
 
 	it('searches publisher and description', () => {

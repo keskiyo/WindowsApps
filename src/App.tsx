@@ -13,6 +13,7 @@ import { ScanPrompt } from './components/shared/ScanPrompt'
 import { useAppFeedback } from './hooks/useAppFeedback'
 import { useCatalogNavigation } from './hooks/useCatalogNavigation'
 import { useDesktopNavigation } from './hooks/useDesktopNavigation'
+import { catalogChangeMessage } from './lib/catalogChanges'
 import { tauriSystemClient } from './lib/system'
 import {
 	appStore,
@@ -20,26 +21,44 @@ import {
 	selectFilteredApps,
 	type AppState,
 } from './store/appStore'
-import type { AppInfo, SystemClient } from './types'
+import type { AppInfo, SystemClient, UninstallPreview } from './types'
 
 interface AppProps {
 	store?: StoreApi<AppState>
 	systemClient?: SystemClient
 }
 
-export function App({ store = appStore, systemClient = tauriSystemClient }: AppProps) {
+export function App({
+	store = appStore,
+	systemClient = tauriSystemClient,
+}: AppProps) {
 	const state = useStore(store)
 	const filteredApps = selectFilteredApps(state)
 	const categorizedApps = selectCategorizedApps(state)
+	const visibleHydrationIds = filteredApps
+		.slice(0, 48)
+		.map(app => app.id)
+		.join('|')
 	const [drawerOpen, setDrawerOpen] = useState(false)
 	const [infoApp, setInfoApp] = useState<AppInfo | null>(null)
 	const [uninstallApp, setUninstallApp] = useState<AppInfo | null>(null)
+	const [uninstallPreview, setUninstallPreview] =
+		useState<UninstallPreview | null>(null)
+	const [uninstallPreviewLoading, setUninstallPreviewLoading] =
+		useState(false)
+	const [uninstallPreviewError, setUninstallPreviewError] = useState<
+		string | null
+	>(null)
 	const [scanPromptDismissed, setScanPromptDismissed] = useState(false)
 	const menuButtonRef = useRef<HTMLButtonElement>(null)
 	const desktopNavigation = useDesktopNavigation()
 	const closeDrawer = useCallback(() => setDrawerOpen(false), [])
 	const closeInfo = useCallback(() => setInfoApp(null), [])
-	const closeUninstall = useCallback(() => setUninstallApp(null), [])
+	const closeUninstall = useCallback(() => {
+		setUninstallApp(null)
+		setUninstallPreview(null)
+		setUninstallPreviewError(null)
+	}, [])
 	const feedback = useAppFeedback({
 		onLaunch: state.launch,
 		onRefresh: state.refresh,
@@ -63,20 +82,39 @@ export function App({ store = appStore, systemClient = tauriSystemClient }: AppP
 	}
 
 	useEffect(() => {
-		void state.load()
-		let unlisten: (() => void) | undefined
-		let unlistenProgress: (() => void) | undefined
-		void state.subscribe().then(dispose => {
-			unlisten = dispose
-		})
-		void state.subscribeScanProgress().then(dispose => {
-			unlistenProgress = dispose
+		if (!uninstallApp) return
+		let active = true
+		setUninstallPreview(null)
+		setUninstallPreviewError(null)
+		setUninstallPreviewLoading(true)
+		void state
+			.getUninstallPreview(uninstallApp.id)
+			.then(preview => {
+				if (active) setUninstallPreview(preview)
+			})
+			.catch(error => {
+				if (active)
+					setUninstallPreviewError(
+						error instanceof Error ? error.message : String(error),
+					)
+			})
+			.finally(() => {
+				if (active) setUninstallPreviewLoading(false)
+			})
+		return () => {
+			active = false
+		}
+	}, [state.getUninstallPreview, uninstallApp])
+
+	useEffect(() => {
+		let dispose: (() => void) | undefined
+		void state.initialize().then(value => {
+			dispose = value
 		})
 		return () => {
-			unlisten?.()
-			unlistenProgress?.()
+			dispose?.()
 		}
-	}, [state.load, state.subscribe, state.subscribeScanProgress])
+	}, [state.initialize])
 
 	useEffect(() => {
 		if (state.error) {
@@ -85,22 +123,49 @@ export function App({ store = appStore, systemClient = tauriSystemClient }: AppP
 	}, [state.error])
 
 	useEffect(() => {
+		if (!state.catalogChange) return
+		if (!state.isRefreshing) {
+			const message = catalogChangeMessage(state.catalogChange)
+			if (message) toast.success(message)
+		}
+		state.clearCatalogChange()
+	}, [state.catalogChange, state.isRefreshing, state.clearCatalogChange])
+
+	useEffect(() => {
 		if (desktopNavigation) setDrawerOpen(false)
 	}, [desktopNavigation])
+
+	useEffect(() => {
+		if (state.activeView === 'settings' || state.isLoading) return
+		const ids = visibleHydrationIds.split('|').filter(Boolean)
+		if (ids.length) void state.hydrateVisibleIcons(ids)
+	}, [
+		state.activeView,
+		state.hydrateVisibleIcons,
+		state.isLoading,
+		visibleHydrationIds,
+	])
 
 	const visibleCategorizedApps = categorizedApps.filter(
 		app => !state.hiddenAppIds.includes(app.id),
 	)
 	const navigationCounts = new Map<string, number>()
 	for (const app of visibleCategorizedApps)
-		navigationCounts.set(app.category, (navigationCounts.get(app.category) ?? 0) + 1)
+		navigationCounts.set(
+			app.category,
+			(navigationCounts.get(app.category) ?? 0) + 1,
+		)
 	const navigationProps = {
 		categoryOrder: state.categoryOrder,
 		categories: state.categories,
 		counts: navigationCounts,
 		activeView: state.activeView,
-		favoriteCount: visibleCategorizedApps.filter(app => state.favoriteAppIds.includes(app.id)).length,
-		hiddenCount: state.hiddenAppIds.filter(id => state.apps.some(app => app.id === id)).length,
+		favoriteCount: visibleCategorizedApps.filter(app =>
+			state.favoriteAppIds.includes(app.id),
+		).length,
+		hiddenCount: state.hiddenAppIds.filter(id =>
+			state.apps.some(app => app.id === id),
+		).length,
 		onSelectView: navigation.selectView,
 		onSelectCategory: navigation.selectCategory,
 		onReorderCategory: state.reorderCategory,
@@ -111,75 +176,79 @@ export function App({ store = appStore, systemClient = tauriSystemClient }: AppP
 		<div className='app-shell min-h-screen text-slate-100'>
 			{desktopNavigation && <AppSidebar {...navigationProps} />}
 			<div className={desktopNavigation ? 'ml-70' : ''}>
-			<Header
-				appCount={state.apps.length}
-				query={state.query}
-				isRefreshing={state.isRefreshing}
-				scanProgress={state.scanProgress}
-				onQueryChange={state.setQuery}
-				onRefresh={feedback.refresh}
-				onCancelScan={state.cancelScan}
-				menuButtonRef={menuButtonRef}
-				onOpenNavigation={() => setDrawerOpen(true)}
-				onGoHome={navigation.goHome}
-				showMenu={!desktopNavigation}
-			/>
-			{drawerOpen && !desktopNavigation && (
-				<AppDrawer
-					apps={visibleCategorizedApps}
-					categoryOrder={state.categoryOrder}
-					categories={state.categories}
-					activeView={state.activeView}
-					favoriteCount={
-						categorizedApps.filter(app =>
-							state.favoriteAppIds.includes(app.id),
-						).length
-					}
-					hiddenCount={navigationProps.hiddenCount}
-					triggerRef={menuButtonRef}
-					onSelectView={navigation.selectView}
-					onSelectCategory={navigation.selectCategory}
-					onReorderCategory={state.reorderCategory}
-					onCreateCategory={state.createCategory}
-					onClose={closeDrawer}
+				<Header
+					appCount={state.apps.length}
+					query={state.query}
+					isRefreshing={state.isRefreshing}
+					scanProgress={state.scanProgress}
+					onQueryChange={state.setQuery}
+					onRefresh={feedback.refresh}
+					onCancelScan={state.cancelScan}
+					menuButtonRef={menuButtonRef}
+					onOpenNavigation={() => setDrawerOpen(true)}
+					onGoHome={navigation.goHome}
+					showMenu={!desktopNavigation}
 				/>
-			)}
-			<main className='mx-auto w-full max-w-375 px-5 pb-12 pt-7 sm:px-8'>
-				{state.activeView === 'settings' ? (
-					<SettingsPage client={systemClient} />
-				) : !state.isLoading &&
-				!state.hasCache &&
-				!state.apps.length &&
-				!scanPromptDismissed ? (
-					<ScanPrompt
-						isScanning={state.isRefreshing}
-						onDismiss={() => setScanPromptDismissed(true)}
-						onScan={feedback.refresh}
-					/>
-				) : (
-					<AppGrid
-						apps={filteredApps}
-						isLoading={state.isLoading}
-						hasQuery={state.query.trim().length > 0}
-						activeView={state.activeView}
+				{drawerOpen && !desktopNavigation && (
+					<AppDrawer
+						apps={visibleCategorizedApps}
 						categoryOrder={state.categoryOrder}
 						categories={state.categories}
-						collapsedCategories={state.collapsedCategories}
-						favoriteAppIds={state.favoriteAppIds}
-						onToggleCategory={state.toggleCategory}
-						onToggleFavorite={state.toggleFavorite}
+						activeView={state.activeView}
+						favoriteCount={
+							categorizedApps.filter(app =>
+								state.favoriteAppIds.includes(app.id),
+							).length
+						}
+						hiddenCount={navigationProps.hiddenCount}
+						triggerRef={menuButtonRef}
+						onSelectView={navigation.selectView}
+						onSelectCategory={navigation.selectCategory}
 						onReorderCategory={state.reorderCategory}
-						onMoveApp={state.moveApp}
-						onLaunch={feedback.launch}
-						onInfo={setInfoApp}
-						onUninstall={setUninstallApp}
-						onHide={state.hideApp}
-						onRestore={state.restoreApp}
-						onRenameCategory={state.renameCategory}
-						onDeleteCategory={state.deleteCategory}
+						onCreateCategory={state.createCategory}
+						onClose={closeDrawer}
 					/>
 				)}
-			</main>
+				<main className='mx-auto w-full max-w-375 px-5 pb-12 pt-7 sm:px-8'>
+					{state.activeView === 'settings' ? (
+						<SettingsPage
+							client={systemClient}
+							onForceFullScan={state.forceFullScan}
+							onResetCatalogCache={state.resetCatalogCache}
+						/>
+					) : !state.isLoading &&
+					  !state.hasCache &&
+					  !state.apps.length &&
+					  !scanPromptDismissed ? (
+						<ScanPrompt
+							isScanning={state.isRefreshing}
+							onDismiss={() => setScanPromptDismissed(true)}
+							onScan={feedback.refresh}
+						/>
+					) : (
+						<AppGrid
+							apps={filteredApps}
+							isLoading={state.isLoading}
+							hasQuery={state.query.trim().length > 0}
+							activeView={state.activeView}
+							categoryOrder={state.categoryOrder}
+							categories={state.categories}
+							collapsedCategories={state.collapsedCategories}
+							favoriteAppIds={state.favoriteAppIds}
+							onToggleCategory={state.toggleCategory}
+							onToggleFavorite={state.toggleFavorite}
+							onReorderCategory={state.reorderCategory}
+							onMoveApp={state.moveApp}
+							onLaunch={feedback.launch}
+							onInfo={setInfoApp}
+							onUninstall={setUninstallApp}
+							onHide={state.hideApp}
+							onRestore={state.restoreApp}
+							onRenameCategory={state.renameCategory}
+							onDeleteCategory={state.deleteCategory}
+						/>
+					)}
+				</main>
 			</div>
 			{infoApp && (
 				<AppInfoDialog
@@ -191,6 +260,9 @@ export function App({ store = appStore, systemClient = tauriSystemClient }: AppP
 			{uninstallApp && (
 				<UninstallDialog
 					appName={uninstallApp.name}
+					preview={uninstallPreview}
+					isPreviewLoading={uninstallPreviewLoading}
+					previewError={uninstallPreviewError}
 					onClose={closeUninstall}
 					onConfirm={confirmUninstall}
 				/>

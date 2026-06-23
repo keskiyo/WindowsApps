@@ -33,17 +33,25 @@ fn should_visit(entry: &DirEntry, excluded: &[PathBuf]) -> bool {
     if entry.depth() == 0 {
         return true;
     }
-    let path = entry.path().to_string_lossy().to_lowercase();
+    if !entry.file_type().is_dir() {
+        return true;
+    }
+    should_visit_directory(entry.path(), excluded)
+}
+
+pub(super) fn should_visit_directory(path: &Path, excluded: &[PathBuf]) -> bool {
+    let path = path.to_string_lossy().to_lowercase();
     if excluded
         .iter()
         .any(|value| path.starts_with(&value.to_string_lossy().to_lowercase()))
     {
         return false;
     }
-    if !entry.file_type().is_dir() {
-        return true;
-    }
-    let name = entry.file_name().to_string_lossy().to_lowercase();
+    let name = Path::new(&path)
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_lowercase();
     !matches!(
         name.as_str(),
         "$recycle.bin"
@@ -68,7 +76,7 @@ fn should_visit(entry: &DirEntry, excluded: &[PathBuf]) -> bool {
     )
 }
 
-fn is_portable_candidate(path: &Path) -> bool {
+pub(super) fn is_portable_candidate(path: &Path) -> bool {
     if !path
         .extension()
         .is_some_and(|value| value.eq_ignore_ascii_case("exe"))

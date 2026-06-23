@@ -6,22 +6,35 @@ import {
 	HardDrive,
 	Keyboard,
 	Power,
+	RefreshCw,
+	RotateCcw,
 	Send,
 	Trash2,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { ScanSettings, SystemClient, SystemSettings } from '../../types'
+import { UninstallHistory } from './UninstallHistory'
 
 interface Props {
 	client: SystemClient
+	onForceFullScan?: () => Promise<void>
+	onResetCatalogCache?: () => Promise<void>
 }
 
-export function SettingsPage({ client }: Props) {
+export function SettingsPage({
+	client,
+	onForceFullScan,
+	onResetCatalogCache,
+}: Props) {
 	const [settings, setSettings] = useState<SystemSettings | null>(null)
 	const [error, setError] = useState<string | null>(null)
 	const [saving, setSaving] = useState(false)
 	const [includedPath, setIncludedPath] = useState('')
 	const [excludedPath, setExcludedPath] = useState('')
+	const [confirmForce, setConfirmForce] = useState(false)
+	const [forcing, setForcing] = useState(false)
+	const [confirmReset, setConfirmReset] = useState(false)
+	const [resetting, setResetting] = useState(false)
 	useEffect(() => {
 		let active = true
 		client
@@ -85,6 +98,32 @@ export function SettingsPage({ client }: Props) {
 			...settings.scanSettings,
 			[kind]: settings.scanSettings[kind].filter(path => path !== value),
 		})
+	}
+	async function forceFullScan() {
+		if (!onForceFullScan || forcing) return
+		setForcing(true)
+		setError(null)
+		try {
+			await onForceFullScan()
+			setConfirmForce(false)
+		} catch (reason) {
+			setError(String(reason))
+		} finally {
+			setForcing(false)
+		}
+	}
+	async function resetCatalogCache() {
+		if (!onResetCatalogCache || resetting) return
+		setResetting(true)
+		setError(null)
+		try {
+			await onResetCatalogCache()
+			setConfirmReset(false)
+		} catch (reason) {
+			setError(String(reason))
+		} finally {
+			setResetting(false)
+		}
 	}
 	return (
 		<section aria-labelledby='settings-title' className='mx-auto max-w-3xl'>
@@ -192,6 +231,104 @@ export function SettingsPage({ client }: Props) {
 					/>
 				</div>
 			</div>
+			{onForceFullScan && (
+				<div className='mt-5 rounded-2xl border border-white/8 bg-slate-900/55 p-5'>
+					<div className='flex items-center gap-4'>
+						<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-slate-950/60 text-blue-300'>
+							<RefreshCw size={19} aria-hidden='true' />
+						</span>
+						<div className='min-w-0 flex-1'>
+							<h2 className='font-medium'>Catalog maintenance</h2>
+							<p className='mt-1 text-sm leading-6 text-slate-500'>
+								Discard the incremental scan index and inspect every
+								configured location again. Categories, Favorites and Hidden
+								apps are preserved.
+							</p>
+						</div>
+						<div className='flex shrink-0 flex-wrap gap-2'>
+							<button
+								type='button'
+								disabled={forcing || resetting}
+								onClick={() => setConfirmForce(true)}
+								className='rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-400 disabled:opacity-50'
+							>
+								Force full scan
+							</button>
+							{onResetCatalogCache && (
+								<button
+									type='button'
+									disabled={forcing || resetting}
+									onClick={() => setConfirmReset(true)}
+									className='inline-flex items-center gap-2 rounded-xl border border-red-400/20 px-4 py-2.5 text-sm font-medium text-red-200 hover:bg-red-500/10 disabled:opacity-50'
+								>
+									<RotateCcw size={16} aria-hidden='true' />
+									Reset catalog cache
+								</button>
+							)}
+						</div>
+					</div>
+					{confirmForce && (
+						<div
+							role='dialog'
+							aria-label='Confirm full scan'
+							className='mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/20 bg-amber-400/8 p-4'
+						>
+							<p className='text-sm text-amber-100'>
+								The next scan will take longer than an incremental refresh.
+							</p>
+							<div className='flex gap-2'>
+								<button
+									type='button'
+									disabled={forcing}
+									onClick={() => setConfirmForce(false)}
+									className='rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-white/5'
+								>
+									Cancel
+								</button>
+								<button
+									type='button'
+									disabled={forcing}
+									onClick={() => void forceFullScan()}
+									className='rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-white hover:bg-amber-400 disabled:opacity-50'
+								>
+									{forcing ? 'Scanning…' : 'Confirm full scan'}
+								</button>
+							</div>
+						</div>
+					)}
+					{confirmReset && (
+						<div
+							role='dialog'
+							aria-label='Confirm catalog cache reset'
+							className='mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-400/20 bg-red-500/8 p-4'
+						>
+							<p className='text-sm text-red-100'>
+								This removes the local app cache and icon cache, then scans
+								every configured location again. Favorites, Hidden apps and
+								categories are preserved.
+							</p>
+							<div className='flex gap-2'>
+								<button
+									type='button'
+									disabled={resetting}
+									onClick={() => setConfirmReset(false)}
+									className='rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-white/5'
+								>
+									Cancel
+								</button>
+								<button
+									type='button'
+									disabled={resetting}
+									onClick={() => void resetCatalogCache()}
+									className='rounded-lg bg-red-500 px-3 py-2 text-sm font-medium text-white hover:bg-red-400 disabled:opacity-50'
+								>
+									{resetting ? 'Resetting…' : 'Confirm reset'}
+								</button>
+							</div>
+						</div>
+					)}
+				</div>
+			)}
 			<div className='overflow-hidden mt-5 rounded-2xl border border-white/8 bg-slate-900/55'>
 				<div className='flex items-center gap-4 border-b border-white/7 p-5'>
 					<span className='grid size-10 place-items-center rounded-xl bg-slate-950/60 text-blue-300'>
@@ -261,6 +398,7 @@ export function SettingsPage({ client }: Props) {
 					{settings.shortcut.error}
 				</p>
 			)}
+			<UninstallHistory client={client} />
 			{error && (
 				<p role='alert' className='mt-4 text-sm text-red-300'>
 					{error}

@@ -29,10 +29,13 @@ The installer uses Tauri's WebView2 download bootstrapper when WebView2 is not a
 
 ```mermaid
 flowchart LR
-  Sources["Windows sources"] --> Scanner["Rust scanner"]
+  Sources["Windows and fixed-drive sources"] --> Scanner["Incremental Rust scanner"]
+  Watchers["Directory and registry watchers"] --> Scanner
   Scanner --> Sanitize["Filter and deduplicate"]
-  Sanitize --> Cache["Local catalog cache"]
-  Cache --> UI["React catalog"]
+  Sanitize --> Cache["Versioned lightweight cache"]
+  Cache --> UI["Immediate React catalog"]
+  Cache --> Hydration["Background icon and metadata hydration"]
+  Hydration --> UI
   UI --> Native["Tauri commands"]
   Native --> Windows["Windows launch and uninstall APIs"]
 ```
@@ -41,15 +44,22 @@ The frontend owns presentation and user preferences. Rust owns system discovery,
 
 The main Tauri commands are:
 
-| Command               | Responsibility                                                                               |
-| --------------------- | -------------------------------------------------------------------------------------------- |
-| `get_apps`            | Return the sanitized cached catalog immediately.                                             |
-| `refresh_apps`        | Perform a requested scan, persist the result, then hydrate missing icons in the background.  |
-| `launch_app`          | Launch an application using its recorded source type.                                        |
-| `uninstall_app`       | Run the concrete uninstall mechanism registered by Windows and return its completion status. |
-| `get_system_settings` | Return version, autostart state, and global shortcut status.                                 |
-| `set_autostart`       | Enable or disable startup for the current Windows account.                                   |
-| `open_telegram`       | Open the fixed project contact link.                                                         |
+| Command                   | Responsibility                                                                                                             |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `get_apps`                | Return the sanitized cached catalog immediately.                                                                           |
+| `refresh_apps`            | Validate changed sources and directories, persist a delta, then hydrate details in background.                             |
+| `force_full_scan`         | Rebuild the complete source catalog and portable filesystem index after user confirmation.                                 |
+| `reset_catalog_cache`     | Remove generated catalog and icon cache files, preserve user preferences, then force a clean scan.                         |
+| `hydrate_visible_icons`   | Start icon and metadata hydration with the currently visible application IDs first.                                        |
+| `start_background_sync`   | Start non-blocking incremental validation after a cached catalog is displayed.                                             |
+| `launch_app`              | Launch an application using its recorded source type.                                                                      |
+| `get_uninstall_preview`   | Return publisher, source, removal method, and exact command for the selected uninstall route.                              |
+| `uninstall_app`           | Run the concrete uninstall mechanism registered by Windows, record a privacy-limited result, and return completion status. |
+| `get_uninstall_history`   | Read the local bounded uninstall history newest-first.                                                                     |
+| `clear_uninstall_history` | Clear the local uninstall history without changing the catalog.                                                            |
+| `get_system_settings`     | Return version, autostart state, and global shortcut status.                                                               |
+| `set_autostart`           | Enable or disable startup for the current Windows account.                                                                 |
+| `open_telegram`           | Open the fixed project contact link.                                                                                       |
 
 ## 4. Catalog discovery pipeline
 
@@ -68,17 +78,17 @@ Removable, optical, and network drives are never included in automatic scanning.
 
 ### Lifecycle
 
-1. Startup reads the last sanitized catalog from the Tauri application data directory.
-2. No full scan runs automatically when a cache is unavailable; the interface asks the user first.
-3. **Scan for apps** starts native discovery on a background task.
-4. Fixed local drives are traversed in parallel. Progress is delivered through `scan://progress`; the header action can cancel the operation.
-5. System directories, caches, development dependency trees, Steam libraries, maintenance tools, and configured exclusions are skipped.
-6. Portable candidates are validated using executable metadata and directory structure before entering the catalog.
-7. The result is sanitized, sorted, written to the local cache, and returned to the interface.
-8. Existing cached icons are reused immediately.
-9. Missing icons are hydrated asynchronously and delivered through the `apps://updated` event.
+1. Startup reads a versioned lightweight catalog from the Tauri application data directory and renders names immediately.
+2. When no cache exists, the interface asks before the first complete scan.
+3. With a cache present, background synchronization validates Windows sources, Steam manifests, and the fixed-drive directory index without blocking startup.
+4. Unchanged portable directories reuse indexed records; changed directories alone are enumerated and inspected. Refresh uses the same incremental path.
+5. **Settings > Catalog maintenance > Force full scan** discards incremental assumptions for one pass and rebuilds the directory index.
+6. System directories, caches, dependency trees, Steam libraries, maintenance tools, configured exclusions, removable drives, and network drives are skipped.
+7. Catalog changes are emitted as generation-tagged deltas. The frontend ignores stale generations and preserves local organization preferences.
+8. Icons are stored separately from the catalog using source fingerprints. The UI can ask Rust to hydrate the currently visible cards first, then the normal background hydrator continues through the remaining catalog in bounded batches.
+9. While the process is running, debounced directory and registry watchers request synchronization for Start Menu, uninstall registry, Steam, and Included-folder changes.
 
-This design keeps normal startup fast while preserving a deliberate refresh path.
+Arbitrary locations on permanent fixed drives are intentionally not watched continuously. Their changes are detected during startup validation or Refresh, which avoids keeping a recursive watcher on every directory of every disk.
 
 ## 5. Deduplication and source priority
 
@@ -99,7 +109,7 @@ Deduplication is intentionally conservative: preserving two uncertain records is
 
 ## 6. Icons and metadata
 
-Icons are extracted from shortcut icon locations, resolved executable targets, package assets, and Windows shell resources. Cached icons are reused by stable application ID before slower hydration begins.
+Icons are extracted from shortcut icon locations, resolved executable targets, package assets, and Windows shell resources. The lightweight catalog never embeds large icon payloads. A separate fingerprinted icon cache supplies reusable icons before slower metadata hydration completes.
 
 The information dialog can display:
 
@@ -146,7 +156,11 @@ The uninstall flow follows this priority:
 2. registered standard vendor/MSI uninstall command;
 3. valid MSIX package uninstall route.
 
+Before execution, the confirmation dialog displays the publisher, catalog source, removal method, and exact command that Rust will start. If preview loading fails, confirmation stays disabled.
+
 If Windows exposes no concrete safe uninstall target, the menu displays a disabled **Uninstall unavailable** item. The application waits for a directly registered process, reports a non-success exit code, and refreshes the catalog after successful completion. It never treats shortcut deletion or recursive folder deletion as an uninstall operation.
+
+Every started uninstall attempt appends a local history entry with app name, publisher, method, result, and Unix timestamp. The history retains the newest 100 entries and deliberately excludes command text, paths, arguments, package identifiers, errors, and usernames. The Settings page can clear this history.
 
 ## 9. Native Windows integrations
 
@@ -178,13 +192,14 @@ The interface runs inside Microsoft Edge WebView2. Production bundles use Tauri'
 
 - The catalog and preferences are stored locally.
 - No application inventory is uploaded.
+- Uninstall history is local, bounded to 100 entries, and excludes command text, paths, arguments, package identifiers, errors, and usernames.
 - No telemetry service is configured.
 - Metadata is not enriched over the network.
 - The CSP restricts content to the application and Tauri IPC endpoints.
 
 ### Destructive operations
 
-- Uninstalling requires an explicit confirmation dialog.
+- Uninstalling requires an explicit confirmation dialog with the command, publisher, source, and removal method shown before execution.
 - Native code invokes registered uninstall mechanisms instead of deleting program files.
 - Removing a category or hiding an item affects only local catalog preferences.
 
@@ -213,7 +228,7 @@ src-tauri/src/platform/windows/ Windows integrations and native operations
 src-tauri/capabilities/         Tauri security capabilities
 ```
 
-Important native modules include `catalog`, `cache`, `registry`, `start_apps`, `icon_extractor`, `launcher`, `uninstaller`, `autostart`, `global_shortcut`, and `lifecycle`.
+Important native modules include `catalog`, `cache`, `incremental`, `sync`, `hydration`, `icon_cache`, `change_watcher`, `registry`, `start_apps`, `icon_extractor`, `launcher`, `uninstaller`, `autostart`, `global_shortcut`, and `lifecycle`.
 
 Portable and game discovery are isolated in `catalog/portable.rs` and `catalog/steam.rs`; fixed-drive enumeration is isolated in `platform/windows/drives.rs`.
 
@@ -280,15 +295,15 @@ Get-FileHash $installer.FullName -Algorithm SHA256
 
 ## 14. Publishing a GitHub Release
 
-1. Run the complete frontend and Rust verification suite.
-2. Build the production bundles with `npm run tauri build`.
-3. Install the generated setup executable on clean Windows 10 x64 and Windows 11 x64 systems.
-4. Verify initial launch, fixed-drive scan progress/cancellation, Steam and portable discovery, cache restart, app launch, category persistence, click-to-open and drag-to-reorder category navigation, Hidden restore, favorites, tray lifecycle, `Win+Shift+Q`, autostart, direct uninstall, and the disabled unavailable state.
-5. Generate SHA-256 checksums for every uploaded artifact.
-6. Create an annotated version tag such as `v0.1.0`.
-7. Create a GitHub Release from that tag.
-8. Upload the NSIS `-setup.exe`, optional MSI, and checksum text.
-9. Publish release notes using the template below.
+The repository includes a tag-driven GitHub Actions workflow at `.github/workflows/release.yml`.
+
+1. Run local verification and clean-machine checks.
+2. Confirm `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` contain the same version.
+3. Push a version tag such as `v0.1.0`.
+4. GitHub Actions validates the tag against all manifests, runs frontend and Rust tests, builds the NSIS x64 installer, writes SHA-256, and creates the GitHub Release.
+5. Review the generated Release notes and attached assets.
+
+The workflow is intentionally tag-only. A tag/version mismatch fails before any Release is published.
 
 ### Release notes template
 
@@ -327,7 +342,11 @@ Do not publish a tag or Release until clean-machine verification is complete.
 
 ### The catalog is empty
 
-Press **Scan for apps**. The first launch intentionally waits for user confirmation before performing a full scan.
+Press **Scan for apps**. The first launch intentionally waits for user confirmation before performing a full scan. If an existing catalog appears stale after Refresh, run **Settings > Catalog maintenance > Force full scan** once to rebuild its index.
+
+### Duplicate or stale entries remain after Refresh
+
+Use **Settings > Catalog maintenance > Reset catalog cache**. This removes generated catalog and icon cache files, keeps favorites, Hidden items, custom categories, and category overrides, then performs a clean full scan.
 
 ### An icon is missing
 
@@ -347,11 +366,11 @@ Confirm that the file came from this repository's Releases page and compare its 
 
 ### Duplicate or maintenance entries remain
 
-Run a fresh scan. If the entry remains, record its displayed name, source, launch target, publisher, and resolved path before reporting it.
+Run a fresh scan or reset the catalog cache. If the entry remains, record its displayed name, source, launch target, publisher, and resolved path before reporting it.
 
 ### A portable application is missing
 
-Confirm that the executable is on a permanent local drive and is not inside a configured exclusion. Add its containing directory under **Settings > Application discovery** when automatic fixed-drive scanning is disabled. Executables without usable product metadata are included only when their filename and parent directory identify the same product; this prevents helper binaries from flooding the catalog.
+Confirm that the executable is on a permanent local drive and is not inside a configured exclusion. Add its containing directory under **Settings > Application discovery** when automatic fixed-drive scanning is disabled. Executables without usable product metadata are included when their filename and parent directory identify the same product, or when the file is a known standalone portable utility such as Rufus. Helper, updater, crash reporter, installer, and documentation executables are filtered to avoid flooding the catalog.
 
 ## 16. Release verification checklist
 

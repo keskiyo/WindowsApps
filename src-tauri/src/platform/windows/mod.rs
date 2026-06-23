@@ -1,8 +1,10 @@
 pub mod autostart;
+pub mod change_watcher;
 pub mod drives;
 pub mod executable_metadata;
 pub mod global_shortcut;
 pub mod icon_extractor;
 pub mod launcher;
 pub mod shortcut;
+pub mod uninstall_history;
 pub mod uninstaller;

@@ -1,11 +1,16 @@
 export type {
 	AppInfo,
+	AppHydrationPatch,
 	AppLaunchKind,
 	AppsClient,
 	AppSourceKind,
 	AppView,
 	CatalogSnapshot,
+	CatalogChangeSummary,
+	CatalogDelta,
 	ScanProgress,
+	UninstallMechanism,
+	UninstallPreview,
 } from './app'
 export {
 	CATEGORY_LABELS,
@@ -18,6 +23,7 @@ export type {
 	ScanSettings,
 	SystemClient,
 	SystemSettings,
+	UninstallHistoryEntry,
 } from './system'
 export type {
 	AppCategory,

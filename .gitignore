@@ -8,6 +8,8 @@ dev-launcher.log
 *.tsbuildinfo
 .superpowers/
 docs/
+.github
+scripts
 
 AGENTS.md
 PRODUCT.md

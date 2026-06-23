@@ -57,6 +57,13 @@ function renderApp(
 		refreshApps: vi.fn().mockResolvedValue(apps),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
+		getUninstallPreview: vi.fn().mockResolvedValue({
+			appName: 'Visual Studio Code',
+			publisher: 'Microsoft',
+			source: 'registry',
+			mechanism: 'registered_command',
+			command: 'C:\\Code\\uninstall.exe /quiet',
+		}),
 		uninstallApp: vi.fn().mockResolvedValue(undefined),
 		onAppsUpdated: vi.fn().mockResolvedValue(() => undefined),
 		onScanProgress: vi.fn().mockResolvedValue(() => undefined),
@@ -76,6 +83,8 @@ function renderApp(
 		}),
 		setAutostart: vi.fn().mockResolvedValue(undefined),
 		setScanSettings: vi.fn().mockImplementation(async settings => settings),
+		getUninstallHistory: vi.fn().mockResolvedValue([]),
+		clearUninstallHistory: vi.fn().mockResolvedValue(undefined),
 		pickFolder: vi.fn().mockResolvedValue(null),
 		openTelegram: vi.fn().mockResolvedValue(undefined),
 		...systemOverrides,
@@ -396,6 +405,12 @@ describe('App', () => {
 		)
 		expect(client.uninstallApp).not.toHaveBeenCalled()
 		expect(document.body.style.overflow).toBe('hidden')
+		expect(await screen.findByText('Microsoft')).toBeInTheDocument()
+		expect(screen.getByText('Registry')).toBeInTheDocument()
+		expect(
+			screen.getByText('Registered uninstall command'),
+		).toBeInTheDocument()
+		expect(screen.getByText('C:\\Code\\uninstall.exe /quiet')).toBeInTheDocument()
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Confirm uninstall' }),
 		)
@@ -418,6 +433,28 @@ describe('App', () => {
 		).toBeInTheDocument()
 		expect(client.uninstallApp).not.toHaveBeenCalled()
 		expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+	})
+
+	it('keeps uninstall confirmation disabled when preview fails', async () => {
+		const { client } = renderApp({
+			getUninstallPreview: vi
+				.fn()
+				.mockRejectedValue(new Error('preview unavailable')),
+		})
+		await userEvent.click(
+			await screen.findByRole('button', {
+				name: 'Manage Visual Studio Code',
+			}),
+		)
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Uninstall' }),
+		)
+
+		expect(await screen.findByText('preview unavailable')).toBeInTheDocument()
+		expect(
+			screen.getByRole('button', { name: 'Confirm uninstall' }),
+		).toBeDisabled()
+		expect(client.uninstallApp).not.toHaveBeenCalled()
 	})
 
 	it('returns to All Apps from the header without clearing search', async () => {

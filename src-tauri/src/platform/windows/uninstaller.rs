@@ -1,5 +1,7 @@
 use crate::catalog::UninstallTarget;
+use serde::{Deserialize, Serialize};
 use std::os::windows::process::CommandExt;
+use std::path::Path;
 use std::process::Command;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -16,6 +18,21 @@ pub enum UninstallDecision {
     Unavailable,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UninstallMechanism {
+    RegisteredCommand,
+    Msi,
+    Msix,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UninstallTargetPreview {
+    pub mechanism: UninstallMechanism,
+    pub command: String,
+}
+
 pub fn decide(target: Option<UninstallTarget>) -> UninstallDecision {
     match target {
         Some(UninstallTarget::Command {
@@ -29,6 +46,34 @@ pub fn decide(target: Option<UninstallTarget>) -> UninstallDecision {
             UninstallDecision::Msix { package_full_name }
         }
         None => UninstallDecision::Unavailable,
+    }
+}
+
+pub fn preview(target: &UninstallTarget) -> UninstallTargetPreview {
+    match target {
+        UninstallTarget::Command {
+            executable,
+            arguments,
+        } => {
+            let mechanism = if is_msiexec(executable) {
+                UninstallMechanism::Msi
+            } else {
+                UninstallMechanism::RegisteredCommand
+            };
+            let command = if arguments.trim().is_empty() {
+                executable.clone()
+            } else {
+                format!("{executable} {arguments}")
+            };
+            UninstallTargetPreview { mechanism, command }
+        }
+        UninstallTarget::Msix { package_full_name } => UninstallTargetPreview {
+            mechanism: UninstallMechanism::Msix,
+            command: format!(
+                "powershell.exe -NoLogo -NoProfile -NonInteractive -Command Remove-AppxPackage -Package '{}'",
+                package_full_name
+            ),
+        },
     }
 }
 
@@ -83,6 +128,14 @@ fn ensure_success(code: Option<i32>, success: bool) -> Result<(), String> {
     }
 }
 
+fn is_msiexec(executable: &str) -> bool {
+    let name = Path::new(executable)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or(executable);
+    name.eq_ignore_ascii_case("msiexec") || name.eq_ignore_ascii_case("msiexec.exe")
+}
+
 fn valid_package_name(value: &str) -> bool {
     !value.is_empty()
         && value.chars().all(|character| {
@@ -114,5 +167,24 @@ mod tests {
     fn validates_msix_package_names() {
         assert!(valid_package_name("OpenAI.Codex_1.2.3.0_x64__abc"));
         assert!(!valid_package_name("package'; Remove-Item C:\\"));
+    }
+
+    #[test]
+    fn formats_uninstall_preview_for_msi_and_msix() {
+        assert_eq!(
+            preview(&UninstallTarget::Command {
+                executable: "msiexec.exe".into(),
+                arguments: "/x {PRODUCT}".into(),
+            })
+            .mechanism,
+            UninstallMechanism::Msi
+        );
+        assert_eq!(
+            preview(&UninstallTarget::Msix {
+                package_full_name: "OpenAI.Codex_1.0_x64__abc".into(),
+            })
+            .mechanism,
+            UninstallMechanism::Msix
+        );
     }
 }

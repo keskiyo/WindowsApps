@@ -2,8 +2,10 @@ mod catalog;
 mod lifecycle;
 mod platform;
 
-use catalog::{cache, AppInfo, LaunchKind, UninstallTarget};
-use platform::windows::{autostart, global_shortcut, launcher, uninstaller};
+use catalog::cache::CatalogCache;
+use catalog::sync::{compute_delta, SyncRequest};
+use catalog::{cache, AppInfo, LaunchKind, SourceKind, UninstallTarget};
+use platform::windows::{autostart, global_shortcut, launcher, uninstall_history, uninstaller};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -13,33 +15,181 @@ use std::sync::{
 };
 use tauri::{Emitter, Manager};
 
-static UNINSTALL_TARGETS: OnceLock<Mutex<HashMap<String, UninstallTarget>>> = OnceLock::new();
-static SCAN_CANCELLED: AtomicBool = AtomicBool::new(false);
+#[derive(Clone, Debug)]
+struct UninstallRecord {
+    app_name: String,
+    publisher: Option<String>,
+    source_kind: SourceKind,
+    target: UninstallTarget,
+}
 
-fn uninstall_targets() -> &'static Mutex<HashMap<String, UninstallTarget>> {
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UninstallPreview {
+    app_name: String,
+    publisher: Option<String>,
+    source: SourceKind,
+    mechanism: uninstaller::UninstallMechanism,
+    command: String,
+}
+
+static UNINSTALL_TARGETS: OnceLock<Mutex<HashMap<String, UninstallRecord>>> = OnceLock::new();
+static SCAN_CANCELLED: AtomicBool = AtomicBool::new(false);
+static SYNC_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+static CHANGE_WATCHER: OnceLock<Mutex<Option<platform::windows::change_watcher::WatcherGuard>>> =
+    OnceLock::new();
+
+fn sync_lock() -> &'static Mutex<()> {
+    SYNC_LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn restart_change_watcher(app: tauri::AppHandle, settings: &catalog::scan_settings::ScanSettings) {
+    let paths = catalog::watcher_paths(settings);
+    let callback_handle = app.clone();
+    let callback = Arc::new(move || {
+        let handle = callback_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            let blocking_handle = handle.clone();
+            let _ = tauri::async_runtime::spawn_blocking(move || {
+                synchronize_catalog(&blocking_handle, SyncRequest::Watch)
+            })
+            .await;
+        });
+    });
+    let watcher = platform::windows::change_watcher::start(paths, callback);
+    if let Ok(mut current) = CHANGE_WATCHER.get_or_init(|| Mutex::new(None)).lock() {
+        *current = Some(watcher);
+    }
+}
+
+fn uninstall_targets() -> &'static Mutex<HashMap<String, UninstallRecord>> {
     UNINSTALL_TARGETS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn remember_uninstall_targets(apps: &[AppInfo]) {
     let targets = apps
         .iter()
-        .filter_map(|app| app.uninstall.clone().map(|target| (app.id.clone(), target)))
+        .filter_map(|app| {
+            app.uninstall.clone().map(|target| {
+                (
+                    app.id.clone(),
+                    UninstallRecord {
+                        app_name: app.name.clone(),
+                        publisher: app.publisher.clone(),
+                        source_kind: app.source_kind,
+                        target,
+                    },
+                )
+            })
+        })
         .collect();
     if let Ok(mut stored) = uninstall_targets().lock() {
         *stored = targets;
     }
 }
 
-fn load_sanitized_cache(app_data_dir: &Path) -> Option<Vec<AppInfo>> {
-    let original = cache::read_cache(app_data_dir)?;
-    let apps = prepare_cached_apps(
-        original.clone(),
-        catalog::enrich_registered_uninstall_metadata,
-    );
-    if apps != original {
-        let _ = cache::write_cache(app_data_dir, &apps);
+fn preview_for(record: &UninstallRecord) -> UninstallPreview {
+    let target = uninstaller::preview(&record.target);
+    UninstallPreview {
+        app_name: record.app_name.clone(),
+        publisher: record.publisher.clone(),
+        source: record.source_kind,
+        mechanism: target.mechanism,
+        command: target.command,
     }
-    Some(apps)
+}
+
+fn execute_and_record(
+    app_data_dir: &Path,
+    record: UninstallRecord,
+    executor: impl FnOnce(UninstallTarget) -> Result<(), String>,
+) -> Result<(), String> {
+    let preview = uninstaller::preview(&record.target);
+    let result = executor(record.target);
+    let history_result = if result.is_ok() {
+        uninstall_history::UninstallResult::Succeeded
+    } else {
+        uninstall_history::UninstallResult::Failed
+    };
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_secs());
+    let _ = uninstall_history::append(
+        app_data_dir,
+        uninstall_history::UninstallHistoryEntry {
+            id: String::new(),
+            timestamp,
+            app_name: record.app_name,
+            publisher: record.publisher,
+            mechanism: preview.mechanism,
+            result: history_result,
+        },
+    );
+    result
+}
+
+fn spawn_hydration(
+    app: tauri::AppHandle,
+    app_data_dir: std::path::PathBuf,
+    apps: Vec<AppInfo>,
+    generation: u64,
+) {
+    tauri::async_runtime::spawn(async move {
+        let hydration_dir = app_data_dir.clone();
+        let hydrated = tauri::async_runtime::spawn_blocking(move || {
+            catalog::hydration::hydrate(&hydration_dir, &apps, generation)
+        })
+        .await;
+        let Ok(patches) = hydrated else {
+            return;
+        };
+        for batch in catalog::hydration::batch_patches(patches.clone(), 32) {
+            let current = cache::read_document(&app_data_dir)
+                .is_some_and(|document| document.generation == generation);
+            if !current {
+                return;
+            }
+            let _ = app.emit("catalog://patches", batch);
+        }
+        let Ok(_guard) = sync_lock().lock() else {
+            return;
+        };
+        let Some(mut document) = cache::read_document(&app_data_dir) else {
+            return;
+        };
+        if document.generation != generation {
+            return;
+        }
+        for patch in patches {
+            let Some(target) = document.apps.iter_mut().find(|app| app.id == patch.id) else {
+                continue;
+            };
+            target.description = patch.description;
+            target.version = patch.version;
+            target.publisher = patch.publisher;
+            target.install_location = patch.install_location;
+            target.can_uninstall = patch.can_uninstall.unwrap_or(target.can_uninstall);
+        }
+        let _ = cache::write_document(&app_data_dir, &document);
+    });
+}
+
+fn load_sanitized_document(app_data_dir: &Path) -> Option<CatalogCache> {
+    let mut document = cache::read_document(app_data_dir)?;
+    let original = document.apps.clone();
+    document.apps = catalog::sanitize(document.apps);
+    for app in &mut document.apps {
+        app.can_uninstall = app.uninstall.is_some();
+        app.icon_base64 = None;
+    }
+    if document.apps != original {
+        let _ = cache::write_document(app_data_dir, &document);
+    }
+    Some(document)
+}
+
+fn load_sanitized_cache(app_data_dir: &Path) -> Option<Vec<AppInfo>> {
+    load_sanitized_document(app_data_dir).map(|document| document.apps)
 }
 
 fn prepare_cached_apps(
@@ -59,6 +209,7 @@ fn prepare_cached_apps(
 struct CatalogSnapshot {
     apps: Vec<AppInfo>,
     has_cache: bool,
+    generation: u64,
 }
 
 #[derive(Serialize)]
@@ -134,6 +285,7 @@ async fn set_scan_settings(
         .map_err(|error| format!("Could not open the application data folder: {error}"))?;
     catalog::scan_settings::write(&app_data_dir, &settings)
         .map_err(|error| format!("Could not save scan settings: {error}"))?;
+    restart_change_watcher(app, &settings);
     Ok(settings)
 }
 
@@ -162,58 +314,122 @@ async fn get_apps(app: tauri::AppHandle) -> Result<CatalogSnapshot, String> {
         .path()
         .app_data_dir()
         .map_err(|error| format!("Could not open the application data folder: {error}"))?;
-    let cached = load_sanitized_cache(&app_data_dir);
+    let cached = load_sanitized_document(&app_data_dir);
     let has_cache = cached.is_some();
-    let apps = cached.unwrap_or_default();
+    let document = cached.unwrap_or_default();
+    let generation = document.generation;
+    let apps = document.apps;
     remember_uninstall_targets(&apps);
-    Ok(CatalogSnapshot { has_cache, apps })
+    spawn_hydration(app.clone(), app_data_dir, apps.clone(), generation);
+    Ok(CatalogSnapshot {
+        has_cache,
+        apps,
+        generation,
+    })
 }
 
-#[tauri::command]
-async fn refresh_apps(app: tauri::AppHandle) -> Result<Vec<AppInfo>, String> {
+fn synchronize_catalog(
+    app: &tauri::AppHandle,
+    request: SyncRequest,
+) -> Result<Vec<AppInfo>, String> {
+    let _guard = sync_lock()
+        .lock()
+        .map_err(|_| "Application synchronization is temporarily unavailable".to_string())?;
     let app_data_dir = app
         .path()
         .app_data_dir()
         .map_err(|error| format!("Could not open the application data folder: {error}"))?;
-    let cached = load_sanitized_cache(&app_data_dir).unwrap_or_default();
+    let previous = load_sanitized_document(&app_data_dir).unwrap_or_default();
     let settings = catalog::scan_settings::read(&app_data_dir);
     SCAN_CANCELLED.store(false, Ordering::Relaxed);
-    let progress_handle = app.clone();
-    let mut apps = tauri::async_runtime::spawn_blocking(move || {
-        catalog::discover_apps_with(
-            &settings,
-            |progress| {
-                let _ = progress_handle.emit("scan://progress", progress);
-            },
-            || SCAN_CANCELLED.load(Ordering::Relaxed),
-        )
-    })
-    .await
-    .map_err(|error| format!("Application scanning was interrupted: {error}"))?;
+    let document = catalog::sync::synchronize(
+        &previous,
+        &settings,
+        request,
+        |progress| {
+            let _ = app.emit("scan://progress", progress);
+        },
+        || SCAN_CANCELLED.load(Ordering::Relaxed),
+    );
     if SCAN_CANCELLED.load(Ordering::Relaxed) {
         return Err("Application scan cancelled".into());
     }
-    catalog::reuse_cached_icons(&mut apps, &cached);
-    remember_uninstall_targets(&apps);
-    cache::write_cache(&app_data_dir, &apps)
+    let delta = compute_delta(document.generation, &previous.apps, &document.apps);
+    remember_uninstall_targets(&document.apps);
+    cache::write_document(&app_data_dir, &document)
         .map_err(|error| format!("Could not save the application cache: {error}"))?;
+    if delta.summary.added + delta.summary.removed + delta.summary.updated > 0 {
+        let _ = app.emit("catalog://delta", &delta);
+        let _ = app.emit("catalog://changed", &delta.summary);
+    }
+    let _ = app.emit("apps://updated", &document.apps);
+    spawn_hydration(
+        app.clone(),
+        app_data_dir,
+        document.apps.clone(),
+        document.generation,
+    );
+    Ok(document.apps)
+}
 
-    let response = apps.clone();
-    let handle = app.clone();
+#[tauri::command]
+async fn refresh_apps(app: tauri::AppHandle) -> Result<Vec<AppInfo>, String> {
+    tauri::async_runtime::spawn_blocking(move || synchronize_catalog(&app, SyncRequest::Refresh))
+        .await
+        .map_err(|error| format!("Application scanning was interrupted: {error}"))?
+}
+
+#[tauri::command]
+async fn force_full_scan(app: tauri::AppHandle) -> Result<Vec<AppInfo>, String> {
+    tauri::async_runtime::spawn_blocking(move || synchronize_catalog(&app, SyncRequest::Force))
+        .await
+        .map_err(|error| format!("Application scanning was interrupted: {error}"))?
+}
+
+#[tauri::command]
+async fn reset_catalog_cache(app: tauri::AppHandle) -> Result<Vec<AppInfo>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let app_data_dir = app
+            .path()
+            .app_data_dir()
+            .map_err(|error| format!("Could not open the application data folder: {error}"))?;
+        cache::reset(&app_data_dir)
+            .map_err(|error| format!("Could not reset catalog cache: {error}"))?;
+        catalog::icon_cache::clear(&app_data_dir)
+            .map_err(|error| format!("Could not reset icon cache: {error}"))?;
+        synchronize_catalog(&app, SyncRequest::Force)
+    })
+    .await
+    .map_err(|error| format!("Catalog reset was interrupted: {error}"))?
+}
+
+#[tauri::command]
+async fn hydrate_visible_icons(app: tauri::AppHandle, ids: Vec<String>) -> Result<(), String> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not open the application data folder: {error}"))?;
+    let Some(document) = cache::read_document(&app_data_dir) else {
+        return Ok(());
+    };
+    let generation = document.generation;
+    let apps = catalog::hydration::prioritize_apps(document.apps, &ids);
+    spawn_hydration(app, app_data_dir, apps, generation);
+    Ok(())
+}
+
+#[tauri::command]
+fn start_background_sync(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
-        let hydrated = tauri::async_runtime::spawn_blocking(move || {
-            let mut apps = apps;
-            catalog::hydrate_missing_icons(&mut apps);
-            apps
+        let handle = app.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || {
+            synchronize_catalog(&handle, SyncRequest::Startup)
         })
         .await;
-        if let Ok(apps) = hydrated {
-            remember_uninstall_targets(&apps);
-            let _ = cache::write_cache(&app_data_dir, &apps);
-            let _ = handle.emit("apps://updated", apps);
-        }
     });
-    Ok(response)
 }
 
 #[tauri::command]
@@ -224,15 +440,56 @@ async fn launch_app(launch_kind: LaunchKind, path: String) -> Result<(), String>
 }
 
 #[tauri::command]
-async fn uninstall_app(id: String) -> Result<(), String> {
-    let target = uninstall_targets()
+async fn get_uninstall_preview(id: String) -> Result<UninstallPreview, String> {
+    let record = uninstall_targets()
         .lock()
         .map_err(|_| "Uninstall data is temporarily unavailable".to_string())?
         .get(&id)
-        .cloned();
-    tauri::async_runtime::spawn_blocking(move || uninstaller::execute(target))
-        .await
-        .map_err(|error| format!("Uninstall launch was interrupted: {error}"))??;
+        .cloned()
+        .ok_or_else(|| "Uninstall is unavailable for this application".to_string())?;
+    Ok(preview_for(&record))
+}
+
+#[tauri::command]
+async fn get_uninstall_history(
+    app: tauri::AppHandle,
+) -> Result<Vec<uninstall_history::UninstallHistoryEntry>, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not open the application data folder: {error}"))?;
+    Ok(uninstall_history::read(&app_data_dir))
+}
+
+#[tauri::command]
+async fn clear_uninstall_history(app: tauri::AppHandle) -> Result<(), String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not open the application data folder: {error}"))?;
+    uninstall_history::clear(&app_data_dir)
+        .map_err(|error| format!("Could not clear uninstall history: {error}"))
+}
+
+#[tauri::command]
+async fn uninstall_app(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let record = uninstall_targets()
+        .lock()
+        .map_err(|_| "Uninstall data is temporarily unavailable".to_string())?
+        .get(&id)
+        .cloned()
+        .ok_or_else(|| "Uninstall is unavailable for this application".to_string())?;
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not open the application data folder: {error}"))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        execute_and_record(&app_data_dir, record, |target| {
+            uninstaller::execute(Some(target))
+        })
+    })
+    .await
+    .map_err(|error| format!("Uninstall launch was interrupted: {error}"))??;
     Ok(())
 }
 
@@ -262,6 +519,8 @@ pub fn run() {
                 if let Some(apps) = load_sanitized_cache(&app_data_dir) {
                     remember_uninstall_targets(&apps);
                 }
+                let settings = catalog::scan_settings::read(&app_data_dir);
+                restart_change_watcher(app.handle().clone(), &settings);
             }
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -275,9 +534,16 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_apps,
             refresh_apps,
+            force_full_scan,
+            reset_catalog_cache,
+            hydrate_visible_icons,
+            start_background_sync,
             cancel_scan,
             launch_app,
+            get_uninstall_preview,
             uninstall_app,
+            get_uninstall_history,
+            clear_uninstall_history,
             get_system_settings,
             set_autostart,
             set_scan_settings,
@@ -379,5 +645,51 @@ mod tests {
             excluded_paths: Vec::new(),
         };
         assert!(normalize_scan_settings(invalid).is_err());
+    }
+
+    fn uninstall_record(name: &str) -> UninstallRecord {
+        UninstallRecord {
+            app_name: name.into(),
+            publisher: Some("Publisher".into()),
+            source_kind: SourceKind::Registry,
+            target: UninstallTarget::Command {
+                executable: "uninstall.exe".into(),
+                arguments: "/quiet".into(),
+            },
+        }
+    }
+
+    #[test]
+    fn records_successful_uninstall_without_command_details() {
+        let dir = tempfile::tempdir().unwrap();
+        execute_and_record(dir.path(), uninstall_record("Editor"), |_| Ok(())).unwrap();
+
+        let history = uninstall_history::read(dir.path());
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].app_name, "Editor");
+        assert_eq!(
+            history[0].result,
+            uninstall_history::UninstallResult::Succeeded
+        );
+        let serialized = serde_json::to_value(&history[0]).unwrap();
+        assert!(serialized.get("command").is_none());
+        assert!(serialized.get("path").is_none());
+        assert!(serialized.get("error").is_none());
+    }
+
+    #[test]
+    fn records_failed_uninstall_and_returns_original_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let error = execute_and_record(dir.path(), uninstall_record("Editor"), |_| {
+            Err("boom".into())
+        })
+        .unwrap_err();
+
+        let history = uninstall_history::read(dir.path());
+        assert_eq!(error, "boom");
+        assert_eq!(
+            history[0].result,
+            uninstall_history::UninstallResult::Failed
+        );
     }
 }
