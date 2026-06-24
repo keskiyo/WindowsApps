@@ -132,6 +132,34 @@ describe('app store', () => {
 		])
 	})
 
+	it('merges siblings via the family bucket after an earlier merge', () => {
+		const shortcut = app({
+			id: 's',
+			name: 'Acme',
+			path: String.raw`C:\Menu\Acme.lnk`,
+			category: 'other',
+			launchKind: 'shortcut',
+		})
+		const executable = app({
+			id: 'e',
+			name: 'Acme Launcher',
+			path: String.raw`C:\Apps\Acme\Acme.exe`,
+			category: 'other',
+		})
+		const sibling = app({
+			id: 'x',
+			name: 'Acme Launcher',
+			path: String.raw`D:\Copy\Acme.exe`,
+			category: 'other',
+		})
+		const store = createAppStore(client())
+		store.setState({ apps: [shortcut, executable, sibling] })
+
+		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
+			's',
+		])
+	})
+
 	it('hides launcher executable when a game shortcut exists', () => {
 		const shortcut = app({
 			id: 'wow-lnk',
@@ -451,10 +479,7 @@ describe('app store', () => {
 		await expect(
 			store.getState().uninstall('codex'),
 		).resolves.toBeUndefined()
-		expect(api.launchApp).toHaveBeenCalledWith({
-			launchKind: 'app_user_model_id',
-			path: 'OpenAI.Codex!App',
-		})
+		expect(api.launchApp).toHaveBeenCalledWith({ id: 'codex' })
 		expect(api.uninstallApp).toHaveBeenCalledWith('codex')
 	})
 })

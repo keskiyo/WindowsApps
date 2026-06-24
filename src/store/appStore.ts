@@ -69,6 +69,14 @@ function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
 }
 
+// Preserve an already-loaded icon when an incoming app record has none, so background
+// syncs (which ship icon-less app data) don't blank the grid before patches re-arrive.
+function mergeIcon(previous: AppInfo | undefined, next: AppInfo): AppInfo {
+	return previous?.iconBase64 && !next.iconBase64
+		? { ...next, iconBase64: previous.iconBase64 }
+		: next
+}
+
 export function createAppStore(
 	client: AppsClient,
 	storage: Storage = globalThis.localStorage,
@@ -203,10 +211,7 @@ export function createAppStore(
 			async launch(app) {
 				set({ error: null })
 				try {
-					await client.launchApp({
-						launchKind: app.launchKind,
-						path: app.path,
-					})
+					await client.launchApp({ id: app.id })
 				} catch (error) {
 					set({ error: errorMessage(error) })
 					throw error
@@ -368,7 +373,12 @@ export function createAppStore(
 				persist()
 			},
 			replaceApps(apps) {
-				set({ apps })
+				set(state => {
+					const previous = new Map(
+						state.apps.map(app => [app.id, app]),
+					)
+					return { apps: apps.map(app => mergeIcon(previous.get(app.id), app)) }
+				})
 			},
 			applyDelta(delta) {
 				if (delta.generation < get().catalogGeneration) return
@@ -379,7 +389,8 @@ export function createAppStore(
 							.filter(app => !removed.has(app.id))
 							.map(app => [app.id, app]),
 					)
-					for (const app of delta.upserted) apps.set(app.id, app)
+					for (const app of delta.upserted)
+						apps.set(app.id, mergeIcon(apps.get(app.id), app))
 					return {
 						apps: [...apps.values()],
 						catalogGeneration: delta.generation,
@@ -451,19 +462,44 @@ export const appStore = createAppStore(tauriAppsClient)
 
 function deduplicateVisibleApps(apps: AppInfo[]): AppInfo[] {
 	const unique: AppInfo[] = []
+	const byId = new Map<string, number>()
+	const byPath = new Map<string, number>()
+	const byFamily = new Map<string, number[]>()
+	// Every `isVisibleDuplicate` match requires a shared id, lowercased path, or
+	// launcher-stripped family key, so candidates are looked up by those keys instead of
+	// scanning all uniques (O(N) instead of O(N^2)). Survivor keys are re-registered on
+	// merge so later apps still resolve to the merged entry.
+	const register = (entry: AppInfo, position: number) => {
+		byId.set(entry.id, position)
+		byPath.set(entry.path.toLowerCase(), position)
+		const key = stripLauncherSuffix(normalizedVisibleFamily(entry.name))
+		const list = byFamily.get(key)
+		if (list) {
+			if (!list.includes(position)) list.push(position)
+		} else byFamily.set(key, [position])
+	}
 	for (const app of apps) {
-		const index = unique.findIndex(existing =>
-			isVisibleDuplicate(existing, app),
-		)
-		if (index === -1) {
+		const candidates = new Set<number>()
+		const idHit = byId.get(app.id)
+		if (idHit !== undefined) candidates.add(idHit)
+		const pathHit = byPath.get(app.path.toLowerCase())
+		if (pathHit !== undefined) candidates.add(pathHit)
+		const familyKey = stripLauncherSuffix(normalizedVisibleFamily(app.name))
+		for (const idx of byFamily.get(familyKey) ?? []) candidates.add(idx)
+		const index = [...candidates]
+			.sort((left, right) => left - right)
+			.find(idx => isVisibleDuplicate(unique[idx], app))
+		if (index === undefined) {
+			const position = unique.length
 			unique.push(app)
+			register(app, position)
 			continue
 		}
-		if (visibleCandidateScore(app) > visibleCandidateScore(unique[index])) {
-			unique[index] = mergeVisibleApp(app, unique[index])
-		} else {
-			unique[index] = mergeVisibleApp(unique[index], app)
-		}
+		unique[index] =
+			visibleCandidateScore(app) > visibleCandidateScore(unique[index])
+				? mergeVisibleApp(app, unique[index])
+				: mergeVisibleApp(unique[index], app)
+		register(unique[index], index)
 	}
 	return unique
 }
