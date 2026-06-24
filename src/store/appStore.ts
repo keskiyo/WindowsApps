@@ -426,27 +426,42 @@ export function createAppStore(
 	})
 }
 
-export function selectFilteredApps(state: AppState): AppInfo[] {
-	const apps = selectVisibleApps(state)
-	const query = state.query.trim().toLocaleLowerCase()
-	return query
-		? apps.filter(app =>
-				[app.name, app.publisher, app.description].some(value =>
-					value?.toLocaleLowerCase().includes(query),
-				),
-			)
-		: apps
+export function filterVisibleApps(
+	categorized: AppInfo[],
+	activeView: AppView,
+	hiddenAppIds: string[],
+	favoriteAppIds: string[],
+): AppInfo[] {
+	if (activeView === 'settings') return []
+	if (activeView === 'hidden')
+		return categorized.filter(app => hiddenAppIds.includes(app.id))
+	const visible = categorized.filter(app => !hiddenAppIds.includes(app.id))
+	return activeView === 'favorites'
+		? visible.filter(app => favoriteAppIds.includes(app.id))
+		: visible
+}
+
+export function filterAppsByQuery(apps: AppInfo[], query: string): AppInfo[] {
+	const normalized = query.trim().toLocaleLowerCase()
+	if (!normalized) return apps
+	return apps.filter(app =>
+		[app.name, app.publisher, app.description].some(value =>
+			value?.toLocaleLowerCase().includes(normalized),
+		),
+	)
 }
 
 export function selectVisibleApps(state: AppState): AppInfo[] {
-	const apps = selectCategorizedApps(state)
-	if (state.activeView === 'settings') return []
-	if (state.activeView === 'hidden')
-		return apps.filter(app => state.hiddenAppIds.includes(app.id))
-	const visible = apps.filter(app => !state.hiddenAppIds.includes(app.id))
-	return state.activeView === 'favorites'
-		? visible.filter(app => state.favoriteAppIds.includes(app.id))
-		: visible
+	return filterVisibleApps(
+		selectCategorizedApps(state),
+		state.activeView,
+		state.hiddenAppIds,
+		state.favoriteAppIds,
+	)
+}
+
+export function selectFilteredApps(state: AppState): AppInfo[] {
+	return filterAppsByQuery(selectVisibleApps(state), state.query)
 }
 
 export function selectCategorizedApps(state: AppState): AppInfo[] {
