@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast, Toaster } from 'sonner'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
@@ -17,8 +17,9 @@ import { catalogChangeMessage } from './lib/catalogChanges'
 import { tauriSystemClient } from './lib/system'
 import {
 	appStore,
+	filterAppsByQuery,
+	filterVisibleApps,
 	selectCategorizedApps,
-	selectFilteredApps,
 	type AppState,
 } from './store/appStore'
 import type { AppInfo, SystemClient, UninstallPreview } from './types'
@@ -33,8 +34,31 @@ export function App({
 	systemClient = tauriSystemClient,
 }: AppProps) {
 	const state = useStore(store)
-	const filteredApps = selectFilteredApps(state)
-	const categorizedApps = selectCategorizedApps(state)
+	// Dedup is O(N) but still recomputed only when the catalog actually changes; query
+	// typing, scan progress, favorites and drawer toggles reuse the memoized result.
+	const categorizedApps = useMemo(
+		() => selectCategorizedApps(state),
+		[state.apps, state.categoryOverrides],
+	)
+	const visibleApps = useMemo(
+		() =>
+			filterVisibleApps(
+				categorizedApps,
+				state.activeView,
+				state.hiddenAppIds,
+				state.favoriteAppIds,
+			),
+		[
+			categorizedApps,
+			state.activeView,
+			state.hiddenAppIds,
+			state.favoriteAppIds,
+		],
+	)
+	const filteredApps = useMemo(
+		() => filterAppsByQuery(visibleApps, state.query),
+		[visibleApps, state.query],
+	)
 	const visibleHydrationIds = filteredApps
 		.slice(0, 48)
 		.map(app => app.id)
@@ -173,7 +197,7 @@ export function App({
 	}
 
 	return (
-		<div className='app-shell min-h-screen text-slate-100'>
+		<div className='app-shell theme-soft-surface min-h-screen'>
 			{desktopNavigation && <AppSidebar {...navigationProps} />}
 			<div className={desktopNavigation ? 'ml-70' : ''}>
 				<Header
@@ -269,7 +293,7 @@ export function App({
 			)}
 			<Toaster
 				className='app-toaster'
-				theme='dark'
+				theme='light'
 				position='bottom-right'
 				richColors
 				closeButton
