@@ -32,13 +32,13 @@ export function CategoryNameEditor({
 						if (event.key === 'Enter') save()
 						if (event.key === 'Escape') onCancel()
 					}}
-					className='h-9 min-w-0 flex-1 rounded-lg border border-blue-400/40 bg-slate-950 px-3 text-sm outline-none focus:ring-3 focus:ring-blue-500/10'
+					className='h-9 min-w-0 flex-1 rounded-lg border border-violet-400/45 bg-white/80 px-3 text-sm text-slate-800 outline-none focus:ring-3 focus:ring-violet-500/10'
 				/>
 				<button
 					type='button'
 					aria-label='Save category name'
 					onClick={save}
-					className='grid size-9 place-items-center rounded-lg text-blue-300 hover:bg-slate-800'
+					className='grid size-9 place-items-center rounded-lg text-violet-700 hover:bg-violet-100'
 				>
 					<Check size={16} />
 				</button>
@@ -46,13 +46,13 @@ export function CategoryNameEditor({
 					type='button'
 					aria-label='Cancel category editing'
 					onClick={onCancel}
-					className='grid size-9 place-items-center rounded-lg text-slate-400 hover:bg-slate-800'
+					className='grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-200/75'
 				>
 					<X size={16} />
 				</button>
 			</div>
 			{error && (
-				<p className='mt-1 text-xs text-red-300' role='alert'>
+				<p className='mt-1 text-xs text-red-700' role='alert'>
 					{error}
 				</p>
 			)}

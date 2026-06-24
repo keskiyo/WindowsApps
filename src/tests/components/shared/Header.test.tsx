@@ -29,6 +29,7 @@ describe('Header', () => {
 		)
 
 		expect(screen.getByText('Portable applications · D:\\ · 1/3')).toBeInTheDocument()
+		expect(screen.getByRole('banner')).toHaveClass('app-header-glass')
 		await userEvent.click(screen.getByRole('button', { name: 'Cancel scan' }))
 		expect(onCancelScan).toHaveBeenCalledOnce()
 	})

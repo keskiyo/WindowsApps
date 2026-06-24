@@ -44,24 +44,24 @@ export function SortableCategorySection(props: Props) {
 			{...sortable.attributes}
 			{...sortable.listeners}
 			aria-label={`Move ${label} category`}
-			className='group flex min-w-0 flex-1 cursor-grab items-center gap-3 rounded-xl px-1 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 active:cursor-grabbing'
+			className='group flex min-w-0 flex-1 cursor-grab items-center gap-3 rounded-xl px-1 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 active:cursor-grabbing'
 		>
 			<h2
 				id={`category-${props.category}`}
-				className='text-base font-semibold tracking-tight text-slate-100'
+				className='text-base font-semibold tracking-tight text-slate-800'
 			>
 				{label}
 			</h2>
-			<span className='rounded-full bg-slate-800/65 px-2.5 py-1 text-[0.7rem] font-medium text-slate-400'>
+			<span className='rounded-full bg-slate-200/80 px-2.5 py-1 text-[0.7rem] font-medium text-slate-500'>
 				{props.apps.length} {props.apps.length === 1 ? 'app' : 'apps'}
 			</span>
 			<span
-				className='h-px min-w-5 flex-1 bg-linear-to-r from-white/10 to-transparent'
+				className='h-px min-w-5 flex-1 bg-linear-to-r from-slate-300/80 to-transparent'
 				aria-hidden='true'
 			/>
 			<GripVertical
 				size={16}
-				className='shrink-0 text-slate-500 transition group-hover:text-blue-300'
+				className='shrink-0 text-slate-400 transition group-hover:text-violet-700'
 				aria-hidden='true'
 			/>
 		</button>

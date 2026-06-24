@@ -35,7 +35,7 @@ export function FavoritesGrid({
 			<section className='grid min-h-[55vh] place-items-center text-center'>
 				<div>
 					<Star
-						className='mx-auto mb-4 text-yellow-300/60'
+						className='mx-auto mb-4 text-amber-500/65'
 						size={38}
 					/>
 					<h2 className='text-lg font-semibold'>
@@ -43,7 +43,7 @@ export function FavoritesGrid({
 							? 'No matching favorites'
 							: 'No favorites yet'}
 					</h2>
-					<p className='mt-2 text-sm text-slate-500'>
+					<p className='mt-2 text-sm text-slate-600'>
 						{hasQuery
 							? 'Try a different search.'
 							: 'Use the star on an app card to add it here.'}

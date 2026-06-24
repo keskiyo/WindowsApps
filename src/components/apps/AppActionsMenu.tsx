@@ -73,14 +73,14 @@ export function AppActionsMenu({
 			style={{ transform: `translateX(${menuShift}px)` }}
 			role='menu'
 			aria-label={`${app.name} actions`}
-			className='absolute left-2 top-11 z-110 w-55 max-w-[calc(100vw-1rem)] rounded-xl border border-white/10 bg-slate-900 p-1.5 text-left shadow-2xl shadow-black/40'
+			className='absolute left-2 top-11 z-110 w-55 max-w-[calc(100vw-1rem)] rounded-xl border border-slate-200/85 bg-slate-50 p-1.5 text-left text-slate-700 shadow-[0_18px_45px_rgba(53,61,82,.2)]'
 		>
 			{!isHidden && (
 				<button
 					type='button'
 					role='menuitem'
 					onClick={() => setShowCategories(value => !value)}
-					className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-blue-400'
+					className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-200/70 focus-visible:outline-2 focus-visible:outline-violet-500'
 				>
 					<ChevronRight
 						size={15}
@@ -91,7 +91,7 @@ export function AppActionsMenu({
 				</button>
 			)}
 			{!isHidden && showCategories && (
-				<div className='max-h-56 overflow-y-auto border-y border-white/7 py-1'>
+				<div className='max-h-56 overflow-y-auto border-y border-slate-200 py-1'>
 					{categoryOrder.map(category => (
 						<button
 							key={category}
@@ -104,7 +104,7 @@ export function AppActionsMenu({
 								onMove(app.id, category)
 								onClose()
 							}}
-							className={`flex w-full items-center rounded-lg px-3 py-1.5 text-sm hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-blue-400 ${category === app.category ? 'text-blue-300' : 'text-slate-300'}`}
+							className={`flex w-full items-center rounded-lg px-3 py-1.5 text-sm hover:bg-slate-200/70 focus-visible:outline-2 focus-visible:outline-violet-500 ${category === app.category ? 'font-medium text-violet-700' : 'text-slate-600'}`}
 						>
 							{categoryLabel(categories, category)}
 						</button>
@@ -118,7 +118,7 @@ export function AppActionsMenu({
 					onInfo(app)
 					onClose()
 				}}
-				className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-blue-400'
+				className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-200/70 focus-visible:outline-2 focus-visible:outline-violet-500'
 			>
 				<Info size={15} aria-hidden='true' />
 				App info
@@ -131,7 +131,7 @@ export function AppActionsMenu({
 					else onHide(app.id)
 					onClose()
 				}}
-				className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-blue-400'
+				className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-200/70 focus-visible:outline-2 focus-visible:outline-violet-500'
 			>
 				{isHidden ? (
 					<RotateCcw size={15} aria-hidden='true' />
@@ -148,7 +148,7 @@ export function AppActionsMenu({
 						onUninstall(app)
 						onClose()
 					}}
-					className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-300 hover:bg-red-500/10 focus-visible:outline-2 focus-visible:outline-red-400'
+					className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-700 hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-red-500'
 				>
 					<Trash2 size={15} aria-hidden='true' />
 					Uninstall

@@ -23,7 +23,7 @@ export function HiddenGrid(props: Props) {
 			<section className='grid min-h-[55vh] place-items-center text-center'>
 				<div>
 					<EyeOff
-						className='mx-auto mb-4 text-slate-500'
+						className='mx-auto mb-4 text-slate-400'
 						size={38}
 						aria-hidden='true'
 					/>
@@ -32,7 +32,7 @@ export function HiddenGrid(props: Props) {
 							? 'No matching hidden apps'
 							: 'No hidden apps'}
 					</h2>
-					<p className='mt-2 text-sm text-slate-500'>
+					<p className='mt-2 text-sm text-slate-600'>
 						{props.hasQuery
 							? 'Try a different search.'
 							: 'Apps hidden from the catalog will appear here.'}

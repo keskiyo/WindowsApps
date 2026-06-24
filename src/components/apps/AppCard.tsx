@@ -4,6 +4,7 @@ import { AppWindow, Grip, Star } from 'lucide-react'
 import { memo, useCallback, useState } from 'react'
 import { useSpotlight } from '../../hooks/useSpotlight'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
+import { SpotlightLayer } from '../shared/SpotlightLayer'
 import { AppActionsMenu } from './AppActionsMenu'
 
 interface AppCardProps {
@@ -52,7 +53,7 @@ function AppCardComponent({
 			style={{ transform: CSS.Translate.toString(draggable.transform) }}
 			className={`app-card app-card-glass group relative min-h-34 rounded-[1.15rem] border border-white/85 transition-[transform,border-color,box-shadow,opacity] duration-200 ease-out hover:-translate-y-0.5 focus-within:border-violet-400/45 ${menuOpen ? 'z-100' : ''} ${draggable.isDragging ? 'z-40 opacity-60' : ''}`}
 		>
-			<span className='card-spotlight' aria-hidden='true' />
+			<SpotlightLayer size={110} />
 			<button
 				type='button'
 				onClick={() => void onLaunch(app)}

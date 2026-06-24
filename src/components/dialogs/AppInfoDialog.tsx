@@ -26,7 +26,7 @@ export function AppInfoDialog({
 	const rows = metadataRows(app, categories)
 	return (
 		<div
-			className='fixed inset-0 z-400 grid place-items-center bg-slate-950/78 p-4'
+			className='fixed inset-0 z-400 grid place-items-center bg-slate-700/38 p-4 backdrop-blur-[2px]'
 			onMouseDown={event => {
 				if (event.currentTarget === event.target) onClose()
 			}}
@@ -35,10 +35,10 @@ export function AppInfoDialog({
 				role='dialog'
 				aria-modal='true'
 				aria-label={`${app.name} information`}
-				className='max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-white/10 bg-slate-900 p-5 shadow-2xl shadow-black/50'
+				className='max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-white/90 bg-slate-50 p-5 text-slate-800 shadow-[0_24px_70px_rgba(48,56,76,.28)]'
 			>
 				<header className='flex items-start gap-4'>
-					<span className='grid size-13 shrink-0 place-items-center rounded-xl bg-slate-950/70'>
+					<span className='grid size-13 shrink-0 place-items-center rounded-xl bg-slate-200/70 shadow-inner'>
 						{app.iconBase64 ? (
 							<img
 								src={app.iconBase64}
@@ -53,7 +53,7 @@ export function AppInfoDialog({
 						<h2 className='truncate text-lg font-semibold'>
 							{app.name}
 						</h2>
-						<p className='mt-1 text-sm leading-6 text-slate-400'>
+						<p className='mt-1 text-sm leading-6 text-slate-600'>
 							{descriptionLabel(app.description)}
 						</p>
 					</div>
@@ -62,12 +62,12 @@ export function AppInfoDialog({
 						type='button'
 						aria-label='Close app information'
 						onClick={onClose}
-						className='grid size-9 place-items-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-2 focus-visible:outline-blue-400'
+						className='grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
 						<X size={17} />
 					</button>
 				</header>
-				<dl className='mt-5 divide-y divide-white/7 rounded-xl border border-white/7 bg-slate-950/35 px-4'>
+				<dl className='mt-5 divide-y divide-slate-200 rounded-xl border border-slate-200/90 bg-white/65 px-4'>
 					{rows.map(([label, value]) => (
 						<div
 							key={label}
@@ -76,7 +76,7 @@ export function AppInfoDialog({
 							<dt className='text-xs font-medium uppercase tracking-wide text-slate-500'>
 								{label}
 							</dt>
-							<dd className='select-text break-all text-sm text-slate-200'>
+							<dd className='select-text break-all text-sm text-slate-700'>
 								{value}
 							</dd>
 						</div>

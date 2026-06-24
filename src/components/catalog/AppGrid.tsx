@@ -110,7 +110,7 @@ export function AppGrid(props: Props) {
 			<section className='grid min-h-[55vh] place-items-center text-center'>
 				<div className='max-w-sm'>
 					<SearchX
-						className='mx-auto mb-5 text-slate-600'
+						className='mx-auto mb-5 text-slate-400'
 						size={42}
 						aria-hidden='true'
 					/>
@@ -119,7 +119,7 @@ export function AppGrid(props: Props) {
 							? 'No apps found'
 							: 'No applications available'}
 					</h2>
-					<p className='mt-2 text-sm text-slate-500'>
+					<p className='mt-2 text-sm text-slate-600'>
 						{props.hasQuery
 							? 'Try a different search.'
 							: 'Refresh to scan Windows again.'}
@@ -197,9 +197,9 @@ export function AppGrid(props: Props) {
 
 function Skeleton() {
 	return (
-		<div className='min-h-34 animate-pulse rounded-2xl border border-white/5 bg-slate-900/45 p-4'>
-			<div className='mx-auto mt-3 size-13 rounded-xl bg-slate-800/80' />
-			<div className='mx-auto mt-4 h-3 w-2/3 rounded-full bg-slate-800/80' />
+		<div className='min-h-34 animate-pulse rounded-[1.15rem] border border-white/80 bg-white/48 p-4 shadow-[7px_7px_15px_rgba(126,137,156,.12),-7px_-7px_15px_rgba(255,255,255,.72)]'>
+			<div className='mx-auto mt-3 size-13 rounded-xl bg-slate-300/70' />
+			<div className='mx-auto mt-4 h-3 w-2/3 rounded-full bg-slate-300/70' />
 		</div>
 	)
 }

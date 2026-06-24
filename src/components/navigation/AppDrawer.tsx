@@ -67,18 +67,18 @@ export function AppDrawer(props: Props) {
 				type='button'
 				aria-label='Close navigation backdrop'
 				onClick={props.onClose}
-				className='absolute inset-0 cursor-default bg-slate-950/70'
+				className='absolute inset-0 cursor-default bg-slate-700/35 backdrop-blur-[2px]'
 			/>
 			<aside
 				ref={panelRef}
 				role='dialog'
 				aria-modal='true'
 				aria-label='App navigation'
-				className='drawer-enter absolute inset-y-0 left-0 flex w-[min(22rem,88vw)] flex-col border-r border-white/8 bg-slate-950 shadow-[24px_0_70px_rgba(0,0,0,.48)]'
+				className='drawer-enter absolute inset-y-0 left-0 flex w-[min(22rem,88vw)] flex-col border-r border-slate-300/70 bg-slate-50 shadow-[24px_0_70px_rgba(50,58,78,.24)]'
 			>
-				<div className='flex items-center justify-between border-b border-white/8 px-5 py-5'>
+				<div className='flex items-center justify-between border-b border-slate-300/65 px-5 py-5'>
 					<div>
-						<p className='text-sm font-semibold text-slate-100'>
+						<p className='text-sm font-semibold text-slate-800'>
 							Library
 						</p>
 						<p className='mt-1 text-xs text-slate-500'>
@@ -89,7 +89,7 @@ export function AppDrawer(props: Props) {
 						type='button'
 						aria-label='Close navigation'
 						onClick={props.onClose}
-						className='grid size-10 place-items-center rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+						className='grid size-10 place-items-center rounded-xl text-slate-500 hover:bg-slate-200/75 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
 						<X size={19} />
 					</button>

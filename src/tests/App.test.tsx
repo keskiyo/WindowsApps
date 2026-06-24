@@ -146,6 +146,19 @@ describe('App', () => {
 		expect(settings).toHaveTextContent('Settings')
 	})
 
+	it('uses the light Soft Surface theme and Neon Glass app cards', async () => {
+		renderApp()
+		const launch = await screen.findByRole('button', {
+			name: 'Launch Steam',
+		})
+		const card = launch.closest('article')
+
+		expect(document.querySelector('.app-shell')).toHaveClass(
+			'theme-soft-surface',
+		)
+		expect(card).toHaveClass('app-card-glass')
+	})
+
 	it('renders the English catalog and category counts', async () => {
 		renderApp()
 		expect(
@@ -193,10 +206,7 @@ describe('App', () => {
 				name: 'Launch Visual Studio Code',
 			}),
 		)
-		expect(client.launchApp).toHaveBeenCalledWith({
-			launchKind: 'executable',
-			path: 'C:\\Code.exe',
-		})
+		expect(client.launchApp).toHaveBeenCalledWith({ id: 'code' })
 	})
 
 	it('adds an app to favorites without launching it', async () => {

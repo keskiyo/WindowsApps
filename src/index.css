@@ -172,20 +172,20 @@ button {
  * cursor lights up. Driven by --mouse-x/--mouse-y/--spotlight-opacity set by useSpotlight.
  * Uses its own pseudo-elements because .app-card-glass already owns ::before/::after.
  */
-.card-spotlight {
+.spotlight {
 	position: absolute;
 	inset: 0;
 	border-radius: inherit;
 	pointer-events: none;
 }
 
-.card-spotlight::before {
+.spotlight::before {
 	position: absolute;
 	inset: 0;
 	padding: 1.4px;
 	border-radius: inherit;
 	background: radial-gradient(
-		var(--spotlight-size, 150px) circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+		var(--spotlight-size, 110px) circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
 		rgba(90, 230, 255, 0.95),
 		rgba(170, 80, 255, 0.62) 32%,
 		rgba(255, 70, 220, 0.28) 48%,
@@ -201,18 +201,18 @@ button {
 	content: '';
 }
 
-.card-spotlight::after {
+.spotlight::after {
 	position: absolute;
 	inset: 0;
 	border-radius: inherit;
 	background: radial-gradient(
-		calc(var(--spotlight-size, 150px) * 1.4) circle at var(--mouse-x, 50%)
+		calc(var(--spotlight-size, 110px) * 1.4) circle at var(--mouse-x, 50%)
 			var(--mouse-y, 50%),
 		rgba(90, 220, 255, 0.1),
 		rgba(160, 80, 255, 0.06) 35%,
 		transparent 70%
 	);
-	opacity: calc(var(--spotlight-opacity, 0) * 0.35);
+	opacity: calc(var(--spotlight-opacity, 0) * 0.32);
 	transition: opacity 160ms ease;
 	content: '';
 }

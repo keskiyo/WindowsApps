@@ -13,6 +13,7 @@ import {
 } from '@dnd-kit/sortable'
 import { EyeOff, Grid2X2, Plus, Settings, Star } from 'lucide-react'
 import { useState } from 'react'
+import { useSpotlight } from '../../hooks/useSpotlight'
 import { getDropAction } from '../../lib/catalog'
 import {
 	categoryLabel,
@@ -21,6 +22,7 @@ import {
 	type CategoryDefinition,
 } from '../../types'
 import { CategoryNameEditor } from '../shared/CategoryNameEditor'
+import { SpotlightLayer } from '../shared/SpotlightLayer'
 import { SortableNavigationCategory } from './SortableNavigationCategory'
 
 interface Props {
@@ -40,6 +42,7 @@ interface Props {
 
 export function AppNavigation(props: Props) {
 	const [adding, setAdding] = useState(false)
+	const spotlight = useSpotlight()
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
 		useSensor(KeyboardSensor, {
@@ -47,7 +50,7 @@ export function AppNavigation(props: Props) {
 		}),
 	)
 	const itemClass = (active: boolean) =>
-		`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${active ? 'bg-blue-500/15 text-blue-200' : 'text-slate-300 hover:bg-slate-900'}`
+		`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-violet-500 ${active ? 'bg-violet-100/90 font-medium text-violet-700 shadow-[inset_1px_1px_3px_rgba(119,105,160,.10)]' : 'text-slate-600 hover:bg-slate-200/65 hover:text-slate-900'}`
 	const visibleCategories = props.categoryOrder.filter(category => {
 		const definition = props.categories.find(item => item.id === category)
 		return definition && (props.counts.has(category) || !definition.builtIn)
@@ -70,38 +73,44 @@ export function AppNavigation(props: Props) {
 				<button
 					type='button'
 					onClick={() => props.onSelectView('all')}
+					{...spotlight}
 					className={itemClass(props.activeView === 'all')}
 				>
+					<SpotlightLayer size={90} />
 					<Grid2X2 size={17} /> All Apps
 				</button>
 				<button
 					type='button'
 					onClick={() => props.onSelectView('favorites')}
+					{...spotlight}
 					className={`mt-1 ${itemClass(props.activeView === 'favorites')}`}
 				>
+					<SpotlightLayer size={90} />
 					<Star size={17} /> <span>Favorites</span>
-					<span className='ml-auto rounded-full bg-slate-800 px-2 py-0.5 text-xs'>
+					<span className='ml-auto rounded-full bg-slate-200/85 px-2 py-0.5 text-xs text-slate-600'>
 						{props.favoriteCount}
 					</span>
 				</button>
 				<button
 					type='button'
 					onClick={() => props.onSelectView('settings')}
+					{...spotlight}
 					className={`mt-1 ${itemClass(props.activeView === 'settings')}`}
 				>
+					<SpotlightLayer size={90} />
 					<Settings size={17} /> <span>Settings</span>
 				</button>
 			</div>
 			<div className='min-h-0 flex-1 overflow-y-auto px-4 pb-4'>
 				<div className='mb-2 mt-4 flex items-center justify-between px-3'>
-					<p className='text-[.68rem] font-semibold uppercase tracking-[.16em] text-slate-600'>
+					<p className='text-[.68rem] font-semibold uppercase tracking-[.16em] text-slate-500'>
 						Categories
 					</p>
 					<button
 						type='button'
 						aria-label='Add category'
 						onClick={() => setAdding(true)}
-						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-900 hover:text-blue-300'
+						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-200/75 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
 						<Plus size={16} />
 					</button>
@@ -143,14 +152,16 @@ export function AppNavigation(props: Props) {
 					</SortableContext>
 				</DndContext>
 			</div>
-			<div className='border-t border-white/8 p-4'>
+			<div className='border-t border-slate-300/65 p-4'>
 				<button
 					type='button'
 					onClick={() => props.onSelectView('hidden')}
+					{...spotlight}
 					className={itemClass(props.activeView === 'hidden')}
 				>
+					<SpotlightLayer size={90} />
 					<EyeOff size={17} /> <span>Hidden</span>
-					<span className='ml-auto rounded-full bg-slate-800 px-2 py-0.5 text-xs'>
+					<span className='ml-auto rounded-full bg-slate-200/85 px-2 py-0.5 text-xs text-slate-600'>
 						{props.hiddenCount}
 					</span>
 				</button>

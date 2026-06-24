@@ -49,7 +49,7 @@ export function UninstallDialog({
 	}
 	return (
 		<div
-			className='fixed inset-0 z-400 grid place-items-center bg-slate-950/78 p-4'
+			className='fixed inset-0 z-400 grid place-items-center bg-slate-700/38 p-4 backdrop-blur-[2px]'
 			onMouseDown={event => {
 				if (!pending && event.currentTarget === event.target) onClose()
 			}}
@@ -58,15 +58,15 @@ export function UninstallDialog({
 				role='alertdialog'
 				aria-modal='true'
 				aria-label={`Uninstall ${appName}`}
-				className='w-full max-w-lg rounded-2xl border border-red-400/20 bg-slate-900 p-5 shadow-2xl shadow-black/50'
+				className='w-full max-w-lg rounded-2xl border border-red-300/55 bg-slate-50 p-5 text-slate-800 shadow-[0_24px_70px_rgba(48,56,76,.28)]'
 			>
 				<header className='flex items-start gap-3'>
-					<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-red-500/10 text-red-300'>
+					<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-red-100 text-red-700'>
 						<AlertTriangle size={20} />
 					</span>
 					<div className='flex-1'>
 						<h2 className='font-semibold'>Uninstall {appName}?</h2>
-						<p className='mt-2 text-sm leading-6 text-slate-400'>
+						<p className='mt-2 text-sm leading-6 text-slate-600'>
 							Review the registered uninstall route before starting.
 							Application files will never be deleted directly.
 						</p>
@@ -76,18 +76,18 @@ export function UninstallDialog({
 						aria-label='Close uninstall confirmation'
 						onClick={onClose}
 						disabled={pending}
-						className='grid size-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-800'
+						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
 						<X size={16} />
 					</button>
 				</header>
-				<div className='mt-5 rounded-xl border border-white/8 bg-slate-950/55 p-4'>
+				<div className='mt-5 rounded-xl border border-slate-200 bg-white/65 p-4'>
 					{isPreviewLoading ? (
-						<p className='text-sm text-slate-400'>
+						<p className='text-sm text-slate-600'>
 							Loading uninstall details…
 						</p>
 					) : previewError ? (
-						<p role='alert' className='text-sm text-red-300'>
+						<p role='alert' className='text-sm text-red-700'>
 							{previewError}
 						</p>
 					) : preview ? (
@@ -104,7 +104,7 @@ export function UninstallDialog({
 								<p className='mb-1 text-xs font-semibold uppercase tracking-[.14em] text-slate-500'>
 									Command
 								</p>
-								<code className='block max-h-32 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-white/8 bg-slate-950 p-3 text-xs leading-5 text-slate-300'>
+								<code className='block max-h-32 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-slate-200 bg-slate-100 p-3 text-xs leading-5 text-slate-700'>
 									{preview.command}
 								</code>
 							</div>
@@ -117,7 +117,7 @@ export function UninstallDialog({
 						type='button'
 						disabled={pending}
 						onClick={onClose}
-						className='rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-blue-400'
+						className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-200/70 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
 						Cancel
 					</button>

@@ -80,7 +80,7 @@ export interface AppsClient {
 	hydrateVisibleIcons?(ids: string[]): Promise<void>
 	startBackgroundSync?(): Promise<void>
 	cancelScan(): Promise<void>
-	launchApp(app: Pick<AppInfo, 'launchKind' | 'path'>): Promise<void>
+	launchApp(app: Pick<AppInfo, 'id'>): Promise<void>
 	getUninstallPreview(id: string): Promise<UninstallPreview>
 	uninstallApp(id: string): Promise<void>
 	onAppsUpdated(handler: (apps: AppInfo[]) => void): Promise<() => void>

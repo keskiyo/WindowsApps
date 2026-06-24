@@ -19,11 +19,7 @@ export const tauriAppsClient: AppsClient = {
 	hydrateVisibleIcons: ids => invoke<void>('hydrate_visible_icons', { ids }),
 	startBackgroundSync: () => invoke<void>('start_background_sync'),
 	cancelScan: () => invoke<void>('cancel_scan'),
-	launchApp: app =>
-		invoke<void>('launch_app', {
-			launchKind: app.launchKind,
-			path: app.path,
-		}),
+	launchApp: app => invoke<void>('launch_app', { id: app.id }),
 	getUninstallPreview: id =>
 		invoke<UninstallPreview>('get_uninstall_preview', { id }),
 	uninstallApp: id => invoke<void>('uninstall_app', { id }),

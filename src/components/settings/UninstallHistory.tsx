@@ -63,14 +63,14 @@ export function UninstallHistory({ client }: Props) {
 	}
 
 	return (
-		<div className='mt-5 rounded-2xl border border-white/8 bg-slate-900/55 p-5'>
+		<div className='mt-5 rounded-2xl border border-white/85 bg-white/58 p-5 shadow-[7px_8px_20px_rgba(104,114,136,.11),-6px_-6px_16px_rgba(255,255,255,.72)]'>
 			<div className='flex items-start gap-4'>
-				<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-slate-950/60 text-blue-300'>
+				<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
 					<ShieldCheck size={19} aria-hidden='true' />
 				</span>
 				<div className='min-w-0 flex-1'>
 					<h2 className='font-medium'>Uninstall history</h2>
-					<p className='mt-1 text-sm leading-6 text-slate-500'>
+					<p className='mt-1 text-sm leading-6 text-slate-600'>
 						Last 100 uninstall attempts. Commands, paths, arguments,
 						errors and usernames are not stored.
 					</p>
@@ -79,34 +79,34 @@ export function UninstallHistory({ client }: Props) {
 					type='button'
 					disabled={!entries.length || clearing}
 					onClick={() => setConfirmClear(true)}
-					className='rounded-xl border border-red-400/20 px-3 py-2 text-sm text-red-200 hover:bg-red-500/10 disabled:opacity-40'
+					className='rounded-xl border border-red-300/70 px-3 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-40'
 				>
 					Clear
 				</button>
 			</div>
 
 			{loading ? (
-				<p className='mt-4 text-sm text-slate-400'>Loading history…</p>
+				<p className='mt-4 text-sm text-slate-600'>Loading history…</p>
 			) : error ? (
-				<p role='alert' className='mt-4 text-sm text-red-300'>
+				<p role='alert' className='mt-4 text-sm text-red-700'>
 					{error}
 				</p>
 			) : entries.length ? (
-				<ul className='mt-4 divide-y divide-white/7 overflow-hidden rounded-xl border border-white/8 bg-slate-950/35'>
+				<ul className='mt-4 divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white/65'>
 					{entries.map(entry => (
 						<li key={entry.id} className='p-4'>
 							<div className='flex flex-wrap items-center justify-between gap-2'>
 								<p className='font-medium'>{entry.appName}</p>
 								<span
-									className={`rounded-full px-2.5 py-1 text-xs ${entry.result === 'succeeded' ? 'bg-emerald-500/10 text-emerald-200' : 'bg-red-500/10 text-red-200'}`}
+									className={`rounded-full px-2.5 py-1 text-xs font-medium ${entry.result === 'succeeded' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}
 								>
 									{RESULT_LABELS[entry.result]}
 								</span>
 							</div>
-							<p className='mt-2 text-sm text-slate-500'>
+							<p className='mt-2 text-sm text-slate-600'>
 								{dateFormatter.format(new Date(entry.timestamp * 1000))}
 							</p>
-							<p className='mt-1 text-sm text-slate-400'>
+							<p className='mt-1 text-sm text-slate-500'>
 								{entry.publisher ?? 'Unknown publisher'} ·{' '}
 								{METHOD_LABELS[entry.mechanism]}
 							</p>
@@ -114,7 +114,7 @@ export function UninstallHistory({ client }: Props) {
 					))}
 				</ul>
 			) : (
-				<p className='mt-4 text-sm text-slate-400'>
+				<p className='mt-4 text-sm text-slate-600'>
 					No uninstall history yet.
 				</p>
 			)}
@@ -123,9 +123,9 @@ export function UninstallHistory({ client }: Props) {
 				<div
 					role='dialog'
 					aria-label='Confirm clear uninstall history'
-					className='mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-400/20 bg-red-500/8 p-4'
+					className='mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300/70 bg-red-50 p-4'
 				>
-					<p className='text-sm text-red-100'>
+					<p className='text-sm text-red-800'>
 						Clear the local uninstall history?
 					</p>
 					<div className='flex gap-2'>
@@ -133,7 +133,7 @@ export function UninstallHistory({ client }: Props) {
 							type='button'
 							disabled={clearing}
 							onClick={() => setConfirmClear(false)}
-							className='rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-white/5'
+							className='rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-200/70'
 						>
 							Cancel
 						</button>

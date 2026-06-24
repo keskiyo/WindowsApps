@@ -62,7 +62,7 @@ export function CategorySection({
 			ref={drop.setNodeRef}
 			aria-labelledby={`category-${category}`}
 			data-category={category}
-			className={`relative scroll-mt-40 rounded-2xl transition-colors duration-200 focus-within:z-90 lg:scroll-mt-24 ${drop.isOver ? 'bg-blue-500/7 ring-1 ring-blue-400/30' : ''}`}
+			className={`relative scroll-mt-40 rounded-2xl transition-colors duration-200 focus-within:z-90 lg:scroll-mt-24 ${drop.isOver ? 'bg-violet-100/55 ring-1 ring-violet-400/35' : ''}`}
 		>
 			<div className='mb-3 flex items-center gap-2'>
 				<button
@@ -70,7 +70,7 @@ export function CategorySection({
 					aria-expanded={!collapsed}
 					aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
 					onClick={onToggle}
-					className='grid size-8 shrink-0 place-items-center rounded-lg bg-slate-800/70 text-slate-400 transition-colors hover:text-blue-300 focus-visible:outline-2 focus-visible:outline-blue-400'
+					className='grid size-8 shrink-0 place-items-center rounded-lg bg-slate-200/75 text-slate-500 transition-colors hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
 				>
 					{collapsed ? (
 						<ChevronRight size={15} aria-hidden='true' />
@@ -96,7 +96,7 @@ export function CategorySection({
 					type='button'
 					aria-label={`Rename ${label} category`}
 					onClick={() => setEditing(true)}
-					className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-800 hover:text-blue-300'
+					className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-200/75 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
 				>
 					<Pencil size={15} />
 				</button>
@@ -105,7 +105,7 @@ export function CategorySection({
 						type='button'
 						aria-label={`Delete ${label} category`}
 						onClick={() => setDeleting(true)}
-						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-red-500/10 hover:text-red-300'
+						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-red-100 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-red-500'
 					>
 						<Trash2 size={15} />
 					</button>
