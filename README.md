@@ -3,96 +3,117 @@
 
 # Windows Apps
 
-**A fast, private, and organized launcher for every application on your Windows PC.**
+**A fast, private application catalog and launcher for Windows 10 and Windows 11.**
 
-[![Version](https://img.shields.io/badge/version-0.2.0-5B8CFF?style=flat-square)](../../releases/latest)
+[![Version](https://img.shields.io/badge/version-0.2.0-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.0)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
-![Privacy](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
+![Local first](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
 
-[**Download the latest Windows release**](../../releases/latest) · [Technical documentation](Documentation.md) · [Telegram](https://t.me/keskiyo)
+[Download Windows Apps 0.2.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.0) ·
+[Documentation](Documentation.md) ·
+[Telegram](https://t.me/keskiyo)
 
 </div>
 
 ---
 
-## Why Windows Apps?
+## Overview
 
-Windows accumulates applications across Start Menu shortcuts, executable registrations, Store packages, launchers, and system tools. Windows Apps turns those scattered sources into one clean, searchable catalog without uploading your application list anywhere.
+Windows Apps collects applications scattered across Start Menu shortcuts, Windows registrations, Store packages, Steam libraries, and fixed local drives into one searchable catalog.
 
-It opens from a lightweight local cache, validates changed locations in the background, removes maintenance noise, prefers useful shortcuts over duplicate executables, and keeps your organization choices between sessions.
+The catalog is stored locally. On startup, cached names appear immediately while icons and metadata are loaded in the background. Incremental scanning checks changed locations instead of repeatedly scanning every file.
 
 ## Features
 
-|     | Capability                | What it provides                                                                                                                                                               |
-| --- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ◈   | **Unified catalog**       | Discovers Start Menu shortcuts, registered software, Windows apps, Steam libraries, and portable executables across fixed local drives.                                        |
-| ◇   | **Smart cleanup**         | Filters installers, uninstallers, resource entries, broken names, and common duplicate records.                                                                                |
-| ↕   | **Flexible organization** | Automatic categories, custom categories, renaming, and moving applications. Click a category name to open it or drag the same row to reorder it.                               |
-| ★   | **Favorites and Hidden**  | Keep important apps close and move catalog noise into a reversible Hidden view.                                                                                                |
-| ▶   | **Native launching**      | Opens `.lnk`, `.exe`, shell targets, and packaged applications through the correct Windows mechanism.                                                                          |
-| ⓘ   | **Local metadata**        | Uses Windows, package, shortcut, and executable metadata. Missing information remains `Unknown` instead of being invented.                                                     |
-| ⛨   | **Safe uninstall**        | Runs the registered quiet, standard, or MSIX uninstall route directly. If Windows exposes no safe route, uninstall stays disabled; program folders are never deleted manually. |
-| ⌁   | **Background access**     | Closing the window keeps the app in the system tray. `Win+Shift+Q` or a tray click restores it.                                                                                |
-| ◎   | **Controlled scanning**   | Shows progress, supports cancellation, ignores removable/network drives, accepts custom include/exclude folders, and can reset the local catalog cache from Settings.          |
+- **Unified catalog** — Start Menu shortcuts, registered desktop software, packaged Windows apps, Steam games, and portable executables.
+- **Fast startup** — lightweight versioned cache is rendered before background synchronization finishes.
+- **Incremental scanning** — unchanged directories reuse previous results.
+- **Controlled full scans** — progress reporting, cancellation, depth, entry-count, and time limits.
+- **Smart deduplication** — matching `.lnk` and `.exe` entries are merged, with useful shortcuts preferred.
+- **Noise filtering** — installers, uninstall helpers, updaters, documentation shortcuts, resource entries, and broken names are filtered.
+- **Background icon loading** — visible application cards receive priority without creating duplicate hydration work.
+- **Organization** — automatic and custom categories, category reordering, application moves, Favorites, and reversible Hidden items.
+- **Responsive navigation** — persistent sidebar from `1024px`; overlay drawer on smaller windows.
+- **Native launching** — shortcuts, executables, shell targets, Steam entries, and packaged applications use their appropriate Windows launch mechanism.
+- **Registered uninstall** — Windows Apps uses vendor, MSI, or MSIX uninstall information registered with Windows.
+- **Uninstall history** — keeps a local privacy-limited history of the latest 100 attempts.
+- **System tray** — closing the window keeps the launcher available in the notification area.
+- **Global shortcut** — `Win+Shift+Q` restores the window using the physical Q key regardless of keyboard layout.
+- **Windows startup** — optional launch after sign-in for the current Windows account.
+- **Catalog maintenance** — Force full scan and Reset catalog cache are available in Settings.
 
-Built-in Windows components are grouped under **Windows Features** using known names, executable targets, and package identifiers. A generic `Microsoft` label is not enough to move an app, so Edge, Visual Studio, Microsoft 365, Xbox, and Game Bar keep their functional categories.
+## Installation
 
-## Download and install
+1. Open [Windows Apps 0.2.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.0).
+2. Download `Windows.Apps_0.2.0_x64-setup.exe`.
+3. Run the installer.
+4. Start **Windows Apps** and select **Scan for apps** when prompted.
 
-1. Open the [latest GitHub Release](../../releases/latest).
-2. Download the Windows x64 setup file ending in `-setup.exe`.
-3. Run the installer and start **Windows Apps**.
-4. Select **Scan for apps** once to build the local catalog. Later launches show the cache immediately and validate changes in the background.
+The installer is currently unsigned. Microsoft Defender SmartScreen may display an unrecognized-app warning. Download builds only from this repository and verify the published SHA-256 file.
 
-The scan checks permanent local drives regardless of their letters or folder names. USB and network drives are intentionally ignored.
+### System requirements
 
-Start Menu, uninstall registry, Steam, and configured Included folders are monitored while Windows Apps is running. Portable applications elsewhere on fixed drives are detected by the next incremental startup scan or Refresh. Each fixed-drive root is limited to 16 directory levels, 500,000 filesystem entries, and three minutes; symbolic links, junctions, and other reparse-point directories are skipped to prevent loops and excessive disk activity. Use **Settings > Catalog maintenance > Force full scan** only when the incremental index needs to be rebuilt. Use **Reset catalog cache** when duplicate or stale entries were already saved locally and a clean rebuild is needed; favorites, Hidden items, and custom categories are preserved.
+| Requirement      | Value                                                |
+| ---------------- | ---------------------------------------------------- |
+| Operating system | Windows 10 or Windows 11                             |
+| Architecture     | x64                                                  |
+| Runtime          | Microsoft Edge WebView2                              |
+| Internet         | Not required after installation for catalog features |
 
-Scanning is coordinated through one worker. A manual Refresh or Force full scan cancels a lower-priority background pass, repeated watcher events are coalesced, and cancelled scans never replace the saved catalog. Icon and metadata hydration also uses one deduplicated queue: visible cards are promoted without starting a second full-catalog pass.
+The NSIS installer can download the WebView2 bootstrapper when the runtime is missing.
 
-> [!IMPORTANT]
-> Version 0.2.0 is not code-signed. Microsoft Defender SmartScreen may show an "unrecognized app" warning for community builds. Always download the installer from this repository's Releases page and verify its published SHA-256 checksum.
+## How scanning works
 
-## System requirements
+Windows Apps scans permanent local drives reported by Windows as fixed drives. Removable USB, optical, and network drives are excluded from automatic scanning.
 
-| Requirement         | Supported value                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------ |
-| Operating system    | Windows 10 or Windows 11                                                             |
-| Architecture        | x64 (64-bit)                                                                         |
-| Web runtime         | Microsoft Edge WebView2 Runtime                                                      |
-| Internet connection | Not required for catalog use; the installer may download WebView2 when it is missing |
+Each fixed-drive scan is limited to:
 
-## Privacy by design
+- 16 directory levels;
+- 500,000 filesystem entries;
+- three minutes per scan root.
 
-- Application discovery and categorization happen on your computer.
-- Catalog data, icons, favorites, hidden entries, and custom categories are stored locally.
-- Resetting the catalog cache removes only generated catalog/icon cache files, then rescans. It does not remove preferences or uninstall programs.
-- Fixed-drive and Steam discovery run locally; no drive inventory is uploaded.
-- Uninstall history keeps only the last 100 attempts and stores app name, publisher, method, result, and time. It never stores command text, paths, arguments, package identifiers, errors, or usernames.
-- Windows Apps does not send your software inventory to an external service.
-- It does not fetch online descriptions or invent missing metadata.
-- The only user-initiated web link in 0.2.0 is the Telegram contact in Settings.
+Symbolic links, junctions, and other reparse-point directories are skipped. These limits prevent loops and excessive disk activity while retaining already discovered applications.
 
-## Keyboard and tray behavior
+Use:
 
-- `Win+Shift+Q` restores and focuses the application using the physical Q key, independent of the active English or Russian layout.
-- Closing the main window hides it in the Windows notification area and keeps the shortcut active.
-- Left-click the tray icon or select **Open Windows Apps** to restore the window.
-- Select **Quit** from the tray menu to end the background process completely.
-- **Launch when Windows starts** can be enabled from Settings for the current Windows account.
+- **Refresh** for a normal incremental update;
+- **Force full scan** to rebuild the filesystem index;
+- **Reset catalog cache** to remove generated catalog/icon caches and perform a clean scan.
+
+Favorites, Hidden items, custom categories, and category assignments are preserved when the catalog cache is reset.
+
+## Privacy and safety
+
+- The application catalog is processed and stored locally.
+- No software inventory or drive list is uploaded.
+- No telemetry service is configured.
+- Missing descriptions are left unknown; Windows Apps does not invent or download metadata.
+- Launch commands are resolved from Rust-owned catalog IDs, not arbitrary frontend paths.
+- Uninstall commands come from Windows registration data and are previewed before execution.
+- UNC/network uninstall executables are rejected.
+- Program folders are never recursively deleted as an uninstall method.
+- Uninstall history excludes commands, paths, arguments, package IDs, usernames, and detailed error text.
 
 ## Development
 
-Install [Node.js](https://nodejs.org/), npm, stable Rust with the MSVC toolchain, and the official [Tauri prerequisites for Windows](https://v2.tauri.app/start/prerequisites/).
+Prerequisites:
+
+- Node.js 22 and npm;
+- stable Rust with the MSVC toolchain;
+- Microsoft C++ Build Tools and Windows SDK;
+- WebView2 Runtime;
+- [Tauri prerequisites for Windows](https://v2.tauri.app/start/prerequisites/).
+
+Install and run:
 
 ```powershell
 npm install
 npm run tauri dev
 ```
 
-Run the verification suite:
+Verification:
 
 ```powershell
 npm test
@@ -101,32 +122,37 @@ cargo test --manifest-path src-tauri/Cargo.toml
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
-Releases are automated from version tags. Pushing `v0.2.0` runs GitHub Actions, validates `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`, runs frontend and Rust tests, builds the NSIS installer, generates a SHA-256 file, and attaches both files to the GitHub Release.
-
-## Build from source
-
-Create production Windows bundles on an x64 Windows machine:
+Production build:
 
 ```powershell
 npm run tauri build
 ```
 
-The downloadable NSIS setup executable is generated under:
+Primary local artifact:
 
 ```text
 src-tauri/target/release/bundle/nsis/Windows Apps_0.2.0_x64-setup.exe
 ```
 
-Use this NSIS setup executable as the primary GitHub Release asset. The automated workflow uploads it together with a `.sha256` checksum file.
+## Release process
 
-See [Documentation.md](Documentation.md) for architecture, troubleshooting, release verification, checksums, and the complete GitHub Release procedure.
+Pushing a `v*` tag runs `.github/workflows/release.yml`. The workflow:
 
-## Documentation and support
+1. validates that the tag matches all version manifests;
+2. installs npm dependencies;
+3. runs frontend and Rust tests;
+4. creates the Windows x64 NSIS installer;
+5. generates its SHA-256 checksum;
+6. publishes both files to GitHub Releases.
+
+See [Documentation.md](Documentation.md) for architecture, native commands, scanning behavior, troubleshooting, and the release checklist.
+
+## Support
 
 - [Technical documentation](Documentation.md)
-- [Latest release](../../releases/latest)
+- [GitHub Releases](https://github.com/keskiyo/WindowsApps/releases)
 - [Telegram: @keskiyo](https://t.me/keskiyo)
 
 <div align="center">
-  <sub>Built with Tauri, Rust, React, TypeScript, and native Windows APIs.</sub>
+  <sub>Built with Tauri, Rust, React, TypeScript, Vite, and native Windows APIs.</sub>
 </div>

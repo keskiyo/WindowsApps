@@ -1,269 +1,349 @@
 # Windows Apps Technical Documentation
 
-> Technical and release reference for Windows Apps 0.2.0.
+Technical reference for Windows Apps `0.2.0`.
 
-[Back to README](README.md) · [Latest release](../../releases/latest) · [Telegram](https://t.me/keskiyo)
+[README](README.md) ·
+[Release 0.2.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.0) ·
+[Telegram](https://t.me/keskiyo)
 
 ---
 
 ## 1. Product scope
 
-Windows Apps is a local catalog, launcher, and organization layer for software installed on Windows. It combines Windows discovery sources, Steam manifests, and portable executable discovery across permanent local drives, removes maintenance noise, merges duplicate records, and exposes source-aware launch and uninstall operations through a responsive React interface.
+Windows Apps is a local Windows application catalog, launcher, and organization layer. It discovers applications from Windows and local-drive sources, sanitizes and deduplicates the results, stores a lightweight cache, and exposes native launch and registered-uninstall operations through a React interface.
 
-The project intentionally does not provide cloud synchronization, telemetry, online metadata enrichment, automatic updates, or silent file deletion.
+The supported product scope does not include:
+
+- cloud synchronization;
+- telemetry or software-inventory uploads;
+- online metadata enrichment;
+- arbitrary command execution from the frontend;
+- automatic application updates;
+- VPN control;
+- direct deletion of program directories.
 
 ## 2. Supported environment
 
-| Component           | Supported environment                                              |
-| ------------------- | ------------------------------------------------------------------ |
-| Operating system    | Windows 10 and Windows 11                                          |
-| CPU architecture    | x64                                                                |
-| Application runtime | Tauri 2 with Microsoft Edge WebView2                               |
-| Frontend            | React 18, TypeScript, Vite, Tailwind CSS                           |
-| Native backend      | Rust 2021 and Windows APIs                                         |
-| Package format      | NSIS `.exe`; MSI may also be produced by the local Tauri toolchain |
+| Component        | Current implementation                       |
+| ---------------- | -------------------------------------------- |
+| Operating system | Windows 10 and Windows 11                    |
+| CPU architecture | x64                                          |
+| Desktop runtime  | Tauri 2 and Microsoft Edge WebView2          |
+| Frontend         | React 18, TypeScript, Vite 6, Tailwind CSS 4 |
+| Native backend   | Rust 2021 and Windows APIs                   |
+| State            | Zustand plus local component state           |
+| Tests            | Vitest/Testing Library and Rust unit tests   |
+| Primary package  | NSIS setup executable                        |
 
-The installer uses Tauri's WebView2 download bootstrapper when WebView2 is not already present.
+The main window uses custom decorations, supports resizing, and has a minimum size of `760 × 520`.
 
 ## 3. Architecture
 
 ```mermaid
 flowchart LR
-  Sources["Windows and fixed-drive sources"] --> Scanner["Incremental Rust scanner"]
-  Watchers["Directory and registry watchers"] --> Scanner
-  Scanner --> Sanitize["Filter and deduplicate"]
-  Sanitize --> Cache["Versioned lightweight cache"]
-  Cache --> UI["Immediate React catalog"]
-  Cache --> Hydration["Background icon and metadata hydration"]
+  Sources["Start Menu, registry, Start Apps, Steam, fixed drives"] --> Scanner["Rust scanner"]
+  Watchers["Filesystem and registry watchers"] --> Coordinator["Scan coordinator"]
+  Coordinator --> Scanner
+  Scanner --> Clean["Filter, classify, deduplicate"]
+  Clean --> Cache["Versioned lightweight cache"]
+  Cache --> UI["React catalog"]
+  Cache --> Hydration["Icon and metadata hydration queue"]
   Hydration --> UI
-  UI --> Native["Tauri commands"]
-  Native --> Windows["Windows launch and uninstall APIs"]
+  UI --> IPC["Typed Tauri commands"]
+  IPC --> Native["Windows launch, uninstall, tray, startup, shortcut"]
 ```
 
-The frontend owns presentation and user preferences. Rust owns system discovery, cache persistence, icon extraction, metadata access, source-aware launching, safe uninstall routing, autostart, tray lifecycle, and global shortcut registration.
+### Ownership boundaries
 
-The main Tauri commands are:
+The React frontend owns:
 
-| Command                   | Responsibility                                                                                                             |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `get_apps`                | Return the sanitized cached catalog immediately.                                                                           |
-| `refresh_apps`            | Validate changed sources and directories, persist a delta, then hydrate details in background.                             |
-| `force_full_scan`         | Rebuild the complete source catalog and portable filesystem index after user confirmation.                                 |
-| `reset_catalog_cache`     | Remove generated catalog and icon cache files, preserve user preferences, then force a clean scan.                         |
-| `hydrate_visible_icons`   | Start icon and metadata hydration with the currently visible application IDs first.                                        |
-| `start_background_sync`   | Start non-blocking incremental validation after a cached catalog is displayed.                                             |
-| `launch_app`              | Launch an application using its recorded source type.                                                                      |
-| `get_uninstall_preview`   | Return publisher, source, removal method, and exact command for the selected uninstall route.                              |
-| `uninstall_app`           | Run the concrete uninstall mechanism registered by Windows, record a privacy-limited result, and return completion status. |
-| `get_uninstall_history`   | Read the local bounded uninstall history newest-first.                                                                     |
-| `clear_uninstall_history` | Clear the local uninstall history without changing the catalog.                                                            |
-| `get_system_settings`     | Return version, autostart state, and global shortcut status.                                                               |
-| `set_autostart`           | Enable or disable startup for the current Windows account.                                                                 |
-| `open_telegram`           | Open the fixed project contact link.                                                                                       |
-| `vpn_list`                | Return supported local VPN providers and their current connection state.                                                   |
-| `vpn_set`                 | Start or stop a supported VPN through its code-defined local integration.                                                  |
-| `vpn_setup`               | Open the provider application when initial provider configuration is required.                                            |
+- presentation and responsive navigation;
+- search and current view state;
+- Favorites, Hidden items, custom categories, and manual category assignments;
+- dialogs, confirmations, scan progress, and user feedback.
 
-## 4. Catalog discovery pipeline
+The Rust backend owns:
+
+- discovery and portable scanning;
+- cache persistence and incremental indexes;
+- icon and executable metadata extraction;
+- deduplication inputs and source-aware launch targets;
+- uninstall target resolution and execution;
+- global shortcut, autostart, tray, and window lifecycle;
+- filesystem and registry watchers.
+
+The frontend sends application IDs for native actions. Rust resolves those IDs through trusted maps built from the catalog, so the webview cannot supply an arbitrary executable path.
+
+## 4. Tauri command surface
+
+| Command                   | Responsibility                                                               |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| `get_apps`                | Return the sanitized cached catalog, cache status, and generation.           |
+| `refresh_apps`            | Run an interactive incremental refresh.                                      |
+| `force_full_scan`         | Rebuild configured sources without relying on the previous filesystem index. |
+| `reset_catalog_cache`     | Remove generated catalog and icon caches, then run a clean full scan.        |
+| `hydrate_visible_icons`   | Promote visible application IDs in the hydration queue.                      |
+| `start_background_sync`   | Start background validation after the cached catalog is displayed.           |
+| `cancel_scan`             | Cancel active and queued scanning work.                                      |
+| `launch_app`              | Launch a trusted catalog entry by ID.                                        |
+| `get_uninstall_preview`   | Return publisher, source, removal mechanism, and command.                    |
+| `uninstall_app`           | Execute the trusted uninstall target and record its result.                  |
+| `get_uninstall_history`   | Return the local uninstall history newest-first.                             |
+| `clear_uninstall_history` | Delete uninstall history without modifying applications.                     |
+| `get_system_settings`     | Return version, autostart, shortcut, scan settings, and fixed drives.        |
+| `set_autostart`           | Enable or disable startup for the current Windows account.                   |
+| `set_scan_settings`       | Save automatic fixed-drive, included-path, and excluded-path settings.       |
+| `open_telegram`           | Open the fixed project contact URL.                                          |
+
+## 5. Catalog discovery
 
 ### Sources
 
-The scanner combines records from:
+The catalog combines:
 
-- user and system Start Menu shortcuts;
-- registered desktop applications;
-- Windows Start Apps;
-- Store/MSIX application packages;
-- Steam libraries declared by `libraryfolders.vdf` and installed app manifests;
-- portable executables discovered on drives reported by Windows as `DRIVE_FIXED`.
+- per-user and system Start Menu shortcuts;
+- uninstall registry entries for 64-bit, 32-bit, and current-user software;
+- Windows Start Apps and packaged applications;
+- Steam library folders and app manifests;
+- portable executables discovered on fixed local drives;
+- user-configured included folders.
 
-Removable, optical, and network drives are never included in automatic scanning. Drive letters and user folder names are not hardcoded.
+Drive letters and user folder names are not hardcoded.
 
-### Lifecycle
+### Exclusions
 
-1. Startup reads a versioned lightweight catalog from the Tauri application data directory and renders names immediately.
-2. When no cache exists, the interface asks before the first complete scan.
-3. With a cache present, background synchronization validates Windows sources, Steam manifests, and the fixed-drive directory index without blocking startup.
-4. Unchanged portable directories reuse indexed records; changed directories alone are enumerated and inspected. Refresh uses the same incremental path.
-5. **Settings > Catalog maintenance > Force full scan** discards incremental assumptions for one pass and rebuilds the directory index.
-6. Each portable scan root is bounded to 16 directory levels, 500,000 filesystem entries, and three minutes. Symbolic links, junctions, and other Windows reparse-point directories are skipped. If a limit is reached, already discovered applications are retained, the partial directory is not marked as fully indexed, and the next incremental scan can continue safely.
-7. One scan coordinator serializes all Startup, Watch, Refresh, and Force requests. Interactive scans cancel lower-priority background work, duplicate watcher requests are coalesced, and cancelled results are discarded before cache persistence.
-8. One hydration queue processes each application ID once per catalog generation. Visible IDs move ahead of background work, while repeated viewport requests do not duplicate icon extraction.
-9. Directory and registry watchers use a shared Windows stop event. Reconfiguring discovery settings wakes blocked Windows API calls, joins the old watcher threads, releases their handles, and only then starts the replacement watcher set.
-10. System directories, caches, dependency trees, Steam libraries, maintenance tools, configured exclusions, removable drives, and network drives are skipped.
-11. Catalog changes are emitted as generation-tagged deltas. The frontend ignores stale generations and preserves local organization preferences.
-12. Icons are stored separately from the catalog using source fingerprints. The UI can ask Rust to hydrate the currently visible cards first, then the normal background hydrator continues through the remaining catalog in bounded batches.
-13. While the process is running, debounced directory and registry watchers request synchronization for Start Menu, uninstall registry, Steam, and Included-folder changes.
+Automatic portable discovery excludes:
 
-Arbitrary locations on permanent fixed drives are intentionally not watched continuously. Their changes are detected during startup validation or Refresh, which avoids keeping a recursive watcher on every directory of every disk.
+- removable USB drives;
+- network and optical drives;
+- junctions, symbolic links, and other reparse-point directories;
+- configured excluded paths;
+- dependency, cache, system, and maintenance locations;
+- installers, uninstallers, updaters, crash reporters, helper binaries, and documentation shortcuts.
 
-## 5. Deduplication and source priority
+### Scan limits
 
-Sanitization considers normalized display names, case-insensitive paths, resolved shortcut targets, package identities, publishers, architecture/version suffixes, and cached stable IDs.
+Default limits for each portable scan root:
 
-Important rules include:
+| Limit            | Value          |
+| ---------------- | -------------- |
+| Maximum depth    | 16 directories |
+| Maximum entries  | 500,000        |
+| Maximum duration | 3 minutes      |
 
-- prefer a valid `.lnk` shortcut over a matching executable record;
-- keep the executable when no useful shortcut exists;
-- merge packaged and desktop records only when identity evidence is strong;
-- merge known architecture or version suffix duplicates without merging unrelated products that merely share a prefix;
-- preserve records with conflicting publishers;
-- remove installers, uninstallers, maintenance tools, resource-only names, invalid Unicode output, and stale noise;
-- prefer the newer version when duplicate portable copies expose the same product identity;
-- prefer Steam launch identities for Steam-managed games while merging local registry metadata when available.
+If an entry or time limit is reached, discovered results are retained but the partial directory is not recorded as fully indexed. A later scan can inspect it again.
 
-Deduplication is intentionally conservative: preserving two uncertain records is safer than hiding a legitimate application.
+## 6. Startup, incremental scanning, and watchers
 
-## 6. Icons and metadata
+1. `get_apps` reads the versioned cache and renders application names immediately.
+2. A missing cache produces the first-scan prompt instead of silently scanning all drives.
+3. Cached applications enter a background hydration queue for icons and local metadata.
+4. `start_background_sync` checks Windows sources and indexed fixed-drive directories without blocking startup.
+5. Unchanged directories reuse cached application records.
+6. Changed directories are re-enumerated and their additions/removals are merged into a new catalog generation.
+7. Watcher-triggered scans emit deltas instead of replacing the entire frontend list.
+8. Interactive Refresh and Force full scan return a complete list and expose progress.
 
-Icons are extracted from shortcut icon locations, resolved executable targets, package assets, and Windows shell resources. The lightweight catalog never embeds large icon payloads. A separate fingerprinted icon cache supplies reusable icons before slower metadata hydration completes.
+One scan coordinator serializes Startup, Watch, Refresh, and Force work:
 
-The information dialog can display:
+- repeated watcher events are coalesced;
+- interactive work cancels lower-priority background work;
+- cancelled results are not written to the cache;
+- only one scan mutates the catalog at a time.
 
-- description;
-- version;
+The watcher monitors Start Menu paths, uninstall registry keys, and user-configured included folders. Arbitrary fixed-drive roots are validated during startup or Refresh instead of being watched recursively.
+
+## 7. Cache and asynchronous hydration
+
+The catalog cache contains lightweight application records and a monotonically increasing generation. Large icon payloads are stored separately.
+
+Icon hydration:
+
+- deduplicates requests by application ID and catalog generation;
+- promotes currently visible cards;
+- processes only changed applications after watcher scans;
+- emits patches in batches of 24 to avoid a full React update for every icon;
+- uses source fingerprints to reuse valid cached PNG data;
+- discards stale work after a new generation starts.
+
+Reset catalog cache removes generated catalog/index and icon cache files. It does not remove Favorites, Hidden entries, custom categories, category ordering, or manual assignments.
+
+## 8. Filtering and duplicate resolution
+
+Duplicate matching considers:
+
+- case-insensitive paths;
+- resolved shortcut targets;
+- normalized product families;
+- architecture suffixes such as `x64`, `x86`, `64-bit`, and `32-bit`;
+- version suffixes;
+- shortcut/executable pairs in the same product folder;
+- package and desktop identity;
+- publishers when both are available.
+
+Candidate priority is:
+
+1. Steam identity;
+2. `.lnk` shortcut;
+3. `.exe` executable;
+4. packaged application identity.
+
+Metadata and uninstall data from the secondary record are merged into the preferred record when safe. Conflicting publishers and products that merely share a prefix remain separate. Deduplication intentionally prefers a possible duplicate over hiding a legitimate application when identity evidence is weak.
+
+## 9. Categories and navigation
+
+Built-in categories:
+
+- Games;
+- AI & Agents;
+- Editors & Design;
+- Development;
+- Browsers;
+- Media;
+- Communication;
+- Utilities;
+- System;
+- Windows Features;
+- Other.
+
+Windows Features is based on known names, targets, and package identities. A generic Microsoft publisher/name is not enough to classify an application as a Windows component.
+
+Users can:
+
+- create, rename, delete, and reorder categories;
+- drag a category by its name;
+- click the same category row to navigate to it;
+- move applications between categories;
+- mark applications as Favorites;
+- hide and later restore applications.
+
+Deleting a custom category moves its applications to Other. Hidden is a separate navigation view and does not uninstall or modify the application.
+
+At widths of `1024px` and above, navigation uses a persistent sidebar. Below `1024px`, the same navigation is presented as an overlay drawer.
+
+## 10. Launching
+
+Launch kinds:
+
+- executable;
+- shortcut;
+- AppUserModelID / packaged application;
+- Steam-managed application identity.
+
+The backend stores each trusted launch kind and target against its stable application ID. `launch_app` accepts only that ID and resolves the actual target inside Rust.
+
+## 11. Uninstalling
+
+Supported uninstall targets:
+
+1. registered quiet vendor command when available;
+2. registered standard vendor or MSI command;
+3. valid MSIX package removal.
+
+Before confirmation, the UI requests an uninstall preview containing:
+
+- application name;
 - publisher;
-- category and source;
-- launch target;
-- install location;
-- uninstall availability.
+- catalog source;
+- removal mechanism;
+- exact command.
 
-Values originate from local Windows, package, shortcut, registry, or executable resources. Unavailable fields remain `Unknown`. Windows Apps does not search the internet or generate descriptions.
+If Rust cannot resolve a concrete safe target, the action remains disabled as **Uninstall unavailable**.
 
-## 7. Categories and local preferences
+Safety rules:
 
-Built-in categories provide the initial organization. A category row has two deliberate pointer behaviors: click its name to open the category, or drag the same row to change its position. No separate drag icon is required. Users can also rename labels, create custom categories, collapse sections, and move individual applications. Deleting a custom category moves its applications to **Other**.
+- UNC/network-hosted uninstall executables are rejected;
+- empty or malformed registered commands are rejected;
+- program directories are not deleted directly;
+- deleting a shortcut is not treated as uninstalling software;
+- the frontend cannot substitute a command or target path.
 
-The built-in **Windows Features** category groups confirmed Windows components such as File Explorer, Snipping Tool, Task Scheduler, Get Help, Remote Desktop Connection, Windows administrative consoles, accessibility tools, and inbox applications. Classification uses known display names, executable targets, and package identifiers. A generic `Microsoft` name is intentionally insufficient, so products such as Microsoft Edge, Visual Studio, Microsoft 365, Xbox, and Game Bar retain their functional categories.
+The history stores only:
 
-The following preferences remain local:
+- timestamp;
+- application name;
+- publisher;
+- removal mechanism;
+- succeeded/failed result.
 
-- favorite application IDs;
-- hidden application IDs;
-- custom categories and labels;
-- category order and collapsed state;
-- manual application-to-category assignments;
-- automatic fixed-drive scanning and custom included/excluded paths.
+It retains the newest 100 records and excludes command text, paths, arguments, package IDs, usernames, and detailed errors.
 
-Settings lists every detected permanent local drive. Additional folders and exclusions must resolve to a fixed local drive; USB and network paths are rejected.
+## 12. Native Windows integrations
 
-Hidden applications appear only in the **Hidden** navigation view. Restoring an item preserves its previous category and favorite state. Hiding never uninstalls or modifies the target application.
+### System tray
 
-## 8. Launching and uninstalling
-
-### Launching
-
-Windows Apps records the source kind for every item and selects the matching Windows launch path for shortcuts, executables, shell targets, and packaged applications.
-
-### Uninstalling
-
-The uninstall flow follows this priority:
-
-1. registered quiet vendor uninstall command;
-2. registered standard vendor/MSI uninstall command;
-3. valid MSIX package uninstall route.
-
-Before execution, the confirmation dialog displays the publisher, catalog source, removal method, and exact command that Rust will start. If preview loading fails, confirmation stays disabled.
-
-If Windows exposes no concrete safe uninstall target, the menu displays a disabled **Uninstall unavailable** item. The application waits for a directly registered process, reports a non-success exit code, and refreshes the catalog after successful completion. It never treats shortcut deletion or recursive folder deletion as an uninstall operation.
-
-Every started uninstall attempt appends a local history entry with app name, publisher, method, result, and Unix timestamp. The history retains the newest 100 entries and deliberately excludes command text, paths, arguments, package identifiers, errors, and usernames. The Settings page can clear this history.
-
-## 9. Native Windows integrations
+Closing the main window hides it instead of terminating the process. The tray icon can restore the window. **Quit** performs an intentional process exit.
 
 ### Global shortcut
 
-`Win+Shift+Q` is registered with `RegisterHotKey` and physical virtual key `VK_Q`. The same physical key therefore works with English Q and Russian Й layouts. If another process owns the combination, Settings reports the conflict while the rest of the application remains available.
+`Win+Shift+Q` is registered with `RegisterHotKey` and physical `VK_Q`. It therefore refers to the same keyboard key when the active layout changes.
 
-### Background and system tray
+If another process owns the combination, the application remains usable and Settings reports the registration error.
 
-Closing the main window prevents process termination and hides the window in the Windows notification area. The shortcut, a left click on the tray icon, or **Open Windows Apps** restores and focuses it. Tray **Quit** marks the exit as intentional, terminates the process, and releases the shortcut.
+### Startup
 
-### Startup with Windows
-
-The Settings toggle writes the quoted path of the currently running executable to:
+The startup toggle writes the quoted current executable path to:
 
 ```text
 HKCU\Software\Microsoft\Windows\CurrentVersion\Run
 ```
 
-The entry affects only the current account. Moving the executable after enabling startup requires toggling the setting off and on again.
+The setting applies only to the current Windows account.
 
 ### WebView2
 
-The interface runs inside Microsoft Edge WebView2. Production bundles use Tauri's silent download bootstrapper when the runtime is missing.
+Production bundles use Tauri's silent WebView2 download bootstrapper when the runtime is missing.
 
-### VPN providers
+## 13. Privacy and security
 
-The VPN page uses a code-defined provider registry; it does not accept arbitrary commands or executable paths from the frontend.
+- Catalog discovery and categorization are local.
+- No external telemetry or catalog upload is configured.
+- No online application-description lookup is performed.
+- The Content Security Policy allows application resources and Tauri IPC endpoints.
+- Native launch and uninstall operations resolve trusted Rust-owned catalog records.
+- Uninstall actions require explicit confirmation.
+- Scan recursion is bounded and does not follow reparse points.
+- Debug logging is enabled only in debug builds.
+- The release installer is unsigned and can trigger SmartScreen.
 
-- **Hiddify:** launches or closes the installed Hiddify GUI. Hiddify must have its own connect-on-start option configured.
-
-## 10. Privacy and security
-
-### Local data boundary
-
-- The catalog and preferences are stored locally.
-- No application inventory is uploaded.
-- Uninstall history is local, bounded to 100 entries, and excludes command text, paths, arguments, package identifiers, errors, and usernames.
-- No telemetry service is configured.
-- Metadata is not enriched over the network.
-- The CSP restricts content to the application and Tauri IPC endpoints.
-- VPN integrations communicate only with locally installed providers and use code-defined actions.
-
-### Destructive operations
-
-- Uninstalling requires an explicit confirmation dialog with the command, publisher, source, and removal method shown before execution.
-- Native code invokes registered uninstall mechanisms instead of deleting program files.
-- Removing a category or hiding an item affects only local catalog preferences.
-
-### Code signing
-
-Version 0.2.0 does not include a configured Authenticode signing identity. An unsigned installer can trigger Microsoft Defender SmartScreen. Publish SHA-256 checksums with every release and never describe an unsigned artifact as signed.
-
-## 11. Repository structure
+## 14. Repository structure
 
 ```text
-public/                         Static assets and application logo
-src/components/apps/            Application cards and action menus
-src/components/catalog/         Catalog grids and category sections
-src/components/dialogs/         Information, deletion, and uninstall dialogs
-src/components/navigation/      Sidebar, drawer, and sortable category navigation
-src/components/settings/        Settings interface
-src/components/shared/          Shared interface components
-src/hooks/                      Reusable navigation and interaction hooks
-src/lib/                        Tauri clients, preferences, and catalog helpers
-src/store/                      Zustand application state
-src/tests/                      Frontend tests grouped by feature
-src/types/                      Shared TypeScript contracts
-src-tauri/src/catalog/          Discovery, cache, registry, and Start Apps logic
-src-tauri/src/lifecycle/        Window, tray, and process lifecycle
-src-tauri/src/platform/windows/ Windows integrations and native operations
-src-tauri/capabilities/         Tauri security capabilities
+public/                          Static assets and application icon
+src/components/apps/             Application cards and action menus
+src/components/catalog/          Catalog grids and sortable sections
+src/components/dialogs/          App information and destructive confirmations
+src/components/navigation/       Sidebar, drawer, and category navigation
+src/components/settings/         Settings and uninstall history
+src/components/shared/           Header, title bar, scan prompt, shared UI
+src/hooks/                       Navigation, spotlight, and scroll-lock hooks
+src/lib/                         Tauri clients, preferences, catalog utilities
+src/store/                       Zustand application state
+src/tests/                       Frontend tests grouped by layer
+src/types/                       Shared TypeScript contracts
+src-tauri/src/catalog/           Discovery, cache, scanning, hydration, deduplication
+src-tauri/src/lifecycle/         Tray and window lifecycle
+src-tauri/src/platform/windows/  Windows-specific native integrations
+.github/workflows/release.yml    Tag-driven Windows release pipeline
+scripts/verify-release-version.ps1
 ```
 
-Important native modules include `catalog`, `cache`, `incremental`, `sync`, `hydration`, `icon_cache`, `change_watcher`, `registry`, `start_apps`, `icon_extractor`, `launcher`, `uninstaller`, `autostart`, `global_shortcut`, and `lifecycle`.
-
-Portable and game discovery are isolated in `catalog/portable.rs` and `catalog/steam.rs`; fixed-drive enumeration is isolated in `platform/windows/drives.rs`.
-
-## 12. Development workflow
+## 15. Development workflow
 
 ### Prerequisites
 
-- Node.js and npm;
-- stable Rust with the `x86_64-pc-windows-msvc` toolchain;
+- Node.js 22 and npm;
+- stable Rust with `x86_64-pc-windows-msvc`;
 - Microsoft C++ Build Tools and Windows SDK;
 - WebView2 Runtime;
-- the official [Tauri prerequisites for Windows](https://v2.tauri.app/start/prerequisites/).
+- [Tauri prerequisites for Windows](https://v2.tauri.app/start/prerequisites/).
 
-### Start development
+### Install and run
 
 ```powershell
 npm install
 npm run tauri dev
 ```
-
-Vite provides frontend hot reload. Native Rust changes trigger a Tauri rebuild.
 
 ### Verification
 
@@ -274,149 +354,123 @@ cargo test --manifest-path src-tauri/Cargo.toml
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
-## 13. Production build
-
-Confirm that the application version matches in:
-
-- `package.json`;
-- `src-tauri/Cargo.toml`;
-- `src-tauri/tauri.conf.json`.
-
-Build production bundles on Windows x64:
+### Production build
 
 ```powershell
 npm run tauri build
 ```
 
-Expected artifact directories:
+Expected Windows x64 bundles:
 
 ```text
 src-tauri/target/release/bundle/nsis/Windows Apps_0.2.0_x64-setup.exe
 src-tauri/target/release/bundle/msi/Windows Apps_0.2.0_x64_en-US.msi
 ```
 
-Use the NSIS `-setup.exe` as the primary public download. The MSI is optional.
+The NSIS setup executable is the primary public artifact.
 
-Generate the release checksum:
+## 16. Release automation
+
+`.github/workflows/release.yml` runs when a `v*` tag is pushed.
+
+The workflow:
+
+1. checks out the tag;
+2. configures Node.js 22 and stable Rust;
+3. runs `npm ci`;
+4. validates the tag against `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`;
+5. runs frontend tests;
+6. runs Rust tests;
+7. builds Tauri bundles;
+8. generates an SHA-256 file for the NSIS installer;
+9. creates the GitHub Release and uploads both files.
+
+Prepare a release:
 
 ```powershell
-$installer = Get-ChildItem src-tauri/target/release/bundle/nsis -Filter *.exe |
-  Sort-Object LastWriteTime -Descending |
-  Select-Object -First 1
-
-Get-FileHash $installer.FullName -Algorithm SHA256
+npm test
+npm run build
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo check --manifest-path src-tauri/Cargo.toml
+npm run tauri build
+powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.0
 ```
 
-## 14. Publishing a GitHub Release
+Publish:
 
-The repository includes a tag-driven GitHub Actions workflow at `.github/workflows/release.yml`.
-
-1. Run local verification and clean-machine checks.
-2. Confirm `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` contain the same version.
-3. Push a version tag such as `v0.2.0`.
-4. GitHub Actions validates the tag against all manifests, runs frontend and Rust tests, builds the NSIS x64 installer, writes SHA-256, and creates the GitHub Release.
-5. Review the generated Release notes and attached assets.
-
-The workflow is intentionally tag-only. A tag/version mismatch fails before any Release is published.
-
-### Release notes template
-
-```markdown
-# Windows Apps 0.2.0
-
-## Highlights
-
-- Unified and deduplicated Windows application catalog.
-- Steam and portable application discovery across permanent local drives.
-- Custom categories with direct row dragging, Favorites, and reversible Hidden items.
-- System tray lifecycle and global Win+Shift+Q shortcut.
-
-## Requirements
-
-- Windows 10 or Windows 11 x64.
-- WebView2 Runtime; the installer can bootstrap it when missing.
-
-## Installation
-
-Download the x64 setup executable, verify its SHA-256 checksum, and run it.
-
-## Verification
-
-SHA-256: `<paste the published checksum>`
-
-## Known limitations
-
-- The 0.2.0 installer is not Authenticode-signed and may trigger SmartScreen.
-- Online metadata enrichment and automatic updates are not included.
+```powershell
+git tag -a v0.2.0 -m "Windows Apps 0.2.0"
+git push origin v0.2.0
 ```
 
-Do not publish a tag or Release until clean-machine verification is complete.
+Do not reuse or move a tag after a public Release has been published. Increase the version for the next release.
 
-## 15. Troubleshooting
+## 17. Troubleshooting
 
-### The catalog is empty
+### Catalog is empty
 
-Press **Scan for apps**. The first launch intentionally waits for user confirmation before performing a full scan. If an existing catalog appears stale after Refresh, run **Settings > Catalog maintenance > Force full scan** once to rebuild its index.
+Select **Scan for apps**. The first complete scan requires explicit user action.
 
-### Duplicate or stale entries remain after Refresh
+### Duplicate or stale entries remain
 
-Use **Settings > Catalog maintenance > Reset catalog cache**. This removes generated catalog and icon cache files, keeps favorites, Hidden items, custom categories, and category overrides, then performs a clean full scan.
+Run Refresh first. If the saved cache already contains bad records, use **Settings → Catalog maintenance → Reset catalog cache**.
 
-### An icon is missing
+### Application is missing
 
-Wait for background icon hydration, then scan again if the application or shortcut changed. Some Windows shell entries do not expose an extractable icon.
+Confirm that it is on a permanent local drive and not under an excluded folder. Add its folder under **Settings → Application discovery** if needed. Executables without usable metadata may be rejected unless their filename/folder identify a real portable product.
 
-### `Win+Shift+Q` does not restore the window
+### Icon is missing
 
-Confirm that Windows Apps is running in the notification area and review the shortcut status in Settings. Another application may already own the combination.
+Keep the application visible briefly so its ID receives hydration priority. Refresh if its shortcut or executable changed. Some Windows shell entries do not expose an extractable icon.
 
-### Startup does not launch the application
+### Global shortcut does not work
 
-Check the Settings toggle and Windows **Startup apps** settings. If the executable moved, disable and re-enable startup to refresh the registered path.
+Confirm Windows Apps is still running in the notification area. Check the shortcut status in Settings; another process may already own `Win+Shift+Q`.
 
-### The installer displays SmartScreen
+### Startup does not work
 
-Confirm that the file came from this repository's Releases page and compare its SHA-256 value with the published checksum. This warning is expected for an unsigned 0.2.0 community build.
+Disable and enable **Launch when Windows starts** again, especially if the executable was moved after the setting was created.
 
-### Duplicate or maintenance entries remain
+### Uninstall is unavailable
 
-Run a fresh scan or reset the catalog cache. If the entry remains, record its displayed name, source, launch target, publisher, and resolved path before reporting it.
+Windows did not expose a valid registered vendor, MSI, or MSIX uninstall target for that catalog entry. Windows Apps intentionally does not guess a command or delete its directory.
 
-### A portable application is missing
+### SmartScreen warning
 
-Confirm that the executable is on a permanent local drive and is not inside a configured exclusion. Add its containing directory under **Settings > Application discovery** when automatic fixed-drive scanning is disabled. Executables without usable product metadata are included when their filename and parent directory identify the same product, or when the file is a known standalone portable utility such as Rufus. Helper, updater, crash reporter, installer, and documentation executables are filtered to avoid flooding the catalog.
+The installer is not Authenticode-signed. Download it from the project Release and compare its SHA-256 value with the attached checksum.
 
-## 16. Release verification checklist
+## 18. Release verification checklist
 
-### Automated
+### Automated checks
 
 - [ ] Frontend tests pass.
-- [ ] Category rows open on click and reorder when dragged by their name.
-- [ ] Steam manifests and portable executables are discovered on fixed drives.
-- [ ] USB and network drives are excluded.
-- [ ] Scan progress, cancellation, include paths, and exclude paths work.
 - [ ] TypeScript and Vite production build pass.
 - [ ] Rust tests pass.
 - [ ] Cargo check passes.
-- [ ] Tauri production bundle completes.
-- [ ] SHA-256 checksum is generated for the uploaded `.exe`.
+- [ ] Version verification passes for the intended tag.
+- [ ] Tauri production build completes.
+- [ ] NSIS installer and SHA-256 file are attached to the Release.
 
 ### Windows 10 x64
 
-- [ ] Installer completes and the application starts.
-- [ ] WebView2 bootstrap works when required.
-- [ ] Scan, cache, launch, direct uninstall, and the disabled unavailable state work.
-- [ ] Favorites, custom categories, and Hidden restore persist.
-- [ ] Close-to-tray, tray Open/Quit, shortcut, and autostart work.
+- [ ] Installer and WebView2 bootstrap work.
+- [ ] First scan, Refresh, Force full scan, cancellation, and cache reset work.
+- [ ] Launching works for shortcuts, executables, and packaged apps.
+- [ ] Favorites, Hidden items, custom categories, and category ordering persist.
+- [ ] Registered uninstall and unavailable states behave correctly.
+- [ ] Tray Open/Quit, global shortcut, and autostart work.
 
 ### Windows 11 x64
 
-- [ ] Installer completes and the application starts.
-- [ ] WebView2 bootstrap works when required.
-- [ ] Scan, cache, launch, direct uninstall, and the disabled unavailable state work.
-- [ ] Favorites, custom categories, and Hidden restore persist.
-- [ ] Close-to-tray, tray Open/Quit, shortcut, and autostart work.
+- [ ] Installer and WebView2 bootstrap work.
+- [ ] First scan, Refresh, Force full scan, cancellation, and cache reset work.
+- [ ] Launching works for shortcuts, executables, and packaged apps.
+- [ ] Favorites, Hidden items, custom categories, and category ordering persist.
+- [ ] Registered uninstall and unavailable states behave correctly.
+- [ ] Tray Open/Quit, global shortcut, and autostart work.
 
 ---
 
-[Back to README](README.md) · [Latest release](../../releases/latest) · [Telegram: @keskiyo](https://t.me/keskiyo)
+[README](README.md) ·
+[Release 0.2.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.0) ·
+[Telegram: @keskiyo](https://t.me/keskiyo)

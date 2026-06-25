@@ -12,7 +12,6 @@ dev-launcher.log
 docs/
 
 AGENTS.md
-for_claude.md
-# Hiddify CLI scratch artifacts
-/data/
-/tmp/
+
+npm run tauri dev
+.sentry-native/
