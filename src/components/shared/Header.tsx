@@ -34,7 +34,7 @@ export function Header({
 	const scanSpotlight = useSpotlight()
 	return (
 		<header className='app-header-glass sticky top-0 z-300 border-b border-slate-300/65 shadow-[0_10px_30px_rgba(74,82,105,0.08)]'>
-			<div className='mx-auto flex w-full max-w-375 flex-col gap-4 px-5 py-5 sm:px-8 md:flex-row md:items-center'>
+			<div className='mx-auto flex w-full max-w-375 flex-col gap-4 px-5 pt-4.75 pb-4.75 sm:px-8 md:flex-row md:items-center'>
 				<div className='flex min-w-60 items-center gap-3'>
 					{showMenu && (
 						<button

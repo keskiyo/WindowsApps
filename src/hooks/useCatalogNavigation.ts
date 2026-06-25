@@ -31,7 +31,9 @@ export function useCatalogNavigation({
 	const goHome = useCallback(() => {
 		setActiveView('all')
 		closeDrawer()
-		window.scrollTo({ top: 0, behavior: scrollBehavior() })
+		// The catalog scrolls inside its rounded panel, not the window.
+		const scroller = document.getElementById('catalog-scroll')
+		;(scroller ?? window).scrollTo({ top: 0, behavior: scrollBehavior() })
 	}, [closeDrawer, setActiveView])
 
 	const selectCategory = useCallback(

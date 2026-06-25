@@ -111,6 +111,21 @@ button {
 	color: var(--text-primary);
 }
 
+.app-titlebar {
+	background: oklch(0.965 0.009 274 / 0.85);
+	-webkit-backdrop-filter: blur(14px) saturate(115%);
+	backdrop-filter: blur(14px) saturate(115%);
+}
+
+/* Rounded floating surfaces (sidebar + content) sit on the app-shell gradient. */
+.app-panel {
+	background: oklch(0.99 0.005 274 / 0.72);
+	border: 1px solid oklch(0.88 0.012 274 / 0.7);
+	-webkit-backdrop-filter: blur(16px) saturate(118%);
+	backdrop-filter: blur(16px) saturate(118%);
+	box-shadow: 0 18px 40px oklch(0.43 0.035 270 / 0.08);
+}
+
 .app-header-glass {
 	background: oklch(0.985 0.008 274 / 0.78);
 	-webkit-backdrop-filter: blur(18px) saturate(115%);

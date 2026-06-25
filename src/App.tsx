@@ -10,6 +10,7 @@ import { AppSidebar } from './components/navigation/AppSidebar'
 import { SettingsPage } from './components/settings/SettingsPage'
 import { Header } from './components/shared/Header'
 import { ScanPrompt } from './components/shared/ScanPrompt'
+import { TitleBar } from './components/shared/TitleBar'
 import { useAppFeedback } from './hooks/useAppFeedback'
 import { useCatalogNavigation } from './hooks/useCatalogNavigation'
 import { useDesktopNavigation } from './hooks/useDesktopNavigation'
@@ -197,10 +198,15 @@ export function App({
 	}
 
 	return (
-		<div className='app-shell theme-soft-surface min-h-screen'>
-			{desktopNavigation && <AppSidebar {...navigationProps} />}
-			<div className={desktopNavigation ? 'ml-70' : ''}>
-				<Header
+		<div className='app-shell theme-soft-surface flex h-screen flex-col overflow-hidden'>
+			<TitleBar />
+			<div className='flex min-h-0 flex-1 gap-2 px-2 pb-2'>
+				{desktopNavigation && <AppSidebar {...navigationProps} />}
+				<div
+					id='catalog-scroll'
+					className='app-panel flex min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl'
+				>
+					<Header
 					appCount={state.apps.length}
 					query={state.query}
 					isRefreshing={state.isRefreshing}
@@ -213,26 +219,6 @@ export function App({
 					onGoHome={navigation.goHome}
 					showMenu={!desktopNavigation}
 				/>
-				{drawerOpen && !desktopNavigation && (
-					<AppDrawer
-						apps={visibleCategorizedApps}
-						categoryOrder={state.categoryOrder}
-						categories={state.categories}
-						activeView={state.activeView}
-						favoriteCount={
-							categorizedApps.filter(app =>
-								state.favoriteAppIds.includes(app.id),
-							).length
-						}
-						hiddenCount={navigationProps.hiddenCount}
-						triggerRef={menuButtonRef}
-						onSelectView={navigation.selectView}
-						onSelectCategory={navigation.selectCategory}
-						onReorderCategory={state.reorderCategory}
-						onCreateCategory={state.createCategory}
-						onClose={closeDrawer}
-					/>
-				)}
 				<main className='mx-auto w-full max-w-375 px-5 pb-12 pt-7 sm:px-8'>
 					{state.activeView === 'settings' ? (
 						<SettingsPage
@@ -273,7 +259,28 @@ export function App({
 						/>
 					)}
 				</main>
+				</div>
 			</div>
+			{drawerOpen && !desktopNavigation && (
+				<AppDrawer
+					apps={visibleCategorizedApps}
+					categoryOrder={state.categoryOrder}
+					categories={state.categories}
+					activeView={state.activeView}
+					favoriteCount={
+						categorizedApps.filter(app =>
+							state.favoriteAppIds.includes(app.id),
+						).length
+					}
+					hiddenCount={navigationProps.hiddenCount}
+					triggerRef={menuButtonRef}
+					onSelectView={navigation.selectView}
+					onSelectCategory={navigation.selectCategory}
+					onReorderCategory={state.reorderCategory}
+					onCreateCategory={state.createCategory}
+					onClose={closeDrawer}
+				/>
+			)}
 			{infoApp && (
 				<AppInfoDialog
 					app={infoApp}

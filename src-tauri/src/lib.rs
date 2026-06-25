@@ -1,3 +1,5 @@
+// Custom title bar (decorations disabled) needs window drag/min/max/close permissions;
+// see src-tauri/capabilities/default.json.
 mod catalog;
 mod lifecycle;
 mod platform;

@@ -1,5 +1,11 @@
 import { ChevronRight, EyeOff, Info, RotateCcw, Trash2 } from 'lucide-react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+	type CSSProperties,
+} from 'react'
 import { useSpotlight } from '../../hooks/useSpotlight'
 import { horizontalViewportShift } from '../../lib/positioning'
 import { SpotlightLayer } from '../shared/SpotlightLayer'
@@ -56,6 +62,19 @@ export function AppActionsMenu({
 		window.addEventListener('resize', keepMenuInViewport)
 		return () => window.removeEventListener('resize', keepMenuInViewport)
 	}, [showCategories])
+	// When the menu (or its expanded category list) doesn't fit the viewport, gently
+	// scroll it fully into view instead of leaving it clipped at the edge.
+	useEffect(() => {
+		const element = menuRef.current
+		if (!element) return
+		const id = requestAnimationFrame(() => {
+			const bounds = element.getBoundingClientRect()
+			if (bounds.bottom > window.innerHeight - 8 || bounds.top < 44) {
+				element.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+			}
+		})
+		return () => cancelAnimationFrame(id)
+	}, [showCategories])
 	useEffect(() => {
 		function keydown(event: KeyboardEvent) {
 			if (event.key === 'Escape') onClose()
@@ -73,7 +92,14 @@ export function AppActionsMenu({
 	return (
 		<div
 			ref={menuRef}
-			style={{ transform: `translateX(${menuShift}px)` }}
+			style={
+				{
+					transform: `translateX(${menuShift}px)`,
+					// Reset the spotlight vars so menu items don't inherit the parent card's
+					// glow (each item drives its own on hover).
+					'--spotlight-opacity': 0,
+				} as CSSProperties
+			}
 			role='menu'
 			aria-label={`${app.name} actions`}
 			className='absolute left-2 top-11 z-110 w-55 max-w-[calc(100vw-1rem)] rounded-xl border border-slate-200/85 bg-slate-50 p-1.5 text-left text-slate-700 shadow-[0_18px_45px_rgba(53,61,82,.2)]'
@@ -96,7 +122,7 @@ export function AppActionsMenu({
 				</button>
 			)}
 			{!isHidden && showCategories && (
-				<div className='max-h-56 overflow-y-auto border-y border-slate-200 py-1'>
+				<div className='max-h-56 overflow-y-auto overscroll-contain border-y border-slate-200 py-1'>
 					{categoryOrder.map(category => (
 						<button
 							key={category}
@@ -159,10 +185,8 @@ export function AppActionsMenu({
 						onUninstall(app)
 						onClose()
 					}}
-					{...spotlight}
-					className='relative flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-700 hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-red-500'
+					className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-700 hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-red-500'
 				>
-					<SpotlightLayer size={70} />
 					<Trash2 size={15} aria-hidden='true' />
 					Uninstall
 				</button>

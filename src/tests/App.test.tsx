@@ -119,6 +119,10 @@ describe('App', () => {
 			configurable: true,
 			value: vi.fn(),
 		})
+		Object.defineProperty(Element.prototype, 'scrollTo', {
+			configurable: true,
+			value: vi.fn(),
+		})
 		Object.defineProperty(Element.prototype, 'scrollIntoView', {
 			configurable: true,
 			value: vi.fn(),
@@ -483,7 +487,7 @@ describe('App', () => {
 		expect(
 			screen.queryByRole('dialog', { name: 'App navigation' }),
 		).not.toBeInTheDocument()
-		expect(window.scrollTo).toHaveBeenCalledWith({
+		expect(Element.prototype.scrollTo).toHaveBeenCalledWith({
 			top: 0,
 			behavior: 'smooth',
 		})

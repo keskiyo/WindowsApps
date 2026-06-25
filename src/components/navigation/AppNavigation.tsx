@@ -110,13 +110,13 @@ export function AppNavigation(props: Props) {
 						type='button'
 						aria-label='Add category'
 						onClick={() => setAdding(true)}
-						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-violet-100/75 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
+						className='-mr-2 grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-violet-100/75 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
 						<Plus size={16} />
 					</button>
 				</div>
 				{adding && (
-					<div className='mb-2 px-2'>
+					<div className='mb-2 px-3'>
 						<CategoryNameEditor
 							label='New category name'
 							onCancel={() => setAdding(false)}
@@ -157,7 +157,7 @@ export function AppNavigation(props: Props) {
 					type='button'
 					onClick={() => props.onSelectView('hidden')}
 					{...spotlight}
-					className={itemClass(props.activeView === 'hidden')}
+					className={`${itemClass(props.activeView === 'hidden')} !py-[calc(0.625rem-1.5px)]`}
 				>
 					<SpotlightLayer size={90} />
 					<EyeOff size={17} /> <span>Hidden</span>

@@ -1,6 +1,5 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical } from 'lucide-react'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
 import { CategorySection } from './CategorySection'
 
@@ -55,15 +54,6 @@ export function SortableCategorySection(props: Props) {
 			<span className='rounded-full bg-slate-200/80 px-2.5 py-1 text-[0.7rem] font-medium text-slate-500'>
 				{props.apps.length} {props.apps.length === 1 ? 'app' : 'apps'}
 			</span>
-			<span
-				className='h-px min-w-5 flex-1 bg-linear-to-r from-slate-300/80 to-transparent'
-				aria-hidden='true'
-			/>
-			<GripVertical
-				size={16}
-				className='shrink-0 text-slate-400 transition group-hover:text-violet-700'
-				aria-hidden='true'
-			/>
 		</button>
 	)
 	return (
