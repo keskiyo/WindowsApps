@@ -48,3 +48,36 @@ pub fn providers() -> Vec<Box<dyn VpnProvider>> {
 pub fn provider(id: &str) -> Option<Box<dyn VpnProvider>> {
     providers().into_iter().find(|provider| provider.id() == id)
 }
+
+use std::os::windows::process::CommandExt;
+use std::process::Command;
+
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+pub struct SystemRunner;
+
+impl Runner for SystemRunner {
+    fn run(&self, program: &Path, args: &[&str]) -> Result<bool, String> {
+        Command::new(program)
+            .args(args)
+            .creation_flags(CREATE_NO_WINDOW)
+            .status()
+            .map(|status| status.success())
+            .map_err(|error| format!("Could not run {}: {error}", program.display()))
+    }
+    fn run_elevated(&self, program: &Path, args: &[&str]) -> Result<(), String> {
+        crate::platform::windows::launcher::shell_execute_elevated(program, args)
+    }
+    fn process_running(&self, image: &str) -> bool {
+        Command::new("tasklist")
+            .args(["/FI", &format!("IMAGENAME eq {image}"), "/NH"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map(|out| {
+                String::from_utf8_lossy(&out.stdout)
+                    .to_lowercase()
+                    .contains(&image.to_lowercase())
+            })
+            .unwrap_or(false)
+    }
+}

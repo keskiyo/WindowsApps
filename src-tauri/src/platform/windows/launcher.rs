@@ -37,6 +37,24 @@ fn apps_folder_target(app_id: &str) -> String {
     format!(r"shell:AppsFolder\{app_id}")
 }
 
+pub fn shell_execute_elevated(program: &std::path::Path, args: &[&str]) -> Result<(), String> {
+    let verb: Vec<u16> = OsStr::new("runas").encode_wide().chain(Some(0)).collect();
+    let file: Vec<u16> = program.as_os_str().encode_wide().chain(Some(0)).collect();
+    let params = args.join(" ");
+    let params_wide: Vec<u16> = OsStr::new(&params).encode_wide().chain(Some(0)).collect();
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            PCWSTR(verb.as_ptr()),
+            PCWSTR(file.as_ptr()),
+            PCWSTR(params_wide.as_ptr()),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    validate_shell_result(result.0 as isize)
+}
+
 fn validate_shell_result(result: isize) -> Result<(), String> {
     if result > 32 {
         Ok(())
