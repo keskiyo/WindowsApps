@@ -31,6 +31,20 @@ describe('VpnPage', () => {
 		expect(api.set).toHaveBeenCalledWith('hiddify', true)
 	})
 
+	it('shows the provider state as accessible status text', async () => {
+		render(
+			<VpnPage
+				client={client({
+					list: vi.fn().mockResolvedValue([
+						{ id: 'hiddify', name: 'Hiddify', installed: true, connected: true },
+					]),
+				})}
+			/>,
+		)
+
+		expect(await screen.findByRole('status')).toHaveTextContent('Connected')
+	})
+
 	it('offers setup when not installed', async () => {
 		const api = client({
 			list: vi.fn().mockResolvedValue([

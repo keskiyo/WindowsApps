@@ -42,7 +42,7 @@ pub trait VpnProvider {
     }
 }
 
-/// All known providers (Hiddify today; extend here later).
+/// All known providers.
 pub fn providers() -> Vec<Box<dyn VpnProvider>> {
     vec![Box::new(hiddify::Hiddify)]
 }

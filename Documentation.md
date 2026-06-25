@@ -60,6 +60,9 @@ The main Tauri commands are:
 | `get_system_settings`     | Return version, autostart state, and global shortcut status.                                                               |
 | `set_autostart`           | Enable or disable startup for the current Windows account.                                                                 |
 | `open_telegram`           | Open the fixed project contact link.                                                                                       |
+| `vpn_list`                | Return supported local VPN providers and their current connection state.                                                   |
+| `vpn_set`                 | Start or stop a supported VPN through its code-defined local integration.                                                  |
+| `vpn_setup`               | Open the provider application when initial provider configuration is required.                                            |
 
 ## 4. Catalog discovery pipeline
 
@@ -190,6 +193,12 @@ The entry affects only the current account. Moving the executable after enabling
 
 The interface runs inside Microsoft Edge WebView2. Production bundles use Tauri's silent download bootstrapper when the runtime is missing.
 
+### VPN providers
+
+The VPN page uses a code-defined provider registry; it does not accept arbitrary commands or executable paths from the frontend.
+
+- **Hiddify:** launches or closes the installed Hiddify GUI. Hiddify must have its own connect-on-start option configured.
+
 ## 10. Privacy and security
 
 ### Local data boundary
@@ -200,6 +209,7 @@ The interface runs inside Microsoft Edge WebView2. Production bundles use Tauri'
 - No telemetry service is configured.
 - Metadata is not enriched over the network.
 - The CSP restricts content to the application and Tauri IPC endpoints.
+- VPN integrations communicate only with locally installed providers and use code-defined actions.
 
 ### Destructive operations
 
