@@ -9,6 +9,8 @@ pub trait Runner {
     fn run(&self, program: &Path, args: &[&str]) -> Result<bool, String>;
     /// Run `program args...` elevated (UAC). Ok(()) once the user accepts.
     fn run_elevated(&self, program: &Path, args: &[&str]) -> Result<(), String>;
+    /// Launch a GUI program detached — returns immediately, the process keeps running.
+    fn launch(&self, program: &Path) -> Result<(), String>;
     /// True if a process with this image name is running (used for status / GUI checks).
     fn process_running(&self, image_name: &str) -> bool;
 }
@@ -67,6 +69,9 @@ impl Runner for SystemRunner {
     }
     fn run_elevated(&self, program: &Path, args: &[&str]) -> Result<(), String> {
         crate::platform::windows::launcher::shell_execute_elevated(program, args)
+    }
+    fn launch(&self, program: &Path) -> Result<(), String> {
+        crate::platform::windows::launcher::shell_execute(&program.to_string_lossy())
     }
     fn process_running(&self, image: &str) -> bool {
         Command::new("tasklist")
