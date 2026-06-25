@@ -42,23 +42,6 @@ pub fn read(path: &Path) -> ExecutableMetadata {
     }
 }
 
-pub fn fill_missing(
-    description: &mut Option<String>,
-    version: &mut Option<String>,
-    publisher: &mut Option<String>,
-    metadata: &ExecutableMetadata,
-) {
-    if description.is_none() {
-        *description = metadata.description.clone();
-    }
-    if version.is_none() {
-        *version = metadata.version.clone();
-    }
-    if publisher.is_none() {
-        *publisher = metadata.publisher.clone();
-    }
-}
-
 fn translation(data: &[u8]) -> Option<(u16, u16)> {
     let query = wide(OsStr::new(r"\VarFileInfo\Translation"));
     let mut buffer: *mut c_void = std::ptr::null_mut();
@@ -105,30 +88,4 @@ fn string_value(data: &[u8], language: u16, code_page: u16, key: &str) -> Option
 
 fn wide(value: &OsStr) -> Vec<u16> {
     value.encode_wide().chain(Some(0)).collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{fill_missing, ExecutableMetadata};
-
-    #[test]
-    fn fills_only_missing_metadata_fields() {
-        let mut description = Some("Registry description".to_string());
-        let mut version = None;
-        let mut publisher = None;
-        fill_missing(
-            &mut description,
-            &mut version,
-            &mut publisher,
-            &ExecutableMetadata {
-                description: Some("File description".into()),
-                version: Some("2.14.0".into()),
-                publisher: Some("Happ".into()),
-                product_name: Some("Happ".into()),
-            },
-        );
-        assert_eq!(description.as_deref(), Some("Registry description"));
-        assert_eq!(version.as_deref(), Some("2.14.0"));
-        assert_eq!(publisher.as_deref(), Some("Happ"));
-    }
 }

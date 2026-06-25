@@ -12,6 +12,7 @@ pub mod icon_cache;
 pub mod incremental;
 mod portable;
 mod registry;
+pub mod scan_coordinator;
 pub mod scan_settings;
 pub mod source;
 mod start_apps;
@@ -106,104 +107,6 @@ pub struct ScanProgress {
     pub location: Option<String>,
     pub completed_roots: usize,
     pub total_roots: usize,
-}
-
-pub fn discover_apps_with(
-    settings: &scan_settings::ScanSettings,
-    progress: impl Fn(ScanProgress),
-    is_cancelled: impl Fn() -> bool + Sync,
-) -> Vec<AppInfo> {
-    progress(ScanProgress {
-        stage: "Windows applications".into(),
-        location: None,
-        completed_roots: 0,
-        total_roots: 0,
-    });
-    let (mut apps, registry_metadata) = scan_registry();
-    apps.extend(scan_start_menu());
-    apps.extend(start_apps::scan());
-    if is_cancelled() {
-        return sanitize(apps);
-    }
-
-    let steam_libraries = steam::installed_libraries();
-    progress(ScanProgress {
-        stage: "Steam libraries".into(),
-        location: None,
-        completed_roots: 0,
-        total_roots: steam_libraries.len(),
-    });
-    for (index, library) in steam_libraries.iter().enumerate() {
-        if is_cancelled() {
-            break;
-        }
-        progress(ScanProgress {
-            stage: "Steam libraries".into(),
-            location: Some(library.to_string_lossy().into_owned()),
-            completed_roots: index,
-            total_roots: steam_libraries.len(),
-        });
-        apps.extend(steam::scan_library(library).into_iter().map(steam_app));
-    }
-
-    let mut roots = if settings.auto_scan_fixed_drives {
-        crate::platform::windows::drives::fixed_drive_roots()
-    } else {
-        Vec::new()
-    };
-    roots.extend(
-        settings
-            .included_paths
-            .iter()
-            .map(PathBuf::from)
-            .filter(|path| path.is_dir()),
-    );
-    roots.sort_by_cached_key(|path| path.to_string_lossy().to_lowercase());
-    roots.dedup_by(|left, right| {
-        left.to_string_lossy()
-            .eq_ignore_ascii_case(&right.to_string_lossy())
-    });
-    let mut excluded = default_portable_exclusions();
-    excluded.extend(settings.excluded_paths.iter().map(PathBuf::from));
-    excluded.extend(steam_libraries);
-    progress(ScanProgress {
-        stage: "Portable applications".into(),
-        location: None,
-        completed_roots: 0,
-        total_roots: roots.len(),
-    });
-    let portable_paths = std::thread::scope(|scope| {
-        let (sender, receiver) = std::sync::mpsc::channel();
-        for root in &roots {
-            let sender = sender.clone();
-            let excluded = &excluded;
-            let is_cancelled = &is_cancelled;
-            scope.spawn(move || {
-                let paths = portable::discover_executables(
-                    std::slice::from_ref(root),
-                    excluded,
-                    is_cancelled,
-                );
-                let _ = sender.send((root.to_path_buf(), paths));
-            });
-        }
-        drop(sender);
-        let mut paths = Vec::new();
-        for (index, (root, found)) in receiver.into_iter().enumerate() {
-            progress(ScanProgress {
-                stage: "Portable applications".into(),
-                location: Some(root.to_string_lossy().into_owned()),
-                completed_roots: index + 1,
-                total_roots: roots.len(),
-            });
-            paths.extend(found);
-        }
-        paths
-    });
-    apps.extend(portable_paths.into_iter().filter_map(portable_app));
-    attach_registry_metadata(&mut apps, &registry_metadata);
-    enrich_local_metadata(&mut apps);
-    sanitize(apps)
 }
 
 fn steam_app(game: steam::SteamGame) -> AppInfo {
@@ -314,11 +217,9 @@ pub fn watcher_paths(settings: &scan_settings::ScanSettings) -> Vec<PathBuf> {
         paths.push(PathBuf::from(appdata).join(r"Microsoft\Windows\Start Menu\Programs"));
     }
     paths.extend(settings.included_paths.iter().map(PathBuf::from));
-    paths.extend(
-        steam::installed_libraries()
-            .into_iter()
-            .map(|library| library.join("steamapps")),
-    );
+    // Intentionally NOT watching Steam `steamapps`: Steam writes there constantly
+    // (shadercache, manifests, logs), which triggered a full resync every few seconds.
+    // Newly installed Steam games are picked up on manual Refresh / next startup.
     paths.retain(|path| path.is_dir());
     paths.sort_by_cached_key(|path| path.to_string_lossy().to_lowercase());
     paths.dedup_by(|left, right| {
@@ -350,11 +251,6 @@ fn scan_registry() -> (Vec<AppInfo>, Vec<registry::RegistryMetadata>) {
         metadata.extend(scan.metadata);
     }
     (apps, metadata)
-}
-
-pub fn enrich_registered_uninstall_metadata(apps: &mut [AppInfo]) {
-    let (_, metadata) = scan_registry();
-    attach_registry_metadata(apps, &metadata);
 }
 
 fn attach_registry_metadata(apps: &mut [AppInfo], metadata: &[registry::RegistryMetadata]) {
@@ -435,44 +331,6 @@ fn is_known_standalone_portable(stem: &str) -> bool {
         || normalized.starts_with("ventoy")
 }
 
-fn enrich_local_metadata(apps: &mut [AppInfo]) {
-    for app in apps {
-        let target = app.resolved_path.as_deref().unwrap_or(&app.path);
-        let path = Path::new(target);
-        if !path
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
-            || !path.is_file()
-        {
-            continue;
-        }
-        let metadata = crate::platform::windows::executable_metadata::read(path);
-        crate::platform::windows::executable_metadata::fill_missing(
-            &mut app.description,
-            &mut app.version,
-            &mut app.publisher,
-            &metadata,
-        );
-        if app.install_location.is_none() {
-            app.install_location = path
-                .parent()
-                .map(|parent| parent.to_string_lossy().into_owned());
-        }
-    }
-}
-
-pub fn reuse_cached_icons(apps: &mut [AppInfo], cached: &[AppInfo]) {
-    for app in apps {
-        if let Some(icon) = cached
-            .iter()
-            .find(|cached| cached.id == app.id)
-            .and_then(|cached| cached.icon_base64.clone())
-        {
-            app.icon_base64 = Some(icon);
-        }
-    }
-}
-
 pub(super) fn icon_source(app: &AppInfo) -> Option<String> {
     app.shortcut_icon_path
         .clone()
@@ -483,18 +341,6 @@ pub(super) fn icon_source(app: &AppInfo) -> Option<String> {
                 .filter(|path| Path::new(path).is_file())
         })
         .or_else(|| (app.launch_kind != LaunchKind::AppUserModelId).then(|| app.path.clone()))
-}
-
-pub fn hydrate_missing_icons(apps: &mut [AppInfo]) {
-    for app in apps.iter_mut().filter(|app| app.icon_base64.is_none()) {
-        app.icon_base64 = if app.launch_kind == LaunchKind::AppUserModelId {
-            crate::platform::windows::icon_extractor::extract_app_id_icon(&app.path)
-        } else {
-            icon_source(app).and_then(|path| {
-                crate::platform::windows::icon_extractor::extract_icon(Path::new(&path))
-            })
-        };
-    }
 }
 
 fn scan_start_menu() -> Vec<AppInfo> {
@@ -1738,19 +1584,6 @@ mod tests {
         assert_eq!(value.version.as_deref(), Some("1.2.3"));
         assert_eq!(value.publisher.as_deref(), Some("OpenAI"));
         assert!(value.can_uninstall);
-    }
-
-    #[test]
-    fn reuses_cached_icon_by_stable_id() {
-        let mut discovered = vec![app("Happ", r"C:\Menu\Happ.lnk")];
-        discovered[0].id = "happ".into();
-        let mut cached = discovered[0].clone();
-        cached.icon_base64 = Some("data:image/png;base64,cached".into());
-        reuse_cached_icons(&mut discovered, &[cached]);
-        assert_eq!(
-            discovered[0].icon_base64.as_deref(),
-            Some("data:image/png;base64,cached")
-        );
     }
 
     #[test]

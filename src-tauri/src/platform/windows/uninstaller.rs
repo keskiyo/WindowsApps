@@ -67,13 +67,20 @@ pub fn preview(target: &UninstallTarget) -> UninstallTargetPreview {
             };
             UninstallTargetPreview { mechanism, command }
         }
-        UninstallTarget::Msix { package_full_name } => UninstallTargetPreview {
-            mechanism: UninstallMechanism::Msix,
-            command: format!(
-                "powershell.exe -NoLogo -NoProfile -NonInteractive -Command Remove-AppxPackage -Package '{}'",
-                package_full_name
-            ),
-        },
+        UninstallTarget::Msix { package_full_name } => {
+            let command = if valid_package_name(package_full_name) {
+                format!(
+                    "powershell.exe -NoLogo -NoProfile -NonInteractive -Command Remove-AppxPackage -Package '{}'",
+                    package_full_name
+                )
+            } else {
+                "<invalid package identity>".to_string()
+            };
+            UninstallTargetPreview {
+                mechanism: UninstallMechanism::Msix,
+                command,
+            }
+        }
     }
 }
 
@@ -83,6 +90,9 @@ pub fn execute(target: Option<UninstallTarget>) -> Result<(), String> {
             executable,
             arguments,
         } => {
+            if !is_local_executable(&executable) {
+                return Err("Uninstaller path is not a local executable".into());
+            }
             let mut command = Command::new(executable);
             if !arguments.is_empty() {
                 command.raw_arg(arguments);
@@ -136,6 +146,13 @@ fn is_msiexec(executable: &str) -> bool {
     name.eq_ignore_ascii_case("msiexec") || name.eq_ignore_ascii_case("msiexec.exe")
 }
 
+/// Reject empty and UNC (`\\server\share`) uninstaller paths so a tampered registry
+/// entry cannot point the uninstall action at a network-hosted binary.
+fn is_local_executable(value: &str) -> bool {
+    let trimmed = value.trim().trim_matches('"');
+    !trimmed.is_empty() && !trimmed.starts_with(r"\\")
+}
+
 fn valid_package_name(value: &str) -> bool {
     !value.is_empty()
         && value.chars().all(|character| {
@@ -167,6 +184,24 @@ mod tests {
     fn validates_msix_package_names() {
         assert!(valid_package_name("OpenAI.Codex_1.2.3.0_x64__abc"));
         assert!(!valid_package_name("package'; Remove-Item C:\\"));
+    }
+
+    #[test]
+    fn rejects_unc_and_empty_uninstaller_paths() {
+        assert!(is_local_executable(r"C:\Program Files\App\uninstall.exe"));
+        assert!(is_local_executable("msiexec.exe"));
+        assert!(!is_local_executable(r"\\attacker\share\payload.exe"));
+        assert!(!is_local_executable("   "));
+        assert!(!is_local_executable(r#""\\attacker\share\x.exe""#));
+    }
+
+    #[test]
+    fn preview_does_not_inject_invalid_package_identity() {
+        let preview = preview(&UninstallTarget::Msix {
+            package_full_name: "evil'; Remove-Item C:\\".into(),
+        });
+        assert_eq!(preview.command, "<invalid package identity>");
+        assert!(!preview.command.contains("Remove-Item"));
     }
 
     #[test]

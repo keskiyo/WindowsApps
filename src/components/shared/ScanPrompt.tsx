@@ -14,7 +14,7 @@ export function ScanPrompt({ isScanning, onScan, onDismiss }: Props) {
 					type='button'
 					aria-label='Dismiss scan prompt'
 					onClick={onDismiss}
-					className='absolute right-3 top-3 grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-200/75 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-violet-500'
+					className='absolute right-3 top-3 grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-violet-100/75 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-violet-500'
 				>
 					<X size={17} aria-hidden='true' />
 				</button>

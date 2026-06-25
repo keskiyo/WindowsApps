@@ -83,10 +83,14 @@ Removable, optical, and network drives are never included in automatic scanning.
 3. With a cache present, background synchronization validates Windows sources, Steam manifests, and the fixed-drive directory index without blocking startup.
 4. Unchanged portable directories reuse indexed records; changed directories alone are enumerated and inspected. Refresh uses the same incremental path.
 5. **Settings > Catalog maintenance > Force full scan** discards incremental assumptions for one pass and rebuilds the directory index.
-6. System directories, caches, dependency trees, Steam libraries, maintenance tools, configured exclusions, removable drives, and network drives are skipped.
-7. Catalog changes are emitted as generation-tagged deltas. The frontend ignores stale generations and preserves local organization preferences.
-8. Icons are stored separately from the catalog using source fingerprints. The UI can ask Rust to hydrate the currently visible cards first, then the normal background hydrator continues through the remaining catalog in bounded batches.
-9. While the process is running, debounced directory and registry watchers request synchronization for Start Menu, uninstall registry, Steam, and Included-folder changes.
+6. Each portable scan root is bounded to 16 directory levels, 500,000 filesystem entries, and three minutes. Symbolic links, junctions, and other Windows reparse-point directories are skipped. If a limit is reached, already discovered applications are retained, the partial directory is not marked as fully indexed, and the next incremental scan can continue safely.
+7. One scan coordinator serializes all Startup, Watch, Refresh, and Force requests. Interactive scans cancel lower-priority background work, duplicate watcher requests are coalesced, and cancelled results are discarded before cache persistence.
+8. One hydration queue processes each application ID once per catalog generation. Visible IDs move ahead of background work, while repeated viewport requests do not duplicate icon extraction.
+9. Directory and registry watchers use a shared Windows stop event. Reconfiguring discovery settings wakes blocked Windows API calls, joins the old watcher threads, releases their handles, and only then starts the replacement watcher set.
+10. System directories, caches, dependency trees, Steam libraries, maintenance tools, configured exclusions, removable drives, and network drives are skipped.
+11. Catalog changes are emitted as generation-tagged deltas. The frontend ignores stale generations and preserves local organization preferences.
+12. Icons are stored separately from the catalog using source fingerprints. The UI can ask Rust to hydrate the currently visible cards first, then the normal background hydrator continues through the remaining catalog in bounded batches.
+13. While the process is running, debounced directory and registry watchers request synchronization for Start Menu, uninstall registry, Steam, and Included-folder changes.
 
 Arbitrary locations on permanent fixed drives are intentionally not watched continuously. Their changes are detected during startup validation or Refresh, which avoids keeping a recursive watcher on every directory of every disk.
 

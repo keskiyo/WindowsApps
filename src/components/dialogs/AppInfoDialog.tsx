@@ -62,7 +62,7 @@ export function AppInfoDialog({
 						type='button'
 						aria-label='Close app information'
 						onClick={onClose}
-						className='grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-violet-500'
+						className='grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-violet-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
 						<X size={17} />
 					</button>

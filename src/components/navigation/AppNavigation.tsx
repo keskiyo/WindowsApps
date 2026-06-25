@@ -50,7 +50,7 @@ export function AppNavigation(props: Props) {
 		}),
 	)
 	const itemClass = (active: boolean) =>
-		`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-violet-500 ${active ? 'bg-violet-100/90 font-medium text-violet-700 shadow-[inset_1px_1px_3px_rgba(119,105,160,.10)]' : 'text-slate-600 hover:bg-slate-200/65 hover:text-slate-900'}`
+		`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-violet-500 ${active ? 'bg-violet-100/90 font-medium text-violet-700 shadow-[inset_1px_1px_3px_rgba(119,105,160,.10)]' : 'text-slate-600 hover:bg-violet-100/65 hover:text-violet-700'}`
 	const visibleCategories = props.categoryOrder.filter(category => {
 		const definition = props.categories.find(item => item.id === category)
 		return definition && (props.counts.has(category) || !definition.builtIn)
@@ -110,7 +110,7 @@ export function AppNavigation(props: Props) {
 						type='button'
 						aria-label='Add category'
 						onClick={() => setAdding(true)}
-						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-200/75 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
+						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-violet-100/75 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
 						<Plus size={16} />
 					</button>

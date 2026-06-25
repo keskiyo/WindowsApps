@@ -23,6 +23,18 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO};
 
+/// Decode an on-disk image (JPG/PNG/ICO) and re-encode it as a PNG data URL.
+/// Used for Steam library-cache icons, which are not embedded in an executable.
+pub fn image_file_to_png_data_url(path: &Path) -> Option<String> {
+    let image = image::open(path).ok()?;
+    let mut png = Cursor::new(Vec::new());
+    image.write_to(&mut png, ImageFormat::Png).ok()?;
+    Some(format!(
+        "data:image/png;base64,{}",
+        STANDARD.encode(png.into_inner())
+    ))
+}
+
 pub fn extract_icon(path: &Path) -> Option<String> {
     let wide = wide(path.as_os_str());
     let mut file_info = SHFILEINFOW::default();

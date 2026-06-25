@@ -51,24 +51,6 @@ pub fn read_document(app_data_dir: &Path) -> Option<CatalogCache> {
     })
 }
 
-pub fn read_cache(app_data_dir: &Path) -> Option<Vec<AppInfo>> {
-    read_document(app_data_dir).map(|document| document.apps)
-}
-
-pub fn write_cache(app_data_dir: &Path, apps: &[AppInfo]) -> io::Result<()> {
-    let mut lightweight = apps.to_vec();
-    for app in &mut lightweight {
-        app.icon_base64 = None;
-    }
-    write_document(
-        app_data_dir,
-        &CatalogCache {
-            apps: lightweight,
-            ..CatalogCache::default()
-        },
-    )
-}
-
 pub fn write_document(app_data_dir: &Path, document: &CatalogCache) -> io::Result<()> {
     fs::create_dir_all(app_data_dir)?;
     let cache = app_data_dir.join(CACHE_FILE);
@@ -109,40 +91,13 @@ pub fn reset(app_data_dir: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::{AppInfo, UninstallTarget};
-
-    #[test]
-    fn round_trips_cache() {
-        let dir = tempfile::tempdir().unwrap();
-        let apps = vec![AppInfo {
-            id: "editor".into(),
-            name: "Editor".into(),
-            path: r"C:\Editor.exe".into(),
-            icon_base64: None,
-            category: Default::default(),
-            launch_kind: Default::default(),
-            source_kind: Default::default(),
-            description: None,
-            version: None,
-            publisher: None,
-            install_location: None,
-            can_uninstall: true,
-            uninstall: Some(UninstallTarget::Command {
-                executable: r"C:\Editor\uninstall.exe".into(),
-                arguments: "/quiet".into(),
-            }),
-            resolved_path: None,
-            shortcut_icon_path: None,
-        }];
-        write_cache(dir.path(), &apps).unwrap();
-        assert_eq!(read_cache(dir.path()), Some(apps));
-    }
+    use crate::catalog::AppInfo;
 
     #[test]
     fn ignores_corrupt_cache() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("apps-cache.json"), "not json").unwrap();
-        assert_eq!(read_cache(dir.path()), None);
+        assert_eq!(read_document(dir.path()), None);
     }
 
     #[test]

@@ -46,7 +46,7 @@ export function CategoryNameEditor({
 					type='button'
 					aria-label='Cancel category editing'
 					onClick={onCancel}
-					className='grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-200/75'
+					className='grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-violet-100/75'
 				>
 					<X size={16} />
 				</button>

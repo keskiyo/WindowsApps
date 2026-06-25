@@ -1,6 +1,8 @@
 import { ChevronRight, EyeOff, Info, RotateCcw, Trash2 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useSpotlight } from '../../hooks/useSpotlight'
 import { horizontalViewportShift } from '../../lib/positioning'
+import { SpotlightLayer } from '../shared/SpotlightLayer'
 import {
 	categoryLabel,
 	type AppCategory,
@@ -33,6 +35,7 @@ export function AppActionsMenu({
 	onHide,
 	onRestore,
 }: Props) {
+	const spotlight = useSpotlight()
 	const [showCategories, setShowCategories] = useState(false)
 	const [menuShift, setMenuShift] = useState(0)
 	const menuShiftRef = useRef(0)
@@ -80,8 +83,10 @@ export function AppActionsMenu({
 					type='button'
 					role='menuitem'
 					onClick={() => setShowCategories(value => !value)}
-					className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-200/70 focus-visible:outline-2 focus-visible:outline-violet-500'
+					{...spotlight}
+					className='relative flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-violet-100/70 focus-visible:outline-2 focus-visible:outline-violet-500'
 				>
+					<SpotlightLayer size={70} />
 					<ChevronRight
 						size={15}
 						className={showCategories ? 'rotate-90' : ''}
@@ -104,8 +109,10 @@ export function AppActionsMenu({
 								onMove(app.id, category)
 								onClose()
 							}}
-							className={`flex w-full items-center rounded-lg px-3 py-1.5 text-sm hover:bg-slate-200/70 focus-visible:outline-2 focus-visible:outline-violet-500 ${category === app.category ? 'font-medium text-violet-700' : 'text-slate-600'}`}
+							{...spotlight}
+							className={`relative flex w-full items-center rounded-lg px-3 py-1.5 text-sm hover:bg-violet-100/70 focus-visible:outline-2 focus-visible:outline-violet-500 ${category === app.category ? 'font-medium text-violet-700' : 'text-slate-600'}`}
 						>
+							<SpotlightLayer size={60} />
 							{categoryLabel(categories, category)}
 						</button>
 					))}
@@ -118,8 +125,10 @@ export function AppActionsMenu({
 					onInfo(app)
 					onClose()
 				}}
-				className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-200/70 focus-visible:outline-2 focus-visible:outline-violet-500'
+				{...spotlight}
+				className='relative flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-violet-100/70 focus-visible:outline-2 focus-visible:outline-violet-500'
 			>
+				<SpotlightLayer size={70} />
 				<Info size={15} aria-hidden='true' />
 				App info
 			</button>
@@ -131,8 +140,10 @@ export function AppActionsMenu({
 					else onHide(app.id)
 					onClose()
 				}}
-				className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-200/70 focus-visible:outline-2 focus-visible:outline-violet-500'
+				{...spotlight}
+				className='relative flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-violet-100/70 focus-visible:outline-2 focus-visible:outline-violet-500'
 			>
+				<SpotlightLayer size={70} />
 				{isHidden ? (
 					<RotateCcw size={15} aria-hidden='true' />
 				) : (
@@ -148,8 +159,10 @@ export function AppActionsMenu({
 						onUninstall(app)
 						onClose()
 					}}
-					className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-700 hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-red-500'
+					{...spotlight}
+					className='relative flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-700 hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-red-500'
 				>
+					<SpotlightLayer size={70} />
 					<Trash2 size={15} aria-hidden='true' />
 					Uninstall
 				</button>

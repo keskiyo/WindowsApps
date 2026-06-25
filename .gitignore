@@ -2,14 +2,14 @@ node_modules/
 dist/
 target/
 src-tauri/target/
+src-tauri/gen/
 .cargo-target/
 *.log
 dev-launcher.log
 *.tsbuildinfo
+.agents/
 .superpowers/
 docs/
-.github
-scripts
 
 AGENTS.md
 PRODUCT.md

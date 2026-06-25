@@ -21,38 +21,18 @@ pub struct SourceSnapshot {
     pub apps: Vec<AppInfo>,
 }
 
-pub enum SourceUpdate {
-    Success(SourceSnapshot),
-    Failed { key: SourceKey, message: String },
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SourceError {
-    pub key: SourceKey,
-    pub message: String,
-}
-
 pub struct MergedSources {
     pub sources: Vec<SourceSnapshot>,
     pub apps: Vec<AppInfo>,
-    pub errors: Vec<SourceError>,
 }
 
-pub fn merge_sources(previous: Vec<SourceSnapshot>, updates: Vec<SourceUpdate>) -> MergedSources {
+pub fn merge_sources(previous: Vec<SourceSnapshot>, updates: Vec<SourceSnapshot>) -> MergedSources {
     let mut sources = previous
         .into_iter()
         .map(|snapshot| (snapshot.key.clone(), snapshot))
         .collect::<BTreeMap<_, _>>();
-    let mut errors = Vec::new();
-    for update in updates {
-        match update {
-            SourceUpdate::Success(snapshot) => {
-                sources.insert(snapshot.key.clone(), snapshot);
-            }
-            SourceUpdate::Failed { key, message } => {
-                errors.push(SourceError { key, message });
-            }
-        }
+    for snapshot in updates {
+        sources.insert(snapshot.key.clone(), snapshot);
     }
     let sources = sources.into_values().collect::<Vec<_>>();
     let apps = sanitize(
@@ -61,11 +41,7 @@ pub fn merge_sources(previous: Vec<SourceSnapshot>, updates: Vec<SourceUpdate>) 
             .flat_map(|snapshot| snapshot.apps.iter().cloned())
             .collect(),
     );
-    MergedSources {
-        sources,
-        apps,
-        errors,
-    }
+    MergedSources { sources, apps }
 }
 
 #[cfg(test)]
@@ -107,32 +83,12 @@ mod tests {
             snapshot("start-menu", vec![app("Old", "old.lnk")]),
             snapshot("registry:hklm", vec![app("Editor", "editor.exe")]),
         ];
-        let updates = vec![SourceUpdate::Success(snapshot(
-            "start-menu",
-            vec![app("New", "new.lnk")],
-        ))];
+        let updates = vec![snapshot("start-menu", vec![app("New", "new.lnk")])];
 
         let merged = merge_sources(old, updates);
 
         assert!(merged.apps.iter().any(|app| app.name == "New"));
         assert!(merged.apps.iter().any(|app| app.name == "Editor"));
         assert!(!merged.apps.iter().any(|app| app.name == "Old"));
-    }
-
-    #[test]
-    fn failed_source_keeps_its_last_successful_snapshot() {
-        let old = vec![snapshot("registry:hklm", vec![app("Editor", "editor.exe")])];
-
-        let merged = merge_sources(
-            old,
-            vec![SourceUpdate::Failed {
-                key: SourceKey("registry:hklm".into()),
-                message: "access denied".into(),
-            }],
-        );
-
-        assert_eq!(merged.sources.len(), 1);
-        assert_eq!(merged.apps[0].name, "Editor");
-        assert_eq!(merged.errors.len(), 1);
     }
 }

@@ -96,7 +96,7 @@ export function CategorySection({
 					type='button'
 					aria-label={`Rename ${label} category`}
 					onClick={() => setEditing(true)}
-					className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-200/75 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
+					className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-violet-100/75 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
 				>
 					<Pencil size={15} />
 				</button>

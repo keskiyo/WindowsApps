@@ -3,18 +3,22 @@ use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::CloseHandle;
+use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0};
 use windows::Win32::Storage::FileSystem::{
-    CreateFileW, ReadDirectoryChangesW, FILE_FLAG_BACKUP_SEMANTICS, FILE_LIST_DIRECTORY,
-    FILE_NOTIFY_CHANGE_DIR_NAME, FILE_NOTIFY_CHANGE_FILE_NAME, FILE_NOTIFY_CHANGE_LAST_WRITE,
-    FILE_NOTIFY_CHANGE_SIZE, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
+    CreateFileW, ReadDirectoryChangesW, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OVERLAPPED,
+    FILE_LIST_DIRECTORY, FILE_NOTIFY_CHANGE_DIR_NAME, FILE_NOTIFY_CHANGE_FILE_NAME,
+    FILE_NOTIFY_CHANGE_LAST_WRITE, FILE_NOTIFY_CHANGE_SIZE, FILE_SHARE_DELETE, FILE_SHARE_READ,
+    FILE_SHARE_WRITE, OPEN_EXISTING,
 };
 use windows::Win32::System::Registry::{
     RegCloseKey, RegNotifyChangeKeyValue, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER,
     HKEY_LOCAL_MACHINE, KEY_NOTIFY, REG_NOTIFY_CHANGE_LAST_SET, REG_NOTIFY_CHANGE_NAME,
 };
+use windows::Win32::System::Threading::{CreateEventW, SetEvent, WaitForMultipleObjects, INFINITE};
+use windows::Win32::System::IO::{CancelIoEx, OVERLAPPED};
 
 #[derive(Default)]
 struct DebounceState {
@@ -39,6 +43,8 @@ impl DebounceState {
 
 pub struct WatcherGuard {
     stop: Arc<AtomicBool>,
+    stop_event: isize,
+    threads: Vec<JoinHandle<()>>,
 }
 
 #[derive(Clone, Copy)]
@@ -49,33 +55,46 @@ enum RegistryRoot {
 
 impl Drop for WatcherGuard {
     fn drop(&mut self) {
-        self.stop.store(true, Ordering::Relaxed);
+        self.stop.store(true, Ordering::Release);
+        let stop_event = HANDLE(self.stop_event as *mut _);
+        let _ = unsafe { SetEvent(stop_event) };
+        for thread in self.threads.drain(..) {
+            let _ = thread.join();
+        }
+        let _ = unsafe { CloseHandle(stop_event) };
     }
 }
 
 pub fn start(paths: Vec<PathBuf>, on_change: Arc<dyn Fn() + Send + Sync>) -> WatcherGuard {
     let stop = Arc::new(AtomicBool::new(false));
+    let stop_event = unsafe { CreateEventW(None, true, false, PCWSTR::null()) }
+        .expect("create watcher stop event");
     let (sender, receiver) = mpsc::channel::<()>();
+    let mut threads = Vec::new();
     let debounce_stop = Arc::clone(&stop);
-    std::thread::spawn(move || {
+    threads.push(std::thread::spawn(move || {
         let mut state = DebounceState::default();
-        while !debounce_stop.load(Ordering::Relaxed) {
+        while !debounce_stop.load(Ordering::Acquire) {
             match receiver.recv_timeout(Duration::from_millis(200)) {
                 Ok(()) => state.push(Instant::now()),
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
             }
-            if state.take_if_ready(Instant::now(), Duration::from_secs(2)) {
+            if state.take_if_ready(Instant::now(), Duration::from_secs(8)) {
                 on_change();
             }
         }
-    });
+    }));
 
     for path in paths {
-        if !path.is_dir() {
-            continue;
+        if path.is_dir() {
+            threads.push(spawn_directory_watcher(
+                path,
+                sender.clone(),
+                Arc::clone(&stop),
+                stop_event.0 as isize,
+            ));
         }
-        spawn_directory_watcher(path, sender.clone(), Arc::clone(&stop));
     }
     for (root, subkey) in [
         (
@@ -91,13 +110,29 @@ pub fn start(paths: Vec<PathBuf>, on_change: Arc<dyn Fn() + Send + Sync>) -> Wat
             r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
         ),
     ] {
-        spawn_registry_watcher(root, subkey, sender.clone(), Arc::clone(&stop));
+        threads.push(spawn_registry_watcher(
+            root,
+            subkey,
+            sender.clone(),
+            Arc::clone(&stop),
+            stop_event.0 as isize,
+        ));
     }
-    WatcherGuard { stop }
+    WatcherGuard {
+        stop,
+        stop_event: stop_event.0 as isize,
+        threads,
+    }
 }
 
-fn spawn_directory_watcher(path: PathBuf, sender: mpsc::Sender<()>, stop: Arc<AtomicBool>) {
+fn spawn_directory_watcher(
+    path: PathBuf,
+    sender: mpsc::Sender<()>,
+    stop: Arc<AtomicBool>,
+    stop_event: isize,
+) -> JoinHandle<()> {
     std::thread::spawn(move || {
+        let stop_event = HANDLE(stop_event as *mut _);
         let wide = wide(path.as_os_str());
         let handle = unsafe {
             CreateFileW(
@@ -106,17 +141,27 @@ fn spawn_directory_watcher(path: PathBuf, sender: mpsc::Sender<()>, stop: Arc<At
                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                 None,
                 OPEN_EXISTING,
-                FILE_FLAG_BACKUP_SEMANTICS,
+                FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
                 None,
             )
         };
         let Ok(handle) = handle else {
             return;
         };
+        let change_event = match unsafe { CreateEventW(None, false, false, PCWSTR::null()) } {
+            Ok(event) => event,
+            Err(_) => {
+                let _ = unsafe { CloseHandle(handle) };
+                return;
+            }
+        };
         let mut buffer = vec![0u8; 16 * 1024];
-        while !stop.load(Ordering::Relaxed) {
-            let mut bytes = 0u32;
-            let result = unsafe {
+        while !stop.load(Ordering::Acquire) {
+            let mut overlapped = OVERLAPPED {
+                hEvent: change_event,
+                ..Default::default()
+            };
+            if unsafe {
                 ReadDirectoryChangesW(
                     handle,
                     buffer.as_mut_ptr().cast(),
@@ -126,20 +171,28 @@ fn spawn_directory_watcher(path: PathBuf, sender: mpsc::Sender<()>, stop: Arc<At
                         | FILE_NOTIFY_CHANGE_DIR_NAME
                         | FILE_NOTIFY_CHANGE_LAST_WRITE
                         | FILE_NOTIFY_CHANGE_SIZE,
-                    Some(&mut bytes),
                     None,
+                    Some(&mut overlapped),
                     None,
                 )
-            };
-            if result.is_err() {
+            }
+            .is_err()
+            {
                 break;
             }
-            if bytes > 0 && sender.send(()).is_err() {
+            let wait =
+                unsafe { WaitForMultipleObjects(&[stop_event, change_event], false, INFINITE) };
+            if wait == WAIT_OBJECT_0 {
+                let _ = unsafe { CancelIoEx(handle, Some(&overlapped)) };
+                break;
+            }
+            if wait.0 == WAIT_OBJECT_0.0 + 1 && sender.send(()).is_err() {
                 break;
             }
         }
+        let _ = unsafe { CloseHandle(change_event) };
         let _ = unsafe { CloseHandle(handle) };
-    });
+    })
 }
 
 fn spawn_registry_watcher(
@@ -147,35 +200,54 @@ fn spawn_registry_watcher(
     subkey: &'static str,
     sender: mpsc::Sender<()>,
     stop: Arc<AtomicBool>,
-) {
+    stop_event: isize,
+) -> JoinHandle<()> {
     std::thread::spawn(move || {
+        let stop_event = HANDLE(stop_event as *mut _);
         let root = match root {
             RegistryRoot::LocalMachine => HKEY_LOCAL_MACHINE,
             RegistryRoot::CurrentUser => HKEY_CURRENT_USER,
         };
         let wide = wide(OsStr::new(subkey));
         let mut key = HKEY::default();
-        let status =
-            unsafe { RegOpenKeyExW(root, PCWSTR(wide.as_ptr()), None, KEY_NOTIFY, &mut key) };
-        if status.is_err() {
+        if unsafe { RegOpenKeyExW(root, PCWSTR(wide.as_ptr()), None, KEY_NOTIFY, &mut key) }
+            .is_err()
+        {
             return;
         }
-        while !stop.load(Ordering::Relaxed) {
-            let status = unsafe {
+        let change_event = match unsafe { CreateEventW(None, false, false, PCWSTR::null()) } {
+            Ok(event) => event,
+            Err(_) => {
+                let _ = unsafe { RegCloseKey(key) };
+                return;
+            }
+        };
+        while !stop.load(Ordering::Acquire) {
+            if unsafe {
                 RegNotifyChangeKeyValue(
                     key,
                     true,
                     REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET,
-                    None,
-                    false,
+                    Some(change_event),
+                    true,
                 )
-            };
-            if status.is_err() || sender.send(()).is_err() {
+            }
+            .is_err()
+            {
+                break;
+            }
+            let wait =
+                unsafe { WaitForMultipleObjects(&[stop_event, change_event], false, INFINITE) };
+            if wait == WAIT_OBJECT_0 {
+                break;
+            }
+            if wait.0 == WAIT_OBJECT_0.0 + 1 && sender.send(()).is_err() {
                 break;
             }
         }
+        let _ = unsafe { CloseHandle(change_event) };
         let _ = unsafe { RegCloseKey(key) };
-    });
+    })
 }
 
 fn wide(value: &OsStr) -> Vec<u16> {
@@ -196,5 +268,13 @@ mod tests {
         assert!(!state.take_if_ready(start + Duration::from_secs(2), Duration::from_secs(2)));
         assert!(state.take_if_ready(start + Duration::from_millis(2501), Duration::from_secs(2)));
         assert!(!state.take_if_ready(start + Duration::from_secs(5), Duration::from_secs(2)));
+    }
+
+    #[test]
+    fn watcher_guard_stops_blocked_registry_watchers() {
+        let started = Instant::now();
+        let guard = start(Vec::new(), Arc::new(|| {}));
+        drop(guard);
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
 }

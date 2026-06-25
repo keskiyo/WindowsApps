@@ -76,7 +76,7 @@ export function UninstallDialog({
 						aria-label='Close uninstall confirmation'
 						onClick={onClose}
 						disabled={pending}
-						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-200 focus-visible:outline-2 focus-visible:outline-violet-500'
+						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
 						<X size={16} />
 					</button>
@@ -117,7 +117,7 @@ export function UninstallDialog({
 						type='button'
 						disabled={pending}
 						onClick={onClose}
-						className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-200/70 focus-visible:outline-2 focus-visible:outline-violet-500'
+						className='rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-violet-100/70 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
 						Cancel
 					</button>

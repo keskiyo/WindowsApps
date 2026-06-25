@@ -1,12 +1,11 @@
 use crate::catalog::cache::CatalogCache;
 use crate::catalog::incremental::{scan_root, FilesystemIndex, ScanMode};
 use crate::catalog::scan_settings::ScanSettings;
-use crate::catalog::source::{merge_sources, SourceKey, SourceSnapshot, SourceUpdate};
+use crate::catalog::source::{merge_sources, SourceKey, SourceSnapshot};
 use crate::catalog::{self, AppInfo, ScanProgress};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -17,20 +16,9 @@ pub enum SyncRequest {
     Force,
 }
 
-#[derive(Default)]
-pub struct SyncQueue {
-    pending: Mutex<Option<SyncRequest>>,
-}
-
-impl SyncQueue {
-    pub fn request(&self, request: SyncRequest) {
-        if let Ok(mut pending) = self.pending.lock() {
-            *pending = Some(pending.map_or(request, |current| current.max(request)));
-        }
-    }
-
-    pub fn take(&self) -> Option<SyncRequest> {
-        self.pending.lock().ok()?.take()
+impl SyncRequest {
+    pub fn is_interactive(self) -> bool {
+        matches!(self, Self::Refresh | Self::Force)
     }
 }
 
@@ -175,12 +163,16 @@ pub fn synchronize(
             &excluded,
             &is_cancelled,
         );
+        let limit_reached = scanned.limit_reached;
         portable_apps.extend(scanned.apps);
         filesystem_index
             .directories
             .extend(scanned.index.directories);
         progress(ScanProgress {
-            stage: "Portable applications".into(),
+            stage: limit_reached.map_or_else(
+                || "Portable applications".into(),
+                |limit| format!("Portable applications · {}", limit.message()),
+            ),
             location: Some(root.to_string_lossy().into_owned()),
             completed_roots: index + 1,
             total_roots: roots.len(),
@@ -188,21 +180,21 @@ pub fn synchronize(
     }
 
     let updates = vec![
-        SourceUpdate::Success(SourceSnapshot {
+        SourceSnapshot {
             key: SourceKey("windows".into()),
             fingerprint: None,
             apps: windows_apps,
-        }),
-        SourceUpdate::Success(SourceSnapshot {
+        },
+        SourceSnapshot {
             key: SourceKey("steam".into()),
             fingerprint: None,
             apps: steam_apps,
-        }),
-        SourceUpdate::Success(SourceSnapshot {
+        },
+        SourceSnapshot {
             key: SourceKey("portable".into()),
             fingerprint: None,
             apps: portable_apps,
-        }),
+        },
     ];
     let merged = merge_sources(previous.sources.clone(), updates);
     let mut apps = merged.apps;
@@ -246,17 +238,6 @@ mod tests {
             resolved_path: None,
             shortcut_icon_path: None,
         }
-    }
-
-    #[test]
-    fn force_request_upgrades_pending_refresh() {
-        let queue = SyncQueue::default();
-        queue.request(SyncRequest::Refresh);
-        queue.request(SyncRequest::Watch);
-        queue.request(SyncRequest::Force);
-
-        assert_eq!(queue.take(), Some(SyncRequest::Force));
-        assert_eq!(queue.take(), None);
     }
 
     #[test]

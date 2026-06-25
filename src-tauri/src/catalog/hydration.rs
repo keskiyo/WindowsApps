@@ -1,9 +1,9 @@
-use crate::catalog::{icon_cache, icon_source, AppInfo, LaunchKind};
+use crate::catalog::{icon_cache, icon_source, AppInfo, LaunchKind, SourceKind};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use serde::Serialize;
-use std::collections::HashMap;
-use std::path::Path;
+use std::collections::{HashSet, VecDeque};
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,46 +24,78 @@ pub struct AppHydrationPatch {
     pub can_uninstall: Option<bool>,
 }
 
-pub fn batch_patches(patches: Vec<AppHydrationPatch>, limit: usize) -> Vec<Vec<AppHydrationPatch>> {
-    let limit = limit.max(1);
-    let mut batches = Vec::new();
-    let mut current = Vec::with_capacity(limit);
-    for patch in patches {
-        current.push(patch);
-        if current.len() == limit {
-            batches.push(std::mem::take(&mut current));
-            current = Vec::with_capacity(limit);
+pub fn hydrate_one(app_data_dir: &Path, app: &AppInfo, generation: u64) -> AppHydrationPatch {
+    hydrate_app(app_data_dir, app, generation)
+}
+
+#[derive(Default)]
+pub struct HydrationQueue {
+    generation: u64,
+    foreground: VecDeque<String>,
+    background: VecDeque<String>,
+    queued: HashSet<String>,
+    running: bool,
+}
+
+impl HydrationQueue {
+    pub fn enqueue(
+        &mut self,
+        generation: u64,
+        ids: impl IntoIterator<Item = String>,
+        priority: bool,
+    ) -> bool {
+        if self.generation != generation {
+            self.generation = generation;
+            self.foreground.clear();
+            self.background.clear();
+            self.queued.clear();
+            self.running = false;
+        }
+        for id in ids {
+            if !self.queued.insert(id.clone()) {
+                if priority {
+                    let was_background = self.background.iter().any(|queued| queued == &id);
+                    self.background.retain(|queued| queued != &id);
+                    if was_background && !self.foreground.iter().any(|queued| queued == &id) {
+                        self.foreground.push_back(id);
+                    }
+                }
+                continue;
+            }
+            if priority {
+                self.foreground.push_back(id);
+            } else {
+                self.background.push_back(id);
+            }
+        }
+        if self.running || self.queued.is_empty() {
+            false
+        } else {
+            self.running = true;
+            true
         }
     }
-    if !current.is_empty() {
-        batches.push(current);
+
+    pub fn pop(&mut self, generation: u64) -> Option<String> {
+        if self.generation != generation {
+            return None;
+        }
+        self.foreground
+            .pop_front()
+            .or_else(|| self.background.pop_front())
     }
-    batches
-}
 
-pub fn is_current_generation(generation: u64, patch: &AppHydrationPatch) -> bool {
-    generation == patch.generation
-}
+    pub fn complete(&mut self, generation: u64, id: &str) {
+        if self.generation == generation {
+            self.queued.remove(id);
+        }
+    }
 
-pub fn hydrate(app_data_dir: &Path, apps: &[AppInfo], generation: u64) -> Vec<AppHydrationPatch> {
-    apps.iter()
-        .map(|app| hydrate_app(app_data_dir, app, generation))
-        .collect()
-}
-
-pub fn prioritize_apps(mut apps: Vec<AppInfo>, priority_ids: &[String]) -> Vec<AppInfo> {
-    let priority = priority_ids
-        .iter()
-        .enumerate()
-        .map(|(index, id)| (id.as_str(), index))
-        .collect::<HashMap<_, _>>();
-    apps.sort_by_key(|app| {
-        priority
-            .get(app.id.as_str())
-            .copied()
-            .unwrap_or(priority_ids.len() + 1)
-    });
-    apps
+    pub fn finish(&mut self, generation: u64) {
+        if self.generation == generation {
+            self.running = false;
+        }
+    }
 }
 
 fn hydrate_app(app_data_dir: &Path, app: &AppInfo, generation: u64) -> AppHydrationPatch {
@@ -107,6 +139,11 @@ fn hydrate_icon(app_data_dir: &Path, app: &AppInfo) -> Option<String> {
     }
     let data_url = if app.launch_kind == LaunchKind::AppUserModelId {
         crate::platform::windows::icon_extractor::extract_app_id_icon(&app.path)
+    } else if app.source_kind == SourceKind::Steam {
+        // Steam game executables often lack an embedded icon; prefer Steam's own
+        // library-cache icon and only fall back to the resolved executable.
+        steam_library_icon(app)
+            .or_else(|| crate::platform::windows::icon_extractor::extract_icon(Path::new(&source)))
     } else {
         crate::platform::windows::icon_extractor::extract_icon(Path::new(&source))
     }?;
@@ -116,71 +153,122 @@ fn hydrate_icon(app_data_dir: &Path, app: &AppInfo) -> Option<String> {
     Some(data_url)
 }
 
+/// Resolve a Steam game's icon from `<SteamPath>/appcache/librarycache`.
+fn steam_library_icon(app: &AppInfo) -> Option<String> {
+    let app_id = app.path.strip_prefix("steam://rungameid/")?;
+    let cache = super::steam::steam_root()?
+        .join("appcache")
+        .join("librarycache");
+    let candidate = steam_icon_file(&cache, app_id)?;
+    crate::platform::windows::icon_extractor::image_file_to_png_data_url(&candidate)
+}
+
+/// Locate the icon image for a Steam app inside `librarycache`.
+/// Legacy Steam stored `<appid>_icon.jpg` directly; modern Steam stores per-app folders
+/// `<appid>/<sha1hash>.jpg`, where the SHA1-named image is the client icon (the descriptive
+/// `library_*.jpg`/`header.jpg`/`logo.png` files are large store art, not the icon).
+fn steam_icon_file(librarycache: &Path, app_id: &str) -> Option<PathBuf> {
+    let legacy = librarycache.join(format!("{app_id}_icon.jpg"));
+    if legacy.is_file() {
+        return Some(legacy);
+    }
+    let mut hashed = std::fs::read_dir(librarycache.join(app_id))
+        .ok()?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| is_hashed_image(path))
+        .collect::<Vec<_>>();
+    hashed.sort();
+    hashed.into_iter().next()
+}
+
+/// True for SHA1-hash-named image files (`<40 hex>.jpg|jpeg|png`) — Steam's icon naming.
+fn is_hashed_image(path: &Path) -> bool {
+    let extension_ok = path.extension().is_some_and(|extension| {
+        ["jpg", "jpeg", "png"]
+            .iter()
+            .any(|value| extension.eq_ignore_ascii_case(value))
+    });
+    let stem_is_hash = path.file_stem().and_then(|stem| stem.to_str()).is_some_and(|stem| {
+        stem.len() == 40 && stem.chars().all(|character| character.is_ascii_hexdigit())
+    });
+    extension_ok && stem_is_hash
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn patch(index: usize) -> AppHydrationPatch {
-        AppHydrationPatch {
-            id: format!("app-{index}"),
-            generation: 1,
-            icon_base64: None,
-            description: None,
-            version: None,
-            publisher: None,
-            install_location: None,
-            can_uninstall: None,
+    #[test]
+    fn picks_sha1_named_icon_from_modern_steam_layout() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path();
+        let app_folder = cache.join("1623730");
+        std::fs::create_dir_all(&app_folder).unwrap();
+        let icon = app_folder.join("f5523077a8f4c923c2e8d8c17794b3319035fa73.jpg");
+        for name in [
+            "f5523077a8f4c923c2e8d8c17794b3319035fa73.jpg",
+            "library_600x900.jpg",
+            "library_header.jpg",
+            "logo.png",
+        ] {
+            std::fs::write(app_folder.join(name), []).unwrap();
         }
+
+        assert_eq!(steam_icon_file(cache, "1623730"), Some(icon));
     }
 
     #[test]
-    fn batches_patches_without_exceeding_limit() {
-        let batches = batch_patches((0..65).map(patch).collect(), 32);
-        assert_eq!(
-            batches.iter().map(Vec::len).collect::<Vec<_>>(),
-            vec![32, 32, 1]
-        );
+    fn prefers_legacy_appid_icon_when_present() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path();
+        let legacy = cache.join("13180_icon.jpg");
+        std::fs::write(&legacy, []).unwrap();
+
+        assert_eq!(steam_icon_file(cache, "13180"), Some(legacy));
     }
 
     #[test]
-    fn rejects_patches_from_a_stale_generation() {
-        assert!(!is_current_generation(4, &patch(0)));
-        let mut current = patch(0);
-        current.generation = 4;
-        assert!(is_current_generation(4, &current));
+    fn returns_none_when_only_store_art_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path();
+        let app_folder = cache.join("999");
+        std::fs::create_dir_all(&app_folder).unwrap();
+        for name in ["header.jpg", "library_hero.jpg", "logo.png"] {
+            std::fs::write(app_folder.join(name), []).unwrap();
+        }
+
+        assert_eq!(steam_icon_file(cache, "999"), None);
     }
 
     #[test]
-    fn prioritizes_visible_apps_before_background_hydration() {
-        let apps = ["app-1", "app-2", "app-3"]
-            .into_iter()
-            .map(|id| AppInfo {
-                id: id.into(),
-                name: id.into(),
-                path: format!(r"C:\{id}.exe"),
-                icon_base64: None,
-                category: crate::catalog::AppCategory::Other,
-                launch_kind: LaunchKind::Executable,
-                source_kind: crate::catalog::SourceKind::Registry,
-                description: None,
-                version: None,
-                publisher: None,
-                install_location: None,
-                can_uninstall: false,
-                uninstall: None,
-                resolved_path: None,
-                shortcut_icon_path: None,
-            })
-            .collect::<Vec<_>>();
+    fn queue_prioritizes_visible_ids_and_deduplicates_requests() {
+        let mut queue = HydrationQueue::default();
+        assert!(queue.enqueue(1, ["a".into(), "b".into(), "c".into()], false));
+        assert!(!queue.enqueue(1, ["c".into(), "b".into()], true));
+        assert_eq!(queue.pop(1).as_deref(), Some("c"));
+        queue.complete(1, "c");
+        assert_eq!(queue.pop(1).as_deref(), Some("b"));
+        queue.complete(1, "b");
+        assert_eq!(queue.pop(1).as_deref(), Some("a"));
+    }
 
-        let ordered = prioritize_apps(apps, &["app-3".into(), "app-1".into()]);
+    #[test]
+    fn new_generation_discards_stale_hydration_work() {
+        let mut queue = HydrationQueue::default();
+        assert!(queue.enqueue(1, ["old".into()], false));
+        assert!(queue.enqueue(2, ["new".into()], true));
+        assert_eq!(queue.pop(1), None);
+        assert_eq!(queue.pop(2).as_deref(), Some("new"));
+    }
 
-        assert_eq!(
-            ordered
-                .iter()
-                .map(|app| app.id.as_str())
-                .collect::<Vec<_>>(),
-            vec!["app-3", "app-1", "app-2"]
-        );
+    #[test]
+    fn visible_request_does_not_duplicate_an_in_flight_id() {
+        let mut queue = HydrationQueue::default();
+        assert!(queue.enqueue(1, ["app".into()], false));
+        assert_eq!(queue.pop(1).as_deref(), Some("app"));
+        assert!(!queue.enqueue(1, ["app".into()], true));
+        queue.complete(1, "app");
+        assert_eq!(queue.pop(1), None);
     }
 }

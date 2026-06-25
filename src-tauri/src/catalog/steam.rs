@@ -57,14 +57,19 @@ pub(super) fn scan_library(library: &Path) -> Vec<SteamGame> {
         .collect()
 }
 
+/// Main Steam install directory (contains `appcache/librarycache`), from the registry.
+pub(crate) fn steam_root() -> Option<PathBuf> {
+    let steam = RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey(r"Software\Valve\Steam")
+        .ok()?;
+    let path = steam.get_value::<String, _>("SteamPath").ok()?;
+    Some(PathBuf::from(path.replace('/', r"\")))
+}
+
 pub(super) fn installed_libraries() -> Vec<PathBuf> {
-    let Ok(steam) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(r"Software\Valve\Steam") else {
+    let Some(main) = steam_root() else {
         return Vec::new();
     };
-    let Ok(path) = steam.get_value::<String, _>("SteamPath") else {
-        return Vec::new();
-    };
-    let main = PathBuf::from(path.replace('/', r"\"));
     let mut libraries = vec![main.clone()];
     if let Ok(value) = std::fs::read_to_string(main.join("steamapps").join("libraryfolders.vdf")) {
         libraries.extend(parse_library_paths(&value));

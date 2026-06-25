@@ -182,7 +182,7 @@ button {
 .spotlight::before {
 	position: absolute;
 	inset: 0;
-	padding: 1.4px;
+	padding: 2.4px;
 	border-radius: inherit;
 	background: radial-gradient(
 		var(--spotlight-size, 110px) circle at var(--mouse-x, 50%) var(--mouse-y, 50%),

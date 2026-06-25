@@ -133,7 +133,7 @@ export function UninstallHistory({ client }: Props) {
 							type='button'
 							disabled={clearing}
 							onClick={() => setConfirmClear(false)}
-							className='rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-200/70'
+							className='rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-violet-100/70'
 						>
 							Cancel
 						</button>

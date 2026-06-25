@@ -12,7 +12,9 @@ import {
 	Trash2,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
+import { useSpotlight } from '../../hooks/useSpotlight'
 import type { ScanSettings, SystemClient, SystemSettings } from '../../types'
+import { SpotlightLayer } from '../shared/SpotlightLayer'
 import { UninstallHistory } from './UninstallHistory'
 
 interface Props {
@@ -281,7 +283,7 @@ export function SettingsPage({
 									type='button'
 									disabled={forcing}
 									onClick={() => setConfirmForce(false)}
-									className='rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-200/70'
+									className='rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-violet-100/70'
 								>
 									Cancel
 								</button>
@@ -312,7 +314,7 @@ export function SettingsPage({
 									type='button'
 									disabled={resetting}
 									onClick={() => setConfirmReset(false)}
-									className='rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-200/70'
+									className='rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-violet-100/70'
 								>
 									Cancel
 								</button>
@@ -375,7 +377,7 @@ export function SettingsPage({
 					type='button'
 					aria-label='Open @keskiyo on Telegram'
 					onClick={() => void client.openTelegram()}
-					className='flex w-full items-center gap-4 p-5 text-left hover:bg-slate-200/55 focus-visible:outline-2 focus-visible:outline-violet-500'
+					className='flex w-full items-center gap-4 p-5 text-left hover:bg-violet-100/55 focus-visible:outline-2 focus-visible:outline-violet-500'
 				>
 					<span className='grid size-10 place-items-center rounded-xl bg-[#229ED9]/15 text-[#5cc8f5]'>
 						<Send size={19} aria-hidden='true' />
@@ -423,6 +425,7 @@ interface PathEditorProps {
 }
 
 function PathEditor(props: PathEditorProps) {
+	const spotlight = useSpotlight()
 	async function browse() {
 		if (props.disabled) return
 		const picked = await props.onBrowse()
@@ -434,16 +437,24 @@ function PathEditor(props: PathEditorProps) {
 				{props.label}
 			</label>
 			<div className='mt-2 flex gap-2'>
-				<input
-					id={props.label}
-					aria-label={props.label}
-					value={props.value}
-					onChange={event => props.onChange(event.target.value)}
-					onDoubleClick={() => void browse()}
-					placeholder='D:\\Apps'
-					title='Double-click to browse for a folder'
-					className='h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white/75 px-3 text-sm text-slate-800 outline-none focus:border-violet-400/55 focus:ring-3 focus:ring-violet-500/10'
-				/>
+				<div
+					className='relative min-w-0 flex-1 rounded-xl'
+					onPointerMove={spotlight.onPointerMove}
+					onPointerEnter={spotlight.onPointerEnter}
+					onPointerLeave={spotlight.onPointerLeave}
+				>
+					<SpotlightLayer size={150} />
+					<input
+						id={props.label}
+						aria-label={props.label}
+						value={props.value}
+						onChange={event => props.onChange(event.target.value)}
+						onDoubleClick={() => void browse()}
+						placeholder='D:\\Apps'
+						title='Double-click to browse for a folder'
+						className='h-10 w-full rounded-xl border border-slate-200 bg-white/75 px-3 text-sm text-slate-800 outline-none focus:border-violet-400/55 focus:ring-3 focus:ring-violet-500/10'
+					/>
+				</div>
 				<button
 					type='button'
 					aria-label={props.browseLabel}

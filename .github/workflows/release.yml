@@ -1,0 +1,66 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - 'v*'
+
+permissions:
+    contents: write
+
+jobs:
+    build-release:
+        name: Build Windows x64 installer
+        runs-on: windows-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '22'
+                  cache: npm
+
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: x86_64-pc-windows-msvc
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Verify release version
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag "${{ github.ref_name }}"
+
+            - name: Run frontend tests
+              run: npm test -- --run
+
+            - name: Run Rust tests
+              run: cargo test --manifest-path src-tauri/Cargo.toml
+
+            - name: Build installer
+              run: npm run tauri build
+
+            - name: Hash installer
+              shell: pwsh
+              run: |
+                  $installer = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
+                  if (-not $installer) {
+                    throw 'Installer was not produced.'
+                  }
+                  $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+                  "$hash  $($installer.Name)" | Set-Content "$($installer.FullName).sha256" -Encoding utf8NoBOM
+
+            - name: Publish release
+              shell: pwsh
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  $installer = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
+                  if (-not $installer) {
+                    throw 'Installer was not produced.'
+                  }
+                  gh release create '${{ github.ref_name }}' --verify-tag --generate-notes --title "Windows Apps ${{ github.ref_name }}" $installer.FullName "$($installer.FullName).sha256"

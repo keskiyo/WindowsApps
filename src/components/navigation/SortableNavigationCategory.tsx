@@ -45,7 +45,7 @@ export function SortableNavigationCategory({
 			onPointerEnter={spotlight.onPointerEnter}
 			onPointerLeave={spotlight.onPointerLeave}
 			style={style}
-			className={`relative flex w-full cursor-grab touch-none items-center rounded-xl px-3 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-200/65 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-violet-500 active:cursor-grabbing ${isDragging ? 'z-10 bg-white text-slate-900 shadow-lg shadow-slate-500/20' : ''}`}
+			className={`relative flex w-full cursor-grab touch-none items-center rounded-xl px-3 py-2.5 text-left text-sm text-slate-600 hover:bg-violet-100/65 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500 active:cursor-grabbing ${isDragging ? 'z-10 bg-white text-slate-900 shadow-lg shadow-slate-500/20' : ''}`}
 			{...attributes}
 			{...listeners}
 			ref={node => {

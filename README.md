@@ -48,7 +48,9 @@ Built-in Windows components are grouped under **Windows Features** using known n
 
 The scan checks permanent local drives regardless of their letters or folder names. USB and network drives are intentionally ignored.
 
-Start Menu, uninstall registry, Steam, and configured Included folders are monitored while Windows Apps is running. Portable applications elsewhere on fixed drives are detected by the next incremental startup scan or Refresh. Use **Settings > Catalog maintenance > Force full scan** only when the incremental index needs to be rebuilt. Use **Reset catalog cache** when duplicate or stale entries were already saved locally and a clean rebuild is needed; favorites, Hidden items, and custom categories are preserved.
+Start Menu, uninstall registry, Steam, and configured Included folders are monitored while Windows Apps is running. Portable applications elsewhere on fixed drives are detected by the next incremental startup scan or Refresh. Each fixed-drive root is limited to 16 directory levels, 500,000 filesystem entries, and three minutes; symbolic links, junctions, and other reparse-point directories are skipped to prevent loops and excessive disk activity. Use **Settings > Catalog maintenance > Force full scan** only when the incremental index needs to be rebuilt. Use **Reset catalog cache** when duplicate or stale entries were already saved locally and a clean rebuild is needed; favorites, Hidden items, and custom categories are preserved.
+
+Scanning is coordinated through one worker. A manual Refresh or Force full scan cancels a lower-priority background pass, repeated watcher events are coalesced, and cancelled scans never replace the saved catalog. Icon and metadata hydration also uses one deduplicated queue: visible cards are promoted without starting a second full-catalog pass.
 
 > [!IMPORTANT]
 > Version 0.1.0 is not code-signed. Microsoft Defender SmartScreen may show an "unrecognized app" warning for community builds. Always download the installer from this repository's Releases page and verify its published SHA-256 checksum.
