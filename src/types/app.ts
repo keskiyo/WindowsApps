@@ -25,20 +25,7 @@ export interface AppInfo {
 	canUninstall: boolean
 }
 
-export type AppView = 'all' | 'favorites' | 'settings' | 'hidden' | 'vpn'
-
-export interface VpnInfo {
-	id: string
-	name: string
-	installed: boolean
-	connected: boolean
-}
-
-export interface VpnClient {
-	list(): Promise<VpnInfo[]>
-	set(id: string, enabled: boolean): Promise<VpnInfo>
-	setup(id: string): Promise<VpnInfo>
-}
+export type AppView = 'all' | 'favorites' | 'settings' | 'hidden'
 
 export interface CatalogSnapshot {
 	apps: AppInfo[]

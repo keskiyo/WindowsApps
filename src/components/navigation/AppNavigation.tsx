@@ -11,7 +11,7 @@ import {
 	sortableKeyboardCoordinates,
 	verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { EyeOff, Grid2X2, Plus, Settings, ShieldCheck, Star } from 'lucide-react'
+import { EyeOff, Grid2X2, Plus, Settings, Star } from 'lucide-react'
 import { useState } from 'react'
 import { useSpotlight } from '../../hooks/useSpotlight'
 import { getDropAction } from '../../lib/catalog'
@@ -90,15 +90,6 @@ export function AppNavigation(props: Props) {
 					<span className='ml-auto rounded-full bg-slate-200/85 px-2 py-0.5 text-xs text-slate-600'>
 						{props.favoriteCount}
 					</span>
-				</button>
-				<button
-					type='button'
-					onClick={() => props.onSelectView('vpn')}
-					{...spotlight}
-					className={`mt-1 ${itemClass(props.activeView === 'vpn')}`}
-				>
-					<SpotlightLayer size={90} />
-					<ShieldCheck size={17} /> <span>VPN</span>
 				</button>
 				<button
 					type='button'

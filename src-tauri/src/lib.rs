@@ -1,7 +1,6 @@
 mod catalog;
 mod lifecycle;
 mod platform;
-mod vpn;
 
 use catalog::cache::CatalogCache;
 use catalog::scan_coordinator::{ScanCoordinator, ScanJob, Submission};
@@ -641,39 +640,6 @@ async fn uninstall_app(app: tauri::AppHandle, id: String) -> Result<(), String> 
     Ok(())
 }
 
-#[tauri::command]
-async fn vpn_list() -> Result<Vec<vpn::VpnInfo>, String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let runner = vpn::SystemRunner;
-        vpn::providers().iter().map(|provider| provider.info(&runner)).collect()
-    })
-    .await
-    .map_err(|error| format!("VPN list was interrupted: {error}"))
-}
-
-#[tauri::command]
-async fn vpn_set(id: String, enabled: bool) -> Result<vpn::VpnInfo, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let runner = vpn::SystemRunner;
-        let provider = vpn::provider(&id).ok_or("Unknown VPN provider")?;
-        provider.set(&runner, enabled)?;
-        Ok(provider.info(&runner))
-    })
-    .await
-    .map_err(|error| format!("VPN toggle was interrupted: {error}"))?
-}
-
-#[tauri::command]
-async fn vpn_setup(id: String) -> Result<vpn::VpnInfo, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let runner = vpn::SystemRunner;
-        let provider = vpn::provider(&id).ok_or("Unknown VPN provider")?;
-        provider.setup(&runner)?;
-        Ok(provider.info(&runner))
-    })
-    .await
-    .map_err(|error| format!("VPN setup was interrupted: {error}"))?
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -730,10 +696,7 @@ pub fn run() {
             get_system_settings,
             set_autostart,
             set_scan_settings,
-            open_telegram,
-            vpn_list,
-            vpn_set,
-            vpn_setup
+            open_telegram
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -11,8 +11,6 @@ export type {
 	ScanProgress,
 	UninstallMechanism,
 	UninstallPreview,
-	VpnInfo,
-	VpnClient,
 } from './app'
 export {
 	CATEGORY_LABELS,
