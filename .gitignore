@@ -13,3 +13,6 @@ docs/
 
 AGENTS.md
 for_claude.md
+# Hiddify CLI scratch artifacts
+/data/
+/tmp/
