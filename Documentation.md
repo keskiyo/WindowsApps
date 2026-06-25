@@ -1,6 +1,6 @@
 # Windows Apps Technical Documentation
 
-> Technical and release reference for Windows Apps 0.1.0.
+> Technical and release reference for Windows Apps 0.2.0.
 
 [Back to README](README.md) · [Latest release](../../releases/latest) · [Telegram](https://t.me/keskiyo)
 
@@ -219,7 +219,7 @@ The VPN page uses a code-defined provider registry; it does not accept arbitrary
 
 ### Code signing
 
-Version 0.1.0 does not include a configured Authenticode signing identity. An unsigned installer can trigger Microsoft Defender SmartScreen. Publish SHA-256 checksums with every release and never describe an unsigned artifact as signed.
+Version 0.2.0 does not include a configured Authenticode signing identity. An unsigned installer can trigger Microsoft Defender SmartScreen. Publish SHA-256 checksums with every release and never describe an unsigned artifact as signed.
 
 ## 11. Repository structure
 
@@ -291,8 +291,8 @@ npm run tauri build
 Expected artifact directories:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.1.0_x64-setup.exe
-src-tauri/target/release/bundle/msi/Windows Apps_0.1.0_x64_en-US.msi
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.0_x64-setup.exe
+src-tauri/target/release/bundle/msi/Windows Apps_0.2.0_x64_en-US.msi
 ```
 
 Use the NSIS `-setup.exe` as the primary public download. The MSI is optional.
@@ -313,7 +313,7 @@ The repository includes a tag-driven GitHub Actions workflow at `.github/workflo
 
 1. Run local verification and clean-machine checks.
 2. Confirm `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` contain the same version.
-3. Push a version tag such as `v0.1.0`.
+3. Push a version tag such as `v0.2.0`.
 4. GitHub Actions validates the tag against all manifests, runs frontend and Rust tests, builds the NSIS x64 installer, writes SHA-256, and creates the GitHub Release.
 5. Review the generated Release notes and attached assets.
 
@@ -322,7 +322,7 @@ The workflow is intentionally tag-only. A tag/version mismatch fails before any 
 ### Release notes template
 
 ```markdown
-# Windows Apps 0.1.0
+# Windows Apps 0.2.0
 
 ## Highlights
 
@@ -346,7 +346,7 @@ SHA-256: `<paste the published checksum>`
 
 ## Known limitations
 
-- The 0.1.0 installer is not Authenticode-signed and may trigger SmartScreen.
+- The 0.2.0 installer is not Authenticode-signed and may trigger SmartScreen.
 - Online metadata enrichment and automatic updates are not included.
 ```
 
@@ -376,7 +376,7 @@ Check the Settings toggle and Windows **Startup apps** settings. If the executab
 
 ### The installer displays SmartScreen
 
-Confirm that the file came from this repository's Releases page and compare its SHA-256 value with the published checksum. This warning is expected for an unsigned 0.1.0 community build.
+Confirm that the file came from this repository's Releases page and compare its SHA-256 value with the published checksum. This warning is expected for an unsigned 0.2.0 community build.
 
 ### Duplicate or maintenance entries remain
 

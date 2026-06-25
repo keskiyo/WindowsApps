@@ -5,7 +5,7 @@
 
 **A fast, private, and organized launcher for every application on your Windows PC.**
 
-[![Version](https://img.shields.io/badge/version-0.1.0-5B8CFF?style=flat-square)](../../releases/latest)
+[![Version](https://img.shields.io/badge/version-0.2.0-5B8CFF?style=flat-square)](../../releases/latest)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
@@ -53,7 +53,7 @@ Start Menu, uninstall registry, Steam, and configured Included folders are monit
 Scanning is coordinated through one worker. A manual Refresh or Force full scan cancels a lower-priority background pass, repeated watcher events are coalesced, and cancelled scans never replace the saved catalog. Icon and metadata hydration also uses one deduplicated queue: visible cards are promoted without starting a second full-catalog pass.
 
 > [!IMPORTANT]
-> Version 0.1.0 is not code-signed. Microsoft Defender SmartScreen may show an "unrecognized app" warning for community builds. Always download the installer from this repository's Releases page and verify its published SHA-256 checksum.
+> Version 0.2.0 is not code-signed. Microsoft Defender SmartScreen may show an "unrecognized app" warning for community builds. Always download the installer from this repository's Releases page and verify its published SHA-256 checksum.
 
 ## System requirements
 
@@ -73,7 +73,7 @@ Scanning is coordinated through one worker. A manual Refresh or Force full scan 
 - Uninstall history keeps only the last 100 attempts and stores app name, publisher, method, result, and time. It never stores command text, paths, arguments, package identifiers, errors, or usernames.
 - Windows Apps does not send your software inventory to an external service.
 - It does not fetch online descriptions or invent missing metadata.
-- The only user-initiated web link in 0.1.0 is the Telegram contact in Settings.
+- The only user-initiated web link in 0.2.0 is the Telegram contact in Settings.
 
 ## Keyboard and tray behavior
 
@@ -101,7 +101,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
-Releases are automated from version tags. Pushing `v0.1.0` runs GitHub Actions, validates `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`, runs frontend and Rust tests, builds the NSIS installer, generates a SHA-256 file, and attaches both files to the GitHub Release.
+Releases are automated from version tags. Pushing `v0.2.0` runs GitHub Actions, validates `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`, runs frontend and Rust tests, builds the NSIS installer, generates a SHA-256 file, and attaches both files to the GitHub Release.
 
 ## Build from source
 
@@ -114,7 +114,7 @@ npm run tauri build
 The downloadable NSIS setup executable is generated under:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.1.0_x64-setup.exe
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.0_x64-setup.exe
 ```
 
 Use this NSIS setup executable as the primary GitHub Release asset. The automated workflow uploads it together with a `.sha256` checksum file.
