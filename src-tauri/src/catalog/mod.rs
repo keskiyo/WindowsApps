@@ -1588,12 +1588,18 @@ mod tests {
 
     #[test]
     fn shortcut_icon_source_prefers_target_when_icon_location_is_empty() {
-        let mut value = app("Happ", r"C:\Menu\Happ.lnk");
+        let dir = tempfile::tempdir().unwrap();
+        let shortcut = dir.path().join("Happ.lnk");
+        let target = dir.path().join("Happ.exe");
+        std::fs::write(&shortcut, []).unwrap();
+        std::fs::write(&target, []).unwrap();
+
+        let mut value = app("Happ", &shortcut.to_string_lossy());
         value.launch_kind = LaunchKind::Shortcut;
-        value.resolved_path = Some(r"C:\Program Files\Happ\Happ.exe".into());
+        value.resolved_path = Some(target.to_string_lossy().into_owned());
         assert_eq!(
             icon_source(&value).as_deref(),
-            Some(r"C:\Program Files\Happ\Happ.exe")
+            Some(target.to_string_lossy().as_ref())
         );
     }
 
