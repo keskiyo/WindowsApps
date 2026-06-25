@@ -8,6 +8,7 @@ import { UninstallDialog } from './components/dialogs/UninstallDialog'
 import { AppDrawer } from './components/navigation/AppDrawer'
 import { AppSidebar } from './components/navigation/AppSidebar'
 import { SettingsPage } from './components/settings/SettingsPage'
+import { VpnPage } from './components/vpn/VpnPage'
 import { Header } from './components/shared/Header'
 import { ScanPrompt } from './components/shared/ScanPrompt'
 import { useAppFeedback } from './hooks/useAppFeedback'
@@ -15,6 +16,7 @@ import { useCatalogNavigation } from './hooks/useCatalogNavigation'
 import { useDesktopNavigation } from './hooks/useDesktopNavigation'
 import { catalogChangeMessage } from './lib/catalogChanges'
 import { tauriSystemClient } from './lib/system'
+import { tauriVpnClient } from './lib/vpn'
 import {
 	appStore,
 	filterAppsByQuery,
@@ -22,16 +24,18 @@ import {
 	selectCategorizedApps,
 	type AppState,
 } from './store/appStore'
-import type { AppInfo, SystemClient, UninstallPreview } from './types'
+import type { AppInfo, SystemClient, UninstallPreview, VpnClient } from './types'
 
 interface AppProps {
 	store?: StoreApi<AppState>
 	systemClient?: SystemClient
+	vpnClient?: VpnClient
 }
 
 export function App({
 	store = appStore,
 	systemClient = tauriSystemClient,
+	vpnClient = tauriVpnClient,
 }: AppProps) {
 	const state = useStore(store)
 	// Dedup is O(N) but still recomputed only when the catalog actually changes; query
@@ -160,7 +164,7 @@ export function App({
 	}, [desktopNavigation])
 
 	useEffect(() => {
-		if (state.activeView === 'settings' || state.isLoading) return
+		if (state.activeView === 'settings' || state.activeView === 'vpn' || state.isLoading) return
 		const ids = visibleHydrationIds.split('|').filter(Boolean)
 		if (ids.length) void state.hydrateVisibleIcons(ids)
 	}, [
@@ -240,6 +244,8 @@ export function App({
 							onForceFullScan={state.forceFullScan}
 							onResetCatalogCache={state.resetCatalogCache}
 						/>
+					) : state.activeView === 'vpn' ? (
+						<VpnPage client={vpnClient} />
 					) : !state.isLoading &&
 					  !state.hasCache &&
 					  !state.apps.length &&

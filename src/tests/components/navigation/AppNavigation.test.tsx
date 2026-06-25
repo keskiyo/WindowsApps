@@ -46,4 +46,27 @@ describe('AppNavigation', () => {
 		await userEvent.click(games)
 		expect(onSelectCategory).toHaveBeenCalledWith('games')
 	})
+
+	it('renders a VPN button and calls onSelectView with vpn', async () => {
+		const onSelectView = vi.fn()
+		render(
+			<AppNavigation
+				categoryOrder={[]}
+				categories={categories}
+				counts={new Map()}
+				activeView='all'
+				favoriteCount={0}
+				hiddenCount={0}
+				onSelectView={onSelectView}
+				onSelectCategory={vi.fn()}
+				onCreateCategory={() => ({ ok: true, id: 'custom' })}
+				onReorderCategory={vi.fn()}
+			/>,
+		)
+
+		const vpnButton = screen.getByRole('button', { name: 'VPN' })
+		expect(vpnButton).toBeInTheDocument()
+		await userEvent.click(vpnButton)
+		expect(onSelectView).toHaveBeenCalledWith('vpn')
+	})
 })
