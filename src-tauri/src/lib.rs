@@ -1,6 +1,7 @@
 mod catalog;
 mod lifecycle;
 mod platform;
+mod vpn;
 
 use catalog::cache::CatalogCache;
 use catalog::scan_coordinator::{ScanCoordinator, ScanJob, Submission};
