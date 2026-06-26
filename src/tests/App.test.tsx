@@ -424,7 +424,9 @@ describe('App', () => {
 		expect(
 			screen.getByText('Registered uninstall command'),
 		).toBeInTheDocument()
-		expect(screen.getByText('C:\\Code\\uninstall.exe /quiet')).toBeInTheDocument()
+		expect(
+			screen.getByText('C:\\Code\\uninstall.exe /quiet'),
+		).toBeInTheDocument()
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Confirm uninstall' }),
 		)
@@ -464,7 +466,9 @@ describe('App', () => {
 			screen.getByRole('menuitem', { name: 'Uninstall' }),
 		)
 
-		expect(await screen.findByText('preview unavailable')).toBeInTheDocument()
+		expect(
+			await screen.findByText('preview unavailable'),
+		).toBeInTheDocument()
 		expect(
 			screen.getByRole('button', { name: 'Confirm uninstall' }),
 		).toBeDisabled()

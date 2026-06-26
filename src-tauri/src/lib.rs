@@ -648,7 +648,14 @@ pub fn run() {
     let lifecycle = Arc::new(lifecycle::LifecycleState::default());
     let close_lifecycle = Arc::clone(&lifecycle);
     let tray_lifecycle = Arc::clone(&lifecycle);
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            lifecycle::show_main_window(app);
+        }));
+    }
+    builder
         .plugin(tauri_plugin_dialog::init())
         .on_window_event(move |window, event| {
             if window.label() == "main" {

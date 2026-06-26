@@ -1,5 +1,7 @@
 import { X } from 'lucide-react'
 import { useEffect, useRef, type RefObject } from 'react'
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 import type {
 	AppCategory,
 	AppInfo,
@@ -27,37 +29,20 @@ interface Props {
 
 export function AppDrawer(props: Props) {
 	const panelRef = useRef<HTMLElement>(null)
+	useBodyScrollLock()
+	useFocusTrap(panelRef)
+	const { onClose, triggerRef } = props
 	useEffect(() => {
-		const previousOverflow = document.body.style.overflow
-		document.body.style.overflow = 'hidden'
 		panelRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
 		function keydown(event: KeyboardEvent) {
-			if (event.key === 'Escape') props.onClose()
-			if (event.key === 'Tab' && panelRef.current) {
-				const items = [
-					...panelRef.current.querySelectorAll<HTMLElement>(
-						'button:not([disabled])',
-					),
-				]
-				if (!items.length) return
-				const first = items[0],
-					last = items[items.length - 1]
-				if (event.shiftKey && document.activeElement === first) {
-					event.preventDefault()
-					last.focus()
-				} else if (!event.shiftKey && document.activeElement === last) {
-					event.preventDefault()
-					first.focus()
-				}
-			}
+			if (event.key === 'Escape') onClose()
 		}
 		document.addEventListener('keydown', keydown)
 		return () => {
-			document.body.style.overflow = previousOverflow
 			document.removeEventListener('keydown', keydown)
-			props.triggerRef.current?.focus()
+			triggerRef.current?.focus()
 		}
-	}, [props.onClose, props.triggerRef])
+	}, [onClose, triggerRef])
 	const counts = new Map<AppCategory, number>()
 	for (const app of props.apps)
 		counts.set(app.category, (counts.get(app.category) ?? 0) + 1)

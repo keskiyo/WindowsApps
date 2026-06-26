@@ -89,9 +89,31 @@ export function AppActionsMenu({
 			document.removeEventListener('pointerdown', pointerdown)
 		}
 	}, [onClose])
+	// WAI-ARIA menu pattern: move focus into the menu on open so arrow keys work immediately.
+	useEffect(() => {
+		const first = menuRef.current?.querySelector<HTMLElement>(
+			'[role="menuitem"]:not([disabled])',
+		)
+		first?.focus()
+	}, [])
+	function onMenuKeyDown(event: React.KeyboardEvent) {
+		if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+		const items = Array.from(
+			menuRef.current?.querySelectorAll<HTMLElement>(
+				'[role="menuitem"]:not([disabled])',
+			) ?? [],
+		)
+		if (items.length === 0) return
+		event.preventDefault()
+		const current = items.indexOf(document.activeElement as HTMLElement)
+		const delta = event.key === 'ArrowDown' ? 1 : -1
+		const next = (current + delta + items.length) % items.length
+		items[next].focus()
+	}
 	return (
 		<div
 			ref={menuRef}
+			onKeyDown={onMenuKeyDown}
 			style={
 				{
 					transform: `translateX(${menuShift}px)`,

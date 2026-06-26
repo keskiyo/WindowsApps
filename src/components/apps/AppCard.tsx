@@ -1,7 +1,7 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { AppWindow, Grip, Star } from 'lucide-react'
-import { memo, useCallback, useState } from 'react'
+import { memo, useCallback, useRef, useState } from 'react'
 import { useSpotlight } from '../../hooks/useSpotlight'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
 import { SpotlightLayer } from '../shared/SpotlightLayer'
@@ -37,7 +37,13 @@ function AppCardComponent({
 	onRestore,
 }: AppCardProps) {
 	const [menuOpen, setMenuOpen] = useState(false)
-	const closeMenu = useCallback(() => setMenuOpen(false), [])
+	const [launching, setLaunching] = useState(false)
+	const gripRef = useRef<HTMLButtonElement | null>(null)
+	// Return focus to the grip trigger when the menu closes (keyboard users keep their place).
+	const closeMenu = useCallback(() => {
+		setMenuOpen(false)
+		gripRef.current?.focus()
+	}, [])
 	const spotlight = useSpotlight()
 	const draggable = useDraggable({
 		id: `app:${app.id}`,
@@ -56,10 +62,16 @@ function AppCardComponent({
 			<SpotlightLayer size={110} />
 			<button
 				type='button'
-				onClick={() => void onLaunch(app)}
+				onClick={() => {
+					if (launching) return
+					setLaunching(true)
+					void onLaunch(app).finally(() => setLaunching(false))
+				}}
 				aria-label={`Launch ${app.name}`}
-				title={app.path}
-				className='relative z-1 flex min-h-34 w-full flex-col items-center justify-center gap-3 px-4 py-4 text-center focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-violet-500'
+				aria-busy={launching}
+				disabled={launching}
+				title={app.description ?? app.path}
+				className='relative z-1 flex min-h-34 w-full flex-col items-center justify-center gap-3 px-4 py-4 text-center focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-violet-500 disabled:opacity-60'
 			>
 				<span className='grid size-13 place-items-center rounded-xl bg-white/52 shadow-[inset_1px_1px_3px_rgba(111,124,146,.13),inset_-2px_-2px_5px_rgba(255,255,255,.85)] ring-1 ring-inset ring-white/80'>
 					{app.iconBase64 ? (
@@ -83,11 +95,15 @@ function AppCardComponent({
 			</button>
 			<button
 				type='button'
-				ref={draggable.setActivatorNodeRef}
+				ref={node => {
+					draggable.setActivatorNodeRef(node)
+					gripRef.current = node
+				}}
 				{...draggable.listeners}
 				{...draggable.attributes}
 				aria-label={`Manage ${app.name}`}
 				aria-expanded={menuOpen}
+				aria-haspopup='menu'
 				onClick={event => {
 					event.stopPropagation()
 					setMenuOpen(value => !value)

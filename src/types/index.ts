@@ -1,13 +1,13 @@
 export type {
-	AppInfo,
 	AppHydrationPatch,
+	AppInfo,
 	AppLaunchKind,
 	AppsClient,
 	AppSourceKind,
 	AppView,
-	CatalogSnapshot,
 	CatalogChangeSummary,
 	CatalogDelta,
+	CatalogSnapshot,
 	ScanProgress,
 	UninstallMechanism,
 	UninstallPreview,
@@ -19,14 +19,14 @@ export {
 	DEFAULT_CATEGORIES,
 } from './category'
 export type {
+	AppCategory,
+	BuiltInCategory,
+	CategoryDefinition,
+} from './category'
+export type {
 	GlobalShortcutStatus,
 	ScanSettings,
 	SystemClient,
 	SystemSettings,
 	UninstallHistoryEntry,
 } from './system'
-export type {
-	AppCategory,
-	BuiltInCategory,
-	CategoryDefinition,
-} from './category'

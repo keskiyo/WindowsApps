@@ -20,6 +20,22 @@ export function groupAppsByCategory(
 	return groups
 }
 
+/**
+ * Surfaces favorited apps at the top of a category while preserving the original
+ * relative order within each group (Array.sort is stable). Returns a new array.
+ */
+export function sortFavoritesFirst(
+	apps: readonly AppInfo[],
+	favoriteAppIds: readonly string[],
+): AppInfo[] {
+	const isFavorite = new Set(favoriteAppIds)
+	return [...apps].sort((a, b) => {
+		const aFav = isFavorite.has(a.id) ? 0 : 1
+		const bFav = isFavorite.has(b.id) ? 0 : 1
+		return aFav - bFav
+	})
+}
+
 export function getDropAction(
 	active: DragData | undefined,
 	over: DragData | undefined,

@@ -104,7 +104,9 @@ export function UninstallHistory({ client }: Props) {
 								</span>
 							</div>
 							<p className='mt-2 text-sm text-slate-600'>
-								{dateFormatter.format(new Date(entry.timestamp * 1000))}
+								{dateFormatter.format(
+									new Date(entry.timestamp * 1000),
+								)}
 							</p>
 							<p className='mt-1 text-sm text-slate-500'>
 								{entry.publisher ?? 'Unknown publisher'} ·{' '}

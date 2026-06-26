@@ -16,6 +16,7 @@ import { SearchX } from 'lucide-react'
 import {
 	getDropAction,
 	groupAppsByCategory,
+	sortFavoritesFirst,
 	type DragData,
 } from '../../lib/catalog'
 import type {
@@ -160,18 +161,22 @@ export function AppGrid(props: Props) {
 					aria-label='Applications by category'
 					className='space-y-9'
 				>
-					{visibleCategories.map(category => (
+					{visibleCategories.map(category => {
+						const definition = props.categories.find(
+							item => item.id === category,
+						)
+						if (!definition) return null
+						return (
 						<SortableCategorySection
 							key={category}
 							category={category}
-							definition={
-								props.categories.find(
-									item => item.id === category,
-								)!
-							}
+							definition={definition}
 							categories={props.categories}
 							categoryOrder={props.categoryOrder}
-							apps={groups.get(category) ?? []}
+							apps={sortFavoritesFirst(
+								groups.get(category) ?? [],
+								props.favoriteAppIds,
+							)}
 							collapsed={
 								!props.hasQuery &&
 								props.collapsedCategories.includes(category)
@@ -188,7 +193,7 @@ export function AppGrid(props: Props) {
 							onRenameCategory={props.onRenameCategory}
 							onDeleteCategory={props.onDeleteCategory}
 						/>
-					))}
+					)})}
 				</div>
 			</SortableContext>
 		</DndContext>

@@ -9,6 +9,7 @@ interface Props {
 	isRefreshing: boolean
 	scanProgress: ScanProgress | null
 	menuButtonRef: RefObject<HTMLButtonElement>
+	searchInputRef?: RefObject<HTMLInputElement>
 	onOpenNavigation(): void
 	onGoHome(): void
 	onQueryChange(query: string): void
@@ -22,6 +23,7 @@ export function Header({
 	isRefreshing,
 	scanProgress,
 	menuButtonRef,
+	searchInputRef,
 	onOpenNavigation,
 	onGoHome,
 	onQueryChange,
@@ -29,7 +31,8 @@ export function Header({
 	onCancelScan,
 	showMenu,
 }: Props) {
-	const searchRef = useRef<HTMLInputElement>(null)
+	const fallbackRef = useRef<HTMLInputElement>(null)
+	const searchRef = searchInputRef ?? fallbackRef
 	const searchSpotlight = useSpotlight()
 	const scanSpotlight = useSpotlight()
 	return (
@@ -70,6 +73,10 @@ export function Header({
 				</div>
 				<div className='flex flex-1 items-start gap-3 md:items-center md:justify-end'>
 					<div className='w-full max-w-2xl'>
+						{/* Outside <label> so it doesn't pollute the input's computed accessible name */}
+						<span id='search-hint' className='sr-only'>
+							Searches app name, publisher, and description
+						</span>
 						<label
 							className='group relative flex w-full items-center rounded-xl'
 							onPointerMove={searchSpotlight.onPointerMove}
@@ -89,7 +96,8 @@ export function Header({
 									onQueryChange(event.target.value)
 								}
 								placeholder='Search apps…'
-								className='h-11 w-full rounded-xl border border-white/90 bg-slate-100/75 pl-11 pr-11 text-sm text-slate-800 shadow-[inset_2px_2px_5px_rgba(100,112,138,.12),inset_-2px_-2px_5px_rgba(255,255,255,.9)] outline-none placeholder:text-slate-400 focus:border-violet-400/55 focus:ring-3 focus:ring-violet-500/10'
+								aria-describedby='search-hint'
+								className='h-11 w-full rounded-xl border border-white/90 bg-slate-100/75 pl-11 pr-11 text-sm text-slate-800 shadow-[inset_2px_2px_5px_rgba(100,112,138,.12),inset_-2px_-2px_5px_rgba(255,255,255,.9)] outline-none placeholder:text-slate-500 focus:border-violet-400/55 focus:ring-3 focus:ring-violet-500/10'
 							/>
 							{query.length > 0 && (
 								<button
@@ -110,6 +118,7 @@ export function Header({
 							<p
 								className='mt-1.5 truncate px-1 text-xs text-violet-700'
 								aria-live='polite'
+								aria-atomic='true'
 							>
 								{scanProgress.stage}
 								{scanProgress.location

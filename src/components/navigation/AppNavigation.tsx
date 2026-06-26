@@ -73,6 +73,9 @@ export function AppNavigation(props: Props) {
 				<button
 					type='button'
 					onClick={() => props.onSelectView('all')}
+					aria-current={
+						props.activeView === 'all' ? 'page' : undefined
+					}
 					{...spotlight}
 					className={itemClass(props.activeView === 'all')}
 				>
@@ -82,6 +85,9 @@ export function AppNavigation(props: Props) {
 				<button
 					type='button'
 					onClick={() => props.onSelectView('favorites')}
+					aria-current={
+						props.activeView === 'favorites' ? 'page' : undefined
+					}
 					{...spotlight}
 					className={`mt-1 ${itemClass(props.activeView === 'favorites')}`}
 				>
@@ -94,6 +100,9 @@ export function AppNavigation(props: Props) {
 				<button
 					type='button'
 					onClick={() => props.onSelectView('settings')}
+					aria-current={
+						props.activeView === 'settings' ? 'page' : undefined
+					}
 					{...spotlight}
 					className={`mt-1 ${itemClass(props.activeView === 'settings')}`}
 				>
@@ -156,8 +165,11 @@ export function AppNavigation(props: Props) {
 				<button
 					type='button'
 					onClick={() => props.onSelectView('hidden')}
+					aria-current={
+						props.activeView === 'hidden' ? 'page' : undefined
+					}
 					{...spotlight}
-					className={`${itemClass(props.activeView === 'hidden')} !py-[calc(0.625rem-1.5px)]`}
+					className={`${itemClass(props.activeView === 'hidden')} py-[calc(0.625rem-1.5px)]!`}
 				>
 					<SpotlightLayer size={90} />
 					<EyeOff size={17} /> <span>Hidden</span>

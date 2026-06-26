@@ -18,6 +18,8 @@ describe('catalog change messages', () => {
 		expect(catalogChangeMessage({ added: 1, removed: 1, updated: 0 })).toBe(
 			'Application catalog updated',
 		)
-		expect(catalogChangeMessage({ added: 0, removed: 0, updated: 0 })).toBeNull()
+		expect(
+			catalogChangeMessage({ added: 0, removed: 0, updated: 0 }),
+		).toBeNull()
 	})
 })

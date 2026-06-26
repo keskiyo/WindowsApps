@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+	useCallback,
+	useDeferredValue,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react'
 import { toast, Toaster } from 'sonner'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
@@ -8,6 +15,7 @@ import { UninstallDialog } from './components/dialogs/UninstallDialog'
 import { AppDrawer } from './components/navigation/AppDrawer'
 import { AppSidebar } from './components/navigation/AppSidebar'
 import { SettingsPage } from './components/settings/SettingsPage'
+import { CommandPalette } from './components/shared/CommandPalette'
 import { Header } from './components/shared/Header'
 import { ScanPrompt } from './components/shared/ScanPrompt'
 import { TitleBar } from './components/shared/TitleBar'
@@ -56,9 +64,12 @@ export function App({
 			state.favoriteAppIds,
 		],
 	)
+	// Defer the query so fast typing never blocks the input. React will render
+	// the grid with the deferred value while keeping the input state current.
+	const deferredQuery = useDeferredValue(state.query)
 	const filteredApps = useMemo(
-		() => filterAppsByQuery(visibleApps, state.query),
-		[visibleApps, state.query],
+		() => filterAppsByQuery(visibleApps, deferredQuery),
+		[visibleApps, deferredQuery],
 	)
 	const visibleHydrationIds = filteredApps
 		.slice(0, 48)
@@ -75,7 +86,9 @@ export function App({
 		string | null
 	>(null)
 	const [scanPromptDismissed, setScanPromptDismissed] = useState(false)
+	const [paletteOpen, setPaletteOpen] = useState(false)
 	const menuButtonRef = useRef<HTMLButtonElement>(null)
+	const searchInputRef = useRef<HTMLInputElement>(null)
 	const desktopNavigation = useDesktopNavigation()
 	const closeDrawer = useCallback(() => setDrawerOpen(false), [])
 	const closeInfo = useCallback(() => setInfoApp(null), [])
@@ -97,7 +110,11 @@ export function App({
 	})
 	async function confirmUninstall() {
 		if (!uninstallApp) return
-		await feedback.uninstall(uninstallApp.id)
+		try {
+			await feedback.uninstall(uninstallApp)
+		} catch {
+			return // toast already shown; keep dialog open
+		}
 		setUninstallApp(null)
 		try {
 			await state.refresh()
@@ -146,6 +163,41 @@ export function App({
 			toast.error(state.error)
 		}
 	}, [state.error])
+
+	// Global keyboard shortcuts: Ctrl+K opens the quick-launch palette; Ctrl+F or "/"
+	// jump to the search field (a launcher should be keyboard-first).
+	useEffect(() => {
+		function onKeyDown(event: KeyboardEvent) {
+			const target = event.target as HTMLElement | null
+			const typing =
+				target instanceof HTMLInputElement ||
+				target instanceof HTMLTextAreaElement ||
+				target?.isContentEditable === true
+			if (
+				(event.ctrlKey || event.metaKey) &&
+				event.key.toLowerCase() === 'k'
+			) {
+				event.preventDefault()
+				setPaletteOpen(value => !value)
+				return
+			}
+			if (
+				(event.ctrlKey || event.metaKey) &&
+				event.key.toLowerCase() === 'f'
+			) {
+				event.preventDefault()
+				searchInputRef.current?.focus()
+				searchInputRef.current?.select()
+				return
+			}
+			if (event.key === '/' && !typing) {
+				event.preventDefault()
+				searchInputRef.current?.focus()
+			}
+		}
+		document.addEventListener('keydown', onKeyDown)
+		return () => document.removeEventListener('keydown', onKeyDown)
+	}, [])
 
 	useEffect(() => {
 		if (!state.catalogChange) return
@@ -207,58 +259,59 @@ export function App({
 					className='app-panel flex min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl'
 				>
 					<Header
-					appCount={state.apps.length}
-					query={state.query}
-					isRefreshing={state.isRefreshing}
-					scanProgress={state.scanProgress}
-					onQueryChange={state.setQuery}
-					onRefresh={feedback.refresh}
-					onCancelScan={state.cancelScan}
-					menuButtonRef={menuButtonRef}
-					onOpenNavigation={() => setDrawerOpen(true)}
-					onGoHome={navigation.goHome}
-					showMenu={!desktopNavigation}
-				/>
-				<main className='mx-auto w-full max-w-375 px-5 pb-12 pt-7 sm:px-8'>
-					{state.activeView === 'settings' ? (
-						<SettingsPage
-							client={systemClient}
-							onForceFullScan={state.forceFullScan}
-							onResetCatalogCache={state.resetCatalogCache}
-						/>
-					) : !state.isLoading &&
-					  !state.hasCache &&
-					  !state.apps.length &&
-					  !scanPromptDismissed ? (
-						<ScanPrompt
-							isScanning={state.isRefreshing}
-							onDismiss={() => setScanPromptDismissed(true)}
-							onScan={feedback.refresh}
-						/>
-					) : (
-						<AppGrid
-							apps={filteredApps}
-							isLoading={state.isLoading}
-							hasQuery={state.query.trim().length > 0}
-							activeView={state.activeView}
-							categoryOrder={state.categoryOrder}
-							categories={state.categories}
-							collapsedCategories={state.collapsedCategories}
-							favoriteAppIds={state.favoriteAppIds}
-							onToggleCategory={state.toggleCategory}
-							onToggleFavorite={state.toggleFavorite}
-							onReorderCategory={state.reorderCategory}
-							onMoveApp={state.moveApp}
-							onLaunch={feedback.launch}
-							onInfo={setInfoApp}
-							onUninstall={setUninstallApp}
-							onHide={state.hideApp}
-							onRestore={state.restoreApp}
-							onRenameCategory={state.renameCategory}
-							onDeleteCategory={state.deleteCategory}
-						/>
-					)}
-				</main>
+						appCount={state.apps.length}
+						query={state.query}
+						isRefreshing={state.isRefreshing}
+						scanProgress={state.scanProgress}
+						onQueryChange={state.setQuery}
+						onRefresh={feedback.refresh}
+						onCancelScan={state.cancelScan}
+						menuButtonRef={menuButtonRef}
+						searchInputRef={searchInputRef}
+						onOpenNavigation={() => setDrawerOpen(true)}
+						onGoHome={navigation.goHome}
+						showMenu={!desktopNavigation}
+					/>
+					<main className='mx-auto w-full max-w-375 px-5 pb-12 pt-7 sm:px-8'>
+						{state.activeView === 'settings' ? (
+							<SettingsPage
+								client={systemClient}
+								onForceFullScan={state.forceFullScan}
+								onResetCatalogCache={state.resetCatalogCache}
+							/>
+						) : !state.isLoading &&
+						  !state.hasCache &&
+						  !state.apps.length &&
+						  !scanPromptDismissed ? (
+							<ScanPrompt
+								isScanning={state.isRefreshing}
+								onDismiss={() => setScanPromptDismissed(true)}
+								onScan={feedback.refresh}
+							/>
+						) : (
+							<AppGrid
+								apps={filteredApps}
+								isLoading={state.isLoading}
+								hasQuery={deferredQuery.trim().length > 0}
+								activeView={state.activeView}
+								categoryOrder={state.categoryOrder}
+								categories={state.categories}
+								collapsedCategories={state.collapsedCategories}
+								favoriteAppIds={state.favoriteAppIds}
+								onToggleCategory={state.toggleCategory}
+								onToggleFavorite={state.toggleFavorite}
+								onReorderCategory={state.reorderCategory}
+								onMoveApp={state.moveApp}
+								onLaunch={feedback.launch}
+								onInfo={setInfoApp}
+								onUninstall={setUninstallApp}
+								onHide={state.hideApp}
+								onRestore={state.restoreApp}
+								onRenameCategory={state.renameCategory}
+								onDeleteCategory={state.deleteCategory}
+							/>
+						)}
+					</main>
 				</div>
 			</div>
 			{drawerOpen && !desktopNavigation && (
@@ -279,6 +332,13 @@ export function App({
 					onReorderCategory={state.reorderCategory}
 					onCreateCategory={state.createCategory}
 					onClose={closeDrawer}
+				/>
+			)}
+			{paletteOpen && (
+				<CommandPalette
+					apps={visibleApps}
+					onLaunch={feedback.launch}
+					onClose={() => setPaletteOpen(false)}
 				/>
 			)}
 			{infoApp && (

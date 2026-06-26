@@ -70,7 +70,8 @@ export function CategorySection({
 					aria-expanded={!collapsed}
 					aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
 					onClick={onToggle}
-					className='grid size-8 shrink-0 place-items-center rounded-lg bg-slate-200/75 text-slate-500 transition-colors hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
+					disabled={apps.length === 0}
+					className='grid size-8 shrink-0 place-items-center rounded-lg bg-slate-200/75 text-slate-500 transition-colors hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:pointer-events-none disabled:opacity-40'
 				>
 					{collapsed ? (
 						<ChevronRight size={15} aria-hidden='true' />

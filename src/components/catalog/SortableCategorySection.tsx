@@ -51,7 +51,10 @@ export function SortableCategorySection(props: Props) {
 			>
 				{label}
 			</h2>
-			<span className='rounded-full bg-slate-200/80 px-2.5 py-1 text-[0.7rem] font-medium text-slate-500'>
+			<span
+				aria-hidden='true'
+				className='rounded-full bg-slate-200/80 px-2.5 py-1 text-[0.7rem] font-medium text-slate-500'
+			>
 				{props.apps.length} {props.apps.length === 1 ? 'app' : 'apps'}
 			</span>
 		</button>

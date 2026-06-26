@@ -14,12 +14,23 @@ export function useAppFeedback({
 	onUninstall,
 }: AppFeedbackOptions) {
 	const launch = useCallback(
-		async (app: AppInfo) => {
+		async function launch(app: AppInfo) {
 			try {
 				await onLaunch(app)
 				toast.success(`${app.name} launched`)
-			} catch {
-				toast.error(`Could not launch ${app.name}`)
+			} catch (error) {
+				const reason = error instanceof Error ? error.message : null
+				toast.error(
+					reason
+						? `Could not launch ${app.name}: ${reason}`
+						: `Could not launch ${app.name}`,
+					{
+						action: {
+							label: 'Retry',
+							onClick: () => void launch(app),
+						},
+					},
+				)
 			}
 		},
 		[onLaunch],
@@ -40,13 +51,13 @@ export function useAppFeedback({
 	}, [onRefresh])
 
 	const uninstall = useCallback(
-		async (id: string) => {
+		async (app: AppInfo) => {
 			try {
-				await onUninstall(id)
-				toast.success('Application uninstalled')
-			} catch (error) {
-				toast.error('Could not uninstall the application')
-				throw error
+				await onUninstall(app.id)
+				toast.success(`${app.name} uninstalled`)
+			} catch {
+				toast.error(`Could not uninstall ${app.name}`)
+				throw app.name // rethrown so App.tsx knows to keep the dialog open
 			}
 		},
 		[onUninstall],

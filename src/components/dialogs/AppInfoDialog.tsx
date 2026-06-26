@@ -1,6 +1,7 @@
 import { AppWindow, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { descriptionLabel, metadataRows } from '../../lib/appMetadata'
 import type { AppInfo, CategoryDefinition } from '../../types'
 
@@ -15,6 +16,8 @@ export function AppInfoDialog({
 }) {
 	useBodyScrollLock()
 	const closeRef = useRef<HTMLButtonElement>(null)
+	const dialogRef = useRef<HTMLElement>(null)
+	useFocusTrap(dialogRef)
 	useEffect(() => {
 		closeRef.current?.focus()
 		function keydown(event: KeyboardEvent) {
@@ -32,6 +35,7 @@ export function AppInfoDialog({
 			}}
 		>
 			<section
+				ref={dialogRef}
 				role='dialog'
 				aria-modal='true'
 				aria-label={`${app.name} information`}

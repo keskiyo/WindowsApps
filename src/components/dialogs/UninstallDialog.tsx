@@ -1,6 +1,7 @@
-import { AlertTriangle, X } from 'lucide-react'
+import { AlertTriangle, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { SOURCE_LABELS } from '../../lib/appMetadata'
 import type { UninstallPreview } from '../../types'
 
@@ -30,6 +31,8 @@ export function UninstallDialog({
 	useBodyScrollLock()
 	const [pending, setPending] = useState(false)
 	const cancelRef = useRef<HTMLButtonElement>(null)
+	const dialogRef = useRef<HTMLElement>(null)
+	useFocusTrap(dialogRef)
 	useEffect(() => {
 		cancelRef.current?.focus()
 		function keydown(event: KeyboardEvent) {
@@ -50,11 +53,12 @@ export function UninstallDialog({
 	return (
 		<div
 			className='fixed inset-0 z-400 grid place-items-center bg-slate-700/38 p-4 backdrop-blur-[2px]'
-			onMouseDown={event => {
+			onClick={event => {
 				if (!pending && event.currentTarget === event.target) onClose()
 			}}
 		>
 			<section
+				ref={dialogRef}
 				role='alertdialog'
 				aria-modal='true'
 				aria-label={`Uninstall ${appName}`}
@@ -83,9 +87,14 @@ export function UninstallDialog({
 				</header>
 				<div className='mt-5 rounded-xl border border-slate-200 bg-white/65 p-4'>
 					{isPreviewLoading ? (
-						<p className='text-sm text-slate-600'>
+						<div className='flex items-center gap-2 text-sm text-slate-600'>
+							<Loader2
+								size={15}
+								className='animate-spin text-violet-600'
+								aria-hidden='true'
+							/>
 							Loading uninstall details…
-						</p>
+						</div>
 					) : previewError ? (
 						<p role='alert' className='text-sm text-red-700'>
 							{previewError}

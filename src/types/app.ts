@@ -91,5 +91,7 @@ export interface AppsClient {
 	onCatalogChanged?(
 		handler: (summary: CatalogChangeSummary) => void,
 	): Promise<() => void>
-	onScanProgress(handler: (progress: ScanProgress) => void): Promise<() => void>
+	onScanProgress(
+		handler: (progress: ScanProgress) => void,
+	): Promise<() => void>
 }

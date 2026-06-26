@@ -127,9 +127,9 @@ describe('app store', () => {
 		const store = createAppStore(client())
 		store.setState({ apps: [executable, shortcut] })
 
-		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
-			'battle-lnk',
-		])
+		expect(
+			selectVisibleApps(store.getState()).map(item => item.id),
+		).toEqual(['battle-lnk'])
 	})
 
 	it('merges siblings via the family bucket after an earlier merge', () => {
@@ -155,9 +155,9 @@ describe('app store', () => {
 		const store = createAppStore(client())
 		store.setState({ apps: [shortcut, executable, sibling] })
 
-		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
-			's',
-		])
+		expect(
+			selectVisibleApps(store.getState()).map(item => item.id),
+		).toEqual(['s'])
 	})
 
 	it('hides launcher executable when a game shortcut exists', () => {
@@ -180,9 +180,9 @@ describe('app store', () => {
 		const store = createAppStore(client())
 		store.setState({ apps: [executable, shortcut] })
 
-		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
-			'wow-lnk',
-		])
+		expect(
+			selectVisibleApps(store.getState()).map(item => item.id),
+		).toEqual(['wow-lnk'])
 	})
 
 	it('hides duplicate executable catalog entries with the same product name', () => {
@@ -203,9 +203,9 @@ describe('app store', () => {
 		const store = createAppStore(client())
 		store.setState({ apps: [executable, steam] })
 
-		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
-			'hearthstone-steam',
-		])
+		expect(
+			selectVisibleApps(store.getState()).map(item => item.id),
+		).toEqual(['hearthstone-steam'])
 	})
 
 	it('hides cached TablePlus shortcut and versioned executable duplicates', () => {
@@ -232,9 +232,9 @@ describe('app store', () => {
 		const store = createAppStore(client())
 		store.setState({ apps: [executable, shortcut] })
 
-		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
-			'tableplus-lnk',
-		])
+		expect(
+			selectVisibleApps(store.getState()).map(item => item.id),
+		).toEqual(['tableplus-lnk'])
 	})
 
 	it('hides shortcut and executable duplicates even when publisher spelling differs', () => {
@@ -261,9 +261,9 @@ describe('app store', () => {
 		const store = createAppStore(client())
 		store.setState({ apps: [executable, shortcut] })
 
-		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
-			'assistant-lnk',
-		])
+		expect(
+			selectVisibleApps(store.getState()).map(item => item.id),
+		).toEqual(['assistant-lnk'])
 	})
 
 	it('keeps same-name apps when publishers conflict', () => {
@@ -284,10 +284,9 @@ describe('app store', () => {
 		const store = createAppStore(client())
 		store.setState({ apps: [first, second] })
 
-		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
-			'app-a',
-			'app-b',
-		])
+		expect(
+			selectVisibleApps(store.getState()).map(item => item.id),
+		).toEqual(['app-a', 'app-b'])
 	})
 
 	it('filters applications case-insensitively', () => {

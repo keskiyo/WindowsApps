@@ -1,5 +1,7 @@
 import { Trash2, X } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 
 export function DeleteCategoryDialog({
 	name,
@@ -11,9 +13,21 @@ export function DeleteCategoryDialog({
 	onClose(): void
 }) {
 	useBodyScrollLock()
+	const dialogRef = useRef<HTMLElement>(null)
+	const closeRef = useRef<HTMLButtonElement>(null)
+	useFocusTrap(dialogRef)
+	useEffect(() => {
+		closeRef.current?.focus()
+		function keydown(event: KeyboardEvent) {
+			if (event.key === 'Escape') onClose()
+		}
+		document.addEventListener('keydown', keydown)
+		return () => document.removeEventListener('keydown', keydown)
+	}, [onClose])
 	return (
 		<div className='fixed inset-0 z-400 grid place-items-center bg-slate-700/38 p-4 backdrop-blur-[2px]'>
 			<section
+				ref={dialogRef}
 				role='alertdialog'
 				aria-modal='true'
 				aria-label={`Delete ${name} category`}
@@ -28,9 +42,11 @@ export function DeleteCategoryDialog({
 						</p>
 					</div>
 					<button
+						ref={closeRef}
 						type='button'
 						aria-label='Close category deletion'
 						onClick={onClose}
+						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-violet-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
 						<X size={17} />
 					</button>
