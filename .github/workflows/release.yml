@@ -10,7 +10,7 @@ permissions:
 
 jobs:
     build-release:
-        name: Build Windows x64 installer
+        name: Build & publish Windows x64 installer
         runs-on: windows-latest
 
         steps:
@@ -41,26 +41,18 @@ jobs:
             - name: Run Rust tests
               run: cargo test --manifest-path src-tauri/Cargo.toml
 
-            - name: Build installer
-              run: npm run tauri build
-
-            - name: Hash installer
-              shell: pwsh
-              run: |
-                  $installer = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
-                  if (-not $installer) {
-                    throw 'Installer was not produced.'
-                  }
-                  $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-                  "$hash  $($installer.Name)" | Set-Content "$($installer.FullName).sha256" -Encoding utf8NoBOM
-
-            - name: Publish release
-              shell: pwsh
+            # tauri-action builds the app, signs the update artifacts with the private key,
+            # generates latest.json (the updater manifest), creates the GitHub Release for the
+            # tag, and uploads the installer + latest.json + .sig as release assets.
+            - name: Build, sign & publish release
+              uses: tauri-apps/tauri-action@v0
               env:
-                  GH_TOKEN: ${{ github.token }}
-              run: |
-                  $installer = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
-                  if (-not $installer) {
-                    throw 'Installer was not produced.'
-                  }
-                  gh release create '${{ github.ref_name }}' --verify-tag --generate-notes --title "Windows Apps ${{ github.ref_name }}" $installer.FullName "$($installer.FullName).sha256"
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+                  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+              with:
+                  tagName: ${{ github.ref_name }}
+                  releaseName: 'Windows Apps ${{ github.ref_name }}'
+                  releaseBody: 'Install the latest version. Existing installs update automatically.'
+                  releaseDraft: false
+                  prerelease: false

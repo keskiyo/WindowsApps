@@ -1,4 +1,4 @@
-use crate::catalog::{sanitize, AppInfo};
+use crate::catalog::{sanitize_reported, AppInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -35,7 +35,7 @@ pub fn merge_sources(previous: Vec<SourceSnapshot>, updates: Vec<SourceSnapshot>
         sources.insert(snapshot.key.clone(), snapshot);
     }
     let sources = sources.into_values().collect::<Vec<_>>();
-    let apps = sanitize(
+    let apps = sanitize_reported(
         sources
             .iter()
             .flat_map(|snapshot| snapshot.apps.iter().cloned())

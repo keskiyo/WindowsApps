@@ -150,7 +150,7 @@ describe('App', () => {
 		expect(settings).toHaveTextContent('Settings')
 	})
 
-	it('uses the light Soft Surface theme and Neon Glass app cards', async () => {
+	it('uses the dark Graphite Surface theme and Neon Glass app cards', async () => {
 		renderApp()
 		const launch = await screen.findByRole('button', {
 			name: 'Launch Steam',
@@ -158,7 +158,7 @@ describe('App', () => {
 		const card = launch.closest('article')
 
 		expect(document.querySelector('.app-shell')).toHaveClass(
-			'theme-soft-surface',
+			'theme-graphite-surface',
 		)
 		expect(card).toHaveClass('app-card-glass')
 	})
@@ -175,6 +175,28 @@ describe('App', () => {
 			screen.getByRole('heading', { name: 'Development' }),
 		).toBeInTheDocument()
 		expect(screen.getAllByText('1 app')).toHaveLength(3)
+	})
+
+	it('renders a workspace summary for the visible organizer state', async () => {
+		renderApp()
+		expect(
+			await screen.findByRole('region', { name: 'Workspace summary' }),
+		).toBeInTheDocument()
+		expect(screen.getByText('Visible apps')).toBeInTheDocument()
+		expect(screen.getByText('3')).toBeInTheDocument()
+		expect(screen.getByText('Categories')).toBeInTheDocument()
+		expect(screen.getByText('3 active')).toBeInTheDocument()
+		expect(screen.getByText('Favorites')).toBeInTheDocument()
+		expect(screen.getByText('Hidden')).toBeInTheDocument()
+	})
+
+	it('updates the header count to show search matches', async () => {
+		renderApp()
+		const search = await screen.findByRole('textbox', {
+			name: 'Search applications',
+		})
+		await userEvent.type(search, 'code')
+		expect(screen.getByText('1 match')).toBeInTheDocument()
 	})
 
 	it('shows and dismisses the first-run scan prompt without scanning', async () => {
@@ -284,6 +306,21 @@ describe('App', () => {
 		expect(screen.getByRole('button', { name: 'Collapse Games' })).not.toBe(
 			move,
 		)
+	})
+
+	it('hides the rename pencil while a category name is being edited', async () => {
+		renderApp()
+		await screen.findByText('Steam')
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Rename Games category' }),
+		)
+
+		expect(
+			screen.getByRole('textbox', { name: 'Rename Games category' }),
+		).toBeInTheDocument()
+		expect(
+			screen.queryByRole('button', { name: 'Rename Games category' }),
+		).not.toBeInTheDocument()
 	})
 
 	it('clears search and restores input focus', async () => {

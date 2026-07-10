@@ -5,13 +5,13 @@
 
 **A fast, private application catalog and launcher for Windows 10 and Windows 11.**
 
-[![Version](https://img.shields.io/badge/version-0.2.0-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.0)
+[![Version](https://img.shields.io/badge/version-0.2.1-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.1)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
 ![Local first](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
 
-[Download Windows Apps 0.2.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.0) ·
+[Download Windows Apps 0.2.1](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.1) ·
 [Documentation](Documentation.md) ·
 [Telegram](https://t.me/keskiyo)
 
@@ -31,11 +31,16 @@ The catalog is stored locally. On startup, cached names appear immediately while
 - **Fast startup** — lightweight versioned cache is rendered before background synchronization finishes.
 - **Incremental scanning** — unchanged directories reuse previous results.
 - **Controlled full scans** — progress reporting, cancellation, depth, entry-count, and time limits.
-- **Smart deduplication** — matching `.lnk` and `.exe` entries are merged, with useful shortcuts preferred.
+- **Smart deduplication** — evidence-based resolution merges the same product found across sources, with useful shortcuts preferred and legitimate apps kept when identity is ambiguous.
 - **Noise filtering** — installers, uninstall helpers, updaters, documentation shortcuts, resource entries, and broken names are filtered.
+- **Full-text search** — matches application name, publisher, description, and install path; each word is matched independently.
+- **Quick launch (Ctrl+K)** — keyboard-first command palette to find and launch any app; `Ctrl+F` or `/` jumps to search.
+- **Launch feedback** — the card shows a launching state (dimmed icon + spinner) and a top activity bar, cleared when the app window is ready or after a short ceiling.
 - **Background icon loading** — visible application cards receive priority without creating duplicate hydration work.
-- **Organization** — automatic and custom categories, category reordering, application moves, Favorites, and reversible Hidden items.
+- **Organization** — automatic and custom categories, category reordering, application moves, Favorites (surfaced first within a category), and reversible Hidden items.
+- **Automatic updates** — the app checks GitHub Releases on startup and offers a signed update with one click; you choose when to install.
 - **Responsive navigation** — persistent sidebar from `1024px`; overlay drawer on smaller windows.
+- **Keyboard & accessibility** — focus traps in dialogs and menus, `aria-current` navigation, arrow-key menus, and reduced-motion support.
 - **Native launching** — shortcuts, executables, shell targets, Steam entries, and packaged applications use their appropriate Windows launch mechanism.
 - **Registered uninstall** — Windows Apps uses vendor, MSI, or MSIX uninstall information registered with Windows.
 - **Uninstall history** — keeps a local privacy-limited history of the latest 100 attempts.
@@ -46,12 +51,12 @@ The catalog is stored locally. On startup, cached names appear immediately while
 
 ## Installation
 
-1. Open [Windows Apps 0.2.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.0).
-2. Download `Windows.Apps_0.2.0_x64-setup.exe`.
+1. Open [Windows Apps 0.2.1](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.1).
+2. Download `Windows.Apps_0.2.1_x64-setup.exe`.
 3. Run the installer.
 4. Start **Windows Apps** and select **Scan for apps** when prompted.
 
-The installer is currently unsigned. Microsoft Defender SmartScreen may display an unrecognized-app warning. Download builds only from this repository and verify the published SHA-256 file.
+The installer is not Authenticode-signed, so Microsoft Defender SmartScreen may show an unrecognized-app warning. Download builds only from this repository's official Releases. Automatic updates are cryptographically signed and verified by the app before installation.
 
 ### System requirements
 
@@ -131,7 +136,7 @@ npm run tauri build
 Primary local artifact:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.0_x64-setup.exe
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.1_x64-setup.exe
 ```
 
 ## Release process
@@ -141,9 +146,10 @@ Pushing a `v*` tag runs `.github/workflows/release.yml`. The workflow:
 1. validates that the tag matches all version manifests;
 2. installs npm dependencies;
 3. runs frontend and Rust tests;
-4. creates the Windows x64 NSIS installer;
-5. generates its SHA-256 checksum;
-6. publishes both files to GitHub Releases.
+4. uses `tauri-apps/tauri-action` to build the Windows x64 installer, sign the update
+   artifacts with the `TAURI_SIGNING_PRIVATE_KEY` secret, and generate `latest.json`;
+5. creates the GitHub Release for the tag and uploads the installer, `latest.json`, and
+   signature so existing installs can update automatically.
 
 See [Documentation.md](Documentation.md) for architecture, native commands, scanning behavior, troubleshooting, and the release checklist.
 

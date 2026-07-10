@@ -64,7 +64,7 @@ export function SettingsPage({
 					</p>
 				</div>
 			</div>
-			<div className='mt-6 rounded-2xl border border-white/85 bg-white/58 p-5 shadow-[7px_8px_20px_rgba(104,114,136,.11),-6px_-6px_16px_rgba(255,255,255,.72)]'>
+			<div className='settings-surface mt-6 rounded-2xl border border-white/85 bg-white/58 p-5'>
 				<div className='flex items-start gap-4'>
 					<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
 						<HardDrive size={19} aria-hidden='true' />
@@ -152,7 +152,7 @@ export function SettingsPage({
 				</div>
 			</div>
 			{onForceFullScan && (
-				<div className='mt-5 rounded-2xl border border-white/85 bg-white/58 p-5 shadow-[7px_8px_20px_rgba(104,114,136,.11),-6px_-6px_16px_rgba(255,255,255,.72)]'>
+				<div className='settings-surface mt-5 rounded-2xl border border-white/85 bg-white/58 p-5'>
 					<div className='flex items-center gap-4'>
 						<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
 							<RefreshCw size={19} aria-hidden='true' />
@@ -179,7 +179,7 @@ export function SettingsPage({
 									type='button'
 									disabled={forcing || resetting}
 									onClick={() => setConfirmReset(true)}
-									className='inline-flex items-center gap-2 rounded-xl border border-red-300/70 px-4 py-2.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50'
+									className='danger-button inline-flex items-center gap-2 rounded-xl border border-red-300/70 px-4 py-2.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50'
 								>
 									<RotateCcw size={16} aria-hidden='true' />
 									Reset catalog cache
@@ -223,7 +223,7 @@ export function SettingsPage({
 						<div
 							role='dialog'
 							aria-label='Confirm catalog cache reset'
-							className='mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300/70 bg-red-50 p-4'
+							className='danger-panel mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300/70 bg-red-50 p-4'
 						>
 							<p className='text-sm text-red-800'>
 								This removes the local app cache and icon cache,
@@ -253,7 +253,7 @@ export function SettingsPage({
 					)}
 				</div>
 			)}
-			<div className='mt-5 overflow-hidden rounded-2xl border border-white/85 bg-white/58 shadow-[7px_8px_20px_rgba(104,114,136,.11),-6px_-6px_16px_rgba(255,255,255,.72)]'>
+			<div className='settings-surface mt-5 overflow-hidden rounded-2xl border border-white/85 bg-white/58'>
 				<div className='flex items-center gap-4 border-b border-slate-200 p-5'>
 					<span className='grid size-10 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
 						<Power size={19} aria-hidden='true' />

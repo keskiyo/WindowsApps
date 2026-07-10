@@ -31,6 +31,9 @@ export interface AppState {
 	categoryOverrides: Record<string, AppCategory>
 	hiddenAppIds: string[]
 	categories: CategoryDefinition[]
+	launchingIds: string[]
+	markLaunching(id: string): void
+	clearLaunching(id: string): void
 	createCategory(
 		label: string,
 	): { ok: true; id: string } | { ok: false; error: string }
@@ -65,6 +68,10 @@ export interface AppState {
 	subscribeScanProgress(): Promise<() => void>
 }
 
+// Ceiling for the "launching" visual when the backend can't report real readiness
+// (Store/UWP, shell hand-off). Cleared early by the launch://status event when available.
+const LAUNCH_CEILING_MS = 12000
+
 function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
 }
@@ -83,6 +90,19 @@ export function createAppStore(
 	idFactory: () => string = () => `custom:${crypto.randomUUID()}`,
 ): StoreApi<AppState> {
 	const preferences = readPreferences(storage)
+	const launchTimers = new Map<string, ReturnType<typeof setTimeout>>()
+	let initializationPromise: Promise<() => void> | null = null
+	let initializationDispose: (() => void) | null = null
+	let initializationUsers = 0
+
+	function releaseInitialization() {
+		initializationUsers = Math.max(0, initializationUsers - 1)
+		if (initializationUsers > 0) return
+		initializationDispose?.()
+		initializationDispose = null
+		initializationPromise = null
+	}
+
 	return createStore<AppState>((set, get) => {
 		function persist() {
 			const state = get()
@@ -114,6 +134,30 @@ export function createAppStore(
 			categoryOverrides: preferences.categoryOverrides,
 			hiddenAppIds: preferences.hiddenAppIds,
 			categories: preferences.categories,
+			launchingIds: [],
+			markLaunching(id) {
+				set(state =>
+					state.launchingIds.includes(id)
+						? state
+						: { launchingIds: [...state.launchingIds, id] },
+				)
+			},
+			clearLaunching(id) {
+				const timer = launchTimers.get(id)
+				if (timer) {
+					clearTimeout(timer)
+					launchTimers.delete(id)
+				}
+				set(state =>
+					state.launchingIds.includes(id)
+						? {
+								launchingIds: state.launchingIds.filter(
+									appId => appId !== id,
+								),
+							}
+						: state,
+				)
+			},
 			async load() {
 				set({ isLoading: true, error: null })
 				try {
@@ -130,30 +174,48 @@ export function createAppStore(
 				}
 			},
 			async initialize() {
-				const disposers: Array<() => void> = []
-				const subscribe = async <T>(
-					registration:
-						| ((handler: (value: T) => void) => Promise<() => void>)
-						| undefined,
-					handler: (value: T) => void,
-				) => {
-					if (registration)
-						disposers.push(await registration(handler))
+				initializationUsers += 1
+				if (!initializationPromise) {
+					initializationPromise = (async () => {
+						const disposers: Array<() => void> = []
+						const subscribe = async <T>(
+							registration:
+								| ((
+										handler: (value: T) => void,
+									) => Promise<() => void>)
+								| undefined,
+							handler: (value: T) => void,
+						) => {
+							if (registration)
+								disposers.push(await registration(handler))
+						}
+						await subscribe(client.onCatalogDelta, get().applyDelta)
+						await subscribe(
+							client.onCatalogPatches,
+							get().applyPatches,
+						)
+						await subscribe(client.onCatalogChanged, summary =>
+							set({ catalogChange: summary }),
+						)
+						disposers.push(
+							await client.onAppsUpdated(get().replaceApps),
+						)
+						disposers.push(
+							await client.onScanProgress(scanProgress =>
+								set({ scanProgress }),
+							),
+						)
+						await subscribe(client.onLaunchStatus, status =>
+							get().clearLaunching(status.id),
+						)
+						await get().load()
+						if (get().hasCache) await client.startBackgroundSync?.()
+						initializationDispose = () =>
+							disposers.splice(0).forEach(dispose => dispose())
+						return releaseInitialization
+					})()
 				}
-				await subscribe(client.onCatalogDelta, get().applyDelta)
-				await subscribe(client.onCatalogPatches, get().applyPatches)
-				await subscribe(client.onCatalogChanged, summary =>
-					set({ catalogChange: summary }),
-				)
-				disposers.push(await client.onAppsUpdated(get().replaceApps))
-				disposers.push(
-					await client.onScanProgress(scanProgress =>
-						set({ scanProgress }),
-					),
-				)
-				await get().load()
-				if (get().hasCache) await client.startBackgroundSync?.()
-				return () => disposers.forEach(dispose => dispose())
+				return initializationPromise
 			},
 			async refresh() {
 				set({ isRefreshing: true, error: null })
@@ -210,9 +272,20 @@ export function createAppStore(
 			},
 			async launch(app) {
 				set({ error: null })
+				get().markLaunching(app.id)
+				const existing = launchTimers.get(app.id)
+				if (existing) clearTimeout(existing)
+				launchTimers.set(
+					app.id,
+					setTimeout(
+						() => get().clearLaunching(app.id),
+						LAUNCH_CEILING_MS,
+					),
+				)
 				try {
 					await client.launchApp({ id: app.id })
 				} catch (error) {
+					get().clearLaunching(app.id)
 					set({ error: errorMessage(error) })
 					throw error
 				}

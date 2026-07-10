@@ -81,6 +81,58 @@ describe('app store', () => {
 		expect(store.getState().isLoading).toBe(false)
 	})
 
+	it('marks an app launching and clears it on the ceiling timer', async () => {
+		vi.useFakeTimers()
+		try {
+			const store = createAppStore(client())
+			await store.getState().launch(apps[0])
+			expect(store.getState().launchingIds).toContain('code')
+			vi.advanceTimersByTime(12000)
+			expect(store.getState().launchingIds).not.toContain('code')
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('clears launching immediately when a launch fails', async () => {
+		const store = createAppStore(
+			client({ launchApp: vi.fn().mockRejectedValue(new Error('nope')) }),
+		)
+		await expect(store.getState().launch(apps[0])).rejects.toThrow()
+		expect(store.getState().launchingIds).not.toContain('code')
+	})
+
+	it('clearLaunching is idempotent', () => {
+		const store = createAppStore(client())
+		store.getState().markLaunching('x')
+		expect(store.getState().launchingIds).toEqual(['x'])
+		store.getState().clearLaunching('x')
+		store.getState().clearLaunching('x')
+		expect(store.getState().launchingIds).toEqual([])
+	})
+
+	it('reuses an in-flight initialization so dev StrictMode does not start two scans', async () => {
+		const api = client({
+			startBackgroundSync: vi.fn().mockResolvedValue(undefined),
+			onCatalogDelta: vi.fn().mockResolvedValue(() => undefined),
+			onCatalogPatches: vi.fn().mockResolvedValue(() => undefined),
+			onCatalogChanged: vi.fn().mockResolvedValue(() => undefined),
+		})
+		const store = createAppStore(api)
+
+		const [firstDispose, secondDispose] = await Promise.all([
+			store.getState().initialize(),
+			store.getState().initialize(),
+		])
+
+		expect(api.getApps).toHaveBeenCalledOnce()
+		expect(api.startBackgroundSync).toHaveBeenCalledOnce()
+		expect(api.onAppsUpdated).toHaveBeenCalledOnce()
+		firstDispose()
+		expect(api.onAppsUpdated).toHaveBeenCalledOnce()
+		secondDispose()
+	})
+
 	it('keeps one app per id when cached and updated data repeats entries', async () => {
 		const duplicate = { ...apps[0] }
 		const store = createAppStore(
@@ -107,9 +159,10 @@ describe('app store', () => {
 		])
 	})
 
-	it('hides visible shortcut and executable duplicates for the same product', () => {
+	it('collapses stale shortcut and executable duplicates by canonical id', () => {
+		const canonicalId = 'target:d:\\games\\battle.net\\battle.net.exe'
 		const shortcut = app({
-			id: 'battle-lnk',
+			id: canonicalId,
 			name: 'Battle.net',
 			path: String.raw`C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Battle.net\Battle.net.lnk`,
 			category: 'games',
@@ -117,7 +170,7 @@ describe('app store', () => {
 			sourceKind: 'start_menu',
 		})
 		const executable = app({
-			id: 'battle-exe',
+			id: canonicalId,
 			name: 'Battle.net',
 			path: String.raw`D:\Games\Battle.net\Battle.net.exe`,
 			category: 'games',
@@ -129,10 +182,10 @@ describe('app store', () => {
 
 		expect(
 			selectVisibleApps(store.getState()).map(item => item.id),
-		).toEqual(['battle-lnk'])
+		).toEqual([canonicalId])
 	})
 
-	it('merges siblings via the family bucket after an earlier merge', () => {
+	it('does not merge product-family siblings in the UI', () => {
 		const shortcut = app({
 			id: 's',
 			name: 'Acme',
@@ -157,10 +210,10 @@ describe('app store', () => {
 
 		expect(
 			selectVisibleApps(store.getState()).map(item => item.id),
-		).toEqual(['s'])
+		).toEqual(['s', 'e', 'x'])
 	})
 
-	it('hides launcher executable when a game shortcut exists', () => {
+	it('keeps unresolved launcher executable when only names imply a duplicate', () => {
 		const shortcut = app({
 			id: 'wow-lnk',
 			name: 'World of Warcraft',
@@ -182,10 +235,10 @@ describe('app store', () => {
 
 		expect(
 			selectVisibleApps(store.getState()).map(item => item.id),
-		).toEqual(['wow-lnk'])
+		).toEqual(['wow-launcher', 'wow-lnk'])
 	})
 
-	it('hides duplicate executable catalog entries with the same product name', () => {
+	it('keeps unresolved Steam and executable entries when ids differ', () => {
 		const steam = app({
 			id: 'hearthstone-steam',
 			name: 'Hearthstone',
@@ -205,10 +258,10 @@ describe('app store', () => {
 
 		expect(
 			selectVisibleApps(store.getState()).map(item => item.id),
-		).toEqual(['hearthstone-steam'])
+		).toEqual(['hearthstone-exe', 'hearthstone-steam'])
 	})
 
-	it('hides cached TablePlus shortcut and versioned executable duplicates', () => {
+	it('keeps unresolved TablePlus shortcut and versioned executable duplicates', () => {
 		const shortcut = app({
 			id: 'tableplus-lnk',
 			name: 'TablePlus',
@@ -234,10 +287,10 @@ describe('app store', () => {
 
 		expect(
 			selectVisibleApps(store.getState()).map(item => item.id),
-		).toEqual(['tableplus-lnk'])
+		).toEqual(['tableplus-exe', 'tableplus-lnk'])
 	})
 
-	it('hides shortcut and executable duplicates even when publisher spelling differs', () => {
+	it('keeps unresolved shortcut and executable duplicates when ids differ', () => {
 		const shortcut = app({
 			id: 'assistant-lnk',
 			name: 'Assistant',
@@ -263,7 +316,7 @@ describe('app store', () => {
 
 		expect(
 			selectVisibleApps(store.getState()).map(item => item.id),
-		).toEqual(['assistant-lnk'])
+		).toEqual(['assistant-exe', 'assistant-lnk'])
 	})
 
 	it('keeps same-name apps when publishers conflict', () => {

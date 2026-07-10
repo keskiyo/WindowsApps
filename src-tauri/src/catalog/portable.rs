@@ -27,6 +27,8 @@ pub(super) fn should_visit_directory(path: &Path, excluded: &[PathBuf]) -> bool 
             | "perflogs"
             | "documents and settings"
             | "node_modules"
+            | ".cache"
+            | ".codex"
             | ".git"
             | ".svn"
             | "target"
@@ -49,7 +51,7 @@ pub(super) fn is_portable_candidate(path: &Path) -> bool {
         .unwrap_or_default()
         .to_string_lossy()
         .to_lowercase();
-    if super::is_installer_file_name(&stem) {
+    if super::is_installer_file_name(&stem) || super::is_helper_executable_stem(&stem) {
         return false;
     }
     let name = path
@@ -108,10 +110,30 @@ mod tests {
             r"C:\Apps\notification_helper.exe",
             r"C:\Apps\BlizzardError.exe",
             r"C:\Apps\battlenet.overlay.runtime.exe",
+            r"C:\Apps\git-lfs.exe",
+            r"C:\Apps\git-credential-manager.exe",
+            r"C:\Apps\gettext.exe",
+            r"C:\Apps\printf_gettext.exe",
+            r"C:\Apps\printf_ngettext.exe",
         ] {
             assert!(!is_portable_candidate(Path::new(path)), "{path}");
         }
         assert!(is_portable_candidate(Path::new(r"C:\Apps\rufus-4.11p.exe")));
         assert!(is_portable_candidate(Path::new(r"C:\Apps\Notepad.exe")));
+    }
+
+    #[test]
+    fn skips_hidden_runtime_directories() {
+        for path in [
+            Path::new(r"C:\Users\Maks\.cache"),
+            Path::new(r"C:\Users\Maks\.codex"),
+            Path::new(r"C:\Apps\node_modules"),
+        ] {
+            assert!(!should_visit_directory(path, &[]), "{}", path.display());
+        }
+        assert!(should_visit_directory(
+            Path::new(r"C:\Users\Maks\.local"),
+            &[]
+        ));
     }
 }

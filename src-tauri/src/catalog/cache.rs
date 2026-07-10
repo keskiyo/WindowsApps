@@ -137,6 +137,41 @@ mod tests {
     }
 
     #[test]
+    fn preserves_shortcut_resolution_fields_in_versioned_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut app = AppInfo {
+            id: "firefox".into(),
+            name: "Firefox".into(),
+            path: r"C:\Menu\Firefox.lnk".into(),
+            icon_base64: None,
+            category: Default::default(),
+            launch_kind: Default::default(),
+            source_kind: Default::default(),
+            description: None,
+            version: None,
+            publisher: None,
+            install_location: None,
+            can_uninstall: false,
+            uninstall: None,
+            resolved_path: Some(r"C:\Program Files\Mozilla Firefox\firefox.exe".into()),
+            shortcut_icon_path: Some(r"C:\Program Files\Mozilla Firefox\firefox.exe".into()),
+        };
+        write_document(
+            dir.path(),
+            &CatalogCache {
+                apps: vec![app.clone()],
+                ..CatalogCache::default()
+            },
+        )
+        .unwrap();
+
+        let document = read_document(dir.path()).unwrap();
+
+        app.icon_base64 = None;
+        assert_eq!(document.apps[0], app);
+    }
+
+    #[test]
     fn reset_removes_cache_files_without_touching_preferences() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join(CACHE_FILE), "{}").unwrap();

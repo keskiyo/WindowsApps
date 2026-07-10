@@ -63,7 +63,7 @@ export function UninstallHistory({ client }: Props) {
 	}
 
 	return (
-		<div className='mt-5 rounded-2xl border border-white/85 bg-white/58 p-5 shadow-[7px_8px_20px_rgba(104,114,136,.11),-6px_-6px_16px_rgba(255,255,255,.72)]'>
+		<div className='settings-surface mt-5 rounded-2xl border border-white/85 bg-white/58 p-5'>
 			<div className='flex items-start gap-4'>
 				<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
 					<ShieldCheck size={19} aria-hidden='true' />
@@ -79,7 +79,7 @@ export function UninstallHistory({ client }: Props) {
 					type='button'
 					disabled={!entries.length || clearing}
 					onClick={() => setConfirmClear(true)}
-					className='rounded-xl border border-red-300/70 px-3 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-40'
+					className='danger-button rounded-xl border border-red-300/70 px-3 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-40'
 				>
 					Clear
 				</button>
@@ -98,7 +98,7 @@ export function UninstallHistory({ client }: Props) {
 							<div className='flex flex-wrap items-center justify-between gap-2'>
 								<p className='font-medium'>{entry.appName}</p>
 								<span
-									className={`rounded-full px-2.5 py-1 text-xs font-medium ${entry.result === 'succeeded' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}
+									className={`rounded-full px-2.5 py-1 text-xs font-medium ${entry.result === 'succeeded' ? 'success-badge bg-emerald-100 text-emerald-800' : 'danger-badge bg-red-100 text-red-800'}`}
 								>
 									{RESULT_LABELS[entry.result]}
 								</span>
@@ -125,7 +125,7 @@ export function UninstallHistory({ client }: Props) {
 				<div
 					role='dialog'
 					aria-label='Confirm clear uninstall history'
-					className='mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300/70 bg-red-50 p-4'
+					className='danger-panel mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300/70 bg-red-50 p-4'
 				>
 					<p className='text-sm text-red-800'>
 						Clear the local uninstall history?

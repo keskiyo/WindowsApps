@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.2.0"
+version = "0.2.1"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -53,3 +53,5 @@ tempfile = "3.20"
 
 [target."cfg(any(target_os = \"macos\", windows, target_os = \"linux\"))".dependencies]
 tauri-plugin-single-instance = "2.4.2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"

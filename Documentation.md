@@ -1,9 +1,9 @@
 # Windows Apps Technical Documentation
 
-Technical reference for Windows Apps `0.2.0`.
+Technical reference for Windows Apps `0.2.1`.
 
 [README](README.md) ·
-[Release 0.2.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.0) ·
+[Release 0.2.1](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.1) ·
 [Telegram](https://t.me/keskiyo)
 
 ---
@@ -18,9 +18,11 @@ The supported product scope does not include:
 - telemetry or software-inventory uploads;
 - online metadata enrichment;
 - arbitrary command execution from the frontend;
-- automatic application updates;
 - VPN control;
 - direct deletion of program directories.
+
+The application updates itself from signed GitHub Releases (see §12). It never
+auto-updates the third-party applications it catalogs.
 
 ## 2. Supported environment
 
@@ -294,6 +296,30 @@ The setting applies only to the current Windows account.
 
 Production bundles use Tauri's silent WebView2 download bootstrapper when the runtime is missing.
 
+### Automatic updates
+
+On startup the app checks the updater endpoint for a newer signed release:
+
+```text
+https://github.com/keskiyo/WindowsApps/releases/latest/download/latest.json
+```
+
+- Updates are verified against the public key embedded in `tauri.conf.json`; an unsigned or
+  mismatched package is rejected.
+- If an update is available the UI shows a non-intrusive banner with the version and notes.
+  The user chooses when to download and restart — updates are never forced.
+- The check is silent when offline, when no newer release exists, or when running outside
+  the desktop app (development browser and tests).
+- The private signing key lives outside the repository and is provided to CI through the
+  `TAURI_SIGNING_PRIVATE_KEY` secret; it is never committed.
+
+### Launch feedback
+
+`launch_app` starts the process through the Windows shell, which returns before the target
+window is ready. When a process handle is available the backend waits for input-idle and
+emits a `launch://status` event so the launching card clears early; otherwise a short
+client-side ceiling clears it. A top activity bar reflects any in-flight launch or scan.
+
 ## 13. Privacy and security
 
 - Catalog discovery and categorization are local.
@@ -363,8 +389,8 @@ npm run tauri build
 Expected Windows x64 bundles:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.0_x64-setup.exe
-src-tauri/target/release/bundle/msi/Windows Apps_0.2.0_x64_en-US.msi
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.1_x64-setup.exe
+src-tauri/target/release/bundle/msi/Windows Apps_0.2.1_x64_en-US.msi
 ```
 
 The NSIS setup executable is the primary public artifact.
@@ -381,9 +407,13 @@ The workflow:
 4. validates the tag against `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`;
 5. runs frontend tests;
 6. runs Rust tests;
-7. builds Tauri bundles;
-8. generates an SHA-256 file for the NSIS installer;
-9. creates the GitHub Release and uploads both files.
+7. runs `tauri-apps/tauri-action`, which builds the Tauri bundles, signs the update
+   artifacts with the `TAURI_SIGNING_PRIVATE_KEY` secret, and generates `latest.json`;
+8. creates the GitHub Release for the tag and uploads the installer, `latest.json`, and
+   signature, which the updater endpoint serves to existing installs.
+
+The `TAURI_SIGNING_PRIVATE_KEY` (and optional `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) repository
+secrets must be configured before the first signed release, or the update manifest is not produced.
 
 Prepare a release:
 
@@ -393,14 +423,14 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo check --manifest-path src-tauri/Cargo.toml
 npm run tauri build
-powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.0
+powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.1
 ```
 
 Publish:
 
 ```powershell
-git tag -a v0.2.0 -m "Windows Apps 0.2.0"
-git push origin v0.2.0
+git tag -a v0.2.1 -m "Windows Apps 0.2.1"
+git push origin v0.2.1
 ```
 
 Do not reuse or move a tag after a public Release has been published. Increase the version for the next release.
@@ -437,7 +467,7 @@ Windows did not expose a valid registered vendor, MSI, or MSIX uninstall target 
 
 ### SmartScreen warning
 
-The installer is not Authenticode-signed. Download it from the project Release and compare its SHA-256 value with the attached checksum.
+The installer is not Authenticode-signed. Download it only from the official project Releases. After the first install, updates are delivered as cryptographically signed packages that the app verifies against its embedded public key before installing.
 
 ## 18. Release verification checklist
 
@@ -449,7 +479,9 @@ The installer is not Authenticode-signed. Download it from the project Release a
 - [ ] Cargo check passes.
 - [ ] Version verification passes for the intended tag.
 - [ ] Tauri production build completes.
-- [ ] NSIS installer and SHA-256 file are attached to the Release.
+- [ ] `TAURI_SIGNING_PRIVATE_KEY` secret is configured.
+- [ ] Installer, `latest.json`, and signature are attached to the Release.
+- [ ] A prior install detects and installs the update from the new Release.
 
 ### Windows 10 x64
 
@@ -472,5 +504,5 @@ The installer is not Authenticode-signed. Download it from the project Release a
 ---
 
 [README](README.md) ·
-[Release 0.2.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.0) ·
+[Release 0.2.1](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.1) ·
 [Telegram: @keskiyo](https://t.me/keskiyo)

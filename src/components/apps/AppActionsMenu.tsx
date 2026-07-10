@@ -124,7 +124,7 @@ export function AppActionsMenu({
 			}
 			role='menu'
 			aria-label={`${app.name} actions`}
-			className='absolute left-2 top-11 z-110 w-55 max-w-[calc(100vw-1rem)] rounded-xl border border-slate-200/85 bg-slate-50 p-1.5 text-left text-slate-700 shadow-[0_18px_45px_rgba(53,61,82,.2)]'
+			className='absolute left-2 top-11 z-110 flex w-56 max-w-[calc(100vw-1rem)] flex-col gap-0.5 rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-[0_18px_45px_rgba(53,61,82,.2)]'
 		>
 			{!isHidden && (
 				<button
@@ -132,19 +132,19 @@ export function AppActionsMenu({
 					role='menuitem'
 					onClick={() => setShowCategories(value => !value)}
 					{...spotlight}
-					className='relative flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-violet-100/70 focus-visible:outline-2 focus-visible:outline-violet-500'
+					className='relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-500/15 focus-visible:outline-2 focus-visible:outline-violet-500'
 				>
 					<SpotlightLayer size={70} />
 					<ChevronRight
 						size={15}
-						className={showCategories ? 'rotate-90' : ''}
+						className={`text-slate-400 transition-transform ${showCategories ? 'rotate-90' : ''}`}
 						aria-hidden='true'
 					/>
 					Move to category
 				</button>
 			)}
 			{!isHidden && showCategories && (
-				<div className='max-h-56 overflow-y-auto overscroll-contain border-y border-slate-200 py-1'>
+				<div className='my-1 flex max-h-56 flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-lg bg-slate-500/8 p-1'>
 					{categoryOrder.map(category => (
 						<button
 							key={category}
@@ -158,7 +158,7 @@ export function AppActionsMenu({
 								onClose()
 							}}
 							{...spotlight}
-							className={`relative flex w-full items-center rounded-lg px-3 py-1.5 text-sm hover:bg-violet-100/70 focus-visible:outline-2 focus-visible:outline-violet-500 ${category === app.category ? 'font-medium text-violet-700' : 'text-slate-600'}`}
+							className={`relative flex w-full items-center rounded-lg px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-violet-500 ${category === app.category ? 'bg-violet-500/18 font-medium text-violet-300' : 'text-slate-600 hover:bg-slate-500/15'}`}
 						>
 							<SpotlightLayer size={60} />
 							{categoryLabel(categories, category)}
@@ -174,10 +174,10 @@ export function AppActionsMenu({
 					onClose()
 				}}
 				{...spotlight}
-				className='relative flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-violet-100/70 focus-visible:outline-2 focus-visible:outline-violet-500'
+				className='relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-500/15 focus-visible:outline-2 focus-visible:outline-violet-500'
 			>
 				<SpotlightLayer size={70} />
-				<Info size={15} aria-hidden='true' />
+				<Info size={15} className='text-slate-400' aria-hidden='true' />
 				App info
 			</button>
 			<button
@@ -189,16 +189,19 @@ export function AppActionsMenu({
 					onClose()
 				}}
 				{...spotlight}
-				className='relative flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-violet-100/70 focus-visible:outline-2 focus-visible:outline-violet-500'
+				className='relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-500/15 focus-visible:outline-2 focus-visible:outline-violet-500'
 			>
 				<SpotlightLayer size={70} />
 				{isHidden ? (
-					<RotateCcw size={15} aria-hidden='true' />
+					<RotateCcw size={15} className='text-slate-400' aria-hidden='true' />
 				) : (
-					<EyeOff size={15} aria-hidden='true' />
+					<EyeOff size={15} className='text-slate-400' aria-hidden='true' />
 				)}
 				{isHidden ? 'Restore to catalog' : 'Hide from catalog'}
 			</button>
+			{!isHidden && (
+				<div className='mx-1 my-1 border-t border-slate-200/55' />
+			)}
 			{!isHidden && app.canUninstall && (
 				<button
 					type='button'
@@ -207,7 +210,7 @@ export function AppActionsMenu({
 						onUninstall(app)
 						onClose()
 					}}
-					className='flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-700 hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-red-500'
+					className='flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-rose-300 hover:bg-rose-400/15 hover:text-rose-200 focus-visible:outline-2 focus-visible:outline-rose-300/70'
 				>
 					<Trash2 size={15} aria-hidden='true' />
 					Uninstall
@@ -218,7 +221,7 @@ export function AppActionsMenu({
 					type='button'
 					role='menuitem'
 					disabled
-					className='flex w-full cursor-not-allowed items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-500'
+					className='flex w-full cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-slate-500'
 				>
 					<Trash2 size={15} aria-hidden='true' />
 					Uninstall unavailable

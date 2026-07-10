@@ -5,6 +5,7 @@ import type { ScanProgress } from '../../types'
 import { SpotlightLayer } from './SpotlightLayer'
 interface Props {
 	appCount: number
+	visibleCount: number
 	query: string
 	isRefreshing: boolean
 	scanProgress: ScanProgress | null
@@ -19,6 +20,7 @@ interface Props {
 }
 export function Header({
 	appCount,
+	visibleCount,
 	query,
 	isRefreshing,
 	scanProgress,
@@ -35,6 +37,11 @@ export function Header({
 	const searchRef = searchInputRef ?? fallbackRef
 	const searchSpotlight = useSpotlight()
 	const scanSpotlight = useSpotlight()
+	const trimmedQuery = query.trim()
+	const countLabel =
+		trimmedQuery.length > 0
+			? `${visibleCount} ${visibleCount === 1 ? 'match' : 'matches'}`
+			: `${appCount} ${appCount === 1 ? 'app' : 'apps'}`
 	return (
 		<header className='app-header-glass sticky top-0 z-300 border-b border-slate-300/65 shadow-[0_10px_30px_rgba(74,82,105,0.08)]'>
 			<div className='mx-auto flex w-full max-w-375 flex-col gap-4 px-5 pt-4.75 pb-4.75 sm:px-8 md:flex-row md:items-center'>
@@ -66,7 +73,7 @@ export function Header({
 								Windows Apps
 							</span>
 							<span className='block text-xs text-slate-500'>
-								{appCount} {appCount === 1 ? 'app' : 'apps'}
+								{countLabel}
 							</span>
 						</span>
 					</button>
@@ -75,7 +82,8 @@ export function Header({
 					<div className='w-full max-w-2xl'>
 						{/* Outside <label> so it doesn't pollute the input's computed accessible name */}
 						<span id='search-hint' className='sr-only'>
-							Searches app name, publisher, and description
+							Searches app name, publisher, description, and install
+							path
 						</span>
 						<label
 							className='group relative flex w-full items-center rounded-xl'
@@ -97,7 +105,7 @@ export function Header({
 								}
 								placeholder='Search apps…'
 								aria-describedby='search-hint'
-								className='h-11 w-full rounded-xl border border-white/90 bg-slate-100/75 pl-11 pr-11 text-sm text-slate-800 shadow-[inset_2px_2px_5px_rgba(100,112,138,.12),inset_-2px_-2px_5px_rgba(255,255,255,.9)] outline-none placeholder:text-slate-500 focus:border-violet-400/55 focus:ring-3 focus:ring-violet-500/10'
+								className='search-input h-11 w-full rounded-xl border border-white/90 bg-slate-100/75 pl-11 pr-11 text-sm text-slate-800 outline-none placeholder:text-slate-500'
 							/>
 							{query.length > 0 && (
 								<button

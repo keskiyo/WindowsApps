@@ -94,9 +94,9 @@ pub struct AppInfo {
     pub can_uninstall: bool,
     #[serde(default)]
     pub uninstall: Option<UninstallTarget>,
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resolved_path: Option<String>,
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shortcut_icon_path: Option<String>,
 }
 
@@ -298,13 +298,25 @@ fn registry_metadata_matches(app: &AppInfo, record: &registry::RegistryMetadata)
     }
 }
 
+fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
+    apps.into_iter()
+        .filter(|app| !is_maintenance_entry(&app.name, &app.path, app.resolved_path.as_deref()))
+        .collect()
+}
+
 pub fn sanitize(apps: Vec<AppInfo>) -> Vec<AppInfo> {
-    dedup::deduplicate(
-        apps.into_iter()
-            .filter(|app| !is_maintenance_entry(&app.name, &app.path, app.resolved_path.as_deref()))
-            .collect(),
-        classify,
-    )
+    dedup::deduplicate(filter_maintenance(apps), classify)
+}
+
+/// Like `sanitize`, but also refreshes the dev-only dedup report. Call this from the full
+/// catalog assembly (merge_sources) so the report reflects every app — never a partial
+/// sub-list — and is overwritten once per scan (no accumulation).
+pub fn sanitize_reported(apps: Vec<AppInfo>) -> Vec<AppInfo> {
+    let filtered = filter_maintenance(apps);
+    if dedup::dev_report_enabled() {
+        dedup::write_dev_report(&filtered);
+    }
+    dedup::deduplicate(filtered, classify)
 }
 
 fn is_known_standalone_portable(stem: &str) -> bool {
@@ -790,7 +802,17 @@ fn is_maintenance_entry(name: &str, path: &str, resolved_path: Option<&str>) -> 
 }
 
 fn is_maintenance_path(path: &str) -> bool {
+    if is_runtime_internal_path(path) {
+        return true;
+    }
     let path_buf = Path::new(path);
+    if path_buf
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .is_some_and(is_helper_executable_stem)
+    {
+        return true;
+    }
     if path_buf.extension().is_some_and(|extension| {
         [
             "ico", "dll", "mui", "cpl", "chm", "pdf", "html", "htm", "txt", "rtf", "md", "url",
@@ -808,6 +830,26 @@ fn is_maintenance_path(path: &str) -> bool {
         return true;
     }
     is_maintenance_text(path)
+}
+
+fn is_helper_executable_stem(stem: &str) -> bool {
+    let normalized = stem.to_lowercase();
+    matches!(
+        normalized.as_str(),
+        "git-lfs" | "git-credential-manager" | "gettext" | "printf_gettext"
+            | "printf_ngettext" | "envsubst" | "msgfmt"
+    )
+}
+
+fn is_runtime_internal_path(path: &str) -> bool {
+    let normalized = path.replace('/', r"\").to_lowercase();
+    [
+        r"\.cache\codex-runtimes\",
+        r"\.codex\.sandbox-bin\",
+        r"\appdata\local\openai\codex\runtimes\",
+    ]
+    .iter()
+    .any(|marker| normalized.contains(marker))
 }
 
 /// Junk-detection for installer/updater executables by file name (stem, no extension).
@@ -1394,6 +1436,42 @@ mod tests {
         assert_eq!(
             apps.iter().map(|app| app.name.as_str()).collect::<Vec<_>>(),
             vec!["Visual Studio Code"],
+        );
+    }
+
+    #[test]
+    fn sanitizes_runtime_internal_portable_entries() {
+        let apps = sanitize(vec![
+            app(
+                "codex-windows-sandbox",
+                r"C:\Users\Maks\.codex\.sandbox-bin\codex-command-runner.exe",
+            ),
+            app(
+                "Git Large File Storage (LFS)",
+                r"C:\Users\Maks\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\git\mingw64\libexec\git-core\git-lfs.exe",
+            ),
+            app(
+                "git-credential-manager",
+                r"D:\Tools\Git\mingw64\bin\git-credential-manager.exe",
+            ),
+            app(
+                "GNU gettext utilities",
+                r"D:\Tools\Git\mingw64\bin\printf_gettext.exe",
+            ),
+            app(
+                "GNU gettext utilities",
+                r"D:\Tools\Git\mingw64\bin\gettext.exe",
+            ),
+            app(
+                "GNU gettext utilities",
+                r"D:\Tools\Git\mingw64\bin\printf_ngettext.exe",
+            ),
+            app("Claude Code", r"C:\Users\Maks\.local\bin\claude.exe"),
+        ]);
+
+        assert_eq!(
+            apps.iter().map(|app| app.name.as_str()).collect::<Vec<_>>(),
+            vec!["Claude Code"],
         );
     }
 

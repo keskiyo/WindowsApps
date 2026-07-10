@@ -72,6 +72,15 @@ export interface ScanProgress {
 	totalRoots: number
 }
 
+// Best-effort launch outcome from the backend: 'ready' when the launched process reached
+// its input-idle state, 'failed' when the shell/process reported an error. Absent for
+// launches where no process handle is available (Store/UWP, shell hand-off) — the UI's
+// ceiling timer covers those.
+export interface LaunchStatus {
+	id: string
+	state: 'ready' | 'failed'
+}
+
 export interface AppsClient {
 	getApps(): Promise<CatalogSnapshot>
 	refreshApps(): Promise<AppInfo[]>
@@ -93,5 +102,8 @@ export interface AppsClient {
 	): Promise<() => void>
 	onScanProgress(
 		handler: (progress: ScanProgress) => void,
+	): Promise<() => void>
+	onLaunchStatus?(
+		handler: (status: LaunchStatus) => void,
 	): Promise<() => void>
 }

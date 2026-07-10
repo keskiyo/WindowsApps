@@ -10,6 +10,7 @@ describe('Header', () => {
 		render(
 			<Header
 				appCount={12}
+				visibleCount={12}
 				query=''
 				isRefreshing
 				scanProgress={{
@@ -32,5 +33,28 @@ describe('Header', () => {
 		expect(screen.getByRole('banner')).toHaveClass('app-header-glass')
 		await userEvent.click(screen.getByRole('button', { name: 'Cancel scan' }))
 		expect(onCancelScan).toHaveBeenCalledOnce()
+	})
+
+	it('uses the graphite search border treatment', () => {
+		render(
+			<Header
+				appCount={12}
+				visibleCount={12}
+				query=''
+				isRefreshing={false}
+				scanProgress={null}
+				menuButtonRef={createRef()}
+				onOpenNavigation={vi.fn()}
+				onGoHome={vi.fn()}
+				onQueryChange={vi.fn()}
+				onRefresh={vi.fn().mockResolvedValue(undefined)}
+				onCancelScan={vi.fn().mockResolvedValue(undefined)}
+				showMenu={false}
+			/>,
+		)
+
+		expect(
+			screen.getByRole('textbox', { name: 'Search applications' }),
+		).toHaveClass('search-input')
 	})
 })

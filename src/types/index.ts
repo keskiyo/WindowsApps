@@ -8,6 +8,7 @@ export type {
 	CatalogChangeSummary,
 	CatalogDelta,
 	CatalogSnapshot,
+	LaunchStatus,
 	ScanProgress,
 	UninstallMechanism,
 	UninstallPreview,

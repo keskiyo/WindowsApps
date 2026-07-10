@@ -7,6 +7,10 @@ src-tauri/gen/
 *.log
 dev-launcher.log
 *.tsbuildinfo
+
+# Tauri updater signing keys — never commit the private key
+*.key
+*.key.pub
 .agents/
 .superpowers/
 docs/
@@ -15,3 +19,5 @@ AGENTS.md
 
 npm run tauri dev
 .sentry-native/
+
+.claude

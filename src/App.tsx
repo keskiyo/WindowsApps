@@ -16,12 +16,16 @@ import { AppDrawer } from './components/navigation/AppDrawer'
 import { AppSidebar } from './components/navigation/AppSidebar'
 import { SettingsPage } from './components/settings/SettingsPage'
 import { CommandPalette } from './components/shared/CommandPalette'
+import { GlobalActivityBar } from './components/shared/GlobalActivityBar'
 import { Header } from './components/shared/Header'
 import { ScanPrompt } from './components/shared/ScanPrompt'
 import { TitleBar } from './components/shared/TitleBar'
+import { UpdateBanner } from './components/shared/UpdateBanner'
+import { WorkspaceSummary } from './components/shared/WorkspaceSummary'
 import { useAppFeedback } from './hooks/useAppFeedback'
 import { useCatalogNavigation } from './hooks/useCatalogNavigation'
 import { useDesktopNavigation } from './hooks/useDesktopNavigation'
+import { useUpdater } from './hooks/useUpdater'
 import { catalogChangeMessage } from './lib/catalogChanges'
 import { tauriSystemClient } from './lib/system'
 import {
@@ -31,6 +35,7 @@ import {
 	selectCategorizedApps,
 	type AppState,
 } from './store/appStore'
+import { AppStoreProvider } from './store/storeContext'
 import type { AppInfo, SystemClient, UninstallPreview } from './types'
 
 interface AppProps {
@@ -150,10 +155,13 @@ export function App({
 
 	useEffect(() => {
 		let dispose: (() => void) | undefined
+		let cancelled = false
 		void state.initialize().then(value => {
-			dispose = value
+			if (cancelled) value()
+			else dispose = value
 		})
 		return () => {
+			cancelled = true
 			dispose?.()
 		}
 	}, [state.initialize])
@@ -232,26 +240,59 @@ export function App({
 			app.category,
 			(navigationCounts.get(app.category) ?? 0) + 1,
 		)
+	const filteredCategoryCount = new Set(filteredApps.map(app => app.category))
+		.size
+	const hasQuery = deferredQuery.trim().length > 0
+	const favoriteCount = visibleCategorizedApps.filter(app =>
+		state.favoriteAppIds.includes(app.id),
+	).length
+	const hiddenCount = state.hiddenAppIds.filter(id =>
+		state.apps.some(app => app.id === id),
+	).length
 	const navigationProps = {
 		categoryOrder: state.categoryOrder,
 		categories: state.categories,
 		counts: navigationCounts,
 		activeView: state.activeView,
-		favoriteCount: visibleCategorizedApps.filter(app =>
-			state.favoriteAppIds.includes(app.id),
-		).length,
-		hiddenCount: state.hiddenAppIds.filter(id =>
-			state.apps.some(app => app.id === id),
-		).length,
+		favoriteCount,
+		hiddenCount,
 		onSelectView: navigation.selectView,
 		onSelectCategory: navigation.selectCategory,
 		onReorderCategory: state.reorderCategory,
 		onCreateCategory: state.createCategory,
 	}
 
+	const launchingName =
+		state.launchingIds.length === 1
+			? state.apps.find(app => app.id === state.launchingIds[0])?.name
+			: undefined
+	const activityLabel =
+		state.launchingIds.length > 1
+			? `Launching ${state.launchingIds.length} apps…`
+			: launchingName
+				? `Launching ${launchingName}…`
+				: state.isRefreshing
+					? 'Scanning applications…'
+					: ''
+	const activityActive =
+		state.launchingIds.length > 0 || state.isRefreshing
+	const updater = useUpdater()
+
 	return (
-		<div className='app-shell theme-soft-surface flex h-screen flex-col overflow-hidden'>
+		<AppStoreProvider store={store}>
+		<div className='app-shell theme-graphite-surface flex h-screen flex-col overflow-hidden'>
 			<TitleBar />
+			{updater.update && (
+				<UpdateBanner
+					version={updater.update.version}
+					notes={updater.update.notes}
+					installing={updater.installing}
+					progress={updater.progress}
+					onInstall={() => void updater.install()}
+					onDismiss={updater.dismiss}
+				/>
+			)}
+			<GlobalActivityBar active={activityActive} label={activityLabel} />
 			<div className='flex min-h-0 flex-1 gap-2 px-2 pb-2'>
 				{desktopNavigation && <AppSidebar {...navigationProps} />}
 				<div
@@ -260,6 +301,7 @@ export function App({
 				>
 					<Header
 						appCount={state.apps.length}
+						visibleCount={filteredApps.length}
 						query={state.query}
 						isRefreshing={state.isRefreshing}
 						scanProgress={state.scanProgress}
@@ -289,27 +331,42 @@ export function App({
 								onScan={feedback.refresh}
 							/>
 						) : (
-							<AppGrid
-								apps={filteredApps}
-								isLoading={state.isLoading}
-								hasQuery={deferredQuery.trim().length > 0}
-								activeView={state.activeView}
-								categoryOrder={state.categoryOrder}
-								categories={state.categories}
-								collapsedCategories={state.collapsedCategories}
-								favoriteAppIds={state.favoriteAppIds}
-								onToggleCategory={state.toggleCategory}
-								onToggleFavorite={state.toggleFavorite}
-								onReorderCategory={state.reorderCategory}
-								onMoveApp={state.moveApp}
-								onLaunch={feedback.launch}
-								onInfo={setInfoApp}
-								onUninstall={setUninstallApp}
-								onHide={state.hideApp}
-								onRestore={state.restoreApp}
-								onRenameCategory={state.renameCategory}
-								onDeleteCategory={state.deleteCategory}
-							/>
+							<>
+								{!state.isLoading && (
+									<WorkspaceSummary
+										visibleCount={filteredApps.length}
+										activeCategoryCount={
+											filteredCategoryCount
+										}
+										favoriteCount={favoriteCount}
+										hiddenCount={hiddenCount}
+										hasQuery={hasQuery}
+									/>
+								)}
+								<AppGrid
+									apps={filteredApps}
+									isLoading={state.isLoading}
+									hasQuery={hasQuery}
+									activeView={state.activeView}
+									categoryOrder={state.categoryOrder}
+									categories={state.categories}
+									collapsedCategories={
+										state.collapsedCategories
+									}
+									favoriteAppIds={state.favoriteAppIds}
+									onToggleCategory={state.toggleCategory}
+									onToggleFavorite={state.toggleFavorite}
+									onReorderCategory={state.reorderCategory}
+									onMoveApp={state.moveApp}
+									onLaunch={feedback.launch}
+									onInfo={setInfoApp}
+									onUninstall={setUninstallApp}
+									onHide={state.hideApp}
+									onRestore={state.restoreApp}
+									onRenameCategory={state.renameCategory}
+									onDeleteCategory={state.deleteCategory}
+								/>
+							</>
 						)}
 					</main>
 				</div>
@@ -366,5 +423,6 @@ export function App({
 				closeButton
 			/>
 		</div>
+		</AppStoreProvider>
 	)
 }

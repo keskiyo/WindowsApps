@@ -3,10 +3,15 @@ use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 use windows::core::PCWSTR;
-use windows::Win32::UI::Shell::ShellExecuteW;
+use windows::Win32::UI::Shell::{
+    ShellExecuteExW, ShellExecuteW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW,
+};
 use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
-pub fn launch(kind: LaunchKind, target: &str) -> Result<(), String> {
+/// Launches an app and, when the shell hands back a process handle (regular exe/shortcut
+/// launches), returns its raw value so the caller can wait for the window to be ready.
+/// Store/UWP and shell hand-offs return `Ok(None)` — there is no handle to wait on.
+pub fn launch(kind: LaunchKind, target: &str) -> Result<Option<isize>, String> {
     if kind != LaunchKind::AppUserModelId && !Path::new(target).exists() {
         return Err(format!("File not found: {target}"));
     }
@@ -14,7 +19,32 @@ pub fn launch(kind: LaunchKind, target: &str) -> Result<(), String> {
         LaunchKind::AppUserModelId => apps_folder_target(target),
         LaunchKind::Executable | LaunchKind::Shortcut => target.to_string(),
     };
-    shell_execute(&shell_target)
+    shell_execute_with_handle(&shell_target)
+}
+
+fn shell_execute_with_handle(target: &str) -> Result<Option<isize>, String> {
+    let operation: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
+    let file: Vec<u16> = OsStr::new(target).encode_wide().chain(Some(0)).collect();
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+        fMask: SEE_MASK_NOCLOSEPROCESS,
+        lpVerb: PCWSTR(operation.as_ptr()),
+        lpFile: PCWSTR(file.as_ptr()),
+        nShow: SW_SHOWNORMAL.0,
+        ..Default::default()
+    };
+    unsafe { ShellExecuteExW(&mut info) }
+        .map_err(|_| {
+            format!(
+                "Windows Shell could not launch the application (code {})",
+                info.hInstApp.0 as isize
+            )
+        })?;
+    if info.hProcess.is_invalid() {
+        Ok(None)
+    } else {
+        Ok(Some(info.hProcess.0 as isize))
+    }
 }
 
 pub fn shell_execute(target: &str) -> Result<(), String> {

@@ -199,6 +199,7 @@ pub fn synchronize(
     let merged = merge_sources(previous.sources.clone(), updates);
     let mut apps = merged.apps;
     catalog::attach_registry_metadata(&mut apps, &registry_metadata);
+    apps = catalog::sanitize(apps);
     for app in &mut apps {
         app.icon_base64 = None;
     }
@@ -255,5 +256,25 @@ mod tests {
         assert_eq!(delta.summary.added, 1);
         assert_eq!(delta.summary.removed, 1);
         assert_eq!(delta.summary.updated, 1);
+    }
+
+    #[test]
+    fn post_metadata_sanitize_collapses_shortcut_registry_duplicates() {
+        let mut shortcut = app("firefox-shortcut", "Firefox");
+        shortcut.path = r"C:\Menu\Firefox.lnk".into();
+        shortcut.launch_kind = LaunchKind::Shortcut;
+        shortcut.source_kind = SourceKind::StartMenu;
+        shortcut.resolved_path = Some(r"C:\Program Files\Mozilla Firefox\firefox.exe".into());
+        shortcut.publisher = Some("Mozilla Foundation".into());
+        shortcut.install_location = Some(r"C:\Users\Maks\Desktop".into());
+        let mut registry = app("firefox-registry", "Mozilla Firefox (x64 ru)");
+        registry.path = r"C:\Program Files\Mozilla Firefox\firefox.exe".into();
+        registry.publisher = Some("Mozilla".into());
+        registry.install_location = Some(r"C:\Program Files\Mozilla Firefox".into());
+
+        let apps = catalog::sanitize(vec![shortcut, registry]);
+
+        assert_eq!(apps.len(), 1);
+        assert_eq!(apps[0].name, "Firefox");
     }
 }

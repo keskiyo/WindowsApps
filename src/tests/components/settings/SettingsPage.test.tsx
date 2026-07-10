@@ -70,6 +70,25 @@ describe('SettingsPage', () => {
 		expect(onResetCatalogCache).toHaveBeenCalledOnce()
 	})
 
+	it('uses dark-theme-safe settings surfaces and danger controls', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+				onResetCatalogCache={vi.fn().mockResolvedValue(undefined)}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+
+		expect(screen.getByText('Application discovery').closest('div')).toBeTruthy()
+		expect(
+			screen.getByRole('button', { name: 'Reset catalog cache' }),
+		).toHaveClass('danger-button')
+		expect(
+			screen.getByText('Catalog maintenance').closest('.settings-surface'),
+		).toBeInTheDocument()
+	})
+
 	it('loads system settings and toggles Windows startup', async () => {
 		const client: SystemClient = {
 			getSettings: vi
@@ -176,6 +195,7 @@ describe('SettingsPage', () => {
 		])
 		render(<SettingsPage client={client} />)
 		expect(await screen.findByText('Visual Studio Code')).toBeInTheDocument()
+		expect(screen.getByText('Succeeded')).toHaveClass('success-badge')
 
 		await userEvent.click(screen.getByRole('button', { name: 'Clear' }))
 		expect(client.clearUninstallHistory).not.toHaveBeenCalled()

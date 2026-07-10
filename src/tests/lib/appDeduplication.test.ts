@@ -73,4 +73,21 @@ describe('deduplicateVisibleApps', () => {
 		]
 		expect(deduplicateVisibleApps(apps)).toHaveLength(2)
 	})
+
+	it('does not infer duplicates from name families in the UI', () => {
+		const apps = [
+			app({
+				id: 'portable-a',
+				name: 'TablePlus',
+				path: 'D:\\Tools\\TablePlus\\TablePlus.exe',
+			}),
+			app({
+				id: 'portable-b',
+				name: 'TablePlus',
+				path: 'E:\\Tools\\TablePlus\\TablePlus.exe',
+			}),
+		]
+
+		expect(deduplicateVisibleApps(apps)).toHaveLength(2)
+	})
 })

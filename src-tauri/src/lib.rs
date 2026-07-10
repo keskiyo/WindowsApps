@@ -242,22 +242,32 @@ fn enqueue_hydration(
         if document.generation != generation {
             return;
         }
-        let patches = patches
-            .into_iter()
-            .map(|patch| (patch.id.clone(), patch))
-            .collect::<HashMap<_, _>>();
-        for target in &mut document.apps {
-            let Some(patch) = patches.get(&target.id) else {
-                continue;
-            };
-            target.description = patch.description.clone();
-            target.version = patch.version.clone();
-            target.publisher = patch.publisher.clone();
-            target.install_location = patch.install_location.clone();
-            target.can_uninstall = patch.can_uninstall.unwrap_or(target.can_uninstall);
-        }
+        apply_hydration_patches_to_document(&mut document, patches);
         let _ = cache::write_document(&app_data_dir, &document);
     });
+}
+
+fn apply_hydration_patches_to_document(
+    document: &mut CatalogCache,
+    patches: Vec<catalog::hydration::AppHydrationPatch>,
+) {
+    let patches = patches
+        .into_iter()
+        .map(|patch| (patch.id.clone(), patch))
+        .collect::<HashMap<_, _>>();
+    for target in &mut document.apps {
+        let Some(patch) = patches.get(&target.id) else {
+            continue;
+        };
+        target.description = patch.description.clone();
+        target.version = patch.version.clone();
+        target.publisher = patch.publisher.clone();
+        target.install_location = patch.install_location.clone();
+        target.can_uninstall = patch.can_uninstall.unwrap_or(target.can_uninstall);
+        if patch.icon_base64.is_some() {
+            target.icon_base64 = patch.icon_base64.clone();
+        }
+    }
 }
 
 fn load_sanitized_document(app_data_dir: &Path) -> Option<CatalogCache> {
@@ -575,17 +585,47 @@ fn start_background_sync(app: tauri::AppHandle) {
     });
 }
 
+#[derive(Clone, Serialize)]
+struct LaunchStatusPayload {
+    id: String,
+    state: &'static str,
+}
+
+/// Best-effort readiness: blocks until the launched GUI process finishes its startup and is
+/// waiting for input (or the timeout/no-message-queue case returns). Always resolves to
+/// "ready" so the UI clears its launching state as soon as any signal arrives; genuine
+/// launch failures surface earlier via the `launch_app` error path.
+fn wait_for_launch_ready(raw_handle: isize) -> &'static str {
+    use windows::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows::Win32::System::Threading::WaitForInputIdle;
+    let handle = HANDLE(raw_handle as *mut core::ffi::c_void);
+    unsafe {
+        WaitForInputIdle(handle, 12000);
+        let _ = CloseHandle(handle);
+    }
+    "ready"
+}
+
 #[tauri::command]
-async fn launch_app(id: String) -> Result<(), String> {
+async fn launch_app(app: tauri::AppHandle, id: String) -> Result<(), String> {
     let (launch_kind, path) = launch_targets()
         .lock()
         .map_err(|_| "Launch data is temporarily unavailable".to_string())?
         .get(&id)
         .cloned()
         .ok_or_else(|| "Application is not available for launch".to_string())?;
-    tauri::async_runtime::spawn_blocking(move || launcher::launch(launch_kind, &path))
+    let handle = tauri::async_runtime::spawn_blocking(move || launcher::launch(launch_kind, &path))
         .await
-        .map_err(|error| format!("Application launch was interrupted: {error}"))?
+        .map_err(|error| format!("Application launch was interrupted: {error}"))??;
+    if let Some(raw_handle) = handle {
+        let emitter = app.clone();
+        let launch_id = id.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let state = wait_for_launch_ready(raw_handle);
+            let _ = emitter.emit("launch://status", LaunchStatusPayload { id: launch_id, state });
+        });
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -642,7 +682,6 @@ async fn uninstall_app(app: tauri::AppHandle, id: String) -> Result<(), String> 
     Ok(())
 }
 
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let lifecycle = Arc::new(lifecycle::LifecycleState::default());
@@ -651,9 +690,12 @@ pub fn run() {
     let mut builder = tauri::Builder::default();
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            lifecycle::show_main_window(app);
-        }));
+        builder = builder
+            .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+                lifecycle::show_main_window(app);
+            }))
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_process::init());
     }
     builder
         .plugin(tauri_plugin_dialog::init())
@@ -787,6 +829,54 @@ mod tests {
         .unwrap();
         let apps = load_sanitized_cache(dir.path()).unwrap();
         assert!(!apps[0].can_uninstall);
+    }
+
+    #[test]
+    fn hydration_patches_persist_icons_without_erasing_existing_icons() {
+        let mut first = cached_app("Code", r"C:\Code.exe");
+        first.id = "code".into();
+        let mut second = cached_app("Claude", r"C:\Claude.exe");
+        second.id = "claude".into();
+        second.icon_base64 = Some("data:image/png;base64,old".into());
+        let mut document = CatalogCache {
+            apps: vec![first, second],
+            ..CatalogCache::default()
+        };
+
+        apply_hydration_patches_to_document(
+            &mut document,
+            vec![
+                catalog::hydration::AppHydrationPatch {
+                    id: "code".into(),
+                    generation: 1,
+                    icon_base64: Some("data:image/png;base64,new".into()),
+                    description: None,
+                    version: None,
+                    publisher: None,
+                    install_location: None,
+                    can_uninstall: None,
+                },
+                catalog::hydration::AppHydrationPatch {
+                    id: "claude".into(),
+                    generation: 1,
+                    icon_base64: None,
+                    description: None,
+                    version: None,
+                    publisher: None,
+                    install_location: None,
+                    can_uninstall: None,
+                },
+            ],
+        );
+
+        assert_eq!(
+            document.apps[0].icon_base64.as_deref(),
+            Some("data:image/png;base64,new")
+        );
+        assert_eq!(
+            document.apps[1].icon_base64.as_deref(),
+            Some("data:image/png;base64,old")
+        );
     }
 
     #[test]

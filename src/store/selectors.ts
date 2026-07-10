@@ -18,13 +18,24 @@ export function filterVisibleApps(
 }
 
 export function filterAppsByQuery(apps: AppInfo[], query: string): AppInfo[] {
-	const normalized = query.trim().toLocaleLowerCase()
-	if (!normalized) return apps
-	return apps.filter(app =>
-		[app.name, app.publisher, app.description].some(value =>
-			value?.toLocaleLowerCase().includes(normalized),
-		),
-	)
+	// Split into whitespace tokens so "world warcraft" matches "World of Warcraft" and
+	// each fragment can hit a different field. Match across every searchable field
+	// (name, publisher, description, install path, location) so nothing is missed.
+	const tokens = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean)
+	if (tokens.length === 0) return apps
+	return apps.filter(app => {
+		const haystack = [
+			app.name,
+			app.publisher,
+			app.description,
+			app.path,
+			app.installLocation,
+		]
+			.filter(Boolean)
+			.join(' ')
+			.toLocaleLowerCase()
+		return tokens.every(token => haystack.includes(token))
+	})
 }
 
 export function selectCategorizedApps(state: AppState): AppInfo[] {
