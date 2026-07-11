@@ -1,7 +1,7 @@
 {
 	"$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
 	"productName": "Windows Apps",
-	"version": "0.2.2",
+  "version": "0.2.3",
 	"identifier": "dev.neiroslop.windowsapps",
 	"build": {
 		"frontendDist": "../dist",
@@ -37,7 +37,7 @@
 	},
 	"bundle": {
 		"active": true,
-		"targets": "all",
+		"targets": ["nsis"],
 		"createUpdaterArtifacts": true,
 		"windows": {
 			"webviewInstallMode": {

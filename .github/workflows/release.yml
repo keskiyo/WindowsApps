@@ -44,10 +44,8 @@ jobs:
             - name: Run Rust tests
               run: cargo test --manifest-path src-tauri/Cargo.toml
 
-            # tauri-action builds the app, signs the update artifacts with the private key,
-            # generates latest.json (the updater manifest), creates the GitHub Release for the
-            # tag, and uploads the installer + latest.json + .sig as release assets.
-            - name: Build, sign & publish release
+            # Keep the release in draft until latest.json is normalized and verified.
+            - name: Build, sign & create draft release
               uses: tauri-apps/tauri-action@v0
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -61,9 +59,31 @@ jobs:
 
                       ## Highlights
 
-                      - Update dialog shows concise release highlights and remembers a dismissed version.
-                      - Duplicate handling and icon fallback were improved for shortcuts and Steam games.
-                      - Cached startup, incremental scanning, and background icon loading reduce repeated work.
-                      - Graphite UI, violet states, navigation motion, and stacked notifications were polished.
-                  releaseDraft: false
+                      - Better updates - see release date, package size, full notes, and clear Downloading, Verifying, Installing, and Restarting stages.
+                      - Reliable delivery - NSIS-only manifests are validated before a draft release becomes public.
+                      - Healthier catalog - scan diagnostics, missing-icon repair, and icon-only cache cleanup are available in Settings.
+                      - Safer cleanup - duplicate detection uses application identities and install evidence across every source.
+                  releaseDraft: true
                   prerelease: false
+
+            - name: Download draft release assets
+              shell: pwsh
+              run: gh release download "${{ github.ref_name }}" --dir release-assets
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Prepare updater manifest
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/prepare-release-manifest.ps1 -AssetsDir release-assets -Tag "${{ github.ref_name }}"
+
+            - name: Verify release assets
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/verify-release-assets.ps1 -AssetsDir release-assets -Tag "${{ github.ref_name }}"
+
+            - name: Replace manifest and publish release
+              shell: pwsh
+              run: |
+                  gh release upload "${{ github.ref_name }}" release-assets/latest.json --clobber
+                  gh release edit "${{ github.ref_name }}" --draft=false
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

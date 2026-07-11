@@ -262,6 +262,14 @@ fn should_merge(existing: &ResolvedApp, candidate: &AppCandidate) -> bool {
     let Some((evidence, score)) = best else {
         return false;
     };
+    if score < 75
+        && existing
+            .candidates
+            .iter()
+            .any(|left| conflicting_install_roots(left, candidate))
+    {
+        return false;
+    }
     if score >= 80 {
         return true;
     }
@@ -274,6 +282,19 @@ fn should_merge(existing: &ResolvedApp, candidate: &AppCandidate) -> bool {
             || item.reason == EvidenceReason::SameSteamAppId
             || item.reason == EvidenceReason::SameAumid
     })
+}
+
+fn conflicting_install_roots(left: &AppCandidate, right: &AppCandidate) -> bool {
+    matches!(
+        (
+            left.identity.install_root.as_ref(),
+            right.identity.install_root.as_ref()
+        ),
+        (Some(left), Some(right))
+            if left != right
+                && !left.starts_with(&format!("{right}\\"))
+                && !right.starts_with(&format!("{left}\\"))
+    )
 }
 
 fn merge_resolved(
@@ -979,5 +1000,36 @@ mod tests {
 
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].name, "World of Warcraft");
+    }
+
+    #[test]
+    fn command_line_app_shortcut_and_executable_merge_by_resolved_target() {
+        let mut shortcut = app(
+            "Claude Code",
+            r"C:\Users\User\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Claude Code.lnk",
+        );
+        shortcut.launch_kind = LaunchKind::Shortcut;
+        shortcut.source_kind = SourceKind::StartMenu;
+        shortcut.resolved_path = Some(r"C:\Users\User\.local\bin\claude.exe".into());
+        let mut executable = app("Claude Code", r"C:\Users\User\.local\bin\claude.exe");
+        executable.source_kind = SourceKind::Portable;
+
+        let merged = resolve(vec![shortcut, executable]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].id, r"target:c:\users\user\.local\bin\claude.exe");
+    }
+
+    #[test]
+    fn equal_product_names_in_independent_install_roots_stay_separate() {
+        let mut installed = app("Agent", r"C:\Program Files\Agent\agent.exe");
+        installed.publisher = Some("Example".into());
+        installed.install_location = Some(r"C:\Program Files\Agent".into());
+        let mut portable = app("Agent", r"D:\Portable\Agent\agent.exe");
+        portable.source_kind = SourceKind::Portable;
+        portable.publisher = Some("Example".into());
+        portable.install_location = Some(r"D:\Portable\Agent".into());
+
+        assert_eq!(resolve(vec![installed, portable]).len(), 2);
     }
 }

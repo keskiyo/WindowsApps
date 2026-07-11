@@ -1,13 +1,52 @@
-import { Download, Sparkles, X } from 'lucide-react'
+import {
+	AlertTriangle,
+	Download,
+	ExternalLink,
+	LoaderCircle,
+	RefreshCw,
+	Sparkles,
+	X,
+} from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import type { UpdateInstallPhase } from '../../hooks/useUpdater'
 
 interface Props {
 	version: string
+	date: string | null
+	packageSize: number | null
+	releaseUrl: string | null
 	notes: string | null
 	installing: boolean
 	progress: number | null
+	downloadedBytes: number
+	totalBytes: number | null
+	phase: UpdateInstallPhase
+	error: string | null
 	onInstall(): void
 	onDismiss(): void
+	onOpenRelease(): void
+}
+
+const UPDATE_STEPS: Exclude<UpdateInstallPhase, 'idle' | 'failed'>[] = [
+	'downloading',
+	'verifying',
+	'installing',
+	'restarting',
+]
+
+function formatBytes(bytes: number): string {
+	return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function formatReleaseDate(value: string): string | null {
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return null
+	return new Intl.DateTimeFormat('en-GB', {
+		day: '2-digit',
+		month: 'short',
+		year: 'numeric',
+		timeZone: 'UTC',
+	}).format(date)
 }
 
 function cleanMarkdownLine(value: string): string {
@@ -54,18 +93,40 @@ export function releaseHighlights(notes: string | null): string[] {
 
 export function UpdateDialog({
 	version,
+	date,
+	packageSize,
+	releaseUrl,
 	notes,
 	installing,
 	progress,
+	downloadedBytes,
+	totalBytes,
+	phase,
+	error,
 	onInstall,
 	onDismiss,
+	onOpenRelease,
 }: Props) {
 	const highlights = releaseHighlights(notes)
+	const releaseDate = date ? formatReleaseDate(date) : null
+	const effectiveTotal = totalBytes ?? packageSize
+	const activeStep = UPDATE_STEPS.indexOf(
+		phase as Exclude<UpdateInstallPhase, 'idle' | 'failed'>,
+	)
 	const dialogRef = useRef<HTMLElement>(null)
 	const closeButtonRef = useRef<HTMLButtonElement>(null)
-	const installLabel = installing
-		? `Installing... ${progress ?? 0}%`
-		: 'Update & restart'
+	const installLabel =
+		phase === 'failed'
+			? 'Retry update'
+			: phase === 'downloading'
+				? `Downloading... ${progress ?? 0}%`
+				: phase === 'verifying'
+					? 'Verifying...'
+				: phase === 'installing'
+					? 'Installing...'
+					: phase === 'restarting'
+						? 'Restarting...'
+					: 'Update & restart'
 
 	useEffect(() => {
 		const previousFocus = document.activeElement
@@ -115,7 +176,7 @@ export function UpdateDialog({
 				aria-modal='true'
 				aria-labelledby='update-dialog-title'
 				aria-describedby='update-dialog-description'
-				className='update-modal-panel relative flex max-h-[calc(100vh-3rem)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-violet-300/35 bg-[#363940] text-slate-100 shadow-[0_24px_70px_rgba(0,0,0,0.45),0_0_38px_rgba(167,139,250,0.18)]'
+				className='update-modal-panel relative flex min-h-[31rem] max-h-[calc(100vh-3rem)] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-violet-300/35 bg-[#363940] text-slate-100 shadow-[0_24px_70px_rgba(0,0,0,0.45),0_0_38px_rgba(167,139,250,0.18)]'
 			>
 				<div className='flex items-start gap-4 border-b border-white/10 px-6 py-5'>
 					<div className='grid size-11 shrink-0 place-items-center rounded-xl border border-violet-300/25 bg-violet-500/18 text-violet-200'>
@@ -133,6 +194,13 @@ export function UpdateDialog({
 							Review the release highlights before installing.
 						</span>
 						</p>
+						{(releaseDate || packageSize) && (
+							<div className='mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400'>
+								{releaseDate && <span>{releaseDate}</span>}
+								{releaseDate && packageSize && <span aria-hidden='true'>•</span>}
+								{packageSize && <span>{formatBytes(packageSize)}</span>}
+							</div>
+						)}
 					</div>
 					<button
 						ref={closeButtonRef}
@@ -169,14 +237,60 @@ export function UpdateDialog({
 						</p>
 					)}
 
+					{releaseUrl && (
+						<a
+							href={releaseUrl}
+							onClick={event => {
+								event.preventDefault()
+								onOpenRelease()
+							}}
+							className='mt-4 inline-flex items-center gap-2 text-sm font-medium text-violet-200 hover:text-violet-100 focus-visible:outline-2 focus-visible:outline-violet-300'
+						>
+							View full release notes
+							<ExternalLink size={14} aria-hidden='true' />
+						</a>
+					)}
+
 					{installing && (
-						<div className='mt-5' aria-label='Update progress'>
+						<div className='mt-5' aria-label='Update progress' aria-live='polite'>
+							<div className='mb-3 flex items-center justify-between gap-2 text-[11px] font-medium'>
+								{UPDATE_STEPS.map((step, index) => (
+									<span
+										key={step}
+										className={
+											index <= activeStep ? 'text-violet-200' : 'text-slate-500'
+										}
+									>
+										{step[0].toUpperCase() + step.slice(1)}
+									</span>
+								))}
+							</div>
 							<div className='h-2 overflow-hidden rounded-full bg-slate-900/50'>
 								<div
 									className='h-full rounded-full bg-violet-400 transition-[width]'
 									style={{ width: `${progress ?? 0}%` }}
 								/>
 							</div>
+							{phase === 'downloading' && effectiveTotal && (
+								<div className='mt-2 flex justify-between text-xs text-slate-300'>
+									<span
+										aria-label={`${formatBytes(downloadedBytes)} of ${formatBytes(effectiveTotal)}`}
+									>
+										{formatBytes(downloadedBytes)} of {formatBytes(effectiveTotal)}
+									</span>
+									<span>{progress ?? 0}%</span>
+								</div>
+							)}
+						</div>
+					)}
+
+					{phase === 'failed' && error && (
+						<div
+							role='alert'
+							className='mt-5 flex gap-3 rounded-xl border border-rose-300/30 bg-rose-500/10 px-4 py-3 text-sm leading-6 text-rose-100'
+						>
+							<AlertTriangle className='mt-0.5 size-4 shrink-0' aria-hidden='true' />
+							<span>{error}</span>
 						</div>
 					)}
 				</div>
@@ -196,7 +310,13 @@ export function UpdateDialog({
 						disabled={installing}
 						className='inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white shadow-lg shadow-violet-950/20 hover:bg-violet-500 focus-visible:outline-2 focus-visible:outline-violet-300 disabled:opacity-70'
 					>
-						<Download size={16} aria-hidden='true' />
+						{phase === 'failed' ? (
+							<RefreshCw size={16} aria-hidden='true' />
+						) : installing ? (
+							<LoaderCircle className='animate-spin' size={16} aria-hidden='true' />
+						) : (
+							<Download size={16} aria-hidden='true' />
+						)}
 						{installLabel}
 					</button>
 				</div>

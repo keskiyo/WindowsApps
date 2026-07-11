@@ -1,4 +1,4 @@
-use crate::catalog::cache::CatalogCache;
+use crate::catalog::cache::{CatalogCache, CatalogDiagnostics};
 use crate::catalog::incremental::{scan_root, FilesystemIndex, ScanMode};
 use crate::catalog::scan_settings::ScanSettings;
 use crate::catalog::source::{merge_sources, SourceKey, SourceSnapshot};
@@ -6,7 +6,7 @@ use crate::catalog::{self, AppInfo, ScanProgress};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum SyncRequest {
@@ -19,6 +19,15 @@ pub enum SyncRequest {
 impl SyncRequest {
     pub fn is_interactive(self) -> bool {
         matches!(self, Self::Refresh | Self::Force)
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Watch => "watch",
+            Self::Startup => "startup",
+            Self::Refresh => "refresh",
+            Self::Force => "force",
+        }
     }
 }
 
@@ -84,6 +93,7 @@ pub fn synchronize(
     progress: impl Fn(ScanProgress),
     is_cancelled: impl Fn() -> bool + Sync,
 ) -> CatalogCache {
+    let started_at = Instant::now();
     progress(ScanProgress {
         stage: "Windows applications".into(),
         location: None,
@@ -203,16 +213,39 @@ pub fn synchronize(
     for app in &mut apps {
         app.icon_base64 = None;
     }
+    let completed_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .map_or(0, |duration| duration.as_secs());
+    let delta = compute_delta(previous.generation.saturating_add(1), &previous.apps, &apps);
+    let mut source_counts = std::collections::BTreeMap::new();
+    for app in &apps {
+        *source_counts
+            .entry(format!("{:?}", app.source_kind).to_lowercase())
+            .or_insert(0) += 1;
+    }
+    let diagnostics = CatalogDiagnostics {
+        completed_at,
+        duration_ms: started_at
+            .elapsed()
+            .as_millis()
+            .try_into()
+            .unwrap_or(u64::MAX),
+        mode: request.label().into(),
+        total_apps: apps.len(),
+        source_counts,
+        added: delta.summary.added,
+        removed: delta.summary.removed,
+        updated: delta.summary.updated,
+    };
     CatalogCache {
         schema_version: crate::catalog::cache::CACHE_SCHEMA_VERSION,
         generation: previous.generation.saturating_add(1),
         apps,
         sources: merged.sources,
         filesystem_index,
-        last_successful_sync: SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .ok()
-            .map(|duration| duration.as_secs()),
+        last_successful_sync: Some(completed_at),
+        diagnostics: Some(diagnostics),
     }
 }
 

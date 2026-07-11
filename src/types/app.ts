@@ -31,6 +31,18 @@ export interface CatalogSnapshot {
 	apps: AppInfo[]
 	hasCache: boolean
 	generation?: number
+	diagnostics?: CatalogDiagnostics | null
+}
+
+export interface CatalogDiagnostics {
+	completedAt: number
+	durationMs: number
+	mode: 'watch' | 'startup' | 'refresh' | 'force'
+	totalApps: number
+	sourceCounts: Record<string, number>
+	added: number
+	removed: number
+	updated: number
 }
 
 export interface UninstallPreview {
@@ -86,6 +98,7 @@ export interface AppsClient {
 	refreshApps(): Promise<AppInfo[]>
 	forceFullScan?(): Promise<AppInfo[]>
 	resetCatalogCache?(): Promise<AppInfo[]>
+	clearIconCache?(): Promise<void>
 	hydrateVisibleIcons?(ids: string[]): Promise<void>
 	startBackgroundSync?(): Promise<void>
 	cancelScan(): Promise<void>

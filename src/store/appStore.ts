@@ -9,6 +9,7 @@ import type {
 	AppView,
 	CatalogChangeSummary,
 	CatalogDelta,
+	CatalogDiagnostics,
 	CategoryDefinition,
 	ScanProgress,
 	UninstallPreview,
@@ -23,6 +24,7 @@ export interface AppState {
 	hasCache: boolean
 	catalogGeneration: number
 	catalogChange: CatalogChangeSummary | null
+	catalogDiagnostics: CatalogDiagnostics | null
 	error: string | null
 	activeView: AppView
 	favoriteAppIds: string[]
@@ -47,6 +49,8 @@ export interface AppState {
 	refresh(): Promise<void>
 	forceFullScan(): Promise<void>
 	resetCatalogCache(): Promise<void>
+	clearIconCache(): Promise<void>
+	repairMissingIcons(): Promise<void>
 	hydrateVisibleIcons(ids: string[]): Promise<void>
 	cancelScan(): Promise<void>
 	launch(app: AppInfo): Promise<void>
@@ -126,6 +130,7 @@ export function createAppStore(
 			hasCache: false,
 			catalogGeneration: 0,
 			catalogChange: null,
+			catalogDiagnostics: null,
 			error: null,
 			activeView: 'all',
 			favoriteAppIds: preferences.favoriteAppIds,
@@ -166,6 +171,7 @@ export function createAppStore(
 						apps: snapshot.apps,
 						hasCache: snapshot.hasCache,
 						catalogGeneration: snapshot.generation ?? 0,
+						catalogDiagnostics: snapshot.diagnostics ?? null,
 					})
 				} catch (error) {
 					set({ error: errorMessage(error) })
@@ -266,6 +272,18 @@ export function createAppStore(
 					// Icon hydration is an optimization path; the normal background
 					// hydrator still runs and app launching must not be affected.
 				}
+			},
+			async clearIconCache() {
+				if (!client.clearIconCache) return
+				await client.clearIconCache()
+				await client.hydrateVisibleIcons?.(get().apps.map(app => app.id))
+			},
+			async repairMissingIcons() {
+				await client.hydrateVisibleIcons?.(
+					get()
+						.apps.filter(app => !app.iconBase64)
+						.map(app => app.id),
+				)
 			},
 			async cancelScan() {
 				await client.cancelScan()

@@ -294,6 +294,7 @@ struct CatalogSnapshot {
     apps: Vec<AppInfo>,
     has_cache: bool,
     generation: u64,
+    diagnostics: Option<cache::CatalogDiagnostics>,
 }
 
 #[derive(Serialize)]
@@ -402,6 +403,24 @@ async fn open_github() -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn open_release(version: String) -> Result<(), String> {
+    if version.is_empty()
+        || !version
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '.' | '-'))
+    {
+        return Err("Invalid release version".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        launcher::shell_execute(&format!(
+            "https://github.com/keskiyo/WindowsApps/releases/tag/v{version}"
+        ))
+    })
+    .await
+    .map_err(|error| format!("Release notes launch was interrupted: {error}"))?
+}
+
+#[tauri::command]
 async fn get_apps(app: tauri::AppHandle) -> Result<CatalogSnapshot, String> {
     let app_data_dir = app
         .path()
@@ -411,6 +430,7 @@ async fn get_apps(app: tauri::AppHandle) -> Result<CatalogSnapshot, String> {
     let has_cache = cached.is_some();
     let document = cached.unwrap_or_default();
     let generation = document.generation;
+    let diagnostics = document.diagnostics.clone();
     let apps = document.apps;
     remember_uninstall_targets(&apps);
     remember_launch_targets(&apps);
@@ -425,6 +445,7 @@ async fn get_apps(app: tauri::AppHandle) -> Result<CatalogSnapshot, String> {
         has_cache,
         apps,
         generation,
+        diagnostics,
     })
 }
 
@@ -565,6 +586,16 @@ async fn reset_catalog_cache(app: tauri::AppHandle) -> Result<Vec<AppInfo>, Stri
     })
     .await
     .map_err(|error| format!("Catalog reset was interrupted: {error}"))?
+}
+
+#[tauri::command]
+async fn clear_icon_cache(app: tauri::AppHandle) -> Result<(), String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not open the application data folder: {error}"))?;
+    catalog::icon_cache::clear(&app_data_dir)
+        .map_err(|error| format!("Could not clear icon cache: {error}"))
 }
 
 #[tauri::command]
@@ -751,6 +782,7 @@ pub fn run() {
             refresh_apps,
             force_full_scan,
             reset_catalog_cache,
+            clear_icon_cache,
             hydrate_visible_icons,
             start_background_sync,
             cancel_scan,
@@ -763,7 +795,8 @@ pub fn run() {
             set_autostart,
             set_scan_settings,
             open_telegram,
-            open_github
+            open_github,
+            open_release
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

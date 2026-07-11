@@ -38,4 +38,5 @@ export interface SystemClient {
 	pickFolder(): Promise<string | null>
 	openTelegram(): Promise<void>
 	openGithub(): Promise<void>
+	openRelease?(version: string): Promise<void>
 }

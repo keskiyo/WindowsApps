@@ -5,13 +5,13 @@
 
 **A fast, private application catalog and launcher for Windows 10 and Windows 11.**
 
-[![Version](https://img.shields.io/badge/version-0.2.2-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2)
+[![Version](https://img.shields.io/badge/version-0.2.3-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.3)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
 ![Local first](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
 
-[Download Windows Apps 0.2.2](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2) ·
+[Download Windows Apps 0.2.3](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.3) ·
 [Documentation](Documentation.md) ·
 [Telegram](https://t.me/keskiyo)
 
@@ -38,7 +38,9 @@ The catalog is stored locally. On startup, cached names appear immediately while
 - **Launch feedback** — the card shows a launching state (dimmed icon + spinner) and a top activity bar, cleared when the app window is ready or after a short ceiling.
 - **Background icon loading** — visible application cards receive priority without creating duplicate hydration work.
 - **Organization** — automatic and custom categories, category reordering, application moves, Favorites (surfaced first within a category), and reversible Hidden items.
-- **Automatic updates** — the app checks GitHub Releases on startup and offers a signed update with one click; you choose when to install.
+- **Automatic updates** — signed NSIS-only updates show release date, package size, full notes, byte progress, verification, installation, restart, and retry states.
+- **Catalog diagnostics** — Settings reports the last scan mode, duration, changes, and privacy-safe source totals.
+- **Icon recovery** — repair missing icons or clear only the icon cache without forcing another filesystem scan.
 - **Responsive navigation** — persistent sidebar from `1024px`; overlay drawer on smaller windows.
 - **Keyboard & accessibility** — focus traps in dialogs and menus, `aria-current` navigation, arrow-key menus, and reduced-motion support.
 - **Native launching** — shortcuts, executables, shell targets, Steam entries, and packaged applications use their appropriate Windows launch mechanism.
@@ -51,8 +53,8 @@ The catalog is stored locally. On startup, cached names appear immediately while
 
 ## Installation
 
-1. Open [Windows Apps 0.2.2](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2).
-2. Download `Windows.Apps_0.2.2_x64-setup.exe`.
+1. Open [Windows Apps 0.2.3](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.3).
+2. Download `Windows.Apps_0.2.3_x64-setup.exe`.
 3. Run the installer.
 4. Start **Windows Apps** and select **Scan for apps** when prompted.
 
@@ -85,6 +87,8 @@ Use:
 
 - **Refresh** for a normal incremental update;
 - **Force full scan** to rebuild the filesystem index;
+- **Repair missing icons** to retry extraction only for applications without an icon;
+- **Clear icon cache** to rebuild icons from the existing catalog without rescanning drives;
 - **Reset catalog cache** to remove generated catalog/icon caches and perform a clean scan.
 
 Favorites, Hidden items, custom categories, and category assignments are preserved when the catalog cache is reset.
@@ -136,7 +140,7 @@ npm run tauri build
 Primary local artifact:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.2_x64-setup.exe
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.3_x64-setup.exe
 ```
 
 ## Release process
@@ -147,10 +151,9 @@ Pushing a `v*` tag runs `.github/workflows/release.yml`. The workflow:
 2. installs npm dependencies;
 3. runs frontend and Rust tests;
 4. runs the frontend production build;
-5. uses `tauri-apps/tauri-action` to build the Windows x64 installer, sign the update
-   artifacts with the `TAURI_SIGNING_PRIVATE_KEY` secret, and generate `latest.json`;
-6. creates the GitHub Release with short updater highlights and uploads the installer,
-   `latest.json`, and signature so existing installs can update automatically.
+5. uses `tauri-apps/tauri-action` to build and sign the Windows x64 NSIS installer in a draft release;
+6. normalizes `latest.json` to NSIS-only targets, adds package size and release URL, and verifies every updater reference;
+7. publishes the draft only after the manifest, installer, and signature pass validation.
 
 See [Documentation.md](Documentation.md) for architecture, native commands, scanning behavior, troubleshooting, release validation, and updater testing.
 

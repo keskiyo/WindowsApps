@@ -2,12 +2,26 @@ use crate::catalog::incremental::FilesystemIndex;
 use crate::catalog::source::SourceSnapshot;
 use crate::catalog::AppInfo;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::Path;
 
 const CACHE_FILE: &str = "apps-cache.json";
 pub const CACHE_SCHEMA_VERSION: u32 = 2;
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogDiagnostics {
+    pub completed_at: u64,
+    pub duration_ms: u64,
+    pub mode: String,
+    pub total_apps: usize,
+    pub source_counts: BTreeMap<String, usize>,
+    pub added: usize,
+    pub removed: usize,
+    pub updated: usize,
+}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,6 +35,8 @@ pub struct CatalogCache {
     pub filesystem_index: FilesystemIndex,
     #[serde(default)]
     pub last_successful_sync: Option<u64>,
+    #[serde(default)]
+    pub diagnostics: Option<CatalogDiagnostics>,
 }
 
 impl Default for CatalogCache {
@@ -32,6 +48,7 @@ impl Default for CatalogCache {
             sources: Vec::new(),
             filesystem_index: FilesystemIndex::default(),
             last_successful_sync: None,
+            diagnostics: None,
         }
     }
 }

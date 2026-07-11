@@ -14,4 +14,5 @@ export const tauriSystemClient: SystemClient = {
 		),
 	openTelegram: () => invoke('open_telegram'),
 	openGithub: () => invoke('open_github'),
+	openRelease: version => invoke('open_release', { version }),
 }

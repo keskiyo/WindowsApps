@@ -1,9 +1,9 @@
 # Windows Apps Technical Documentation
 
-Technical reference for Windows Apps `0.2.2`.
+Technical reference for Windows Apps `0.2.3`.
 
 [README](README.md) ·
-[Release 0.2.2](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2) ·
+[Release 0.2.3](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.3) ·
 [Telegram](https://t.me/keskiyo)
 
 ---
@@ -35,7 +35,7 @@ auto-updates the third-party applications it catalogs.
 | Native backend   | Rust 2021 and Windows APIs                   |
 | State            | Zustand plus local component state           |
 | Tests            | Vitest/Testing Library and Rust unit tests   |
-| Primary package  | NSIS setup executable                        |
+| Package target   | NSIS setup executable                        |
 
 The main window uses custom decorations, supports resizing, and has a minimum size of `760 × 520`.
 
@@ -84,6 +84,7 @@ The frontend sends application IDs for native actions. Rust resolves those IDs t
 | `refresh_apps`            | Run an interactive incremental refresh.                                      |
 | `force_full_scan`         | Rebuild configured sources without relying on the previous filesystem index. |
 | `reset_catalog_cache`     | Remove generated catalog and icon caches, then run a clean full scan.        |
+| `clear_icon_cache`        | Remove only generated icons; keep the catalog and filesystem index.          |
 | `hydrate_visible_icons`   | Promote visible application IDs in the hydration queue.                      |
 | `start_background_sync`   | Start background validation after the cached catalog is displayed.           |
 | `cancel_scan`             | Cancel active and queued scanning work.                                      |
@@ -169,6 +170,10 @@ Icon hydration:
 - discards stale work after a new generation starts.
 
 Reset catalog cache removes generated catalog/index and icon cache files. It does not remove Favorites, Hidden entries, custom categories, category ordering, or manual assignments.
+
+Settings also exposes two narrower operations. **Repair missing icons** queues only applications currently missing an icon. **Clear icon cache** removes the standalone icon cache and queues extraction from the existing catalog. Neither operation enumerates drives or invalidates the incremental filesystem index.
+
+Every successful synchronization stores privacy-safe diagnostics with the catalog: completion time, elapsed milliseconds, scan mode, application total, source totals, and added/updated/removed counts. Paths and usernames are not included.
 
 ## 8. Filtering and duplicate resolution
 
@@ -306,8 +311,13 @@ https://github.com/keskiyo/WindowsApps/releases/latest/download/latest.json
 
 - Updates are verified against the public key embedded in `tauri.conf.json`; an unsigned or
   mismatched package is rejected.
-- If an update is available the UI shows a modal dialog with the version and release highlights.
+- If an update is available the UI shows a fixed-size modal with version, release date,
+  package size, highlights, and a link to the complete GitHub release notes.
   The user chooses when to download and restart — updates are never forced.
+- Progress follows Downloading, Verifying, Installing, and Restarting. Downloading reports
+  real bytes and percentage; later stages are indeterminate because Tauri does not expose
+  internal installer percentages. A failed update remains in the dialog with a safe
+  explanation and a Retry update action.
 - The check is silent when offline, when no newer release exists, or when running outside
   the desktop app (development browser and tests).
 - The private signing key lives outside the repository and is provided to CI through the
@@ -388,11 +398,10 @@ cargo check --manifest-path src-tauri/Cargo.toml
 npm run tauri build
 ```
 
-Expected Windows x64 bundles:
+Expected Windows x64 bundle:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.2_x64-setup.exe
-src-tauri/target/release/bundle/msi/Windows Apps_0.2.2_x64_en-US.msi
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.3_x64-setup.exe
 ```
 
 The NSIS setup executable is the primary public artifact.
@@ -409,10 +418,10 @@ The workflow:
 4. validates the tag against `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`;
 5. runs frontend tests and the production build;
 6. runs Rust tests;
-7. runs `tauri-apps/tauri-action`, which builds the Tauri bundles, signs the update
-   artifacts with the `TAURI_SIGNING_PRIVATE_KEY` secret, and generates `latest.json`;
-8. creates the GitHub Release for the tag and uploads the installer, `latest.json`, and
-   signature, which the updater endpoint serves to existing installs.
+7. runs `tauri-apps/tauri-action`, which builds and signs the NSIS bundle in a draft release;
+8. downloads the draft assets, rewrites `latest.json` to NSIS-only targets, and adds the package size and release URL;
+9. verifies the manifest, installer, signature, date, size, URL, and target agreement;
+10. publishes the release only after every updater check succeeds.
 
 The `TAURI_SIGNING_PRIVATE_KEY` (and optional `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) repository
 secrets must be configured before the first signed release, or the update manifest is not produced.
@@ -425,21 +434,21 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo check --manifest-path src-tauri/Cargo.toml
 npm run tauri build
-powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.2
-powershell -NoProfile -File scripts/verify-release-notes.ps1 -Path Release.md -Tag v0.2.2
+powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.3
+powershell -NoProfile -File scripts/verify-release-notes.ps1 -Path Release.md -Tag v0.2.3
 ```
 
 After the GitHub Action publishes a release, download the assets into a local folder and run:
 
 ```powershell
-powershell -NoProfile -File scripts/verify-release-assets.ps1 -AssetsDir path\to\downloaded-assets -Tag v0.2.2
+powershell -NoProfile -File scripts/verify-release-assets.ps1 -AssetsDir path\to\downloaded-assets -Tag v0.2.3
 ```
 
 Publish:
 
 ```powershell
-git tag -a v0.2.2 -m "Windows Apps 0.2.2"
-git push origin v0.2.2
+git tag -a v0.2.3 -m "Windows Apps 0.2.3"
+git push origin v0.2.3
 ```
 
 Do not reuse or move a tag after a public Release has been published. Increase the version for the next release.
@@ -515,5 +524,5 @@ The installer is not Authenticode-signed. Download it only from the official pro
 ---
 
 [README](README.md) ·
-[Release 0.2.2](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2) ·
+[Release 0.2.3](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.3) ·
 [Telegram: @keskiyo](https://t.me/keskiyo)

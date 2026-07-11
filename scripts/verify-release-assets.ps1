@@ -52,8 +52,50 @@ if (Test-Path -LiteralPath $latestPath -PathType Leaf) {
       $errors.Add("latest.json version '$($manifest.version)' does not match $version")
     }
 
+    if ($manifestText -match '(?i)\.msi|windows-x86_64-msi') {
+      $errors.Add("latest.json must not contain MSI targets or URLs")
+    }
+
+    $expectedSize = (Get-Item -LiteralPath $setupPath).Length
+    if ($manifest.packageSize -ne $expectedSize) {
+      $errors.Add("latest.json packageSize '$($manifest.packageSize)' does not match $expectedSize")
+    }
+
+    $expectedReleaseUrl = "https://github.com/keskiyo/WindowsApps/releases/tag/$Tag"
+    if ($manifest.releaseUrl -ne $expectedReleaseUrl) {
+      $errors.Add("latest.json releaseUrl '$($manifest.releaseUrl)' does not match $expectedReleaseUrl")
+    }
+
+    if (-not $manifest.pub_date) {
+      $errors.Add("latest.json has no publication date")
+    }
+
     if ($manifestText -notmatch [regex]::Escape($setupName)) {
       $errors.Add("latest.json does not reference $setupName")
+    }
+
+    $genericTarget = $manifest.platforms."windows-x86_64"
+    $nsisTarget = $manifest.platforms."windows-x86_64-nsis"
+    foreach ($target in @(
+      @{ Name = "windows-x86_64"; Value = $genericTarget },
+      @{ Name = "windows-x86_64-nsis"; Value = $nsisTarget }
+    )) {
+      if (-not $target.Value) {
+        $errors.Add("latest.json is missing updater target '$($target.Name)'")
+        continue
+      }
+
+      $targetFile = [IO.Path]::GetFileName(([Uri]$target.Value.url).AbsolutePath)
+      if ($targetFile -ne $setupName) {
+        $errors.Add("latest.json target '$($target.Name)' references '$targetFile' instead of $setupName")
+      }
+      if (-not $target.Value.signature) {
+        $errors.Add("latest.json target '$($target.Name)' has no updater signature")
+      }
+    }
+
+    if ($genericTarget.url -ne $nsisTarget.url -or $genericTarget.signature -ne $nsisTarget.signature) {
+      $errors.Add("Generic and NSIS updater targets must reference the same package and signature")
     }
 
     if ($manifestText -notmatch '"signature"\s*:\s*"[^"]+"') {

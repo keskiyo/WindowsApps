@@ -300,11 +300,22 @@ export function App({
 				{updater.update && (
 					<UpdateDialog
 						version={updater.update.version}
+						date={updater.update.date}
+						packageSize={updater.update.packageSize}
+						releaseUrl={updater.update.releaseUrl}
 						notes={updater.update.notes}
 						installing={updater.installing}
 						progress={updater.progress}
+						downloadedBytes={updater.downloadedBytes}
+						totalBytes={updater.totalBytes}
+						phase={updater.phase}
+						error={updater.error}
 						onInstall={() => void updater.install()}
 						onDismiss={updater.dismiss}
+						onOpenRelease={() =>
+							void (systemClient.openRelease?.(updater.update?.version ?? '') ??
+								systemClient.openGithub())
+						}
 					/>
 				)}
 				<GlobalActivityBar active={activityActive} label={activityLabel} />
@@ -335,6 +346,9 @@ export function App({
 								client={systemClient}
 								onForceFullScan={state.forceFullScan}
 								onResetCatalogCache={state.resetCatalogCache}
+								catalogDiagnostics={state.catalogDiagnostics}
+								onClearIconCache={state.clearIconCache}
+								onRepairMissingIcons={state.repairMissingIcons}
 							/>
 						) : !state.isLoading &&
 						  !state.hasCache &&

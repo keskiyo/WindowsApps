@@ -3,26 +3,34 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUpdater } from '../../hooks/useUpdater'
 
 const check = vi.fn()
+const relaunch = vi.fn()
 
 vi.mock('@tauri-apps/plugin-updater', () => ({
 	check: () => check(),
 }))
 
 vi.mock('@tauri-apps/plugin-process', () => ({
-	relaunch: vi.fn(),
+	relaunch: () => relaunch(),
 }))
 
 function update(version: string) {
 	return {
 		version,
+		date: '2026-07-11T10:00:00Z',
 		body: '## Highlights\n- Test update.',
-		downloadAndInstall: vi.fn(),
+		rawJson: {
+			packageSize: 5_600_000,
+			releaseUrl: `https://github.com/keskiyo/WindowsApps/releases/tag/v${version}`,
+		},
+		download: vi.fn(),
+		install: vi.fn(),
 	}
 }
 
 describe('useUpdater', () => {
 	beforeEach(() => {
 		check.mockReset()
+		relaunch.mockReset()
 		localStorage.clear()
 	})
 
@@ -59,5 +67,77 @@ describe('useUpdater', () => {
 
 		expect(result.current.update?.version).toBe('0.2.2')
 		expect(result.current.status).toBe('available')
+		expect(result.current.update).toMatchObject({
+			version: '0.2.2',
+			date: '2026-07-11T10:00:00Z',
+			packageSize: 5_600_000,
+			releaseUrl:
+				'https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2',
+		})
+	})
+
+	it('shows a useful download error and allows retrying the same update', async () => {
+		const download = vi
+			.fn()
+			.mockRejectedValueOnce(
+				new Error('Download request failed with status: 404 Not Found'),
+			)
+			.mockResolvedValueOnce(undefined)
+		const install = vi.fn().mockResolvedValue(undefined)
+		check.mockResolvedValue({
+			...update('0.2.3'),
+			download,
+			install,
+		})
+
+		const { result } = renderHook(() => useUpdater({ autoCheck: false }))
+		await act(async () => result.current.checkNow())
+		await act(async () => result.current.install())
+
+		expect(result.current.phase).toBe('failed')
+		expect(result.current.error).toBe(
+			'The update package is unavailable. Try again later or download it from GitHub.',
+		)
+
+		await act(async () => result.current.install())
+
+		expect(download).toHaveBeenCalledTimes(2)
+		expect(install).toHaveBeenCalledOnce()
+		expect(relaunch).toHaveBeenCalledOnce()
+	})
+
+	it('tracks downloaded bytes and uses separate download and install stages', async () => {
+		const download = vi.fn(async callback => {
+			callback({ event: 'Started', data: { contentLength: 1000 } })
+			callback({ event: 'Progress', data: { chunkLength: 250 } })
+		})
+		let resolveInstall: (() => void) | undefined
+		const install = vi.fn(
+			() =>
+				new Promise<void>(resolve => {
+					resolveInstall = resolve
+				}),
+		)
+		check.mockResolvedValue({ ...update('0.2.3'), download, install })
+		const { result } = renderHook(() => useUpdater({ autoCheck: false }))
+		await act(async () => result.current.checkNow())
+
+		let installing: Promise<void>
+		act(() => {
+			installing = result.current.install()
+		})
+		await waitFor(() => expect(result.current.phase).toBe('installing'))
+		expect(result.current.downloadedBytes).toBe(250)
+		expect(result.current.totalBytes).toBe(1000)
+		expect(result.current.progress).toBe(100)
+		expect(download).toHaveBeenCalledOnce()
+		expect(install).toHaveBeenCalledOnce()
+
+		await act(async () => {
+			resolveInstall?.()
+			await installing
+		})
+		expect(result.current.phase).toBe('restarting')
+		expect(relaunch).toHaveBeenCalledOnce()
 	})
 })

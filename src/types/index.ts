@@ -7,6 +7,7 @@ export type {
 	AppView,
 	CatalogChangeSummary,
 	CatalogDelta,
+	CatalogDiagnostics,
 	CatalogSnapshot,
 	LaunchStatus,
 	ScanProgress,

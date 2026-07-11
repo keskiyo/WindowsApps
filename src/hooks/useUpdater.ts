@@ -1,14 +1,32 @@
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
 
 export type UpdateCheckStatus = 'idle' | 'checking' | 'current' | 'available' | 'error'
+export type UpdateInstallPhase =
+	| 'idle'
+	| 'downloading'
+	| 'verifying'
+	| 'installing'
+	| 'restarting'
+	| 'failed'
+
+export interface AvailableUpdate {
+	version: string
+	notes: string | null
+	date: string | null
+	packageSize: number | null
+	releaseUrl: string | null
+}
 
 export interface UpdaterState {
-	update: { version: string; notes: string | null } | null
+	update: AvailableUpdate | null
 	installing: boolean
 	progress: number | null
+	downloadedBytes: number
+	totalBytes: number | null
+	phase: UpdateInstallPhase
+	error: string | null
 	status: UpdateCheckStatus
 	checkNow(): Promise<void>
 	install(): Promise<void>
@@ -44,6 +62,41 @@ function shouldShowUpdate(found: Update | null, ignoreDismissed: boolean): boole
 	return ignoreDismissed || dismissedVersion() !== found.version
 }
 
+function positiveNumber(value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) && value > 0
+		? value
+		: null
+}
+
+function httpUrl(value: unknown): string | null {
+	if (typeof value !== 'string') return null
+	try {
+		const url = new URL(value)
+		return url.protocol === 'https:' ? url.toString() : null
+	} catch {
+		return null
+	}
+}
+
+function updateErrorMessage(error: unknown): string {
+	const reason = error instanceof Error ? error.message : String(error)
+	const normalized = reason.toLowerCase()
+	if (normalized.includes('404') || normalized.includes('not found')) {
+		return 'The update package is unavailable. Try again later or download it from GitHub.'
+	}
+	if (
+		normalized.includes('download') ||
+		normalized.includes('network') ||
+		normalized.includes('request')
+	) {
+		return 'Could not download the update. Check your connection and try again.'
+	}
+	if (normalized.includes('signature') || normalized.includes('verify')) {
+		return 'Update verification failed. The package was not installed.'
+	}
+	return 'The update could not be installed. Try again or download it manually.'
+}
+
 /**
  * Checks for an application update (GitHub Releases endpoint). Silent when there is no
  * update, no network, or when not running inside Tauri (dev browser / tests). `install()`
@@ -53,8 +106,11 @@ function shouldShowUpdate(found: Update | null, ignoreDismissed: boolean): boole
 export function useUpdater(options?: Options): UpdaterState {
 	const autoCheck = options?.autoCheck ?? true
 	const [available, setAvailable] = useState<Update | null>(null)
-	const [installing, setInstalling] = useState(false)
+	const [phase, setPhase] = useState<UpdateInstallPhase>('idle')
 	const [progress, setProgress] = useState<number | null>(null)
+	const [downloadedBytes, setDownloadedBytes] = useState(0)
+	const [totalBytes, setTotalBytes] = useState<number | null>(null)
+	const [error, setError] = useState<string | null>(null)
 	const [status, setStatus] = useState<UpdateCheckStatus>('idle')
 
 	const checkNow = useCallback(async () => {
@@ -88,20 +144,30 @@ export function useUpdater(options?: Options): UpdaterState {
 	}, [autoCheck])
 
 	const install = useCallback(async () => {
-		if (!available || installing) return
-		setInstalling(true)
+		if (
+			!available ||
+			['downloading', 'verifying', 'installing', 'restarting'].includes(phase)
+		)
+			return
+		setError(null)
+		setPhase('downloading')
 		setProgress(0)
+		setDownloadedBytes(0)
+		setTotalBytes(null)
 		try {
 			let total = 0
 			let downloaded = 0
-			await available.downloadAndInstall(event => {
+			await available.download(event => {
 				switch (event.event) {
 					case 'Started':
 						total = event.data.contentLength ?? 0
+						setPhase('downloading')
+						setTotalBytes(total || null)
 						setProgress(0)
 						break
 					case 'Progress':
 						downloaded += event.data.chunkLength
+						setDownloadedBytes(downloaded)
 						setProgress(
 							total
 								? Math.min(100, Math.round((downloaded / total) * 100))
@@ -109,18 +175,23 @@ export function useUpdater(options?: Options): UpdaterState {
 						)
 						break
 					case 'Finished':
-						setProgress(100)
 						break
 				}
 			})
+			setPhase('verifying')
+			setProgress(100)
+			await Promise.resolve()
+			setPhase('installing')
+			await available.install()
+			setPhase('restarting')
 			await relaunch()
 		} catch (error) {
-			setInstalling(false)
+			console.error('Update installation failed', error)
+			setPhase('failed')
 			setProgress(null)
-			const reason = error instanceof Error ? error.message : String(error)
-			toast.error(`Update failed: ${reason}`)
+			setError(updateErrorMessage(error))
 		}
-	}, [available, installing])
+	}, [available, phase])
 
 	const dismiss = useCallback(() => {
 		if (available) rememberDismissedVersion(available.version)
@@ -129,10 +200,22 @@ export function useUpdater(options?: Options): UpdaterState {
 
 	return {
 		update: available
-			? { version: available.version, notes: available.body ?? null }
+			? {
+					version: available.version,
+					notes: available.body ?? null,
+					date: available.date ?? null,
+					packageSize: positiveNumber(available.rawJson.packageSize),
+					releaseUrl: httpUrl(available.rawJson.releaseUrl),
+				}
 			: null,
-		installing,
+		installing: ['downloading', 'verifying', 'installing', 'restarting'].includes(
+			phase,
+		),
 		progress,
+		downloadedBytes,
+		totalBytes,
+		phase,
+		error,
 		status,
 		checkNow,
 		install,

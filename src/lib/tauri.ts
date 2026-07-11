@@ -52,6 +52,8 @@ export const tauriAppsClient: AppsClient = {
 		isTauriRuntime()
 			? invoke<AppInfo[]>('reset_catalog_cache')
 			: Promise.resolve([]),
+	clearIconCache: () =>
+		isTauriRuntime() ? invoke<void>('clear_icon_cache') : Promise.resolve(),
 	hydrateVisibleIcons: ids =>
 		isTauriRuntime()
 			? invoke<void>('hydrate_visible_icons', { ids })

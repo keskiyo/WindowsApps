@@ -37,15 +37,24 @@ describe('UpdateDialog', () => {
 	it('shows release highlights and lets the user install or dismiss', async () => {
 		const onInstall = vi.fn()
 		const onDismiss = vi.fn()
+		const onOpenRelease = vi.fn()
 
 		render(
 			<UpdateDialog
 				version='0.2.2'
+				date='2026-07-11T10:00:00Z'
+				packageSize={5_600_000}
+				releaseUrl='https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2'
 				notes={'## Highlights\n- **Automatic updates** - signed update.'}
 				installing={false}
 				progress={null}
+				downloadedBytes={0}
+				totalBytes={null}
+				phase='idle'
+				error={null}
 				onInstall={onInstall}
 				onDismiss={onDismiss}
+				onOpenRelease={onOpenRelease}
 			/>,
 		)
 
@@ -55,6 +64,18 @@ describe('UpdateDialog', () => {
 		expect(
 			screen.getByText('Automatic updates - signed update.'),
 		).toBeInTheDocument()
+		expect(screen.getByText('11 Jul 2026')).toBeInTheDocument()
+		expect(screen.getByText('5.3 MB')).toBeInTheDocument()
+		expect(
+			screen.getByRole('link', { name: 'View full release notes' }),
+		).toHaveAttribute(
+			'href',
+			'https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2',
+		)
+		await userEvent.click(
+			screen.getByRole('link', { name: 'View full release notes' }),
+		)
+		expect(onOpenRelease).toHaveBeenCalledOnce()
 
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Update & restart' }),
@@ -78,11 +99,19 @@ describe('UpdateDialog', () => {
 				<button type='button'>Open updates</button>
 				<UpdateDialog
 					version='0.2.2'
+					date={null}
+					packageSize={null}
+					releaseUrl={null}
 					notes={'## Highlights\n- Safer update window.'}
 					installing={false}
 					progress={null}
+					downloadedBytes={0}
+					totalBytes={null}
+					phase='idle'
+					error={null}
 					onInstall={vi.fn()}
 					onDismiss={onDismiss}
+					onOpenRelease={vi.fn()}
 				/>
 			</>,
 		)
@@ -108,16 +137,56 @@ describe('UpdateDialog', () => {
 		render(
 			<UpdateDialog
 				version='0.2.2'
+				date={null}
+				packageSize={null}
+				releaseUrl={null}
 				notes={'## Highlights\n- Safer update window.'}
 				installing
 				progress={42}
+				downloadedBytes={2_400_000}
+				totalBytes={5_600_000}
+				phase='downloading'
+				error={null}
 				onInstall={vi.fn()}
 				onDismiss={onDismiss}
+				onOpenRelease={vi.fn()}
 			/>,
 		)
 
 		await userEvent.keyboard('{Escape}')
 		expect(onDismiss).not.toHaveBeenCalled()
 		expect(screen.getByLabelText('Update progress')).toBeInTheDocument()
+		expect(screen.getByText('Downloading')).toBeInTheDocument()
+		expect(screen.getByLabelText('2.3 MB of 5.3 MB')).toBeInTheDocument()
+	})
+
+	it('keeps the dialog open with a retry action after an install error', async () => {
+		const onInstall = vi.fn()
+		render(
+			<UpdateDialog
+				version='0.2.3'
+				date={null}
+				packageSize={null}
+				releaseUrl={null}
+				notes={'## Highlights\n- Reliable updates.'}
+				installing={false}
+				progress={null}
+				downloadedBytes={0}
+				totalBytes={null}
+				phase='failed'
+				error='The update package is unavailable.'
+				onInstall={onInstall}
+				onDismiss={vi.fn()}
+				onOpenRelease={vi.fn()}
+			/>,
+		)
+
+		expect(screen.getByRole('alert')).toHaveTextContent(
+			'The update package is unavailable.',
+		)
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Retry update' }),
+		)
+		expect(onInstall).toHaveBeenCalledOnce()
 	})
 })
