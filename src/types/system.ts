@@ -37,4 +37,5 @@ export interface SystemClient {
 	clearUninstallHistory(): Promise<void>
 	pickFolder(): Promise<string | null>
 	openTelegram(): Promise<void>
+	openGithub(): Promise<void>
 }

@@ -1,4 +1,4 @@
-use crate::catalog::{icon_cache, icon_source, AppInfo, LaunchKind, SourceKind};
+use crate::catalog::{icon_cache, icon_source_candidates, AppInfo, LaunchKind, SourceKind};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use serde::Serialize;
@@ -132,25 +132,63 @@ fn hydrate_app(app_data_dir: &Path, app: &AppInfo, generation: u64) -> AppHydrat
 }
 
 fn hydrate_icon(app_data_dir: &Path, app: &AppInfo) -> Option<String> {
-    let source = icon_source(app).unwrap_or_else(|| app.path.clone());
-    let fingerprint = icon_cache::source_fingerprint(&source);
-    if let Some(bytes) = icon_cache::read_icon(app_data_dir, &app.id, &fingerprint) {
-        return Some(format!("data:image/png;base64,{}", STANDARD.encode(bytes)));
+    // Walk the icon-source candidates (shortcut icon file → resolved target → path) until
+    // one yields an icon; a shortcut whose declared .ico fails should still get the icon
+    // embedded in its target executable.
+    let mut candidates = icon_source_candidates(app);
+    if candidates.is_empty() {
+        candidates.push(app.path.clone());
     }
-    let data_url = if app.launch_kind == LaunchKind::AppUserModelId {
-        crate::platform::windows::icon_extractor::extract_app_id_icon(&app.path)
-    } else if app.source_kind == SourceKind::Steam {
+    for source in candidates {
+        let fingerprint = icon_cache::source_fingerprint(&source);
+        if let Some(bytes) = icon_cache::read_icon(app_data_dir, &app.id, &fingerprint) {
+            return Some(format!("data:image/png;base64,{}", STANDARD.encode(bytes)));
+        }
+        let Some(data_url) = extract_icon_from_source(app, &source) else {
+            continue;
+        };
+        if let Some((_, encoded)) = data_url.split_once(',') {
+            if let Ok(bytes) = STANDARD.decode(encoded) {
+                let _ = icon_cache::write_icon(app_data_dir, &app.id, &fingerprint, &bytes);
+            }
+        }
+        return Some(data_url);
+    }
+    None
+}
+
+fn extract_icon_from_source(app: &AppInfo, source: &str) -> Option<String> {
+    if app.launch_kind == LaunchKind::AppUserModelId {
+        return crate::platform::windows::icon_extractor::extract_app_id_icon(&app.path);
+    }
+    if app.source_kind == SourceKind::Steam {
         // Steam game executables often lack an embedded icon; prefer Steam's own
         // library-cache icon and only fall back to the resolved executable.
-        steam_library_icon(app)
-            .or_else(|| crate::platform::windows::icon_extractor::extract_icon(Path::new(&source)))
-    } else {
-        crate::platform::windows::icon_extractor::extract_icon(Path::new(&source))
-    }?;
-    let encoded = data_url.split_once(',')?.1;
-    let bytes = STANDARD.decode(encoded).ok()?;
-    let _ = icon_cache::write_icon(app_data_dir, &app.id, &fingerprint, &bytes);
-    Some(data_url)
+        if let Some(icon) = steam_library_icon(app) {
+            return Some(icon);
+        }
+    }
+    let path = Path::new(source);
+    // Shortcut icon locations frequently point at loose image files (.ico and friends).
+    // SHGetFileInfoW returns the file-class icon for those, not their content — decode
+    // the image directly instead.
+    if is_image_file(path) {
+        if let Some(icon) =
+            crate::platform::windows::icon_extractor::image_file_to_png_data_url(path)
+        {
+            return Some(icon);
+        }
+    }
+    crate::platform::windows::icon_extractor::extract_icon(path)
+}
+
+/// Image formats the bundled `image` crate can decode (see Cargo.toml features).
+fn is_image_file(path: &Path) -> bool {
+    path.extension().is_some_and(|extension| {
+        ["ico", "png", "jpg", "jpeg"]
+            .iter()
+            .any(|value| extension.eq_ignore_ascii_case(value))
+    })
 }
 
 /// Resolve a Steam game's icon from `<SteamPath>/appcache/librarycache`.
@@ -189,9 +227,12 @@ fn is_hashed_image(path: &Path) -> bool {
             .iter()
             .any(|value| extension.eq_ignore_ascii_case(value))
     });
-    let stem_is_hash = path.file_stem().and_then(|stem| stem.to_str()).is_some_and(|stem| {
-        stem.len() == 40 && stem.chars().all(|character| character.is_ascii_hexdigit())
-    });
+    let stem_is_hash = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .is_some_and(|stem| {
+            stem.len() == 40 && stem.chars().all(|character| character.is_ascii_hexdigit())
+        });
     extension_ok && stem_is_hash
 }
 

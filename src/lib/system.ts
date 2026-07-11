@@ -13,4 +13,5 @@ export const tauriSystemClient: SystemClient = {
 			typeof result === 'string' ? result : null,
 		),
 	openTelegram: () => invoke('open_telegram'),
+	openGithub: () => invoke('open_github'),
 }

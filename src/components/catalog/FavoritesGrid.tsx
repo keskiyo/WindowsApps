@@ -35,7 +35,7 @@ export function FavoritesGrid({
 			<section className='grid min-h-[55vh] place-items-center text-center'>
 				<div>
 					<Star
-						className='mx-auto mb-4 text-amber-500/65'
+						className='mx-auto mb-4 text-yellow-300/80'
 						size={38}
 					/>
 					<h2 className='text-lg font-semibold'>

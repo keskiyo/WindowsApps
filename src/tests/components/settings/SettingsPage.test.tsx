@@ -25,6 +25,7 @@ describe('SettingsPage', () => {
 		clearUninstallHistory: vi.fn().mockResolvedValue(undefined),
 		pickFolder: vi.fn().mockResolvedValue(null),
 		openTelegram: vi.fn().mockResolvedValue(undefined),
+		openGithub: vi.fn().mockResolvedValue(undefined),
 	})
 
 	it('confirms and starts a forced full scan', async () => {
@@ -123,6 +124,7 @@ describe('SettingsPage', () => {
 			clearUninstallHistory: vi.fn().mockResolvedValue(undefined),
 			pickFolder: vi.fn().mockResolvedValue(String.raw`F:\Stick\Tools`),
 			openTelegram: vi.fn().mockResolvedValue(undefined),
+			openGithub: vi.fn().mockResolvedValue(undefined),
 		}
 		render(<SettingsPage client={client} />)
 		expect(await screen.findByText('Version 0.1.0')).toBeInTheDocument()
@@ -135,6 +137,12 @@ describe('SettingsPage', () => {
 			screen.getByRole('button', { name: 'Open @keskiyo on Telegram' }),
 		)
 		expect(client.openTelegram).toHaveBeenCalledOnce()
+		await userEvent.click(
+			screen.getByRole('button', {
+				name: 'Open Windows Apps on GitHub',
+			}),
+		)
+		expect(client.openGithub).toHaveBeenCalledOnce()
 		expect(screen.getByText('Fixed local drives')).toBeInTheDocument()
 		expect(screen.getByText('Visual Studio Code')).toBeInTheDocument()
 		expect(screen.getByText('E:\\')).toBeInTheDocument()
@@ -167,6 +175,7 @@ describe('SettingsPage', () => {
 			clearUninstallHistory: vi.fn().mockResolvedValue(undefined),
 			pickFolder: vi.fn().mockResolvedValue(String.raw`F:\Stick\Tools`),
 			openTelegram: vi.fn().mockResolvedValue(undefined),
+			openGithub: vi.fn().mockResolvedValue(undefined),
 		}
 		render(<SettingsPage client={client} />)
 		await screen.findByText('Version 0.1.0')

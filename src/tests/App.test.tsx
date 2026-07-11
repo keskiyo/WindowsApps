@@ -87,6 +87,7 @@ function renderApp(
 		clearUninstallHistory: vi.fn().mockResolvedValue(undefined),
 		pickFolder: vi.fn().mockResolvedValue(null),
 		openTelegram: vi.fn().mockResolvedValue(undefined),
+		openGithub: vi.fn().mockResolvedValue(undefined),
 		...systemOverrides,
 	}
 	const store = createAppStore(client, localStorage)
@@ -175,6 +176,15 @@ describe('App', () => {
 			screen.getByRole('heading', { name: 'Development' }),
 		).toBeInTheDocument()
 		expect(screen.getAllByText('1 app')).toHaveLength(3)
+	})
+
+	it('exposes full app and category names when visible labels are truncated', async () => {
+		renderApp()
+		const steam = await screen.findByText('Steam')
+		expect(steam).toHaveAttribute('title', 'Steam')
+		expect(
+			screen.getByRole('button', { name: 'Move Development category' }),
+		).toHaveAttribute('title', 'Development')
 	})
 
 	it('renders a workspace summary for the visible organizer state', async () => {

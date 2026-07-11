@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
@@ -78,6 +78,7 @@ function renderApp(
 		clearUninstallHistory: vi.fn().mockResolvedValue(undefined),
 		pickFolder: vi.fn().mockResolvedValue(null),
 		openTelegram: vi.fn().mockResolvedValue(undefined),
+		openGithub: vi.fn().mockResolvedValue(undefined),
 		...systemOverrides,
 	}
 	const store = createAppStore(client, localStorage)
@@ -271,6 +272,19 @@ describe('UX quality — keyboard & native (round 3)', () => {
 		expect(
 			screen.queryByRole('dialog', { name: 'Quick launch' }),
 		).not.toBeInTheDocument()
+	})
+
+	it('opens the command palette from the physical K key on non-Latin layouts', async () => {
+		renderApp()
+		await screen.findByText('Steam')
+		fireEvent.keyDown(document, {
+			key: 'л',
+			code: 'KeyK',
+			ctrlKey: true,
+		})
+		expect(
+			await screen.findByRole('dialog', { name: 'Quick launch' }),
+		).toBeInTheDocument()
 	})
 
 	it('closes the command palette with Escape without launching', async () => {

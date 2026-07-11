@@ -204,4 +204,17 @@ mod tests {
             r"shell:AppsFolder\Microsoft.WindowsCamera_8wekyb3d8bbwe!App",
         );
     }
+
+    #[test]
+    fn decodes_ico_file_to_png_data_url() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("app.ico");
+        let pixel = RgbaImage::from_pixel(16, 16, image::Rgba([255, 0, 0, 255]));
+        DynamicImage::ImageRgba8(pixel)
+            .save_with_format(&path, ImageFormat::Ico)
+            .unwrap();
+
+        let url = image_file_to_png_data_url(&path).unwrap();
+        assert!(url.starts_with("data:image/png;base64,"));
+    }
 }

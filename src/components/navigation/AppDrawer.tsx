@@ -11,6 +11,7 @@ import type {
 import { AppNavigation } from './AppNavigation'
 
 interface Props {
+	open: boolean
 	apps: AppInfo[]
 	categoryOrder: AppCategory[]
 	categories: CategoryDefinition[]
@@ -25,13 +26,14 @@ interface Props {
 		label: string,
 	): { ok: true; id: string } | { ok: false; error: string }
 	onClose(): void
+	onExited(): void
 }
 
 export function AppDrawer(props: Props) {
 	const panelRef = useRef<HTMLElement>(null)
 	useBodyScrollLock()
 	useFocusTrap(panelRef)
-	const { onClose, triggerRef } = props
+	const { onClose, onExited, open, triggerRef } = props
 	useEffect(() => {
 		panelRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
 		function keydown(event: KeyboardEvent) {
@@ -43,23 +45,28 @@ export function AppDrawer(props: Props) {
 			triggerRef.current?.focus()
 		}
 	}, [onClose, triggerRef])
+	useEffect(() => {
+		if (open) return
+		const timeout = window.setTimeout(onExited, 240)
+		return () => window.clearTimeout(timeout)
+	}, [onExited, open])
 	const counts = new Map<AppCategory, number>()
 	for (const app of props.apps)
 		counts.set(app.category, (counts.get(app.category) ?? 0) + 1)
 	return (
-		<div className='fixed inset-0 z-400'>
+		<div className={`drawer-shell fixed inset-0 z-400 ${open ? 'is-open' : 'is-closing'}`}>
 			<button
 				type='button'
 				aria-label='Close navigation backdrop'
 				onClick={props.onClose}
-				className='absolute inset-0 cursor-default bg-slate-700/35 backdrop-blur-[2px]'
+				className='drawer-backdrop absolute inset-0 cursor-default bg-slate-700/35 backdrop-blur-[2px]'
 			/>
 			<aside
 				ref={panelRef}
 				role='dialog'
 				aria-modal='true'
 				aria-label='App navigation'
-				className='drawer-enter absolute inset-y-0 left-0 flex w-[min(22rem,88vw)] flex-col border-r border-slate-300/70 bg-slate-50 shadow-[24px_0_70px_rgba(50,58,78,.24)]'
+				className='drawer-panel absolute inset-y-0 left-0 flex w-[min(22rem,88vw)] flex-col border-r border-slate-300/70 bg-slate-50 shadow-[24px_0_70px_rgba(50,58,78,.24)]'
 			>
 				<div className='flex items-center justify-between border-b border-slate-300/65 px-5 py-5'>
 					<div>

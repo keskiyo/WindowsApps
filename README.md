@@ -5,13 +5,13 @@
 
 **A fast, private application catalog and launcher for Windows 10 and Windows 11.**
 
-[![Version](https://img.shields.io/badge/version-0.2.1-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.1)
+[![Version](https://img.shields.io/badge/version-0.2.2-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
 ![Local first](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
 
-[Download Windows Apps 0.2.1](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.1) ·
+[Download Windows Apps 0.2.2](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2) ·
 [Documentation](Documentation.md) ·
 [Telegram](https://t.me/keskiyo)
 
@@ -51,8 +51,8 @@ The catalog is stored locally. On startup, cached names appear immediately while
 
 ## Installation
 
-1. Open [Windows Apps 0.2.1](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.1).
-2. Download `Windows.Apps_0.2.1_x64-setup.exe`.
+1. Open [Windows Apps 0.2.2](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2).
+2. Download `Windows.Apps_0.2.2_x64-setup.exe`.
 3. Run the installer.
 4. Start **Windows Apps** and select **Scan for apps** when prompted.
 
@@ -136,7 +136,7 @@ npm run tauri build
 Primary local artifact:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.1_x64-setup.exe
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.2_x64-setup.exe
 ```
 
 ## Release process
@@ -146,12 +146,13 @@ Pushing a `v*` tag runs `.github/workflows/release.yml`. The workflow:
 1. validates that the tag matches all version manifests;
 2. installs npm dependencies;
 3. runs frontend and Rust tests;
-4. uses `tauri-apps/tauri-action` to build the Windows x64 installer, sign the update
+4. runs the frontend production build;
+5. uses `tauri-apps/tauri-action` to build the Windows x64 installer, sign the update
    artifacts with the `TAURI_SIGNING_PRIVATE_KEY` secret, and generate `latest.json`;
-5. creates the GitHub Release for the tag and uploads the installer, `latest.json`, and
-   signature so existing installs can update automatically.
+6. creates the GitHub Release with short updater highlights and uploads the installer,
+   `latest.json`, and signature so existing installs can update automatically.
 
-See [Documentation.md](Documentation.md) for architecture, native commands, scanning behavior, troubleshooting, and the release checklist.
+See [Documentation.md](Documentation.md) for architecture, native commands, scanning behavior, troubleshooting, release validation, and updater testing.
 
 ## Support
 

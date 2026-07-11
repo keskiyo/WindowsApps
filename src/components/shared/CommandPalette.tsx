@@ -80,7 +80,7 @@ export function CommandPalette({ apps, onLaunch, onClose }: Props) {
 
 	return (
 		<div
-			className='fixed inset-0 z-500 grid place-items-start justify-center bg-slate-700/40 px-4 pt-[14vh] backdrop-blur-[2px]'
+			className='motion-overlay fixed inset-0 z-500 grid place-items-start justify-center bg-slate-700/40 px-4 pt-[14vh] backdrop-blur-[2px]'
 			onMouseDown={event => {
 				if (event.currentTarget === event.target) onClose()
 			}}
@@ -91,7 +91,7 @@ export function CommandPalette({ apps, onLaunch, onClose }: Props) {
 				aria-modal='true'
 				aria-label='Quick launch'
 				onKeyDown={onKeyDown}
-				className='w-full max-w-xl overflow-hidden rounded-2xl border border-white/90 bg-slate-50 shadow-[0_28px_80px_rgba(48,56,76,.34)]'
+				className='motion-panel flex h-[min(22rem,calc(100vh-7rem))] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/90 bg-slate-50 shadow-[0_28px_80px_rgba(48,56,76,.34)]'
 			>
 				<div className='flex items-center gap-3 border-b border-slate-200 px-4'>
 					<Search
@@ -124,7 +124,7 @@ export function CommandPalette({ apps, onLaunch, onClose }: Props) {
 					id='command-palette-list'
 					role='listbox'
 					aria-label='Applications'
-					className='max-h-[44vh] overflow-y-auto overscroll-contain p-2'
+					className='min-h-0 flex-1 overflow-y-auto overscroll-contain p-2'
 				>
 					{results.length === 0 ? (
 						<li className='px-3 py-6 text-center text-sm text-slate-500'>
@@ -142,7 +142,7 @@ export function CommandPalette({ apps, onLaunch, onClose }: Props) {
 									void onLaunch(app)
 									onClose()
 								}}
-								className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm ${index === selected ? 'bg-violet-100/90 text-violet-800' : 'text-slate-700'}`}
+								className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${index === selected ? 'bg-violet-500/24 font-medium text-slate-100' : 'text-slate-700 hover:bg-slate-500/10'}`}
 							>
 								<span className='grid size-7 shrink-0 place-items-center rounded-md bg-white/70 ring-1 ring-inset ring-slate-200'>
 									{app.iconBase64 ? (
@@ -165,7 +165,7 @@ export function CommandPalette({ apps, onLaunch, onClose }: Props) {
 								{index === selected && (
 									<CornerDownLeft
 										size={14}
-										className='shrink-0 text-violet-500'
+										className='shrink-0 text-violet-200'
 										aria-hidden='true'
 									/>
 								)}

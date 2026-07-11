@@ -11,6 +11,11 @@ use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
 pub struct ShortcutDetails {
     pub target: Option<PathBuf>,
     pub icon_location: Option<PathBuf>,
+    /// Command-line arguments stored in the shortcut. A non-empty value usually marks a
+    /// "command" shortcut (e.g. `pg_ctl ... reload`) rather than a plain application.
+    /// Read for the upcoming command-like filtering diagnostics; not consumed yet.
+    #[allow(dead_code)]
+    pub arguments: Option<String>,
 }
 
 pub fn resolve(path: &Path) -> ShortcutDetails {
@@ -33,19 +38,29 @@ unsafe fn resolve_inner(path: &Path) -> windows::core::Result<ShortcutDetails> {
     let mut icon = vec![0_u16; 32768];
     let mut icon_index = 0;
     let _ = unsafe { link.GetIconLocation(&mut icon, &mut icon_index) };
+    let mut arguments = vec![0_u16; 32768];
+    let _ = unsafe { link.GetArguments(&mut arguments) };
     Ok(ShortcutDetails {
         target: path_from_buffer(&target),
-        icon_location: path_from_buffer(&icon),
+        // Installers write icon locations with forward slashes and 8.3 names
+        // (C:/PROGRA~1/...). Normalize separators so cache keys stay consistent.
+        icon_location: path_from_buffer(&icon)
+            .map(|path| PathBuf::from(path.to_string_lossy().replace('/', r"\"))),
+        arguments: string_from_buffer(&arguments),
     })
 }
 
 fn path_from_buffer(buffer: &[u16]) -> Option<PathBuf> {
+    string_from_buffer(buffer).map(PathBuf::from)
+}
+
+fn string_from_buffer(buffer: &[u16]) -> Option<String> {
     let end = buffer
         .iter()
         .position(|value| *value == 0)
         .unwrap_or(buffer.len());
     let value = String::from_utf16_lossy(&buffer[..end]).trim().to_string();
-    (!value.is_empty()).then(|| PathBuf::from(value))
+    (!value.is_empty()).then_some(value)
 }
 
 fn wide(value: &std::ffi::OsStr) -> Vec<u16> {

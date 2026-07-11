@@ -932,15 +932,27 @@ mod tests {
         let mut aumid = app("Firefox", "308046B0AF4A39CB");
         aumid.launch_kind = LaunchKind::AppUserModelId;
         aumid.source_kind = SourceKind::StartApps;
-        let mut private_aumid = app("Private Browsing Firefox", "308046B0AF4A39CB;PrivateBrowsingAUMID");
+        let mut private_aumid = app(
+            "Private Browsing Firefox",
+            "308046B0AF4A39CB;PrivateBrowsingAUMID",
+        );
         private_aumid.launch_kind = LaunchKind::AppUserModelId;
         private_aumid.source_kind = SourceKind::StartApps;
 
-        let merged = resolve(vec![registry, shortcut, private_shortcut, aumid, private_aumid]);
+        let merged = resolve(vec![
+            registry,
+            shortcut,
+            private_shortcut,
+            aumid,
+            private_aumid,
+        ]);
 
         assert_eq!(merged.len(), 2);
         assert_eq!(
-            merged.iter().map(|app| app.name.as_str()).collect::<Vec<_>>(),
+            merged
+                .iter()
+                .map(|app| app.name.as_str())
+                .collect::<Vec<_>>(),
             vec!["Firefox", "Private Browsing Firefox"],
         );
     }

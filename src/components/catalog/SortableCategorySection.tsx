@@ -43,11 +43,13 @@ export function SortableCategorySection(props: Props) {
 			{...sortable.attributes}
 			{...sortable.listeners}
 			aria-label={`Move ${label} category`}
+			title={label}
 			className='group flex min-w-0 flex-1 cursor-grab items-center gap-3 rounded-xl px-1 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 active:cursor-grabbing'
 		>
 			<h2
 				id={`category-${props.category}`}
-				className='text-base font-semibold tracking-tight text-slate-800'
+				className='truncate text-base font-semibold tracking-tight text-slate-800'
+				title={label}
 			>
 				{label}
 			</h2>

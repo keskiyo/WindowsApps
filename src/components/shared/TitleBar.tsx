@@ -57,7 +57,7 @@ export function TitleBar() {
 					type='button'
 					aria-label='Minimize'
 					onClick={action(win => win.minimize())}
-					className='grid h-9 w-11 place-items-center text-slate-500 transition-colors hover:bg-slate-200/70 hover:text-slate-800'
+					className='grid h-9 w-11 place-items-center text-slate-400 transition-colors hover:bg-slate-700/70 hover:text-white'
 				>
 					<Minus size={15} />
 				</button>
@@ -65,7 +65,7 @@ export function TitleBar() {
 					type='button'
 					aria-label={maximized ? 'Restore' : 'Maximize'}
 					onClick={action(win => win.toggleMaximize())}
-					className='grid h-9 w-11 place-items-center text-slate-500 transition-colors hover:bg-slate-200/70 hover:text-slate-800'
+					className='grid h-9 w-11 place-items-center text-slate-400 transition-colors hover:bg-slate-700/70 hover:text-white'
 				>
 					{maximized ? <Copy size={12} /> : <Square size={11} />}
 				</button>

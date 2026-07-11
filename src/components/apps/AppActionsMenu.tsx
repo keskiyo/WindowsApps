@@ -124,7 +124,7 @@ export function AppActionsMenu({
 			}
 			role='menu'
 			aria-label={`${app.name} actions`}
-			className='absolute left-2 top-11 z-110 flex w-56 max-w-[calc(100vw-1rem)] flex-col gap-0.5 rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-[0_18px_45px_rgba(53,61,82,.2)]'
+			className='motion-panel absolute left-2 top-11 z-110 flex w-56 max-w-[calc(100vw-1rem)] flex-col gap-0.5 rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-[0_18px_45px_rgba(53,61,82,.2)]'
 		>
 			{!isHidden && (
 				<button

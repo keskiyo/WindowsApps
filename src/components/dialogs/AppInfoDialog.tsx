@@ -29,7 +29,7 @@ export function AppInfoDialog({
 	const rows = metadataRows(app, categories)
 	return (
 		<div
-			className='fixed inset-0 z-400 grid place-items-center bg-slate-700/38 p-4 backdrop-blur-[2px]'
+			className='motion-overlay fixed inset-0 z-400 grid place-items-center bg-slate-700/38 p-4 backdrop-blur-[2px]'
 			onMouseDown={event => {
 				if (event.currentTarget === event.target) onClose()
 			}}
@@ -39,7 +39,7 @@ export function AppInfoDialog({
 				role='dialog'
 				aria-modal='true'
 				aria-label={`${app.name} information`}
-				className='max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-white/90 bg-slate-50 p-5 text-slate-800 shadow-[0_24px_70px_rgba(48,56,76,.28)]'
+				className='motion-panel max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-white/90 bg-slate-50 p-5 text-slate-800 shadow-[0_24px_70px_rgba(48,56,76,.28)]'
 			>
 				<header className='flex items-start gap-4'>
 					<span className='grid size-13 shrink-0 place-items-center rounded-xl bg-slate-200/70 shadow-inner'>

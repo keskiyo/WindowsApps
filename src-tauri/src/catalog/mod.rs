@@ -343,16 +343,30 @@ fn is_known_standalone_portable(stem: &str) -> bool {
         || normalized.starts_with("ventoy")
 }
 
+/// Ordered icon-source candidates: the shortcut's declared icon file first, then the
+/// resolved launch target, then the catalog path itself. Hydration walks the list until
+/// one source actually yields an icon (a single source is not enough — e.g. PostgreSQL
+/// shortcuts point at an `.ico` the shell can't rasterize, while the target exe can).
+pub(super) fn icon_source_candidates(app: &AppInfo) -> Vec<String> {
+    let mut candidates: Vec<String> = Vec::new();
+    let mut push = |value: Option<&String>| {
+        if let Some(path) = value {
+            if Path::new(path).is_file() && !candidates.contains(path) {
+                candidates.push(path.clone());
+            }
+        }
+    };
+    push(app.shortcut_icon_path.as_ref());
+    push(app.resolved_path.as_ref());
+    if app.launch_kind != LaunchKind::AppUserModelId && !candidates.contains(&app.path) {
+        candidates.push(app.path.clone());
+    }
+    candidates
+}
+
+#[cfg(test)]
 pub(super) fn icon_source(app: &AppInfo) -> Option<String> {
-    app.shortcut_icon_path
-        .clone()
-        .filter(|path| Path::new(path).is_file())
-        .or_else(|| {
-            app.resolved_path
-                .clone()
-                .filter(|path| Path::new(path).is_file())
-        })
-        .or_else(|| (app.launch_kind != LaunchKind::AppUserModelId).then(|| app.path.clone()))
+    icon_source_candidates(app).into_iter().next()
 }
 
 fn scan_start_menu() -> Vec<AppInfo> {
@@ -836,8 +850,13 @@ fn is_helper_executable_stem(stem: &str) -> bool {
     let normalized = stem.to_lowercase();
     matches!(
         normalized.as_str(),
-        "git-lfs" | "git-credential-manager" | "gettext" | "printf_gettext"
-            | "printf_ngettext" | "envsubst" | "msgfmt"
+        "git-lfs"
+            | "git-credential-manager"
+            | "gettext"
+            | "printf_gettext"
+            | "printf_ngettext"
+            | "envsubst"
+            | "msgfmt"
     )
 }
 
@@ -1679,6 +1698,40 @@ mod tests {
             icon_source(&value).as_deref(),
             Some(target.to_string_lossy().as_ref())
         );
+    }
+
+    #[test]
+    fn icon_candidates_order_icon_location_then_target_then_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let shortcut = dir.path().join("PgAdmin.lnk");
+        let icon = dir.path().join("pgAdmin4.ico");
+        let target = dir.path().join("pgAdmin4.exe");
+        for file in [&shortcut, &icon, &target] {
+            std::fs::write(file, []).unwrap();
+        }
+
+        let mut value = app("pgAdmin 4", &shortcut.to_string_lossy());
+        value.launch_kind = LaunchKind::Shortcut;
+        value.shortcut_icon_path = Some(icon.to_string_lossy().into_owned());
+        value.resolved_path = Some(target.to_string_lossy().into_owned());
+
+        let candidates = icon_source_candidates(&value);
+        assert_eq!(
+            candidates,
+            vec![
+                icon.to_string_lossy().into_owned(),
+                target.to_string_lossy().into_owned(),
+                shortcut.to_string_lossy().into_owned(),
+            ],
+        );
+    }
+
+    #[test]
+    fn icon_candidates_skip_missing_files_and_aumid_path() {
+        let mut value = app("Calc", "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App");
+        value.launch_kind = LaunchKind::AppUserModelId;
+        value.shortcut_icon_path = Some(r"C:\missing\icon.ico".into());
+        assert!(icon_source_candidates(&value).is_empty());
     }
 
     #[test]

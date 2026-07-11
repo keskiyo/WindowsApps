@@ -64,7 +64,7 @@ function SummaryTile({ item }: { item: SummaryItem }) {
 	const Icon = item.icon
 	const toneClass = {
 		blue: 'bg-sky-100/80 text-sky-700 ring-sky-500/12',
-		amber: 'bg-amber-100/80 text-amber-700 ring-amber-500/12',
+		amber: 'bg-yellow-300/20 text-yellow-300 ring-yellow-300/18',
 		slate: 'bg-slate-200/80 text-slate-600 ring-slate-500/12',
 		violet: 'bg-violet-100/80 text-violet-700 ring-violet-500/12',
 	}[item.tone]

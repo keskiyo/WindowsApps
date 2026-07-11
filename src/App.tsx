@@ -20,7 +20,7 @@ import { GlobalActivityBar } from './components/shared/GlobalActivityBar'
 import { Header } from './components/shared/Header'
 import { ScanPrompt } from './components/shared/ScanPrompt'
 import { TitleBar } from './components/shared/TitleBar'
-import { UpdateBanner } from './components/shared/UpdateBanner'
+import { UpdateDialog } from './components/shared/UpdateDialog'
 import { WorkspaceSummary } from './components/shared/WorkspaceSummary'
 import { useAppFeedback } from './hooks/useAppFeedback'
 import { useCatalogNavigation } from './hooks/useCatalogNavigation'
@@ -81,6 +81,7 @@ export function App({
 		.map(app => app.id)
 		.join('|')
 	const [drawerOpen, setDrawerOpen] = useState(false)
+	const [drawerMounted, setDrawerMounted] = useState(false)
 	const [infoApp, setInfoApp] = useState<AppInfo | null>(null)
 	const [uninstallApp, setUninstallApp] = useState<AppInfo | null>(null)
 	const [uninstallPreview, setUninstallPreview] =
@@ -95,7 +96,11 @@ export function App({
 	const menuButtonRef = useRef<HTMLButtonElement>(null)
 	const searchInputRef = useRef<HTMLInputElement>(null)
 	const desktopNavigation = useDesktopNavigation()
-	const closeDrawer = useCallback(() => setDrawerOpen(false), [])
+	const animateDrawer = import.meta.env.MODE !== 'test'
+	const closeDrawer = useCallback(() => {
+		setDrawerOpen(false)
+		if (!animateDrawer) setDrawerMounted(false)
+	}, [animateDrawer])
 	const closeInfo = useCallback(() => setInfoApp(null), [])
 	const closeUninstall = useCallback(() => {
 		setUninstallApp(null)
@@ -181,19 +186,22 @@ export function App({
 				target instanceof HTMLInputElement ||
 				target instanceof HTMLTextAreaElement ||
 				target?.isContentEditable === true
-			if (
-				(event.ctrlKey || event.metaKey) &&
-				event.key.toLowerCase() === 'k'
-			) {
+			const commandOrControl = event.ctrlKey || event.metaKey
+			const isQuickLaunchShortcut =
+				commandOrControl &&
+				(event.code === 'KeyK' || event.key.toLowerCase() === 'k')
+			const isSearchShortcut =
+				commandOrControl &&
+				(event.code === 'KeyF' || event.key.toLowerCase() === 'f')
+			if (isQuickLaunchShortcut) {
 				event.preventDefault()
+				event.stopPropagation()
 				setPaletteOpen(value => !value)
 				return
 			}
-			if (
-				(event.ctrlKey || event.metaKey) &&
-				event.key.toLowerCase() === 'f'
-			) {
+			if (isSearchShortcut) {
 				event.preventDefault()
+				event.stopPropagation()
 				searchInputRef.current?.focus()
 				searchInputRef.current?.select()
 				return
@@ -203,8 +211,11 @@ export function App({
 				searchInputRef.current?.focus()
 			}
 		}
-		document.addEventListener('keydown', onKeyDown)
-		return () => document.removeEventListener('keydown', onKeyDown)
+		document.addEventListener('keydown', onKeyDown, { capture: true })
+		return () =>
+			document.removeEventListener('keydown', onKeyDown, {
+				capture: true,
+			})
 	}, [])
 
 	useEffect(() => {
@@ -219,6 +230,10 @@ export function App({
 	useEffect(() => {
 		if (desktopNavigation) setDrawerOpen(false)
 	}, [desktopNavigation])
+
+	useEffect(() => {
+		if (drawerOpen) setDrawerMounted(true)
+	}, [drawerOpen])
 
 	useEffect(() => {
 		if (state.activeView === 'settings' || state.isLoading) return
@@ -280,41 +295,41 @@ export function App({
 
 	return (
 		<AppStoreProvider store={store}>
-		<div className='app-shell theme-graphite-surface flex h-screen flex-col overflow-hidden'>
-			<TitleBar />
-			{updater.update && (
-				<UpdateBanner
-					version={updater.update.version}
-					notes={updater.update.notes}
-					installing={updater.installing}
-					progress={updater.progress}
-					onInstall={() => void updater.install()}
-					onDismiss={updater.dismiss}
-				/>
-			)}
-			<GlobalActivityBar active={activityActive} label={activityLabel} />
-			<div className='flex min-h-0 flex-1 gap-2 px-2 pb-2'>
-				{desktopNavigation && <AppSidebar {...navigationProps} />}
-				<div
-					id='catalog-scroll'
-					className='app-panel flex min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl'
-				>
-					<Header
-						appCount={state.apps.length}
-						visibleCount={filteredApps.length}
-						query={state.query}
-						isRefreshing={state.isRefreshing}
-						scanProgress={state.scanProgress}
-						onQueryChange={state.setQuery}
-						onRefresh={feedback.refresh}
-						onCancelScan={state.cancelScan}
-						menuButtonRef={menuButtonRef}
-						searchInputRef={searchInputRef}
-						onOpenNavigation={() => setDrawerOpen(true)}
-						onGoHome={navigation.goHome}
-						showMenu={!desktopNavigation}
+			<div className='app-shell theme-graphite-surface flex h-screen flex-col overflow-hidden'>
+				<TitleBar />
+				{updater.update && (
+					<UpdateDialog
+						version={updater.update.version}
+						notes={updater.update.notes}
+						installing={updater.installing}
+						progress={updater.progress}
+						onInstall={() => void updater.install()}
+						onDismiss={updater.dismiss}
 					/>
-					<main className='mx-auto w-full max-w-375 px-5 pb-12 pt-7 sm:px-8'>
+				)}
+				<GlobalActivityBar active={activityActive} label={activityLabel} />
+				<div className='flex min-h-0 flex-1 gap-2 px-2 pb-2'>
+					{desktopNavigation && <AppSidebar {...navigationProps} />}
+					<div
+						id='catalog-scroll'
+						className='app-panel flex min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl'
+					>
+						<Header
+							appCount={state.apps.length}
+							visibleCount={filteredApps.length}
+							query={state.query}
+							isRefreshing={state.isRefreshing}
+							scanProgress={state.scanProgress}
+							onQueryChange={state.setQuery}
+							onRefresh={feedback.refresh}
+							onCancelScan={state.cancelScan}
+							menuButtonRef={menuButtonRef}
+							searchInputRef={searchInputRef}
+							onOpenNavigation={() => setDrawerOpen(true)}
+							onGoHome={navigation.goHome}
+							showMenu={!desktopNavigation}
+						/>
+						<main className='mx-auto w-full max-w-375 px-5 pb-12 pt-7 sm:px-8'>
 						{state.activeView === 'settings' ? (
 							<SettingsPage
 								client={systemClient}
@@ -371,8 +386,9 @@ export function App({
 					</main>
 				</div>
 			</div>
-			{drawerOpen && !desktopNavigation && (
+			{drawerMounted && !desktopNavigation && (
 				<AppDrawer
+					open={drawerOpen}
 					apps={visibleCategorizedApps}
 					categoryOrder={state.categoryOrder}
 					categories={state.categories}
@@ -389,6 +405,7 @@ export function App({
 					onReorderCategory={state.reorderCategory}
 					onCreateCategory={state.createCategory}
 					onClose={closeDrawer}
+					onExited={() => setDrawerMounted(false)}
 				/>
 			)}
 			{paletteOpen && (
@@ -419,6 +436,10 @@ export function App({
 				className='app-toaster'
 				theme='light'
 				position='bottom-right'
+				expand
+				visibleToasts={5}
+				gap={10}
+				offset={16}
 				richColors
 				closeButton
 			/>

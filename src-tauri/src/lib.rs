@@ -393,6 +393,15 @@ async fn open_telegram() -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn open_github() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        launcher::shell_execute("https://github.com/keskiyo/WindowsApps")
+    })
+    .await
+    .map_err(|error| format!("GitHub launch was interrupted: {error}"))?
+}
+
+#[tauri::command]
 async fn get_apps(app: tauri::AppHandle) -> Result<CatalogSnapshot, String> {
     let app_data_dir = app
         .path()
@@ -622,7 +631,13 @@ async fn launch_app(app: tauri::AppHandle, id: String) -> Result<(), String> {
         let launch_id = id.clone();
         tauri::async_runtime::spawn_blocking(move || {
             let state = wait_for_launch_ready(raw_handle);
-            let _ = emitter.emit("launch://status", LaunchStatusPayload { id: launch_id, state });
+            let _ = emitter.emit(
+                "launch://status",
+                LaunchStatusPayload {
+                    id: launch_id,
+                    state,
+                },
+            );
         });
     }
     Ok(())
@@ -747,7 +762,8 @@ pub fn run() {
             get_system_settings,
             set_autostart,
             set_scan_settings,
-            open_telegram
+            open_telegram,
+            open_github
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

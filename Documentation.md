@@ -1,9 +1,9 @@
 # Windows Apps Technical Documentation
 
-Technical reference for Windows Apps `0.2.1`.
+Technical reference for Windows Apps `0.2.2`.
 
 [README](README.md) ·
-[Release 0.2.1](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.1) ·
+[Release 0.2.2](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2) ·
 [Telegram](https://t.me/keskiyo)
 
 ---
@@ -306,7 +306,7 @@ https://github.com/keskiyo/WindowsApps/releases/latest/download/latest.json
 
 - Updates are verified against the public key embedded in `tauri.conf.json`; an unsigned or
   mismatched package is rejected.
-- If an update is available the UI shows a non-intrusive banner with the version and notes.
+- If an update is available the UI shows a modal dialog with the version and release highlights.
   The user chooses when to download and restart — updates are never forced.
 - The check is silent when offline, when no newer release exists, or when running outside
   the desktop app (development browser and tests).
@@ -352,6 +352,8 @@ src-tauri/src/lifecycle/         Tray and window lifecycle
 src-tauri/src/platform/windows/  Windows-specific native integrations
 .github/workflows/release.yml    Tag-driven Windows release pipeline
 scripts/verify-release-version.ps1
+scripts/verify-release-assets.ps1
+scripts/verify-release-notes.ps1
 ```
 
 ## 15. Development workflow
@@ -389,8 +391,8 @@ npm run tauri build
 Expected Windows x64 bundles:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.1_x64-setup.exe
-src-tauri/target/release/bundle/msi/Windows Apps_0.2.1_x64_en-US.msi
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.2_x64-setup.exe
+src-tauri/target/release/bundle/msi/Windows Apps_0.2.2_x64_en-US.msi
 ```
 
 The NSIS setup executable is the primary public artifact.
@@ -405,7 +407,7 @@ The workflow:
 2. configures Node.js 22 and stable Rust;
 3. runs `npm ci`;
 4. validates the tag against `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`;
-5. runs frontend tests;
+5. runs frontend tests and the production build;
 6. runs Rust tests;
 7. runs `tauri-apps/tauri-action`, which builds the Tauri bundles, signs the update
    artifacts with the `TAURI_SIGNING_PRIVATE_KEY` secret, and generates `latest.json`;
@@ -423,17 +425,26 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo check --manifest-path src-tauri/Cargo.toml
 npm run tauri build
-powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.1
+powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.2
+powershell -NoProfile -File scripts/verify-release-notes.ps1 -Path Release.md -Tag v0.2.2
+```
+
+After the GitHub Action publishes a release, download the assets into a local folder and run:
+
+```powershell
+powershell -NoProfile -File scripts/verify-release-assets.ps1 -AssetsDir path\to\downloaded-assets -Tag v0.2.2
 ```
 
 Publish:
 
 ```powershell
-git tag -a v0.2.1 -m "Windows Apps 0.2.1"
-git push origin v0.2.1
+git tag -a v0.2.2 -m "Windows Apps 0.2.2"
+git push origin v0.2.2
 ```
 
 Do not reuse or move a tag after a public Release has been published. Increase the version for the next release.
+
+The production updater path cannot be proven while the release is still a draft because the configured `/releases/latest/download/latest.json` endpoint serves only a published latest release. Keep an installed copy of the previous version ready and validate the signed update immediately after publication, before announcing the release broadly. If validation fails, publish a new patch version rather than replacing assets under the same tag.
 
 ## 17. Troubleshooting
 
@@ -504,5 +515,5 @@ The installer is not Authenticode-signed. Download it only from the official pro
 ---
 
 [README](README.md) ·
-[Release 0.2.1](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.1) ·
+[Release 0.2.2](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2) ·
 [Telegram: @keskiyo](https://t.me/keskiyo)

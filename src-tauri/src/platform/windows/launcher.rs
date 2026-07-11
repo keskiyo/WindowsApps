@@ -33,13 +33,12 @@ fn shell_execute_with_handle(target: &str) -> Result<Option<isize>, String> {
         nShow: SW_SHOWNORMAL.0,
         ..Default::default()
     };
-    unsafe { ShellExecuteExW(&mut info) }
-        .map_err(|_| {
-            format!(
-                "Windows Shell could not launch the application (code {})",
-                info.hInstApp.0 as isize
-            )
-        })?;
+    unsafe { ShellExecuteExW(&mut info) }.map_err(|_| {
+        format!(
+            "Windows Shell could not launch the application (code {})",
+            info.hInstApp.0 as isize
+        )
+    })?;
     if info.hProcess.is_invalid() {
         Ok(None)
     } else {

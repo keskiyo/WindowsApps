@@ -74,7 +74,7 @@ function AppCardComponent({
 				title={launching ? 'Launching…' : (app.description ?? app.path)}
 				className='relative z-1 flex min-h-34 w-full flex-col items-center justify-center gap-3 px-4 py-4 text-center focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-violet-500 disabled:cursor-progress'
 			>
-				<span className='relative grid size-13 place-items-center rounded-xl bg-white/52 shadow-[inset_1px_1px_3px_rgba(111,124,146,.13),inset_-2px_-2px_5px_rgba(255,255,255,.85)] ring-1 ring-inset ring-white/80'>
+				<span className='relative grid size-13 place-items-center rounded-xl bg-white/52 shadow-[inset_1px_1px_3px_rgba(111,124,146,.13),inset_-2px_-2px_5px_rgba(255,255,255,.55),0_0_0_1px_rgba(167,139,250,.18)] ring-1 ring-inset ring-violet-300/70'>
 					<span
 						className={
 							launching
@@ -106,6 +106,7 @@ function AppCardComponent({
 					)}
 				</span>
 				<span
+					title={app.name}
 					className={`w-full truncate text-sm font-semibold ${launching ? 'text-violet-500' : 'text-slate-700 group-hover:text-slate-900'}`}
 				>
 					{launching ? 'Launching…' : app.name}
@@ -138,7 +139,7 @@ function AppCardComponent({
 					event.stopPropagation()
 					onToggleFavorite(app.id)
 				}}
-				className={`absolute right-2 top-2 z-2 grid size-8 place-items-center rounded-lg border transition focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-amber-500 ${isFavorite ? 'border-amber-400/35 bg-amber-100/85 text-amber-600 opacity-100' : 'border-white/85 bg-white/72 text-slate-400 opacity-0 hover:text-amber-600 group-hover:opacity-100 group-focus-within:opacity-100'}`}
+				className={`absolute right-2 top-2 z-2 grid size-8 place-items-center rounded-lg border transition focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-yellow-300 ${isFavorite ? 'border-yellow-300/45 bg-yellow-300/20 text-yellow-300 opacity-100' : 'border-white/85 bg-white/72 text-slate-400 opacity-0 hover:text-yellow-300 group-hover:opacity-100 group-focus-within:opacity-100'}`}
 			>
 				<Star
 					size={16}

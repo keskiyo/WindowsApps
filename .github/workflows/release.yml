@@ -36,7 +36,10 @@ jobs:
               run: powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag "${{ github.ref_name }}"
 
             - name: Run frontend tests
-              run: npm test -- --run
+              run: npm test
+
+            - name: Build frontend
+              run: npm run build
 
             - name: Run Rust tests
               run: cargo test --manifest-path src-tauri/Cargo.toml
@@ -53,6 +56,14 @@ jobs:
               with:
                   tagName: ${{ github.ref_name }}
                   releaseName: 'Windows Apps ${{ github.ref_name }}'
-                  releaseBody: 'Install the latest version. Existing installs update automatically.'
+                  releaseBody: |
+                      Windows Apps is a fast, private application catalog and launcher for Windows 10 and 11.
+
+                      ## Highlights
+
+                      - Update dialog shows concise release highlights and remembers a dismissed version.
+                      - Duplicate handling and icon fallback were improved for shortcuts and Steam games.
+                      - Cached startup, incremental scanning, and background icon loading reduce repeated work.
+                      - Graphite UI, violet states, navigation motion, and stacked notifications were polished.
                   releaseDraft: false
                   prerelease: false
