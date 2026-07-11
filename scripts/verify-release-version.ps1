@@ -5,7 +5,8 @@ param(
 
 $expected = $Tag -replace '^v', ''
 $package = (Get-Content package.json -Raw | ConvertFrom-Json).version
-$tauri = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+$tauriConfig = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+$tauri = $tauriConfig.version
 $cargoText = Get-Content src-tauri/Cargo.toml -Raw
 $cargo = [regex]::Match($cargoText, '(?ms)^\[package\].*?^version\s*=\s*"([^"]+)"').Groups[1].Value
 
@@ -20,4 +21,8 @@ if ($mismatches) {
   throw "Tag $Tag does not match project versions: $($versions | ConvertTo-Json -Compress)"
 }
 
-Write-Output "Verified release version $expected"
+if ($tauriConfig.bundle.publisher -ne "keskiyo") {
+  throw "Tauri bundle publisher must be 'keskiyo', found '$($tauriConfig.bundle.publisher)'"
+}
+
+Write-Output "Verified release version $expected and publisher keskiyo"
