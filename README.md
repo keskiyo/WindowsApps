@@ -5,13 +5,13 @@
 
 **A fast, private application catalog and launcher for Windows 10 and Windows 11.**
 
-[![Version](https://img.shields.io/badge/version-0.2.3-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.3)
+[![Version](https://img.shields.io/badge/version-0.2.4-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.4)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
 ![Local first](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
 
-[Download Windows Apps 0.2.3](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.3) ·
+[Download Windows Apps 0.2.4](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.4) ·
 [Documentation](Documentation.md) ·
 [Telegram](https://t.me/keskiyo)
 
@@ -53,8 +53,8 @@ The catalog is stored locally. On startup, cached names appear immediately while
 
 ## Installation
 
-1. Open [Windows Apps 0.2.3](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.3).
-2. Download `Windows.Apps_0.2.3_x64-setup.exe`.
+1. Open [Windows Apps 0.2.4](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.4).
+2. Download `Windows.Apps_0.2.4_x64-setup.exe`.
 3. Run the installer.
 4. Start **Windows Apps** and select **Scan for apps** when prompted.
 
@@ -140,7 +140,7 @@ npm run tauri build
 Primary local artifact:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.3_x64-setup.exe
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.4_x64-setup.exe
 ```
 
 ## Release process

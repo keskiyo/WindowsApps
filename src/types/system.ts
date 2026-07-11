@@ -39,4 +39,13 @@ export interface SystemClient {
 	openTelegram(): Promise<void>
 	openGithub(): Promise<void>
 	openRelease?(version: string): Promise<void>
+	/** Non-null when this process is an outdated leftover copy of the app. */
+	staleCopyStatus?(): Promise<StaleCopyInfo | null>
+	/** Launch the registered (newer) installed copy; the backend exits this one. */
+	openInstalledCopy?(): Promise<void>
+}
+
+export interface StaleCopyInfo {
+	installedVersion: string
+	installLocation: string
 }

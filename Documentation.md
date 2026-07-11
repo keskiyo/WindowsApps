@@ -1,9 +1,9 @@
 # Windows Apps Technical Documentation
 
-Technical reference for Windows Apps `0.2.3`.
+Technical reference for Windows Apps `0.2.4`.
 
 [README](README.md) ·
-[Release 0.2.3](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.3) ·
+[Release 0.2.4](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.4) ·
 [Telegram](https://t.me/keskiyo)
 
 ---
@@ -401,7 +401,7 @@ npm run tauri build
 Expected Windows x64 bundle:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.3_x64-setup.exe
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.4_x64-setup.exe
 ```
 
 The NSIS setup executable is the primary public artifact.
@@ -434,21 +434,21 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo check --manifest-path src-tauri/Cargo.toml
 npm run tauri build
-powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.3
-powershell -NoProfile -File scripts/verify-release-notes.ps1 -Path Release.md -Tag v0.2.3
+powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.4
+powershell -NoProfile -File scripts/verify-release-notes.ps1 -Path Release.md -Tag v0.2.4
 ```
 
 After the GitHub Action publishes a release, download the assets into a local folder and run:
 
 ```powershell
-powershell -NoProfile -File scripts/verify-release-assets.ps1 -AssetsDir path\to\downloaded-assets -Tag v0.2.3
+powershell -NoProfile -File scripts/verify-release-assets.ps1 -AssetsDir path\to\downloaded-assets -Tag v0.2.4
 ```
 
 Publish:
 
 ```powershell
-git tag -a v0.2.3 -m "Windows Apps 0.2.3"
-git push origin v0.2.3
+git tag -a v0.2.4 -m "Windows Apps 0.2.4"
+git push origin v0.2.4
 ```
 
 Do not reuse or move a tag after a public Release has been published. Increase the version for the next release.
@@ -524,5 +524,5 @@ The installer is not Authenticode-signed. Download it only from the official pro
 ---
 
 [README](README.md) ·
-[Release 0.2.3](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.3) ·
+[Release 0.2.4](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.4) ·
 [Telegram: @keskiyo](https://t.me/keskiyo)

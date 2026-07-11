@@ -28,6 +28,7 @@ export type {
 export type {
 	GlobalShortcutStatus,
 	ScanSettings,
+	StaleCopyInfo,
 	SystemClient,
 	SystemSettings,
 	UninstallHistoryEntry,

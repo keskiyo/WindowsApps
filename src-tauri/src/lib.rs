@@ -8,7 +8,9 @@ use catalog::cache::CatalogCache;
 use catalog::scan_coordinator::{ScanCoordinator, ScanJob, Submission};
 use catalog::sync::{compute_delta, SyncRequest};
 use catalog::{cache, AppInfo, LaunchKind, SourceKind, UninstallTarget};
-use platform::windows::{autostart, global_shortcut, launcher, uninstall_history, uninstaller};
+use platform::windows::{
+    autostart, global_shortcut, install_registry, launcher, uninstall_history, uninstaller,
+};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -393,6 +395,49 @@ async fn open_telegram() -> Result<(), String> {
         .map_err(|error| format!("Telegram launch was interrupted: {error}"))?
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StaleCopy {
+    installed_version: String,
+    install_location: String,
+}
+
+/// Reports when this process is an outdated leftover copy: the uninstall registry says a
+/// newer version is installed in a different directory (e.g. an update landed elsewhere).
+#[tauri::command]
+fn stale_copy_status(app: tauri::AppHandle) -> Option<StaleCopy> {
+    let product = app.config().product_name.clone()?;
+    install_registry::stale_copy_info(&product).map(|info| StaleCopy {
+        installed_version: info.installed_version,
+        install_location: info.install_location,
+    })
+}
+
+/// Launches the registered (newer) installed copy and exits this outdated one. The target
+/// path comes from the registry, not from the webview.
+#[tauri::command]
+fn open_installed_copy(app: tauri::AppHandle) -> Result<(), String> {
+    let product = app
+        .config()
+        .product_name
+        .clone()
+        .ok_or_else(|| "Product name is not configured".to_string())?;
+    let info = install_registry::stale_copy_info(&product)
+        .ok_or_else(|| "No newer installed copy was found".to_string())?;
+    let binary = std::env::current_exe()
+        .ok()
+        .and_then(|path| path.file_name().map(|name| name.to_os_string()))
+        .unwrap_or_else(|| "app.exe".into());
+    let target = std::path::Path::new(&info.install_location).join(binary);
+    launcher::shell_execute(&target.to_string_lossy())?;
+    // Give the invoke response a moment to reach the webview before exiting.
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        app.exit(0);
+    });
+    Ok(())
+}
+
 #[tauri::command]
 async fn open_github() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(|| {
@@ -768,6 +813,19 @@ pub fn run() {
                 let settings = catalog::scan_settings::read(&app_data_dir);
                 restart_change_watcher(app.handle().clone(), &settings);
             }
+            // Installed copies self-heal their registry footprint on every start: the NSIS
+            // install-location key follows the directory the app actually runs from (so
+            // updates land in the user's chosen folder), and an enabled autostart entry is
+            // rewritten if the executable moved.
+            if let Some(install_dir) = install_registry::installed_copy_dir() {
+                let config = app.config();
+                let publisher = config.bundle.publisher.clone().unwrap_or_default();
+                let product = config.product_name.clone().unwrap_or_default();
+                install_registry::sync_install_dir(&publisher, &product, &install_dir);
+                if autostart::is_enabled().unwrap_or(false) {
+                    let _ = autostart::set_enabled(true);
+                }
+            }
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -796,7 +854,9 @@ pub fn run() {
             set_scan_settings,
             open_telegram,
             open_github,
-            open_release
+            open_release,
+            stale_copy_status,
+            open_installed_copy
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

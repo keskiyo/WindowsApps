@@ -19,6 +19,7 @@ import { CommandPalette } from './components/shared/CommandPalette'
 import { GlobalActivityBar } from './components/shared/GlobalActivityBar'
 import { Header } from './components/shared/Header'
 import { ScanPrompt } from './components/shared/ScanPrompt'
+import { StaleCopyBanner } from './components/shared/StaleCopyBanner'
 import { TitleBar } from './components/shared/TitleBar'
 import { UpdateDialog } from './components/shared/UpdateDialog'
 import { WorkspaceSummary } from './components/shared/WorkspaceSummary'
@@ -36,7 +37,12 @@ import {
 	type AppState,
 } from './store/appStore'
 import { AppStoreProvider } from './store/storeContext'
-import type { AppInfo, SystemClient, UninstallPreview } from './types'
+import type {
+	AppInfo,
+	StaleCopyInfo,
+	SystemClient,
+	UninstallPreview,
+} from './types'
 
 interface AppProps {
 	store?: StoreApi<AppState>
@@ -292,11 +298,36 @@ export function App({
 	const activityActive =
 		state.launchingIds.length > 0 || state.isRefreshing
 	const updater = useUpdater()
+	const [staleCopy, setStaleCopy] = useState<StaleCopyInfo | null>(null)
+	useEffect(() => {
+		let active = true
+		systemClient
+			.staleCopyStatus?.()
+			.then(value => {
+				if (active) setStaleCopy(value ?? null)
+			})
+			.catch(() => {
+				// Not in Tauri (dev browser / tests) — no stale copy to report.
+			})
+		return () => {
+			active = false
+		}
+	}, [systemClient])
 
 	return (
 		<AppStoreProvider store={store}>
 			<div className='app-shell theme-graphite-surface flex h-screen flex-col overflow-hidden'>
 				<TitleBar />
+				{staleCopy && (
+					<StaleCopyBanner
+						installedVersion={staleCopy.installedVersion}
+						installLocation={staleCopy.installLocation}
+						onOpenInstalled={() =>
+							systemClient.openInstalledCopy?.() ?? Promise.resolve()
+						}
+						onDismiss={() => setStaleCopy(null)}
+					/>
+				)}
 				{updater.update && (
 					<UpdateDialog
 						version={updater.update.version}
