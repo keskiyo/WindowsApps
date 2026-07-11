@@ -28,6 +28,52 @@ describe('SettingsPage', () => {
 		openGithub: vi.fn().mockResolvedValue(undefined),
 	})
 
+	it('runs the manual update check on the shared updater instance', async () => {
+		// The update dialog lives on App's updater; if the button checked on a private
+		// instance, a dismissed update could never be reopened from Settings.
+		const checkNow = vi.fn().mockResolvedValue(undefined)
+		const updater = {
+			update: null,
+			installing: false,
+			progress: null,
+			downloadedBytes: 0,
+			totalBytes: null,
+			phase: 'idle' as const,
+			error: null,
+			status: 'idle' as const,
+			checkNow,
+			install: vi.fn().mockResolvedValue(undefined),
+			dismiss: vi.fn(),
+		}
+		render(<SettingsPage client={systemClient()} updater={updater} />)
+		await screen.findByText('Version 0.1.0')
+
+		await userEvent.click(
+			screen.getByRole('button', { name: /Check updates/ }),
+		)
+
+		expect(checkNow).toHaveBeenCalledOnce()
+	})
+
+	it('places catalog maintenance beside uninstall history', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+
+		const maintenance = screen.getByRole('heading', {
+			name: 'Catalog maintenance',
+		})
+		const history = screen.getByRole('heading', { name: 'Uninstall history' })
+		expect(
+			maintenance.compareDocumentPosition(history) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy()
+	})
+
 	it('confirms and starts a forced full scan', async () => {
 		const onForceFullScan = vi.fn().mockResolvedValue(undefined)
 		render(

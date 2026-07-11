@@ -14,7 +14,11 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useSystemSettings } from '../../hooks/useSystemSettings'
-import { useUpdater, type UpdateCheckStatus } from '../../hooks/useUpdater'
+import {
+	useUpdater,
+	type UpdateCheckStatus,
+	type UpdaterState,
+} from '../../hooks/useUpdater'
 import type { CatalogDiagnostics, SystemClient } from '../../types'
 import { PathEditor } from './PathEditor'
 import { UninstallHistory } from './UninstallHistory'
@@ -26,6 +30,12 @@ interface Props {
 	catalogDiagnostics?: CatalogDiagnostics | null
 	onClearIconCache?: () => Promise<void>
 	onRepairMissingIcons?: () => Promise<void>
+	/**
+	 * Shared updater state from App. Without it, "Check updates" would run on a second
+	 * updater instance while the update dialog listens to App's instance — a manual check
+	 * would then never reopen the dialog after the user dismissed it.
+	 */
+	updater?: UpdaterState
 }
 
 export function SettingsPage({
@@ -35,6 +45,7 @@ export function SettingsPage({
 	catalogDiagnostics,
 	onClearIconCache,
 	onRepairMissingIcons,
+	updater: sharedUpdater,
 }: Props) {
 	const {
 		settings,
@@ -57,7 +68,10 @@ export function SettingsPage({
 	const [excludedPath, setExcludedPath] = useState('')
 	const [iconAction, setIconAction] = useState<'clear' | 'repair' | null>(null)
 	const [iconMessage, setIconMessage] = useState<string | null>(null)
-	const updater = useUpdater({ autoCheck: false })
+	// Hooks must run unconditionally; the local instance is a fallback for isolated
+	// rendering (tests, storybook-style usage) and stays idle when App provides one.
+	const localUpdater = useUpdater({ autoCheck: false })
+	const updater = sharedUpdater ?? localUpdater
 	const updateStatusLabel = updateStatusText(updater.status)
 	async function runIconAction(
 		action: 'clear' | 'repair',
@@ -185,6 +199,116 @@ export function SettingsPage({
 					/>
 				</div>
 			</div>
+			<div className='settings-surface mt-5 overflow-hidden rounded-2xl border border-white/85 bg-white/58'>
+				<div className='flex items-center gap-4 border-b border-slate-200 p-5'>
+					<span className='grid size-10 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
+						<Power size={19} aria-hidden='true' />
+					</span>
+					<div className='min-w-0 flex-1'>
+						<h2 className='font-medium'>
+							Launch when Windows starts
+						</h2>
+						<p className='mt-1 text-sm text-slate-600'>
+							Open Windows Apps automatically after you sign in.
+						</p>
+					</div>
+					<button
+						type='button'
+						role='switch'
+						aria-label='Launch when Windows starts'
+						aria-checked={settings?.autostartEnabled ?? false}
+						disabled={!settings || saving}
+						onClick={() => void toggleAutostart()}
+						className={`relative h-7 w-12 rounded-full transition focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50 ${settings?.autostartEnabled ? 'bg-violet-600' : 'bg-slate-300'}`}
+					>
+						<span
+							className={`absolute left-1 top-1 size-5 rounded-full bg-slate-50 shadow transition-transform ${settings?.autostartEnabled ? 'translate-x-5' : 'translate-x-0'}`}
+						/>
+					</button>
+				</div>
+				<div className='flex items-center gap-4 border-b border-slate-200 p-5'>
+					<span className='grid size-10 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
+						<Keyboard size={19} aria-hidden='true' />
+					</span>
+					<div className='flex-1'>
+						<h2 className='font-medium'>Global shortcut</h2>
+						<p className='mt-1 text-sm text-slate-600'>
+							Uses the physical Q key, independent of keyboard
+							layout.
+						</p>
+					</div>
+					<kbd className='rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-sm text-slate-700'>
+						{settings?.shortcut.label ?? 'Win+Shift+Q'}
+					</kbd>
+				</div>
+				<div className='flex items-center gap-4 border-b border-slate-200 p-5'>
+					<span className='grid size-10 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
+						<Github size={19} aria-hidden='true' />
+					</span>
+					<div className='min-w-0 flex-1'>
+						<h2 className='font-medium'>Updates and source</h2>
+						<p className='mt-1 text-sm text-slate-600'>
+							{updater.update
+								? `Version ${updater.update.version} is available.`
+								: updateStatusLabel}
+						</p>
+					</div>
+					<div className='flex shrink-0 flex-wrap justify-end gap-2'>
+						<button
+							type='button'
+							disabled={updater.status === 'checking'}
+							onClick={() => void updater.checkNow()}
+							className='inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-medium text-white shadow-[0_8px_18px_rgba(104,69,216,.18)] hover:bg-violet-500 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50'
+						>
+							<RefreshCw
+								size={16}
+								className={
+									updater.status === 'checking'
+										? 'animate-spin'
+										: ''
+								}
+								aria-hidden='true'
+							/>
+							Check updates
+						</button>
+						<button
+							type='button'
+							aria-label='Open Windows Apps on GitHub'
+							onClick={() => void client.openGithub()}
+							className='inline-flex items-center gap-2 rounded-xl border border-slate-300/70 px-3.5 py-2 text-sm font-medium text-slate-200 hover:bg-white/8 focus-visible:outline-2 focus-visible:outline-violet-500'
+						>
+							<Github size={16} aria-hidden='true' />
+							keskiyo
+						</button>
+					</div>
+				</div>
+				<button
+					type='button'
+					aria-label='Open @keskiyo on Telegram'
+					onClick={() => void client.openTelegram()}
+					className='flex w-full items-center gap-4 p-5 text-left hover:bg-violet-100/55 focus-visible:outline-2 focus-visible:outline-violet-500'
+				>
+					<span className='grid size-10 place-items-center rounded-xl bg-[#229ED9]/15 text-[#5cc8f5]'>
+						<Send size={19} aria-hidden='true' />
+					</span>
+					<span className='flex-1'>
+						<span className='block font-medium'>Telegram</span>
+						<span className='mt-1 block text-sm text-slate-600'>
+							@keskiyo
+						</span>
+					</span>
+					<ExternalLink
+						size={17}
+						className='text-slate-500'
+						aria-hidden='true'
+					/>
+				</button>
+			</div>
+			{settings?.shortcut.error && (
+				<p className='mt-4 text-sm text-amber-700'>
+					{settings.shortcut.error}
+				</p>
+			)}
 			{onForceFullScan && (
 				<div className='settings-surface mt-5 rounded-2xl border border-white/85 bg-white/58 p-5'>
 					<div className='flex items-center gap-4'>
@@ -347,116 +471,6 @@ export function SettingsPage({
 						</div>
 					)}
 				</div>
-			)}
-			<div className='settings-surface mt-5 overflow-hidden rounded-2xl border border-white/85 bg-white/58'>
-				<div className='flex items-center gap-4 border-b border-slate-200 p-5'>
-					<span className='grid size-10 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
-						<Power size={19} aria-hidden='true' />
-					</span>
-					<div className='min-w-0 flex-1'>
-						<h2 className='font-medium'>
-							Launch when Windows starts
-						</h2>
-						<p className='mt-1 text-sm text-slate-600'>
-							Open Windows Apps automatically after you sign in.
-						</p>
-					</div>
-					<button
-						type='button'
-						role='switch'
-						aria-label='Launch when Windows starts'
-						aria-checked={settings?.autostartEnabled ?? false}
-						disabled={!settings || saving}
-						onClick={() => void toggleAutostart()}
-						className={`relative h-7 w-12 rounded-full transition focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50 ${settings?.autostartEnabled ? 'bg-violet-600' : 'bg-slate-300'}`}
-					>
-						<span
-							className={`absolute left-1 top-1 size-5 rounded-full bg-slate-50 shadow transition-transform ${settings?.autostartEnabled ? 'translate-x-5' : 'translate-x-0'}`}
-						/>
-					</button>
-				</div>
-				<div className='flex items-center gap-4 border-b border-slate-200 p-5'>
-					<span className='grid size-10 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
-						<Keyboard size={19} aria-hidden='true' />
-					</span>
-					<div className='flex-1'>
-						<h2 className='font-medium'>Global shortcut</h2>
-						<p className='mt-1 text-sm text-slate-600'>
-							Uses the physical Q key, independent of keyboard
-							layout.
-						</p>
-					</div>
-					<kbd className='rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-sm text-slate-700'>
-						{settings?.shortcut.label ?? 'Win+Shift+Q'}
-					</kbd>
-				</div>
-				<div className='flex items-center gap-4 border-b border-slate-200 p-5'>
-					<span className='grid size-10 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
-						<Github size={19} aria-hidden='true' />
-					</span>
-					<div className='min-w-0 flex-1'>
-						<h2 className='font-medium'>Updates and source</h2>
-						<p className='mt-1 text-sm text-slate-600'>
-							{updater.update
-								? `Version ${updater.update.version} is available.`
-								: updateStatusLabel}
-						</p>
-					</div>
-					<div className='flex shrink-0 flex-wrap justify-end gap-2'>
-						<button
-							type='button'
-							disabled={updater.status === 'checking'}
-							onClick={() => void updater.checkNow()}
-							className='inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-medium text-white shadow-[0_8px_18px_rgba(104,69,216,.18)] hover:bg-violet-500 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50'
-						>
-							<RefreshCw
-								size={16}
-								className={
-									updater.status === 'checking'
-										? 'animate-spin'
-										: ''
-								}
-								aria-hidden='true'
-							/>
-							Check updates
-						</button>
-						<button
-							type='button'
-							aria-label='Open Windows Apps on GitHub'
-							onClick={() => void client.openGithub()}
-							className='inline-flex items-center gap-2 rounded-xl border border-slate-300/70 px-3.5 py-2 text-sm font-medium text-slate-200 hover:bg-white/8 focus-visible:outline-2 focus-visible:outline-violet-500'
-						>
-							<Github size={16} aria-hidden='true' />
-							keskiyo
-						</button>
-					</div>
-				</div>
-				<button
-					type='button'
-					aria-label='Open @keskiyo on Telegram'
-					onClick={() => void client.openTelegram()}
-					className='flex w-full items-center gap-4 p-5 text-left hover:bg-violet-100/55 focus-visible:outline-2 focus-visible:outline-violet-500'
-				>
-					<span className='grid size-10 place-items-center rounded-xl bg-[#229ED9]/15 text-[#5cc8f5]'>
-						<Send size={19} aria-hidden='true' />
-					</span>
-					<span className='flex-1'>
-						<span className='block font-medium'>Telegram</span>
-						<span className='mt-1 block text-sm text-slate-600'>
-							@keskiyo
-						</span>
-					</span>
-					<ExternalLink
-						size={17}
-						className='text-slate-500'
-						aria-hidden='true'
-					/>
-				</button>
-			</div>
-			{settings?.shortcut.error && (
-				<p className='mt-4 text-sm text-amber-700'>
-					{settings.shortcut.error}
-				</p>
 			)}
 			<UninstallHistory client={client} />
 			{error && (

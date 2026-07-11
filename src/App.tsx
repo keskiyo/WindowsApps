@@ -380,6 +380,7 @@ export function App({
 								catalogDiagnostics={state.catalogDiagnostics}
 								onClearIconCache={state.clearIconCache}
 								onRepairMissingIcons={state.repairMissingIcons}
+								updater={updater}
 							/>
 						) : !state.isLoading &&
 						  !state.hasCache &&
