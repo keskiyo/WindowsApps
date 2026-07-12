@@ -12,6 +12,7 @@ pub struct ExecutableMetadata {
     pub version: Option<String>,
     pub publisher: Option<String>,
     pub product_name: Option<String>,
+    pub original_filename: Option<String>,
 }
 
 pub fn read(path: &Path) -> ExecutableMetadata {
@@ -39,6 +40,7 @@ pub fn read(path: &Path) -> ExecutableMetadata {
         version: string_value(&data, language, code_page, "ProductVersion"),
         publisher: string_value(&data, language, code_page, "CompanyName"),
         product_name: string_value(&data, language, code_page, "ProductName"),
+        original_filename: string_value(&data, language, code_page, "OriginalFilename"),
     }
 }
 

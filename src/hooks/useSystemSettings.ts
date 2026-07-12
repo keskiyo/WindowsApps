@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ScanSettings, SystemClient, SystemSettings } from '../types'
 
 interface Options {
@@ -25,6 +25,7 @@ export function useSystemSettings({
 	const [forcing, setForcing] = useState(false)
 	const [confirmReset, setConfirmReset] = useState(false)
 	const [resetting, setResetting] = useState(false)
+	const maintenanceInFlight = useRef(false)
 
 	useEffect(() => {
 		let active = true
@@ -93,7 +94,8 @@ export function useSystemSettings({
 	}
 
 	async function forceFullScan() {
-		if (!onForceFullScan || forcing) return
+		if (!onForceFullScan || maintenanceInFlight.current) return
+		maintenanceInFlight.current = true
 		setForcing(true)
 		setError(null)
 		try {
@@ -102,12 +104,14 @@ export function useSystemSettings({
 		} catch (reason) {
 			setError(String(reason))
 		} finally {
+			maintenanceInFlight.current = false
 			setForcing(false)
 		}
 	}
 
 	async function resetCatalogCache() {
-		if (!onResetCatalogCache || resetting) return
+		if (!onResetCatalogCache || maintenanceInFlight.current) return
+		maintenanceInFlight.current = true
 		setResetting(true)
 		setError(null)
 		try {
@@ -116,6 +120,7 @@ export function useSystemSettings({
 		} catch (reason) {
 			setError(String(reason))
 		} finally {
+			maintenanceInFlight.current = false
 			setResetting(false)
 		}
 	}

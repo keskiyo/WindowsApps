@@ -1,6 +1,7 @@
 use crate::platform::windows::uninstaller::UninstallMechanism;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::cmp::Reverse;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -63,7 +64,7 @@ fn write(app_data_dir: &Path, entries: &[UninstallHistoryEntry]) -> io::Result<(
 }
 
 fn sort_and_limit(entries: &mut Vec<UninstallHistoryEntry>) {
-    entries.sort_by(|left, right| right.timestamp.cmp(&left.timestamp));
+    entries.sort_by_key(|entry| Reverse(entry.timestamp));
     entries.truncate(MAX_HISTORY_ENTRIES);
 }
 

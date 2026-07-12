@@ -9,6 +9,21 @@ export type AppSourceKind =
 	| 'steam'
 	| 'portable'
 export type UninstallMechanism = 'registered_command' | 'msi' | 'msix'
+export type AppVisibilityClass = 'primary' | 'auxiliary' | 'rejected'
+export type AppVisibilityReason =
+	| 'start_menu_registration'
+	| 'windows_app_registration'
+	| 'steam_registration'
+	| 'portable_candidate'
+	| 'product_metadata'
+	| 'registered_product'
+	| 'executable_product_match'
+	| 'runtime_directory'
+	| 'product_component'
+	| 'documentation_shortcut'
+	| 'installer'
+	| 'maintenance_executable'
+	| 'insufficient_launch_evidence'
 
 export interface AppInfo {
 	id: string
@@ -21,11 +36,19 @@ export interface AppInfo {
 	description: string | null
 	version: string | null
 	publisher: string | null
+	productName?: string | null
+	originalFilename?: string | null
 	installLocation: string | null
 	canUninstall: boolean
+	launchArguments?: string | null
+	canonicalIdentity?: string | null
+	userPromoted?: boolean
+	visibilityClass?: AppVisibilityClass
+	visibilityScore?: number
+	visibilityReasons?: AppVisibilityReason[]
 }
 
-export type AppView = 'all' | 'favorites' | 'settings' | 'hidden'
+export type AppView = 'all' | 'favorites' | 'settings' | 'hidden' | 'auxiliary'
 
 export interface CatalogSnapshot {
 	apps: AppInfo[]
@@ -40,6 +63,7 @@ export interface CatalogDiagnostics {
 	mode: 'watch' | 'startup' | 'refresh' | 'force'
 	totalApps: number
 	sourceCounts: Record<string, number>
+	visibilityCounts?: Record<string, number>
 	added: number
 	removed: number
 	updated: number
@@ -73,6 +97,8 @@ export interface AppHydrationPatch {
 	description?: string
 	version?: string
 	publisher?: string
+	productName?: string
+	originalFilename?: string
 	installLocation?: string
 	canUninstall?: boolean
 }

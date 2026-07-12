@@ -115,6 +115,7 @@ mod tests {
             r"C:\Apps\gettext.exe",
             r"C:\Apps\printf_gettext.exe",
             r"C:\Apps\printf_ngettext.exe",
+            r"C:\Downloads\tsetup-x64.7.3.4.exe",
         ] {
             assert!(!is_portable_candidate(Path::new(path)), "{path}");
         }

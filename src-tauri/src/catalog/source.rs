@@ -61,11 +61,18 @@ mod tests {
             description: None,
             version: None,
             publisher: None,
+            product_name: None,
+            original_filename: None,
             install_location: None,
             can_uninstall: false,
             uninstall: None,
             resolved_path: None,
             shortcut_icon_path: None,
+            launch_arguments: None,
+            canonical_identity: None,
+            visibility_class: Default::default(),
+            visibility_score: 0,
+            visibility_reasons: Vec::new(),
         }
     }
 

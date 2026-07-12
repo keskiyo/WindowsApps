@@ -26,6 +26,7 @@ import type {
 	CategoryDefinition,
 } from '../../types'
 import { FavoritesGrid } from './FavoritesGrid'
+import { AuxiliaryGrid } from './AuxiliaryGrid'
 import { HiddenGrid } from './HiddenGrid'
 import { SortableCategorySection } from './SortableCategorySection'
 
@@ -52,6 +53,8 @@ interface Props {
 	onUninstall(app: AppInfo): void
 	onHide(id: string): void
 	onRestore(id: string): void
+	onPromoteAuxiliary(id: string): void
+	onDemoteAuxiliary(id: string): void
 }
 
 export function AppGrid(props: Props) {
@@ -87,6 +90,7 @@ export function AppGrid(props: Props) {
 				onUninstall={props.onUninstall}
 				onHide={props.onHide}
 				onRestore={props.onRestore}
+				onDemote={props.onDemoteAuxiliary}
 			/>
 		)
 	if (props.activeView === 'hidden')
@@ -104,6 +108,24 @@ export function AppGrid(props: Props) {
 				onUninstall={props.onUninstall}
 				onHide={props.onHide}
 				onRestore={props.onRestore}
+				onDemote={props.onDemoteAuxiliary}
+			/>
+		)
+	if (props.activeView === 'auxiliary')
+		return (
+			<AuxiliaryGrid
+				apps={props.apps}
+				hasQuery={props.hasQuery}
+				favoriteAppIds={props.favoriteAppIds}
+				categories={props.categories}
+				categoryOrder={props.categoryOrder}
+				onToggleFavorite={props.onToggleFavorite}
+				onLaunch={props.onLaunch}
+				onMoveApp={props.onMoveApp}
+				onInfo={props.onInfo}
+				onUninstall={props.onUninstall}
+				onPromote={props.onPromoteAuxiliary}
+				onDemote={props.onDemoteAuxiliary}
 			/>
 		)
 	if (!props.apps.length)
@@ -190,6 +212,7 @@ export function AppGrid(props: Props) {
 							onUninstall={props.onUninstall}
 							onHide={props.onHide}
 							onRestore={props.onRestore}
+							onDemote={props.onDemoteAuxiliary}
 							onRenameCategory={props.onRenameCategory}
 							onDeleteCategory={props.onDeleteCategory}
 						/>

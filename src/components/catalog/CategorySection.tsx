@@ -23,6 +23,7 @@ interface Props {
 	onUninstall(app: AppInfo): void
 	onHide(id: string): void
 	onRestore(id: string): void
+	onDemote(id: string): void
 	onRenameCategory(
 		id: string,
 		label: string,
@@ -47,6 +48,7 @@ export function CategorySection({
 	onUninstall,
 	onHide,
 	onRestore,
+	onDemote,
 	onRenameCategory,
 	onDeleteCategory,
 }: Props) {
@@ -130,6 +132,7 @@ export function CategorySection({
 							onUninstall={onUninstall}
 							onHide={onHide}
 							onRestore={onRestore}
+							onDemote={onDemote}
 						/>
 					))}
 				</div>

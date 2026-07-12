@@ -264,6 +264,8 @@ fn apply_hydration_patches_to_document(
         target.description = patch.description.clone();
         target.version = patch.version.clone();
         target.publisher = patch.publisher.clone();
+        target.product_name = patch.product_name.clone();
+        target.original_filename = patch.original_filename.clone();
         target.install_location = patch.install_location.clone();
         target.can_uninstall = patch.can_uninstall.unwrap_or(target.can_uninstall);
         if patch.icon_base64.is_some() {
@@ -879,11 +881,18 @@ mod tests {
             description: None,
             version: None,
             publisher: None,
+            product_name: None,
+            original_filename: None,
             install_location: None,
             can_uninstall: false,
             uninstall: None,
             resolved_path: None,
             shortcut_icon_path: None,
+            launch_arguments: None,
+            canonical_identity: None,
+            visibility_class: Default::default(),
+            visibility_score: 0,
+            visibility_reasons: Vec::new(),
         }
     }
 
@@ -962,6 +971,8 @@ mod tests {
                     description: None,
                     version: None,
                     publisher: None,
+                    product_name: None,
+                    original_filename: None,
                     install_location: None,
                     can_uninstall: None,
                 },
@@ -972,6 +983,8 @@ mod tests {
                     description: None,
                     version: None,
                     publisher: None,
+                    product_name: None,
+                    original_filename: None,
                     install_location: None,
                     can_uninstall: None,
                 },

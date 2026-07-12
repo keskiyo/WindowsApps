@@ -19,8 +19,10 @@ interface AppCardProps {
 	onInfo(app: AppInfo): void
 	onUninstall(app: AppInfo): void
 	isHidden?: boolean
+	isAuxiliary?: boolean
 	onHide(id: string): void
 	onRestore(id: string): void
+	onDemote(id: string): void
 }
 
 function AppCardComponent({
@@ -34,8 +36,10 @@ function AppCardComponent({
 	onInfo,
 	onUninstall,
 	isHidden = false,
+	isAuxiliary = false,
 	onHide,
 	onRestore,
+	onDemote,
 }: AppCardProps) {
 	const [menuOpen, setMenuOpen] = useState(false)
 	const launching = useIsLaunching(app.id)
@@ -71,7 +75,7 @@ function AppCardComponent({
 				aria-label={`Launch ${app.name}`}
 				aria-busy={launching}
 				disabled={launching}
-				title={launching ? 'Launching…' : (app.description ?? app.path)}
+				title={launching ? 'Launching…' : app.name}
 				className='relative z-1 flex min-h-34 w-full flex-col items-center justify-center gap-3 px-4 py-4 text-center focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-violet-500 disabled:cursor-progress'
 			>
 				<span className='relative grid size-13 place-items-center rounded-xl bg-white/52 shadow-[inset_1px_1px_3px_rgba(111,124,146,.13),inset_-2px_-2px_5px_rgba(255,255,255,.55),0_0_0_1px_rgba(167,139,250,.18)] ring-1 ring-inset ring-violet-300/70'>
@@ -131,7 +135,7 @@ function AppCardComponent({
 			>
 				<Grip size={16} aria-hidden='true' />
 			</button>
-			<button
+			{!isAuxiliary && <button
 				type='button'
 				aria-label={`${isFavorite ? 'Remove' : 'Add'} ${app.name} ${isFavorite ? 'from' : 'to'} favorites`}
 				aria-pressed={isFavorite}
@@ -146,7 +150,7 @@ function AppCardComponent({
 					fill={isFavorite ? 'currentColor' : 'none'}
 					aria-hidden='true'
 				/>
-			</button>
+			</button>}
 			{menuOpen && (
 				<AppActionsMenu
 					app={app}
@@ -157,8 +161,11 @@ function AppCardComponent({
 					onInfo={onInfo}
 					onUninstall={onUninstall}
 					isHidden={isHidden}
+					isUserPromoted={app.userPromoted}
 					onHide={onHide}
 					onRestore={onRestore}
+					onDemote={onDemote}
+					anchorRef={gripRef}
 				/>
 			)}
 		</article>

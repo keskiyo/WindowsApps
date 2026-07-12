@@ -1,13 +1,18 @@
-import { ChevronRight, EyeOff, Info, RotateCcw, Trash2 } from 'lucide-react'
+import { ChevronRight, EyeOff, Info, RotateCcw, Trash2, Wrench } from 'lucide-react'
 import {
 	useEffect,
 	useLayoutEffect,
 	useRef,
 	useState,
 	type CSSProperties,
+	type RefObject,
 } from 'react'
+import { createPortal } from 'react-dom'
 import { useSpotlight } from '../../hooks/useSpotlight'
-import { horizontalViewportShift } from '../../lib/positioning'
+import {
+	floatingMenuPosition,
+	requiredMenuScroll,
+} from '../../lib/positioning'
 import { SpotlightLayer } from '../shared/SpotlightLayer'
 import {
 	categoryLabel,
@@ -25,8 +30,11 @@ interface Props {
 	onInfo(app: AppInfo): void
 	onUninstall(app: AppInfo): void
 	isHidden?: boolean
+	isUserPromoted?: boolean
 	onHide(id: string): void
 	onRestore(id: string): void
+	onDemote(id: string): void
+	anchorRef: RefObject<HTMLButtonElement | null>
 }
 
 export function AppActionsMenu({
@@ -38,43 +46,62 @@ export function AppActionsMenu({
 	onInfo,
 	onUninstall,
 	isHidden = false,
+	isUserPromoted = false,
 	onHide,
 	onRestore,
+	onDemote,
+	anchorRef,
 }: Props) {
 	const spotlight = useSpotlight()
 	const [showCategories, setShowCategories] = useState(false)
-	const [menuShift, setMenuShift] = useState(0)
-	const menuShiftRef = useRef(0)
+	const [position, setPosition] = useState({ left: 12, top: 48 })
 	const menuRef = useRef<HTMLDivElement>(null)
+	const adjustedHeightRef = useRef(0)
 	useLayoutEffect(() => {
-		function keepMenuInViewport() {
-			const bounds = menuRef.current?.getBoundingClientRect()
-			if (!bounds || (bounds.width === 0 && bounds.height === 0)) return
-			const nextShift = horizontalViewportShift(
-				bounds.left - menuShiftRef.current,
-				bounds.right - menuShiftRef.current,
-				window.innerWidth,
+		function placeMenu() {
+			const anchor = anchorRef.current?.getBoundingClientRect()
+			const menu = menuRef.current?.getBoundingClientRect()
+			if (!anchor || !menu || (menu.width === 0 && menu.height === 0)) return
+			setPosition(
+				floatingMenuPosition(
+					anchor,
+					menu.width,
+					menu.height,
+					window.innerWidth,
+					window.innerHeight,
+				),
 			)
-			menuShiftRef.current = nextShift
-			setMenuShift(nextShift)
-		}
-		keepMenuInViewport()
-		window.addEventListener('resize', keepMenuInViewport)
-		return () => window.removeEventListener('resize', keepMenuInViewport)
-	}, [showCategories])
-	// When the menu (or its expanded category list) doesn't fit the viewport, gently
-	// scroll it fully into view instead of leaving it clipped at the edge.
-	useEffect(() => {
-		const element = menuRef.current
-		if (!element) return
-		const id = requestAnimationFrame(() => {
-			const bounds = element.getBoundingClientRect()
-			if (bounds.bottom > window.innerHeight - 8 || bounds.top < 44) {
-				element.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+			const menuHeight = Math.round(menu.height)
+			const scrollAmount = requiredMenuScroll(
+				anchor.bottom,
+				menu.height,
+				window.innerHeight,
+			)
+			const catalog = document.getElementById('catalog-scroll')
+			const remaining = catalog
+				? Math.max(0, catalog.scrollHeight - catalog.clientHeight - catalog.scrollTop)
+				: 0
+			if (
+				catalog &&
+				scrollAmount > 0 &&
+				remaining > 0 &&
+				adjustedHeightRef.current !== menuHeight
+			) {
+				adjustedHeightRef.current = menuHeight
+				catalog.scrollBy({
+					top: Math.min(scrollAmount, remaining),
+					behavior: 'smooth',
+				})
 			}
-		})
-		return () => cancelAnimationFrame(id)
-	}, [showCategories])
+		}
+		placeMenu()
+		window.addEventListener('resize', placeMenu)
+		window.addEventListener('scroll', placeMenu, true)
+		return () => {
+			window.removeEventListener('resize', placeMenu)
+			window.removeEventListener('scroll', placeMenu, true)
+		}
+	}, [anchorRef, showCategories])
 	useEffect(() => {
 		function keydown(event: KeyboardEvent) {
 			if (event.key === 'Escape') onClose()
@@ -110,13 +137,14 @@ export function AppActionsMenu({
 		const next = (current + delta + items.length) % items.length
 		items[next].focus()
 	}
-	return (
+	return createPortal(
 		<div
 			ref={menuRef}
 			onKeyDown={onMenuKeyDown}
 			style={
 				{
-					transform: `translateX(${menuShift}px)`,
+					left: position.left,
+					top: position.top,
 					// Reset the spotlight vars so menu items don't inherit the parent card's
 					// glow (each item drives its own on hover).
 					'--spotlight-opacity': 0,
@@ -124,7 +152,7 @@ export function AppActionsMenu({
 			}
 			role='menu'
 			aria-label={`${app.name} actions`}
-			className='motion-panel absolute left-2 top-11 z-110 flex w-56 max-w-[calc(100vw-1rem)] flex-col gap-0.5 rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-[0_18px_45px_rgba(53,61,82,.2)]'
+			className='motion-panel fixed z-[600] flex max-h-[calc(100vh-1.5rem)] w-56 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 overflow-y-auto rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-[0_18px_45px_rgba(53,61,82,.2)]'
 		>
 			{!isHidden && (
 				<button
@@ -185,6 +213,7 @@ export function AppActionsMenu({
 				role='menuitem'
 				onClick={() => {
 					if (isHidden) onRestore(app.id)
+					else if (isUserPromoted) onDemote(app.id)
 					else onHide(app.id)
 					onClose()
 				}}
@@ -194,10 +223,16 @@ export function AppActionsMenu({
 				<SpotlightLayer size={70} />
 				{isHidden ? (
 					<RotateCcw size={15} className='text-slate-400' aria-hidden='true' />
+				) : isUserPromoted ? (
+					<Wrench size={15} className='text-slate-400' aria-hidden='true' />
 				) : (
 					<EyeOff size={15} className='text-slate-400' aria-hidden='true' />
 				)}
-				{isHidden ? 'Restore to catalog' : 'Hide from catalog'}
+				{isHidden
+					? 'Restore to catalog'
+					: isUserPromoted
+						? 'Move back to Auxiliary tools'
+						: 'Hide from catalog'}
 			</button>
 			{!isHidden && (
 				<div className='mx-1 my-1 border-t border-slate-200/55' />
@@ -227,6 +262,7 @@ export function AppActionsMenu({
 					Uninstall unavailable
 				</button>
 			)}
-		</div>
+		</div>,
+		document.querySelector<HTMLElement>('.app-shell') ?? document.body,
 	)
 }

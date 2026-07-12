@@ -1,0 +1,12 @@
+[
+  {"name":"Git Bash","path":"C:\\Menu\\Git Bash.lnk","source":"start_menu","expected":"primary"},
+  {"name":"Example Editor","path":"C:\\Example\\Editor.exe","source":"registry","canUninstall":true,"expected":"primary"},
+  {"name":"Rufus","path":"D:\\Tools\\rufus-4.11p.exe","source":"portable","publisher":"Akeo","description":"Rufus","expected":"primary"},
+  {"name":"iconv","path":"C:\\Git\\usr\\bin\\iconv.exe","source":"portable","expected":"auxiliary"},
+  {"name":"PHP Tools","path":"C:\\Menu\\PHP Tools.lnk","resolvedPath":"C:\\Editor\\plugins\\intelliphp.ls.exe","source":"start_menu","expected":"auxiliary"},
+  {"name":"OpenJDK Platform binary","path":"C:\\Java\\runtime\\bin\\javaw.exe","source":"portable","description":"OpenJDK Platform binary","expected":"auxiliary"},
+  {"name":"Renamed helper","path":"D:\\Apps\\agent.exe","source":"portable","originalFilename":"notification_helper.exe","expected":"auxiliary"},
+  {"name":"Telegram Desktop Setup","path":"C:\\Downloads\\tsetup.exe","source":"portable","expected":"rejected"},
+  {"name":"Renamed payload","path":"C:\\Downloads\\payload.exe","source":"portable","originalFilename":"product-setup.exe","expected":"rejected"},
+  {"name":"Unknown CLI","path":"D:\\Tools\\bin\\unknown.exe","source":"portable","expected":"uncertain"}
+]

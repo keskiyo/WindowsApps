@@ -211,19 +211,20 @@ describe('UX quality — first impressions', () => {
 		expect(star).toHaveFocus()
 	})
 
-	// Issue 6: tooltip shows description when available, falls back to path
-	it('shows description as tooltip when available', async () => {
+	// Issue 6: the hover tooltip shows the clean application name (useful when the
+	// visible label is truncated), not executable/version/engine metadata.
+	it('shows the application name as the tooltip', async () => {
 		renderApp()
 		const btn = await screen.findByRole('button', {
 			name: 'Launch Visual Studio Code',
 		})
-		expect(btn).toHaveAttribute('title', 'Code editor by Microsoft')
+		expect(btn).toHaveAttribute('title', 'Visual Studio Code')
 	})
 
-	it('falls back to path as tooltip when description is absent', async () => {
+	it('uses the name as tooltip regardless of executable metadata', async () => {
 		renderApp()
 		const btn = await screen.findByRole('button', { name: 'Launch Steam' })
-		expect(btn).toHaveAttribute('title', 'C:\\Steam.exe')
+		expect(btn).toHaveAttribute('title', 'Steam')
 	})
 })
 

@@ -26,7 +26,7 @@ export function AppInfoDialog({
 		document.addEventListener('keydown', keydown)
 		return () => document.removeEventListener('keydown', keydown)
 	}, [onClose])
-	const rows = metadataRows(app, categories)
+	const rows = metadataRows(app, categories, import.meta.env.DEV)
 	return (
 		<div
 			className='motion-overlay fixed inset-0 z-400 grid place-items-center bg-slate-700/38 p-4 backdrop-blur-[2px]'

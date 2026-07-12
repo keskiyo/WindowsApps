@@ -1,7 +1,8 @@
 use crate::catalog::{AppCategory, AppInfo, LaunchKind, SourceKind};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Component, Path};
 
 #[derive(Clone, Debug)]
 pub(super) struct AppCandidate {
@@ -15,6 +16,7 @@ struct CandidateIdentity {
     steam_app_id: Option<String>,
     aumid: Option<String>,
     launch_target: Option<String>,
+    launch_mode: Option<String>,
     install_root: Option<String>,
     registry_product: Option<String>,
     portable_product: Option<String>,
@@ -31,6 +33,7 @@ pub(super) struct Evidence {
 pub(super) enum EvidenceReason {
     SamePath,
     SameLaunchTarget,
+    SameSystemToolAlias,
     ShortcutTargetsExecutable,
     SameSteamAppId,
     SameAumid,
@@ -103,6 +106,11 @@ pub(super) fn dev_report_enabled() -> bool {
 }
 
 pub(super) fn write_dev_report(apps: &[AppInfo]) {
+    // Skip tiny incremental sub-lists so a full-catalog report isn't clobbered by a
+    // background single-source sync. Dev diagnostic only.
+    if apps.len() < 30 {
+        return;
+    }
     let report = analyze(apps.to_vec());
     let Ok(base) = std::env::var("LOCALAPPDATA") else {
         return;
@@ -178,6 +186,7 @@ pub(super) fn deduplicate(
         .into_iter()
         .map(|mut resolved| {
             resolved.app.id = resolved_canonical_id(&resolved);
+            resolved.app.canonical_identity = Some(preference_identity(&resolved.app));
             resolved.app
         })
         .collect::<Vec<_>>();
@@ -232,6 +241,7 @@ impl CandidateIdentity {
             aumid: (app.launch_kind == LaunchKind::AppUserModelId)
                 .then(|| app.path.trim().to_lowercase()),
             launch_target: launch_target(app).map(normalize_path),
+            launch_mode: meaningful_launch_arguments(app.launch_arguments.as_deref()),
             registry_product: (app.source_kind == SourceKind::Registry).then(|| {
                 format!(
                     "{}|{}|{}",
@@ -326,11 +336,19 @@ fn score_evidence(left: &AppCandidate, right: &AppCandidate) -> (Vec<Evidence>, 
     if shared(
         left.identity.launch_target.as_ref(),
         right.identity.launch_target.as_ref(),
-    ) {
+    ) && left.identity.launch_mode == right.identity.launch_mode
+    {
         add(EvidenceReason::SameLaunchTarget, 100);
     }
     if shortcut_targets_executable(&left.app, &right.app) {
         add(EvidenceReason::ShortcutTargetsExecutable, 100);
+    }
+    if let (Some(left_alias), Some(right_alias)) =
+        (system_tool_alias(&left.app), system_tool_alias(&right.app))
+    {
+        if left_alias == right_alias {
+            add(EvidenceReason::SameSystemToolAlias, 90);
+        }
     }
     if shared(
         left.identity.steam_app_id.as_ref(),
@@ -497,7 +515,77 @@ fn shortcut_targets_executable(left: &AppInfo, right: &AppInfo) -> bool {
     let Some(target) = shortcut.resolved_path.as_deref() else {
         return false;
     };
+    if meaningful_launch_arguments(shortcut.launch_arguments.as_deref()).is_some() {
+        return false;
+    }
     normalize_path(target) == normalize_path(&executable.path)
+}
+
+fn meaningful_launch_arguments(value: Option<&str>) -> Option<String> {
+    let tokens = tokenize_quoted_arguments(value?);
+    let mut meaningful = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let token = tokens[index].trim_matches('"').to_lowercase();
+        let takes_value = matches!(
+            token.as_str(),
+            "--profile-directory" | "--user-data-dir" | "--app" | "--app-id" | "--class" | "-p"
+        );
+        let inline = [
+            "--profile-directory=",
+            "--user-data-dir=",
+            "--app=",
+            "--app-id=",
+            "--class=",
+        ]
+        .iter()
+        .any(|prefix| token.starts_with(prefix));
+        if inline {
+            let (key, value) = token.split_once('=').expect("inline argument has equals");
+            meaningful.push(format!("{key}={}", normalize_argument_value(key, value)));
+        } else if takes_value {
+            meaningful.push(token);
+            if let Some(next) = tokens.get(index + 1) {
+                meaningful.push(normalize_argument_value(
+                    meaningful.last().expect("argument key was added"),
+                    next,
+                ));
+                index += 1;
+            }
+        }
+        index += 1;
+    }
+    (!meaningful.is_empty()).then(|| meaningful.join(" "))
+}
+
+fn normalize_argument_value(key: &str, value: &str) -> String {
+    let value = value.trim_matches('"');
+    if key == "--user-data-dir" {
+        normalize_path(value)
+    } else {
+        value.to_lowercase()
+    }
+}
+
+fn tokenize_quoted_arguments(value: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut token = String::new();
+    let mut quoted = false;
+    for character in value.chars() {
+        match character {
+            '"' => quoted = !quoted,
+            character if character.is_whitespace() && !quoted => {
+                if !token.is_empty() {
+                    tokens.push(std::mem::take(&mut token));
+                }
+            }
+            character => token.push(character),
+        }
+    }
+    if !token.is_empty() {
+        tokens.push(token);
+    }
+    tokens
 }
 
 fn registry_install_contains_exe(left: &AppCandidate, right: &AppCandidate) -> bool {
@@ -617,11 +705,91 @@ fn resolved_canonical_id(resolved: &ResolvedApp) -> String {
 }
 
 pub(super) fn normalize_path(value: &str) -> String {
-    value
-        .trim()
-        .replace('/', r"\")
+    let expanded = expand_windows_env(value.trim().trim_matches('"'));
+    let separated = expanded.replace('/', "\\");
+    let mut normalized = std::path::PathBuf::new();
+    for component in Path::new(&separated).components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    normalized.push(component.as_os_str());
+                }
+            }
+            _ => normalized.push(component.as_os_str()),
+        }
+    }
+    normalized
+        .to_string_lossy()
         .trim_end_matches('\\')
         .to_lowercase()
+}
+
+fn expand_windows_env(value: &str) -> String {
+    let mut result = String::with_capacity(value.len());
+    let mut rest = value;
+    while let Some(start) = rest.find('%') {
+        result.push_str(&rest[..start]);
+        let after = &rest[start + 1..];
+        let Some(end) = after.find('%') else {
+            result.push_str(&rest[start..]);
+            return result;
+        };
+        let name = &after[..end];
+        if let Ok(replacement) = std::env::var(name) {
+            result.push_str(&replacement);
+        } else {
+            result.push('%');
+            result.push_str(name);
+            result.push('%');
+        }
+        rest = &after[end + 1..];
+    }
+    result.push_str(rest);
+    result
+}
+
+pub(super) fn preference_identity(app: &AppInfo) -> String {
+    let raw = if let Some(app_id) = steam_app_id(app) {
+        format!("steam:{}", app_id.to_lowercase())
+    } else if app.launch_kind == LaunchKind::AppUserModelId {
+        format!("aumid:{}", app.path.trim().to_lowercase())
+    } else {
+        let product = app
+            .product_name
+            .as_deref()
+            .map(normalized_product_family)
+            .filter(|value| !value.is_empty());
+        let publisher = normalized_publisher(app.publisher.as_deref());
+        let install_root = app.install_location.as_deref().map(normalize_path);
+        if let (Some(product), Some(root)) = (product, install_root.filter(|root| !root.is_empty()))
+        {
+            if !publisher.is_empty() {
+                format!("product:{publisher}|{product}|{root}")
+            } else if app.source_kind == SourceKind::Portable {
+                format!("portable:{product}|{root}")
+            } else if let Some(target) = preference_target(app) {
+                format!("target:{target}")
+            } else {
+                format!("path:{}", normalize_path(&app.path))
+            }
+        } else if let Some(target) = preference_target(app) {
+            format!("target:{target}")
+        } else {
+            format!("path:{}", normalize_path(&app.path))
+        }
+    };
+    format!("identity:{:x}", Sha256::digest(raw.as_bytes()))
+}
+
+fn preference_target(app: &AppInfo) -> Option<String> {
+    let target = normalize_path(launch_target(app)?);
+    Some(
+        match meaningful_launch_arguments(app.launch_arguments.as_deref()) {
+            Some(mode) => format!("{target}|mode:{mode}"),
+            None => target,
+        },
+    )
 }
 
 fn launcher_product_family(name: &str) -> &str {
@@ -645,19 +813,23 @@ fn merge_app(left: AppInfo, right: AppInfo) -> AppInfo {
     if primary.version.is_none() {
         primary.version = secondary.version;
     }
-    if primary.publisher.is_none()
+    if (primary.publisher.is_none()
         || primary
             .publisher
             .as_deref()
-            .is_some_and(|value| value.starts_with("CN="))
-    {
-        if secondary
+            .is_some_and(|value| value.starts_with("CN=")))
+        && secondary
             .publisher
             .as_deref()
             .is_some_and(|value| !value.starts_with("CN="))
-        {
-            primary.publisher = secondary.publisher;
-        }
+    {
+        primary.publisher = secondary.publisher;
+    }
+    if primary.product_name.is_none() {
+        primary.product_name = secondary.product_name;
+    }
+    if primary.original_filename.is_none() {
+        primary.original_filename = secondary.original_filename;
     }
     if primary.install_location.is_none() {
         primary.install_location = secondary.install_location;
@@ -674,8 +846,28 @@ fn merge_app(left: AppInfo, right: AppInfo) -> AppInfo {
     if primary.shortcut_icon_path.is_none() {
         primary.shortcut_icon_path = secondary.shortcut_icon_path;
     }
+    if primary.launch_arguments.is_none() {
+        primary.launch_arguments = secondary.launch_arguments;
+    }
+    if visibility_rank(secondary.visibility_class) > visibility_rank(primary.visibility_class) {
+        primary.visibility_class = secondary.visibility_class;
+    }
+    primary.visibility_score = primary.visibility_score.max(secondary.visibility_score);
+    for reason in secondary.visibility_reasons {
+        if !primary.visibility_reasons.contains(&reason) {
+            primary.visibility_reasons.push(reason);
+        }
+    }
     primary.can_uninstall |= secondary.can_uninstall || primary.uninstall.is_some();
     primary
+}
+
+fn visibility_rank(class: crate::catalog::VisibilityClass) -> u8 {
+    match class {
+        crate::catalog::VisibilityClass::Rejected => 0,
+        crate::catalog::VisibilityClass::Auxiliary => 1,
+        crate::catalog::VisibilityClass::Primary => 2,
+    }
 }
 
 fn version_key(version: Option<&str>) -> Vec<u64> {
@@ -726,7 +918,36 @@ pub(super) fn normalized_product_family(name: &str) -> String {
             family = "firefox".into();
         }
     }
-    family
+    canonical_windows_tool_family(&family)
+}
+
+fn canonical_windows_tool_family(family: &str) -> String {
+    const ALIASES: [(&str, &[&str]); 10] = [
+        ("task manager", &["task manager", "диспетчер задач"]),
+        ("control panel", &["control panel", "панель управления"]),
+        ("registry editor", &["registry editor", "редактор реестра"]),
+        ("device manager", &["device manager", "диспетчер устройств"]),
+        ("services", &["services", "службы"]),
+        ("event viewer", &["event viewer", "просмотр событий"]),
+        (
+            "computer management",
+            &["computer management", "управление компьютером"],
+        ),
+        (
+            "disk management",
+            &["disk management", "управление дисками"],
+        ),
+        (
+            "system information",
+            &["system information", "сведения о системе"],
+        ),
+        ("command prompt", &["command prompt", "командная строка"]),
+    ];
+    ALIASES
+        .iter()
+        .find_map(|(canonical, aliases)| aliases.contains(&family).then_some(*canonical))
+        .unwrap_or(family)
+        .to_string()
 }
 
 fn version_family(name: &str) -> &str {
@@ -754,6 +975,16 @@ fn candidate_score(app: &AppInfo) -> u8 {
     if app.source_kind == SourceKind::Steam {
         return 5;
     }
+    // A localized Start-App for a built-in Windows tool (Event Viewer / Просмотр событий,
+    // etc.) should win over its English Start-Menu shortcut so the merged card keeps the
+    // OS-language name and the working shell icon. Scoped to system targets only, so normal
+    // app merges (registry/shortcut/portable) are unaffected.
+    if app.launch_kind == LaunchKind::AppUserModelId
+        && app.source_kind == SourceKind::StartApps
+        && (is_system_tool_target(app) || system_tool_alias(app).is_some())
+    {
+        return 6;
+    }
     match Path::new(&app.path)
         .extension()
         .and_then(|value| value.to_str())
@@ -767,6 +998,57 @@ fn candidate_score(app: &AppInfo) -> u8 {
     } else {
         0
     }
+}
+
+/// Curated equivalence for built-in Windows shell items whose localized Start-App and English
+/// shortcut resolve to different, non-comparable targets (a shell CLSID vs a PIDL-only shortcut,
+/// or control.exe with an applet name). Returns a shared token so the pair collapses into one
+/// card. Language-independent: keyed on stable AUMIDs and applet names, not display text.
+fn system_tool_alias(app: &AppInfo) -> Option<&'static str> {
+    if app.launch_kind == LaunchKind::AppUserModelId {
+        match app.path.trim().to_lowercase().as_str() {
+            "microsoft.windows.explorer" => return Some("windows:explorer"),
+            "microsoft.windows.administrativetools" => return Some("windows:admintools"),
+            "microsoft.windows.controlpanel" => return Some("windows:controlpanel"),
+            "microsoft.windows.remotedesktop" => return Some("windows:remotedesktop"),
+            _ => {}
+        }
+    }
+    let target = app
+        .resolved_path
+        .as_deref()
+        .unwrap_or_default()
+        .to_lowercase();
+    let args = app
+        .launch_arguments
+        .as_deref()
+        .unwrap_or_default()
+        .to_lowercase();
+    // "Administrative Tools" launches control.exe /name Microsoft.AdministrativeTools.
+    if target.ends_with("control.exe") && args.contains("microsoft.administrativetools") {
+        return Some("windows:admintools");
+    }
+    // "File Explorer" ships as a PIDL-only shortcut (no readable target); its .lnk file name
+    // is English on every locale, so it is a safe key for this fixed shell item.
+    if target.is_empty() && normalize_name(&app.name) == "file explorer" {
+        return Some("windows:explorer");
+    }
+    None
+}
+
+/// True when the app's resolved launch target is a built-in Windows tool: a `.msc`/`.cpl`
+/// snap-in, a binary under the Windows system directories, or a shell CLSID target
+/// (`::{…}`, e.g. Control Panel). Used to scope localized-name preference to system tools.
+fn is_system_tool_target(app: &AppInfo) -> bool {
+    let Some(target) = app.resolved_path.as_deref() else {
+        return false;
+    };
+    let normalized = normalize_path(target);
+    normalized.starts_with("::{")
+        || normalized.ends_with(".msc")
+        || normalized.ends_with(".cpl")
+        || normalized.contains("\\windows\\system32\\")
+        || normalized.contains("\\windows\\syswow64\\")
 }
 
 fn category_rank(category: AppCategory) -> u8 {
@@ -801,11 +1083,18 @@ mod tests {
             description: None,
             version: None,
             publisher: None,
+            product_name: None,
+            original_filename: None,
             install_location: None,
             can_uninstall: false,
             uninstall: None,
             resolved_path: None,
             shortcut_icon_path: None,
+            launch_arguments: None,
+            canonical_identity: None,
+            visibility_class: Default::default(),
+            visibility_score: 0,
+            visibility_reasons: Vec::new(),
         }
     }
 
@@ -829,6 +1118,86 @@ mod tests {
             merged[0].id, "target:d:\\games\\battle.net\\battle.net.exe",
             "id should be based on canonical target, not the winning path",
         );
+    }
+
+    #[test]
+    fn localized_start_app_merges_with_english_shortcut_by_target() {
+        // English Start-Menu shortcut → eventvwr.msc.
+        let mut shortcut = app(
+            "Event Viewer",
+            r"C:\Menu\Administrative Tools\Event Viewer.lnk",
+        );
+        shortcut.launch_kind = LaunchKind::Shortcut;
+        shortcut.source_kind = SourceKind::StartMenu;
+        shortcut.resolved_path = Some(r"C:\Windows\system32\eventvwr.msc".into());
+        // Localized Start-App (opaque AutoGenerated AUMID) → same target file.
+        let mut start_app = app("Просмотр событий", "Microsoft.AutoGenerated.{BB044BFD}");
+        start_app.launch_kind = LaunchKind::AppUserModelId;
+        start_app.source_kind = SourceKind::StartApps;
+        start_app.resolved_path = Some(r"C:\Windows\system32\eventvwr.msc".into());
+
+        let merged = resolve(vec![shortcut, start_app]);
+
+        assert_eq!(merged.len(), 1, "same target → one card");
+        assert_eq!(merged[0].name, "Просмотр событий", "keep localized name");
+        assert_eq!(
+            merged[0].launch_kind,
+            LaunchKind::AppUserModelId,
+            "keep the localized Start-App as the launch/icon source",
+        );
+    }
+
+    #[test]
+    fn file_explorer_and_localized_explorer_merge_via_alias() {
+        // English "File Explorer" is a PIDL-only shortcut (no readable target).
+        let mut shortcut = app("File Explorer", r"C:\Menu\System Tools\File Explorer.lnk");
+        shortcut.launch_kind = LaunchKind::Shortcut;
+        shortcut.source_kind = SourceKind::StartMenu;
+        // Localized "Проводник" (Microsoft.Windows.Explorer) → File Explorer shell CLSID.
+        let mut start_app = app("Проводник", "Microsoft.Windows.Explorer");
+        start_app.launch_kind = LaunchKind::AppUserModelId;
+        start_app.source_kind = SourceKind::StartApps;
+        start_app.resolved_path = Some("::{52205FD8-5DFB-447D-801A-D0B52F2E83E1}".into());
+
+        let merged = resolve(vec![shortcut, start_app]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].name, "Проводник");
+    }
+
+    #[test]
+    fn administrative_tools_merge_via_control_applet_alias() {
+        let mut shortcut = app("Administrative Tools", r"C:\Menu\Administrative Tools.lnk");
+        shortcut.launch_kind = LaunchKind::Shortcut;
+        shortcut.source_kind = SourceKind::StartMenu;
+        shortcut.resolved_path = Some(r"C:\Windows\system32\control.exe".into());
+        shortcut.launch_arguments = Some("/name Microsoft.AdministrativeTools".into());
+        let mut start_app = app(
+            "Инструменты Windows",
+            "Microsoft.Windows.AdministrativeTools",
+        );
+        start_app.launch_kind = LaunchKind::AppUserModelId;
+        start_app.source_kind = SourceKind::StartApps;
+        start_app.resolved_path = Some(r"C:\Windows\system32\control.exe".into());
+
+        let merged = resolve(vec![shortcut, start_app]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].name, "Инструменты Windows");
+    }
+
+    #[test]
+    fn different_system_tools_stay_separate() {
+        let mut events = app("Просмотр событий", "Microsoft.AutoGenerated.{A}");
+        events.launch_kind = LaunchKind::AppUserModelId;
+        events.source_kind = SourceKind::StartApps;
+        events.resolved_path = Some(r"C:\Windows\system32\eventvwr.msc".into());
+        let mut computer = app("Управление компьютером", "Microsoft.AutoGenerated.{B}");
+        computer.launch_kind = LaunchKind::AppUserModelId;
+        computer.source_kind = SourceKind::StartApps;
+        computer.resolved_path = Some(r"C:\Windows\system32\compmgmt.msc".into());
+
+        assert_eq!(resolve(vec![events, computer]).len(), 2);
     }
 
     #[test]
@@ -900,6 +1269,53 @@ mod tests {
 
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].path, r"C:\Docker\Docker Desktop.exe");
+    }
+
+    #[test]
+    fn merged_launcher_preserves_primary_visibility_over_auxiliary_shortcut_rank() {
+        let mut main = app("Tool", r"C:\Tool\Tool.exe");
+        main.visibility_class = crate::catalog::VisibilityClass::Primary;
+        main.visibility_score = 20;
+        let mut helper = app("Tool Diagnostics", r"C:\Tool\Tool Diagnostics.lnk");
+        helper.launch_kind = LaunchKind::Shortcut;
+        helper.resolved_path = Some(r"C:\Tool\Tool.exe".into());
+        helper.visibility_class = crate::catalog::VisibilityClass::Auxiliary;
+        helper.visibility_score = -20;
+
+        let merged = resolve(vec![helper, main]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(
+            merged[0].visibility_class,
+            crate::catalog::VisibilityClass::Primary
+        );
+        assert_eq!(merged[0].visibility_score, 20);
+    }
+
+    #[test]
+    fn meaningful_arguments_keep_quoted_multi_word_values_together() {
+        assert_eq!(
+            meaningful_launch_arguments(
+                Some(r#"--profile-directory="Profile 1" --ignored value"#,)
+            ),
+            Some("--profile-directory=profile 1".into())
+        );
+        assert_eq!(
+            meaningful_launch_arguments(Some(r#"--user-data-dir "C:\My Profile""#)),
+            Some(r"--user-data-dir c:\my profile".into())
+        );
+    }
+
+    #[test]
+    fn equivalent_user_data_paths_have_the_same_launch_fingerprint() {
+        assert_eq!(
+            meaningful_launch_arguments(Some(
+                r#"--user-data-dir="C:\Users\User Name\App Data\Browser Profile""#,
+            )),
+            meaningful_launch_arguments(Some(
+                r#"--user-data-dir="c:/users/user name/app data/browser profile""#,
+            ))
+        );
     }
 
     #[test]
@@ -1031,5 +1447,95 @@ mod tests {
         portable.install_location = Some(r"D:\Portable\Agent".into());
 
         assert_eq!(resolve(vec![installed, portable]).len(), 2);
+    }
+
+    #[test]
+    fn localized_windows_tool_names_share_product_family() {
+        let mut english = app("Task Manager", r"C:\Windows\System32\taskmgr.exe");
+        english.source_kind = SourceKind::StartApps;
+        english.launch_kind = LaunchKind::AppUserModelId;
+        let mut localized = app(
+            "Диспетчер задач",
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\System Tools\Task Manager.lnk",
+        );
+        localized.source_kind = SourceKind::StartMenu;
+        localized.launch_kind = LaunchKind::Shortcut;
+
+        let merged = resolve(vec![english, localized]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(
+            normalized_product_family("Task Manager"),
+            normalized_product_family("Диспетчер задач")
+        );
+    }
+
+    #[test]
+    fn preference_identity_survives_a_change_from_registry_to_shortcut_source() {
+        let mut registry = app("Example Editor", r"C:\Example\Editor.exe");
+        registry.source_kind = SourceKind::Registry;
+        registry.product_name = Some("Example Editor".into());
+        registry.publisher = Some("Example Software LLC".into());
+        registry.install_location = Some(r"C:\Example".into());
+        let mut shortcut = app("Editor", r"C:\Menu\Example Editor.lnk");
+        shortcut.source_kind = SourceKind::StartMenu;
+        shortcut.launch_kind = LaunchKind::Shortcut;
+        shortcut.resolved_path = Some(r"C:\Example\Editor.exe".into());
+        shortcut.product_name = Some("Example Editor".into());
+        shortcut.publisher = Some("Example Software".into());
+        shortcut.install_location = Some(r"C:\Example".into());
+
+        assert_eq!(
+            preference_identity(&registry),
+            preference_identity(&shortcut)
+        );
+    }
+
+    #[test]
+    fn preference_identity_keeps_portable_copies_in_different_roots_separate() {
+        let mut first = app("Tool", r"D:\Tools\Tool\Tool.exe");
+        first.source_kind = SourceKind::Portable;
+        first.product_name = Some("Tool".into());
+        first.publisher = Some("Vendor".into());
+        first.install_location = Some(r"D:\Tools\Tool".into());
+        let mut second = first.clone();
+        second.path = r"E:\Archive\Tool\Tool.exe".into();
+        second.install_location = Some(r"E:\Archive\Tool".into());
+
+        assert_ne!(preference_identity(&first), preference_identity(&second));
+    }
+
+    #[test]
+    fn normalized_windows_paths_ignore_quotes_slashes_and_dot_segments() {
+        assert_eq!(
+            normalize_path(r#""C:/Apps/Tool/./bin/../Tool.exe""#),
+            normalize_path(r"c:\apps\tool\tool.exe")
+        );
+    }
+
+    #[test]
+    fn insignificant_shortcut_arguments_do_not_split_the_same_launcher() {
+        let mut plain = app("Browser", r"C:\Menu\Browser.lnk");
+        plain.launch_kind = LaunchKind::Shortcut;
+        plain.resolved_path = Some(r"C:\Browser\browser.exe".into());
+        let mut flagged = plain.clone();
+        flagged.path = r"C:\Menu\Browser Safe.lnk".into();
+        flagged.launch_arguments = Some("--disable-gpu".into());
+
+        assert_eq!(resolve(vec![plain, flagged]).len(), 1);
+    }
+
+    #[test]
+    fn meaningful_profile_arguments_keep_shortcuts_separate() {
+        let mut work = app("Browser Work", r"C:\Menu\Browser Work.lnk");
+        work.launch_kind = LaunchKind::Shortcut;
+        work.resolved_path = Some(r"C:\Browser\browser.exe".into());
+        work.launch_arguments = Some("--profile-directory=Work".into());
+        let mut personal = work.clone();
+        personal.name = "Browser Personal".into();
+        personal.path = r"C:\Menu\Browser Personal.lnk".into();
+        personal.launch_arguments = Some("--profile-directory=Personal".into());
+
+        assert_eq!(resolve(vec![work, personal]).len(), 2);
     }
 }

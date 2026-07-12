@@ -18,6 +18,9 @@ pub mod source;
 mod start_apps;
 mod steam;
 pub mod sync;
+mod visibility;
+
+pub use visibility::{VisibilityClass, VisibilityReason};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -88,6 +91,10 @@ pub struct AppInfo {
     pub version: Option<String>,
     #[serde(default)]
     pub publisher: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_filename: Option<String>,
     #[serde(default)]
     pub install_location: Option<String>,
     #[serde(default)]
@@ -98,6 +105,16 @@ pub struct AppInfo {
     pub resolved_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shortcut_icon_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub launch_arguments: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canonical_identity: Option<String>,
+    #[serde(default)]
+    pub visibility_class: VisibilityClass,
+    #[serde(default)]
+    pub visibility_score: i16,
+    #[serde(default)]
+    pub visibility_reasons: Vec<VisibilityReason>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -111,6 +128,7 @@ pub struct ScanProgress {
 
 fn steam_app(game: steam::SteamGame) -> AppInfo {
     let path = format!("steam://rungameid/{}", game.app_id);
+    let product_name = game.name.clone();
     AppInfo {
         id: stable_id(&path),
         category: AppCategory::Games,
@@ -122,12 +140,19 @@ fn steam_app(game: steam::SteamGame) -> AppInfo {
         description: None,
         version: None,
         publisher: None,
+        product_name: Some(product_name),
+        original_filename: None,
         install_location: Some(game.install_dir.to_string_lossy().into_owned()),
         can_uninstall: false,
         uninstall: None,
         resolved_path: find_executable(&game.install_dir.to_string_lossy())
             .map(|path| path.to_string_lossy().into_owned()),
         shortcut_icon_path: None,
+        launch_arguments: None,
+        canonical_identity: None,
+        visibility_class: Default::default(),
+        visibility_score: 0,
+        visibility_reasons: Vec::new(),
     }
 }
 
@@ -135,7 +160,8 @@ pub(super) fn portable_app(path: PathBuf) -> Option<AppInfo> {
     let metadata = crate::platform::windows::executable_metadata::read(&path);
     let has_metadata = metadata.product_name.is_some()
         || metadata.description.is_some()
-        || metadata.publisher.is_some();
+        || metadata.publisher.is_some()
+        || metadata.original_filename.is_some();
     let stem = path.file_stem()?.to_string_lossy().trim().to_string();
     let parent_matches = path
         .parent()
@@ -146,29 +172,112 @@ pub(super) fn portable_app(path: PathBuf) -> Option<AppInfo> {
     if !has_metadata && !parent_matches && !is_known_standalone_portable(&stem) {
         return None;
     }
-    let name = metadata
-        .product_name
-        .clone()
-        .filter(|value| !is_generic_product_name(value))
-        .unwrap_or_else(|| clean_portable_name(&stem));
+    let parent_name = path
+        .parent()
+        .and_then(Path::file_name)
+        .map(|parent| parent.to_string_lossy().into_owned());
+    let name = portable_display_name(
+        &stem,
+        parent_name.as_deref(),
+        metadata.product_name.as_deref(),
+    );
     if is_maintenance_entry(&name, &path.to_string_lossy(), None) {
         return None;
     }
     let mut app = make_app(name, path.clone());
     app.source_kind = SourceKind::Portable;
     app.description = metadata.description;
-    app.version = metadata.version;
+    app.version = metadata
+        .version
+        .or_else(|| portable_version_from_stem(&stem));
     app.publisher = metadata.publisher;
+    app.product_name = metadata.product_name;
+    app.original_filename = metadata.original_filename;
     app.install_location = path
         .parent()
         .map(|value| value.to_string_lossy().into_owned());
     Some(app)
 }
 
+/// Chooses a portable app's display name. When the executable name carries no product
+/// identity (`32.exe`, `x64.exe`, …) the embedded metadata is unreliable (a Yandex-derived
+/// binary inside a "Крипто 4" folder reports ProductName "Yandex"), so the parent folder
+/// wins. Otherwise use the metadata product name, falling back to the cleaned file stem.
+fn portable_display_name(stem: &str, parent: Option<&str>, product_name: Option<&str>) -> String {
+    let folder = if is_generic_executable_stem(stem) {
+        parent
+            .map(clean_folder_name)
+            .filter(|value| !value.is_empty() && !is_generic_executable_stem(value))
+    } else {
+        None
+    };
+    folder
+        .or_else(|| {
+            product_name
+                .map(str::to_string)
+                .filter(|value| !is_generic_product_name(value))
+        })
+        .unwrap_or_else(|| clean_portable_name(stem))
+}
+
+/// Light cleanup for a folder used as a display name: normalize separators and whitespace,
+/// but keep trailing numbers ("Крипто 4" must not lose its "4", unlike version-suffix
+/// stripping applied to executable stems).
+fn clean_folder_name(value: &str) -> String {
+    value
+        .replace(['_', '-'], " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// An executable name that identifies the platform/arch, not the product (`32.exe`,
+/// `x64.exe`, `win32.exe`, purely numeric). For these the parent folder is a better name.
+fn is_generic_executable_stem(stem: &str) -> bool {
+    let normalized = stem.trim().to_lowercase();
+    if normalized.is_empty() {
+        return true;
+    }
+    if normalized
+        .chars()
+        .all(|character| character.is_ascii_digit())
+    {
+        return true;
+    }
+    matches!(
+        normalized.as_str(),
+        "x86"
+            | "x64"
+            | "x86_64"
+            | "amd64"
+            | "ia64"
+            | "arm64"
+            | "win32"
+            | "win64"
+            | "app"
+            | "application"
+            | "launcher"
+            | "main"
+            | "run"
+            | "start"
+            | "program"
+    )
+}
+
 fn is_generic_product_name(value: &str) -> bool {
-    ["godot engine", "electron", "chromium", "application"]
-        .iter()
-        .any(|generic| value.trim().eq_ignore_ascii_case(generic))
+    [
+        "godot engine",
+        "electron",
+        "chromium",
+        "application",
+        "java",
+        "python",
+        "runtime",
+        "launcher",
+        "windows application",
+    ]
+    .iter()
+    .any(|generic| value.trim().eq_ignore_ascii_case(generic))
 }
 
 fn normalized_portable_name(value: &str) -> String {
@@ -192,6 +301,16 @@ fn clean_portable_name(value: &str) -> String {
         .replace(['_', '-'], " ")
         .trim()
         .to_string()
+}
+
+fn portable_version_from_stem(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    let start = trimmed.char_indices().find_map(|(index, character)| {
+        (index > 0 && character.is_ascii_digit() && trimmed[..index].ends_with(['-', '_', ' ']))
+            .then_some(index)
+    })?;
+    let version = trimmed[start..].trim();
+    (!version.is_empty()).then(|| version.to_string())
 }
 
 fn default_portable_exclusions() -> Vec<PathBuf> {
@@ -299,8 +418,18 @@ fn registry_metadata_matches(app: &AppInfo, record: &registry::RegistryMetadata)
 }
 
 fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
-    apps.into_iter()
-        .filter(|app| !is_maintenance_entry(&app.name, &app.path, app.resolved_path.as_deref()))
+    let classified = apps
+        .into_iter()
+        .filter(|app| !is_invalid_display_name(&app.name))
+        .map(|mut app| {
+            visibility::apply_visibility(&mut app);
+            app
+        })
+        .collect::<Vec<_>>();
+    visibility::write_dev_report(&classified);
+    classified
+        .into_iter()
+        .filter(|app| app.visibility_class != VisibilityClass::Rejected)
         .collect()
 }
 
@@ -405,6 +534,16 @@ fn scan_start_menu() -> Vec<AppInfo> {
                 app.shortcut_icon_path = details
                     .icon_location
                     .map(|value| value.to_string_lossy().into_owned());
+                app.launch_arguments = details.arguments;
+                if let Some(target) = app.resolved_path.as_deref() {
+                    let metadata =
+                        crate::platform::windows::executable_metadata::read(Path::new(target));
+                    app.product_name = metadata.product_name;
+                    app.original_filename = metadata.original_filename;
+                    app.description = metadata.description;
+                    app.version = metadata.version;
+                    app.publisher = metadata.publisher;
+                }
                 app
             })
         })
@@ -435,11 +574,18 @@ fn make_app(name: String, path: PathBuf) -> AppInfo {
         description: None,
         version: None,
         publisher: None,
+        product_name: None,
+        original_filename: None,
         install_location: None,
         can_uninstall: false,
         uninstall: None,
         resolved_path: None,
         shortcut_icon_path: None,
+        launch_arguments: None,
+        canonical_identity: None,
+        visibility_class: Default::default(),
+        visibility_score: 0,
+        visibility_reasons: Vec::new(),
     }
 }
 
@@ -901,7 +1047,10 @@ pub(crate) fn is_installer_file_name(stem: &str) -> bool {
         // `contains` catches install/installer/instaler/installation, uninstall, and
         // vcredist2005_x64 / vc_redist / redistributables, including misspellings.
         .any(|token| {
-            token.contains("instal") || token.contains("redist") || TOKENS.contains(&token)
+            token.contains("instal")
+                || token.contains("redist")
+                || token.ends_with("setup")
+                || TOKENS.contains(&token)
         });
     if has_token {
         return true;
@@ -1014,12 +1163,46 @@ mod tests {
             description: None,
             version: None,
             publisher: None,
+            product_name: None,
+            original_filename: None,
             install_location: None,
             can_uninstall: false,
             uninstall: None,
             resolved_path: None,
             shortcut_icon_path: None,
+            launch_arguments: None,
+            canonical_identity: None,
+            visibility_class: Default::default(),
+            visibility_score: 0,
+            visibility_reasons: Vec::new(),
         }
+    }
+
+    #[test]
+    fn portable_generic_exe_name_uses_parent_folder() {
+        // 32.exe inside "Крипто 4" reports Yandex metadata — trust the folder instead.
+        assert_eq!(
+            portable_display_name("32", Some("Крипто 4"), Some("Yandex")),
+            "Крипто 4"
+        );
+        assert_eq!(
+            portable_display_name("64", Some("Крипто 5"), Some("Yandex")),
+            "Крипто 5"
+        );
+    }
+
+    #[test]
+    fn portable_real_exe_name_keeps_product_name() {
+        // A properly named executable keeps its product metadata.
+        assert_eq!(
+            portable_display_name("Yandex 32bit", Some("Браузер"), Some("Yandex")),
+            "Yandex"
+        );
+        // Generic stem AND generic (arch) folder → fall back to metadata product name.
+        assert_eq!(
+            portable_display_name("app", Some("x64"), Some("Yandex")),
+            "Yandex"
+        );
     }
 
     #[test]
@@ -1034,6 +1217,20 @@ mod tests {
         assert_eq!(app.name, "rufus");
         assert_eq!(app.path, path.to_string_lossy());
         assert_eq!(app.source_kind, SourceKind::Portable);
+    }
+
+    #[test]
+    fn sanitize_keeps_auxiliary_entries_but_rejects_installers() {
+        let mut helper = app("iconv", r"C:\Git\usr\bin\iconv.exe");
+        helper.source_kind = SourceKind::Portable;
+        let mut installer = app("Telegram Desktop Setup", r"C:\Downloads\tsetup.exe");
+        installer.source_kind = SourceKind::Portable;
+
+        let result = sanitize(vec![helper, installer]);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "iconv");
+        assert_eq!(result[0].visibility_class, VisibilityClass::Auxiliary);
     }
 
     #[test]
@@ -1213,10 +1410,24 @@ mod tests {
         assert!(is_installer_file_name("vc_redist.x64"));
         assert!(is_installer_file_name("7z2501-x64"));
         assert!(is_installer_file_name("app_instaler"));
+        assert!(is_installer_file_name("tsetup-x64.7.3.4"));
         assert!(!is_installer_file_name("7zFM"));
         assert!(!is_installer_file_name("notepad"));
         assert!(!is_installer_file_name("setupbox"));
         assert!(!is_installer_file_name("aida64"));
+    }
+
+    #[test]
+    fn extracts_portable_version_from_file_name() {
+        assert_eq!(
+            portable_version_from_stem("rufus-4.11p").as_deref(),
+            Some("4.11p")
+        );
+        assert_eq!(
+            portable_version_from_stem("tool_3.11").as_deref(),
+            Some("3.11")
+        );
+        assert_eq!(portable_version_from_stem("notepad"), None);
     }
 
     #[test]
@@ -1485,13 +1696,25 @@ mod tests {
                 "GNU gettext utilities",
                 r"D:\Tools\Git\mingw64\bin\printf_ngettext.exe",
             ),
-            app("Claude Code", r"C:\Users\Maks\.local\bin\claude.exe"),
+            {
+                let mut launcher = app("Claude Code", r"C:\Menu\Claude Code.lnk");
+                launcher.source_kind = SourceKind::StartMenu;
+                launcher.launch_kind = LaunchKind::Shortcut;
+                launcher.resolved_path = Some(r"C:\Users\Maks\.local\bin\claude.exe".into());
+                launcher
+            },
         ]);
 
-        assert_eq!(
-            apps.iter().map(|app| app.name.as_str()).collect::<Vec<_>>(),
-            vec!["Claude Code"],
-        );
+        let primary = apps
+            .iter()
+            .filter(|app| app.visibility_class == VisibilityClass::Primary)
+            .map(|app| app.name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(primary, vec!["Claude Code"]);
+        assert!(apps
+            .iter()
+            .filter(|app| app.name != "Claude Code")
+            .all(|app| app.visibility_class == VisibilityClass::Auxiliary));
     }
 
     #[test]

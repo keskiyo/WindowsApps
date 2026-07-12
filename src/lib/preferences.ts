@@ -15,6 +15,8 @@ export interface AppPreferencesV4 {
 	collapsedCategories: AppCategory[]
 	categoryOverrides: Record<string, AppCategory>
 	hiddenAppIds: string[]
+	promotedAppIds: string[]
+	promotedAppIdentities: string[]
 }
 
 export const DEFAULT_PREFERENCES: AppPreferencesV4 = {
@@ -25,6 +27,8 @@ export const DEFAULT_PREFERENCES: AppPreferencesV4 = {
 	collapsedCategories: [],
 	categoryOverrides: {},
 	hiddenAppIds: [],
+	promotedAppIds: [],
+	promotedAppIdentities: [],
 }
 
 function uniqueStrings(value: unknown): string[] {
@@ -112,6 +116,8 @@ export function normalizePreferences(value: unknown): AppPreferencesV4 {
 		),
 		categoryOverrides: overrides,
 		hiddenAppIds: uniqueStrings(raw.hiddenAppIds),
+		promotedAppIds: uniqueStrings(raw.promotedAppIds),
+		promotedAppIdentities: uniqueStrings(raw.promotedAppIdentities),
 	}
 }
 

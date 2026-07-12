@@ -219,9 +219,13 @@ pub fn synchronize(
         .map_or(0, |duration| duration.as_secs());
     let delta = compute_delta(previous.generation.saturating_add(1), &previous.apps, &apps);
     let mut source_counts = std::collections::BTreeMap::new();
+    let mut visibility_counts = std::collections::BTreeMap::new();
     for app in &apps {
         *source_counts
             .entry(format!("{:?}", app.source_kind).to_lowercase())
+            .or_insert(0) += 1;
+        *visibility_counts
+            .entry(format!("{:?}", app.visibility_class).to_lowercase())
             .or_insert(0) += 1;
     }
     let diagnostics = CatalogDiagnostics {
@@ -234,6 +238,7 @@ pub fn synchronize(
         mode: request.label().into(),
         total_apps: apps.len(),
         source_counts,
+        visibility_counts,
         added: delta.summary.added,
         removed: delta.summary.removed,
         updated: delta.summary.updated,
@@ -266,11 +271,18 @@ mod tests {
             description: None,
             version: None,
             publisher: None,
+            product_name: None,
+            original_filename: None,
             install_location: None,
             can_uninstall: false,
             uninstall: None,
             resolved_path: None,
             shortcut_icon_path: None,
+            launch_arguments: None,
+            canonical_identity: None,
+            visibility_class: Default::default(),
+            visibility_score: 0,
+            visibility_reasons: Vec::new(),
         }
     }
 

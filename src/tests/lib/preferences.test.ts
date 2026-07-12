@@ -17,6 +17,8 @@ describe('preferences', () => {
 			collapsedCategories: [],
 			categoryOverrides: {},
 			hiddenAppIds: [],
+			promotedAppIds: [],
+			promotedAppIdentities: [],
 		})
 		expect(DEFAULT_PREFERENCES.categories).toHaveLength(
 			CATEGORY_ORDER.length,
@@ -37,6 +39,8 @@ describe('preferences', () => {
 			collapsedCategories: ['other'],
 			categoryOverrides: {},
 			hiddenAppIds: [],
+			promotedAppIds: [],
+			promotedAppIdentities: [],
 		})
 	})
 
@@ -76,6 +80,8 @@ describe('preferences', () => {
 			collapsedCategories: ['games'],
 			categoryOverrides: {},
 			hiddenAppIds: [],
+			promotedAppIds: [],
+			promotedAppIdentities: [],
 		})
 	})
 

@@ -76,6 +76,29 @@ describe('useUpdater', () => {
 		})
 	})
 
+	it('coalesces an automatic and manual check while preserving manual visibility', async () => {
+		localStorage.setItem('windows-apps.dismissed-update-version', '0.2.2')
+		let resolveCheck: ((value: ReturnType<typeof update>) => void) | undefined
+		check.mockImplementation(
+			() =>
+				new Promise(resolve => {
+					resolveCheck = resolve
+				}),
+		)
+		const { result } = renderHook(() => useUpdater())
+		await waitFor(() => expect(check).toHaveBeenCalledOnce())
+
+		let manualCheck: Promise<void>
+		act(() => {
+			manualCheck = result.current.checkNow()
+		})
+		resolveCheck?.(update('0.2.2'))
+		await act(async () => manualCheck)
+
+		expect(check).toHaveBeenCalledOnce()
+		expect(result.current.update?.version).toBe('0.2.2')
+	})
+
 	it('shows a useful download error and allows retrying the same update', async () => {
 		const download = vi
 			.fn()
@@ -139,5 +162,30 @@ describe('useUpdater', () => {
 		})
 		expect(result.current.phase).toBe('restarting')
 		expect(relaunch).toHaveBeenCalledOnce()
+	})
+
+	it('does not start the same installation twice before React rerenders', async () => {
+		let resolveDownload: (() => void) | undefined
+		const download = vi.fn(
+			() =>
+				new Promise<void>(resolve => {
+					resolveDownload = resolve
+				}),
+		)
+		const install = vi.fn().mockResolvedValue(undefined)
+		check.mockResolvedValue({ ...update('0.2.3'), download, install })
+		const { result } = renderHook(() => useUpdater({ autoCheck: false }))
+		await act(async () => result.current.checkNow())
+
+		let first: Promise<void>
+		let second: Promise<void>
+		act(() => {
+			first = result.current.install()
+			second = result.current.install()
+		})
+		expect(download).toHaveBeenCalledOnce()
+		resolveDownload?.()
+		await act(async () => Promise.all([first, second]))
+		expect(install).toHaveBeenCalledOnce()
 	})
 })

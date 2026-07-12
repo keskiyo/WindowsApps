@@ -1,4 +1,4 @@
-import { EyeOff } from 'lucide-react'
+import { Wrench } from 'lucide-react'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
 import { AppCard } from '../apps/AppCard'
 
@@ -13,37 +13,36 @@ interface Props {
 	onMoveApp(id: string, category: AppCategory): void
 	onInfo(app: AppInfo): void
 	onUninstall(app: AppInfo): void
-	onHide(id: string): void
-	onRestore(id: string): void
+	onPromote(id: string): void
 	onDemote(id: string): void
 }
 
-export function HiddenGrid(props: Props) {
+export function AuxiliaryGrid(props: Props) {
 	if (!props.apps.length)
 		return (
 			<section className='grid min-h-[55vh] place-items-center text-center'>
-				<div>
-					<EyeOff
+				<div className='max-w-sm'>
+					<Wrench
 						className='mx-auto mb-4 text-slate-400'
 						size={38}
 						aria-hidden='true'
 					/>
 					<h2 className='text-lg font-semibold'>
 						{props.hasQuery
-							? 'No matching hidden apps'
-							: 'No hidden apps'}
+							? 'No matching auxiliary tools'
+							: 'No auxiliary tools'}
 					</h2>
 					<p className='mt-2 text-sm text-slate-600'>
 						{props.hasQuery
 							? 'Try a different search.'
-							: 'Apps hidden from the catalog will appear here.'}
+							: 'Runtime components and maintenance tools separated from the main catalog appear here.'}
 					</p>
 				</div>
 			</section>
 		)
 	return (
 		<section
-			aria-label='Hidden applications'
+			aria-label='Auxiliary tools'
 			className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
 		>
 			{props.apps.map(app => (
@@ -51,6 +50,7 @@ export function HiddenGrid(props: Props) {
 					key={app.id}
 					app={app}
 					isHidden
+					isAuxiliary
 					isFavorite={props.favoriteAppIds.includes(app.id)}
 					categories={props.categories}
 					categoryOrder={props.categoryOrder}
@@ -59,8 +59,8 @@ export function HiddenGrid(props: Props) {
 					onMove={props.onMoveApp}
 					onInfo={props.onInfo}
 					onUninstall={props.onUninstall}
-					onHide={props.onHide}
-					onRestore={props.onRestore}
+					onHide={() => undefined}
+					onRestore={props.onPromote}
 					onDemote={props.onDemote}
 				/>
 			))}

@@ -18,6 +18,7 @@ interface Props {
 	activeView: AppView
 	favoriteCount: number
 	hiddenCount?: number
+	auxiliaryCount?: number
 	triggerRef: RefObject<HTMLButtonElement>
 	onSelectView(view: AppView): void
 	onSelectCategory(category: AppCategory): void
@@ -92,7 +93,8 @@ export function AppDrawer(props: Props) {
 					counts={counts}
 					activeView={props.activeView}
 					favoriteCount={props.favoriteCount}
-					hiddenCount={props.hiddenCount ?? 0}
+					 hiddenCount={props.hiddenCount ?? 0}
+					auxiliaryCount={props.auxiliaryCount ?? 0}
 					onSelectView={props.onSelectView}
 					onSelectCategory={props.onSelectCategory}
 					onReorderCategory={props.onReorderCategory}

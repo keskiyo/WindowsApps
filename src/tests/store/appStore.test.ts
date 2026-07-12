@@ -74,6 +74,155 @@ function client(overrides: Partial<AppsClient> = {}): AppsClient {
 }
 
 describe('app store', () => {
+	it('keeps auxiliary tools out of the normal catalog and search', () => {
+		const store = createAppStore(client())
+		store.setState({
+			apps: [
+				...apps,
+				app({
+					id: 'iconv',
+					name: 'iconv',
+					path: String.raw`C:\Git\usr\bin\iconv.exe`,
+					category: 'development',
+					visibilityClass: 'auxiliary',
+					visibilityScore: -30,
+					visibilityReasons: ['product_component'],
+				}),
+			],
+			query: 'iconv',
+		})
+
+		expect(selectVisibleApps(store.getState()).map(item => item.id)).not.toContain(
+			'iconv',
+		)
+		expect(selectFilteredApps(store.getState())).toEqual([])
+	})
+
+	it('shows hidden auxiliary tools only in the Hidden view', () => {
+		const tool = app({
+			id: 'iconv',
+			name: 'iconv',
+			path: String.raw`C:\Git\usr\bin\iconv.exe`,
+			category: 'development',
+			visibilityClass: 'auxiliary',
+		})
+		const store = createAppStore(client())
+		store.setState({
+			apps: [tool],
+			hiddenAppIds: [tool.id],
+			activeView: 'auxiliary',
+		})
+
+		expect(selectVisibleApps(store.getState())).toEqual([])
+		store.setState({ activeView: 'hidden' })
+		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
+			'iconv',
+		])
+	})
+
+	it('persists an auxiliary tool promoted by the user', () => {
+		const storage = localStorage
+		storage.clear()
+		const store = createAppStore(client(), storage)
+		store.setState({
+			apps: [
+				app({
+					id: 'iconv',
+					name: 'iconv',
+					path: String.raw`C:\Git\usr\bin\iconv.exe`,
+					category: 'development',
+					visibilityClass: 'auxiliary',
+				}),
+			],
+		})
+
+		store.getState().promoteAuxiliary('iconv')
+
+		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
+			'iconv',
+		])
+		expect(JSON.parse(storage.getItem(PREFERENCES_KEY) ?? '{}')).toMatchObject({
+			promotedAppIdentities: ['iconv'],
+		})
+	})
+
+	it('migrates a legacy promoted id and survives a launcher source change', async () => {
+		localStorage.setItem(
+			PREFERENCES_KEY,
+			JSON.stringify({ promotedAppIds: ['old-launcher'] }),
+		)
+		const first = app({
+			id: 'old-launcher',
+			canonicalIdentity: 'identity:example',
+			name: 'Example Tool',
+			path: String.raw`C:\Example\Tool.exe`,
+			category: 'utilities',
+			visibilityClass: 'auxiliary',
+		})
+		const replacement = app({
+			...first,
+			id: 'new-shortcut',
+			path: String.raw`C:\Menu\Example Tool.lnk`,
+			launchKind: 'shortcut',
+			sourceKind: 'start_menu',
+		})
+		const store = createAppStore(
+			client({ getApps: vi.fn().mockResolvedValue({ apps: [first], hasCache: true }) }),
+			localStorage,
+		)
+
+		await store.getState().load()
+		store.getState().replaceApps([replacement])
+
+		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
+			'new-shortcut',
+		])
+		expect(JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? '{}')).toMatchObject({
+			promotedAppIds: [],
+			promotedAppIdentities: ['identity:example'],
+		})
+		expect(store.getState().promotedAppIds).toEqual([])
+	})
+
+	it('moves a promoted tool back to auxiliary and removes its favorite', () => {
+		const tool = app({
+			id: 'helper',
+			canonicalIdentity: 'identity:helper',
+			name: 'Helper',
+			path: String.raw`C:\Tool\helper.exe`,
+			category: 'utilities',
+			visibilityClass: 'auxiliary',
+		})
+		const store = createAppStore(client())
+		store.setState({ apps: [tool] })
+		store.getState().promoteAuxiliary(tool.id)
+		store.getState().toggleFavorite(tool.id)
+
+		store.getState().demoteAuxiliary(tool.id)
+
+		expect(selectVisibleApps(store.getState())).toEqual([])
+		expect(store.getState().favoriteAppIds).not.toContain(tool.id)
+		expect(store.getState().promotedAppIdentities).not.toContain(
+			'identity:helper',
+		)
+	})
+
+	it('refuses to favorite an auxiliary tool before user promotion', () => {
+		const tool = app({
+			id: 'helper',
+			name: 'Helper',
+			path: String.raw`C:\Tool\helper.exe`,
+			category: 'utilities',
+			visibilityClass: 'auxiliary',
+		})
+		const store = createAppStore(client())
+		store.setState({ apps: [tool] })
+
+		store.getState().toggleFavorite(tool.id)
+
+		expect(store.getState().favoriteAppIds).toEqual([])
+	})
+
 	it('loads applications and clears loading state', async () => {
 		const store = createAppStore(client())
 		await store.getState().load()

@@ -1,6 +1,6 @@
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check, type Update } from '@tauri-apps/plugin-updater'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type UpdateCheckStatus = 'idle' | 'checking' | 'current' | 'available' | 'error'
 export type UpdateInstallPhase =
@@ -112,24 +112,35 @@ export function useUpdater(options?: Options): UpdaterState {
 	const [totalBytes, setTotalBytes] = useState<number | null>(null)
 	const [error, setError] = useState<string | null>(null)
 	const [status, setStatus] = useState<UpdateCheckStatus>('idle')
+	const checkPromiseRef = useRef<Promise<Update | null> | null>(null)
+	const installInFlightRef = useRef(false)
+
+	const requestCheck = useCallback(() => {
+		if (checkPromiseRef.current) return checkPromiseRef.current
+		const request = check().finally(() => {
+			if (checkPromiseRef.current === request) checkPromiseRef.current = null
+		})
+		checkPromiseRef.current = request
+		return request
+	}, [])
 
 	const checkNow = useCallback(async () => {
 		setStatus('checking')
 		try {
-			const found = await check()
+			const found = await requestCheck()
 			setAvailable(shouldShowUpdate(found, true) ? found : null)
 			setStatus(found ? 'available' : 'current')
 		} catch {
 			setStatus('error')
 		}
-	}, [])
+	}, [requestCheck])
 
 	useEffect(() => {
 		if (!autoCheck) return
 		let active = true
 		void (async () => {
 			try {
-				const found = await check()
+				const found = await requestCheck()
 				if (active && shouldShowUpdate(found, false)) {
 					setAvailable(found)
 					setStatus('available')
@@ -141,14 +152,16 @@ export function useUpdater(options?: Options): UpdaterState {
 		return () => {
 			active = false
 		}
-	}, [autoCheck])
+	}, [autoCheck, requestCheck])
 
 	const install = useCallback(async () => {
 		if (
+			installInFlightRef.current ||
 			!available ||
 			['downloading', 'verifying', 'installing', 'restarting'].includes(phase)
 		)
 			return
+		installInFlightRef.current = true
 		setError(null)
 		setPhase('downloading')
 		setProgress(0)
@@ -190,6 +203,8 @@ export function useUpdater(options?: Options): UpdaterState {
 			setPhase('failed')
 			setProgress(null)
 			setError(updateErrorMessage(error))
+		} finally {
+			installInFlightRef.current = false
 		}
 	}, [available, phase])
 

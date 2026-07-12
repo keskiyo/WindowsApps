@@ -1,9 +1,9 @@
 # Windows Apps Technical Documentation
 
-Technical reference for Windows Apps `0.2.4`.
+Technical reference for Windows Apps `0.2.5`.
 
 [README](README.md) ·
-[Release 0.2.4](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.4) ·
+[Release 0.2.5](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.5) ·
 [Telegram](https://t.me/keskiyo)
 
 ---
@@ -176,6 +176,18 @@ Settings also exposes two narrower operations. **Repair missing icons** queues o
 Every successful synchronization stores privacy-safe diagnostics with the catalog: completion time, elapsed milliseconds, scan mode, application total, source totals, and added/updated/removed counts. Paths and usernames are not included.
 
 ## 8. Filtering and duplicate resolution
+
+Discovery and visibility are separate stages. Every retained candidate receives a `primary`, `auxiliary`, or `rejected` classification with a numeric score and stable reason codes. AUMID, Start Menu, Steam, registered uninstall products, coherent PE metadata, runtime paths, and component-role markers contribute independent evidence.
+
+Normal categories, search, Favorites, and command surfaces exclude `auxiliary` entries. The **Auxiliary tools** view keeps uncertain runtime and maintenance components inspectable. A user can restore an entry to the main catalog; its canonical identity is persisted in local preferences and survives incremental refresh, full scan, and cache reset.
+
+User visibility overrides now prefer a separate hashed canonical identity. AUMID and Steam identities are strongest; normalized ProductName, publisher, and install root provide cross-source stability; resolved target and normalized path are conservative fallbacks. Legacy promoted IDs remain as fallback and are migrated when a current catalog entry can be matched. Portable roots remain part of identity so independent copies do not collapse.
+
+The model retains PE `ProductName` and `OriginalFilename`, plus shortcut arguments. OriginalFilename contributes installer/helper evidence but is never sufficient by itself to reject a normal registered product. Only known user-facing shortcut modes (`--profile-directory`, `--user-data-dir`, `--app`, `--app-id`, `--class`, Firefox `-p`) split target identity.
+
+Debug builds write `%LOCALAPPDATA%\WindowsApps\visibility-report.json` for rejected candidates. User-profile prefixes are replaced with `<USERPROFILE>` and the report is not emitted as a normal production log. A small synthetic fixture corpus lives under `src-tauri/tests/fixtures`; it validates the runner and regression examples but is not evidence of real-world accuracy.
+
+Definite installers, uninstallers, documentation shortcuts, broken resource names, and maintenance executables are rejected. Ambiguous executable names are not rejected solely by name. Registry records marked `SystemComponent=1` remain metadata-only and cannot create a launch card.
 
 Duplicate matching considers:
 
@@ -401,7 +413,7 @@ npm run tauri build
 Expected Windows x64 bundle:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.4_x64-setup.exe
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.5_x64-setup.exe
 ```
 
 The NSIS setup executable is the primary public artifact.
@@ -434,21 +446,21 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo check --manifest-path src-tauri/Cargo.toml
 npm run tauri build
-powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.4
-powershell -NoProfile -File scripts/verify-release-notes.ps1 -Path Release.md -Tag v0.2.4
+powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.5
+powershell -NoProfile -File scripts/verify-release-notes.ps1 -Path Release.md -Tag v0.2.5
 ```
 
 After the GitHub Action publishes a release, download the assets into a local folder and run:
 
 ```powershell
-powershell -NoProfile -File scripts/verify-release-assets.ps1 -AssetsDir path\to\downloaded-assets -Tag v0.2.4
+powershell -NoProfile -File scripts/verify-release-assets.ps1 -AssetsDir path\to\downloaded-assets -Tag v0.2.5
 ```
 
 Publish:
 
 ```powershell
-git tag -a v0.2.4 -m "Windows Apps 0.2.4"
-git push origin v0.2.4
+git tag -a v0.2.5 -m "Windows Apps 0.2.5"
+git push origin v0.2.5
 ```
 
 Do not reuse or move a tag after a public Release has been published. Increase the version for the next release.
@@ -524,5 +536,5 @@ The installer is not Authenticode-signed. Download it only from the official pro
 ---
 
 [README](README.md) ·
-[Release 0.2.4](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.4) ·
+[Release 0.2.5](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.5) ·
 [Telegram: @keskiyo](https://t.me/keskiyo)

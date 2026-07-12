@@ -5,13 +5,13 @@
 
 **A fast, private application catalog and launcher for Windows 10 and Windows 11.**
 
-[![Version](https://img.shields.io/badge/version-0.2.4-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.4)
+[![Version](https://img.shields.io/badge/version-0.2.5-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.5)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
 ![Local first](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
 
-[Download Windows Apps 0.2.4](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.4) ·
+[Download Windows Apps 0.2.5](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.5) ·
 [Documentation](Documentation.md) ·
 [Telegram](https://t.me/keskiyo)
 
@@ -32,7 +32,9 @@ The catalog is stored locally. On startup, cached names appear immediately while
 - **Incremental scanning** — unchanged directories reuse previous results.
 - **Controlled full scans** — progress reporting, cancellation, depth, entry-count, and time limits.
 - **Smart deduplication** — evidence-based resolution merges the same product found across sources, with useful shortcuts preferred and legitimate apps kept when identity is ambiguous.
-- **Noise filtering** — installers, uninstall helpers, updaters, documentation shortcuts, resource entries, and broken names are filtered.
+- **Explainable noise filtering** — applications are classified from Windows registration, shortcut targets, executable metadata, location, and role instead of relying only on filenames.
+- **Auxiliary tools** — runtime components and maintenance executables stay out of normal categories and search, remain inspectable, and can be restored by the user.
+- **Stable catalog overrides** — restored auxiliary tools are tracked by normalized application identity, surviving source and launcher changes; they can be moved back at any time.
 - **Full-text search** — matches application name, publisher, description, and install path; each word is matched independently.
 - **Quick launch (Ctrl+K)** — keyboard-first command palette to find and launch any app; `Ctrl+F` or `/` jumps to search.
 - **Launch feedback** — the card shows a launching state (dimmed icon + spinner) and a top activity bar, cleared when the app window is ready or after a short ceiling.
@@ -53,8 +55,8 @@ The catalog is stored locally. On startup, cached names appear immediately while
 
 ## Installation
 
-1. Open [Windows Apps 0.2.4](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.4).
-2. Download `Windows.Apps_0.2.4_x64-setup.exe`.
+1. Open [Windows Apps 0.2.5](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.5).
+2. Download `Windows.Apps_0.2.5_x64-setup.exe`.
 3. Run the installer.
 4. Start **Windows Apps** and select **Scan for apps** when prompted.
 
@@ -91,7 +93,11 @@ Use:
 - **Clear icon cache** to rebuild icons from the existing catalog without rescanning drives;
 - **Reset catalog cache** to remove generated catalog/icon caches and perform a clean scan.
 
-Favorites, Hidden items, custom categories, and category assignments are preserved when the catalog cache is reset.
+Favorites, Hidden items, promoted auxiliary tools, custom categories, and category assignments are preserved when the catalog cache is reset.
+
+Catalog visibility is conservative. Start Menu/AUMID applications, Steam games, registered products, and portable executables with coherent product metadata receive strong launcher evidence. Runtime paths and helper/service/language-server metadata reduce visibility. Ambiguous entries are placed in **Auxiliary tools** rather than deleted, and **Restore to catalog** creates a persistent user override.
+
+PE `ProductName` and `OriginalFilename` metadata are retained separately. They help identify renamed installers and helpers without replacing the user-facing name. Shortcut arguments affect identity only for a small set of user-facing modes such as browser profiles and PWA app launches; ordinary service flags do not create duplicate cards.
 
 ## Privacy and safety
 
@@ -140,7 +146,7 @@ npm run tauri build
 Primary local artifact:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.4_x64-setup.exe
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.5_x64-setup.exe
 ```
 
 ## Release process

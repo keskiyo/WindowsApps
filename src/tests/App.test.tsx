@@ -162,6 +162,9 @@ describe('App', () => {
 			'theme-graphite-surface',
 		)
 		expect(card).toHaveClass('app-card-glass')
+		expect(document.getElementById('catalog-scroll')).toHaveClass(
+			'overflow-x-hidden',
+		)
 	})
 
 	it('renders the English catalog and category counts', async () => {
@@ -415,6 +418,70 @@ describe('App', () => {
 		)
 		expect(store.getState().hiddenAppIds).not.toContain('steam')
 		expect(store.getState().favoriteAppIds).toContain('steam')
+	})
+
+	it('restores and moves an auxiliary tool back without exposing favorites', async () => {
+		const helper = app({
+			id: 'helper',
+			canonicalIdentity: 'identity:helper',
+			name: 'Runtime Helper',
+			path: String.raw`C:\Tool\runtime\helper.exe`,
+			category: 'utilities',
+			visibilityClass: 'auxiliary',
+			visibilityReasons: ['runtime_directory', 'product_component'],
+		})
+		const { store } = renderApp({
+			getApps: vi.fn().mockResolvedValue({ apps: [...apps, helper], hasCache: true }),
+		})
+		await screen.findByRole('button', { name: 'Launch Steam' })
+		await userEvent.click(screen.getByRole('button', { name: 'Open navigation' }))
+		await userEvent.click(screen.getByRole('button', { name: /Auxiliary tools/ }))
+
+		expect(
+			screen.queryByRole('button', { name: 'Add Runtime Helper to favorites' }),
+		).not.toBeInTheDocument()
+		await userEvent.click(screen.getByRole('button', { name: 'Manage Runtime Helper' }))
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Restore to catalog' }),
+		)
+		store.getState().setActiveView('all')
+		expect(
+			await screen.findByRole('button', { name: 'Launch Runtime Helper' }),
+		).toBeInTheDocument()
+		await userEvent.click(screen.getByRole('button', { name: 'Manage Runtime Helper' }))
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Move back to Auxiliary tools' }),
+		)
+
+		expect(
+			screen.queryByRole('button', { name: 'Launch Runtime Helper' }),
+		).not.toBeInTheDocument()
+		store.getState().setActiveView('auxiliary')
+		expect(
+			await screen.findByRole('button', { name: 'Launch Runtime Helper' }),
+		).toBeInTheDocument()
+	})
+
+	it('keeps auxiliary tools out of command palette from every active view', async () => {
+		const helper = app({
+			id: 'helper',
+			name: 'Runtime Helper',
+			path: String.raw`C:\Tool\runtime\helper.exe`,
+			category: 'utilities',
+			visibilityClass: 'auxiliary',
+		})
+		const { store } = renderApp({
+			getApps: vi.fn().mockResolvedValue({ apps: [...apps, helper], hasCache: true }),
+		})
+		await screen.findByRole('button', { name: 'Launch Steam' })
+		store.getState().setActiveView('auxiliary')
+		await userEvent.keyboard('{Control>}k{/Control}')
+		await userEvent.type(
+			screen.getByRole('combobox', { name: 'Quick launch search' }),
+			'Runtime Helper',
+		)
+
+		expect(screen.getByText(/No apps match/)).toBeInTheDocument()
 	})
 
 	it('keeps the sticky header above cards and open app menus', async () => {

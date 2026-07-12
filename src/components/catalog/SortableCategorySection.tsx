@@ -19,6 +19,7 @@ interface Props {
 	onUninstall(app: AppInfo): void
 	onHide(id: string): void
 	onRestore(id: string): void
+	onDemote(id: string): void
 	onRenameCategory(
 		id: string,
 		label: string,

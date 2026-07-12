@@ -19,6 +19,10 @@ pub struct AppHydrationPatch {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub publisher: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub product_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub original_filename: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub install_location: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub can_uninstall: Option<bool>,
@@ -122,6 +126,16 @@ fn hydrate_app(app_data_dir: &Path, app: &AppInfo, generation: u64) -> AppHydrat
             .publisher
             .clone()
             .or_else(|| metadata.as_ref().and_then(|value| value.publisher.clone())),
+        product_name: app.product_name.clone().or_else(|| {
+            metadata
+                .as_ref()
+                .and_then(|value| value.product_name.clone())
+        }),
+        original_filename: app.original_filename.clone().or_else(|| {
+            metadata
+                .as_ref()
+                .and_then(|value| value.original_filename.clone())
+        }),
         install_location: app.install_location.clone().or_else(|| {
             Path::new(target)
                 .parent()

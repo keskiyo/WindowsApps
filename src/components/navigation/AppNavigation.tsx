@@ -11,7 +11,7 @@ import {
 	sortableKeyboardCoordinates,
 	verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { EyeOff, Grid2X2, Plus, Settings, Star } from 'lucide-react'
+import { EyeOff, Grid2X2, Plus, Settings, Star, Wrench } from 'lucide-react'
 import { useState } from 'react'
 import { useSpotlight } from '../../hooks/useSpotlight'
 import { getDropAction } from '../../lib/catalog'
@@ -32,6 +32,7 @@ interface Props {
 	activeView: AppView
 	favoriteCount: number
 	hiddenCount: number
+	auxiliaryCount?: number
 	onSelectView(view: AppView): void
 	onSelectCategory(category: AppCategory): void
 	onCreateCategory(
@@ -162,6 +163,21 @@ export function AppNavigation(props: Props) {
 				</DndContext>
 			</div>
 			<div className='border-t border-slate-300/65 p-4'>
+				<button
+					type='button'
+					onClick={() => props.onSelectView('auxiliary')}
+					aria-current={
+						props.activeView === 'auxiliary' ? 'page' : undefined
+					}
+					{...spotlight}
+					className={`${itemClass(props.activeView === 'auxiliary')} mb-1 py-[calc(0.625rem-1.5px)]!`}
+				>
+					<SpotlightLayer size={90} />
+					<Wrench size={17} /> <span>Auxiliary tools</span>
+					<span className='ml-auto rounded-full bg-slate-200/85 px-2 py-0.5 text-xs text-slate-600'>
+						{props.auxiliaryCount ?? 0}
+					</span>
+				</button>
 				<button
 					type='button'
 					onClick={() => props.onSelectView('hidden')}

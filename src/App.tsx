@@ -58,7 +58,12 @@ export function App({
 	// typing, scan progress, favorites and drawer toggles reuse the memoized result.
 	const categorizedApps = useMemo(
 		() => selectCategorizedApps(state),
-		[state.apps, state.categoryOverrides],
+		[
+			state.apps,
+			state.categoryOverrides,
+			state.promotedAppIds,
+			state.promotedAppIdentities,
+		],
 	)
 	const visibleApps = useMemo(
 		() =>
@@ -252,8 +257,14 @@ export function App({
 		visibleHydrationIds,
 	])
 
+	const auxiliaryCount = categorizedApps.filter(
+		app => app.visibilityClass === 'auxiliary',
+	).length
+	const primaryCount = categorizedApps.length - auxiliaryCount
 	const visibleCategorizedApps = categorizedApps.filter(
-		app => !state.hiddenAppIds.includes(app.id),
+		app =>
+			app.visibilityClass !== 'auxiliary' &&
+			!state.hiddenAppIds.includes(app.id),
 	)
 	const navigationCounts = new Map<string, number>()
 	for (const app of visibleCategorizedApps)
@@ -277,6 +288,7 @@ export function App({
 		activeView: state.activeView,
 		favoriteCount,
 		hiddenCount,
+		auxiliaryCount,
 		onSelectView: navigation.selectView,
 		onSelectCategory: navigation.selectCategory,
 		onReorderCategory: state.reorderCategory,
@@ -354,10 +366,10 @@ export function App({
 					{desktopNavigation && <AppSidebar {...navigationProps} />}
 					<div
 						id='catalog-scroll'
-						className='app-panel flex min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl'
+						className='app-panel flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto rounded-2xl'
 					>
 						<Header
-							appCount={state.apps.length}
+							appCount={primaryCount}
 							visibleCount={filteredApps.length}
 							query={state.query}
 							isRefreshing={state.isRefreshing}
@@ -378,6 +390,7 @@ export function App({
 								onForceFullScan={state.forceFullScan}
 								onResetCatalogCache={state.resetCatalogCache}
 								catalogDiagnostics={state.catalogDiagnostics}
+								visibilityCounts={{ primary: primaryCount, auxiliary: auxiliaryCount }}
 								onClearIconCache={state.clearIconCache}
 								onRepairMissingIcons={state.repairMissingIcons}
 								updater={updater}
@@ -424,6 +437,8 @@ export function App({
 									onUninstall={setUninstallApp}
 									onHide={state.hideApp}
 									onRestore={state.restoreApp}
+									onPromoteAuxiliary={state.promoteAuxiliary}
+									onDemoteAuxiliary={state.demoteAuxiliary}
 									onRenameCategory={state.renameCategory}
 									onDeleteCategory={state.deleteCategory}
 								/>
@@ -445,6 +460,7 @@ export function App({
 						).length
 					}
 					hiddenCount={navigationProps.hiddenCount}
+					auxiliaryCount={navigationProps.auxiliaryCount}
 					triggerRef={menuButtonRef}
 					onSelectView={navigation.selectView}
 					onSelectCategory={navigation.selectCategory}
@@ -456,7 +472,7 @@ export function App({
 			)}
 			{paletteOpen && (
 				<CommandPalette
-					apps={visibleApps}
+					apps={visibleCategorizedApps}
 					onLaunch={feedback.launch}
 					onClose={() => setPaletteOpen(false)}
 				/>

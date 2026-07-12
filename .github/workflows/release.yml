@@ -59,10 +59,10 @@ jobs:
 
                       ## Highlights
 
-                      - Better updates - see release date, package size, full notes, and clear Downloading, Verifying, Installing, and Restarting stages.
-                      - Reliable delivery - NSIS-only manifests are validated before a draft release becomes public.
-                      - Healthier catalog - scan diagnostics, missing-icon repair, and icon-only cache cleanup are available in Settings.
-                      - Safer cleanup - duplicate detection uses application identities and install evidence across every source.
+                      - Cleaner catalog - runtimes, helpers, services, language servers, documentation, and installers are separated using explainable source and metadata signals.
+                      - Stable user choices - auxiliary tools can be restored permanently, hidden, or moved back without losing their canonical identity.
+                      - More reliable maintenance - overlapping scans and updater actions are coalesced, cache backups recover interrupted writes, and icon maintenance stays separate from full scanning.
+                      - Better identity matching - quoted browser profiles, normalized Windows paths, ProductName, and OriginalFilename improve deduplication without merging distinct portable copies.
                   releaseDraft: true
                   prerelease: false
 

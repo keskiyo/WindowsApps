@@ -95,6 +95,46 @@ describe('SettingsPage', () => {
 		expect(onForceFullScan).toHaveBeenCalledOnce()
 	})
 
+	it('returns focus to the full scan trigger when confirmation closes', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+		const trigger = screen.getByRole('button', { name: 'Force full scan' })
+		await userEvent.click(trigger)
+		await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+		expect(trigger).toHaveFocus()
+	})
+
+	it('uses readable dark text in the light catalog maintenance surface', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+				visibilityCounts={{ primary: 12, auxiliary: 3 }}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Force full scan' }),
+		)
+		expect(
+			screen.getByText(/The next scan will take longer/),
+		).toHaveClass('text-slate-700')
+		expect(screen.getByRole('button', { name: 'Cancel' })).toHaveClass(
+			'text-slate-700',
+		)
+		expect(screen.getByText('Primary applications')).toHaveClass(
+			'text-slate-600',
+		)
+		expect(screen.getByText('12')).toHaveClass('text-slate-800')
+	})
+
 	it('confirms and resets the catalog cache', async () => {
 		const onResetCatalogCache = vi.fn().mockResolvedValue(undefined)
 		render(

@@ -13,6 +13,7 @@ pub(super) struct RegistryValues {
     pub install_location: Option<String>,
     pub uninstall_string: Option<String>,
     pub quiet_uninstall_string: Option<String>,
+    pub system_component: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -53,6 +54,9 @@ pub(super) fn scan(hive: winreg::HKEY, subkey: &str) -> RegistryScan {
             install_location: key.get_value("InstallLocation").ok(),
             uninstall_string: key.get_value("UninstallString").ok(),
             quiet_uninstall_string: key.get_value("QuietUninstallString").ok(),
+            system_component: key
+                .get_value::<u32, _>("SystemComponent")
+                .is_ok_and(|value| value == 1),
         };
         if let Some(metadata) = metadata_from_values(&values) {
             result.metadata.push(metadata);
@@ -65,6 +69,9 @@ pub(super) fn scan(hive: winreg::HKEY, subkey: &str) -> RegistryScan {
 }
 
 pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
+    if values.system_component {
+        return None;
+    }
     let path = values
         .display_icon
         .as_deref()
@@ -86,6 +93,7 @@ pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
     let uninstall = uninstall_from_values(&values);
     let can_uninstall = uninstall.is_some();
     let name = values.display_name.trim().to_string();
+    let executable_metadata = crate::platform::windows::executable_metadata::read(&path);
     Some(AppInfo {
         id: stable_id(&path_text),
         category: classify(&name, &path_text),
@@ -101,14 +109,21 @@ pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
             LaunchKind::Executable
         },
         source_kind: SourceKind::Registry,
-        description: clean(values.comments),
-        version: clean(values.display_version),
-        publisher: clean(values.publisher),
+        description: clean(values.comments).or(executable_metadata.description),
+        version: clean(values.display_version).or(executable_metadata.version),
+        publisher: clean(values.publisher).or(executable_metadata.publisher),
+        product_name: executable_metadata.product_name,
+        original_filename: executable_metadata.original_filename,
         install_location: clean(values.install_location),
         can_uninstall,
         uninstall,
         resolved_path: None,
         shortcut_icon_path: None,
+        launch_arguments: None,
+        canonical_identity: None,
+        visibility_class: Default::default(),
+        visibility_score: 0,
+        visibility_reasons: Vec::new(),
     })
 }
 
@@ -173,7 +188,22 @@ mod tests {
             install_location: None,
             uninstall_string: None,
             quiet_uninstall_string: None,
+            system_component: false,
         }
+    }
+
+    #[test]
+    fn system_component_is_metadata_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let executable = dir.path().join("Runtime.exe");
+        std::fs::write(&executable, []).unwrap();
+        let mut values = values(
+            "Runtime component",
+            Some(executable.to_string_lossy().into_owned()),
+        );
+        values.system_component = true;
+
+        assert!(from_values(values).is_none());
     }
 
     #[test]
@@ -202,6 +232,7 @@ mod tests {
             install_location: Some(r"C:\Apps".into()),
             uninstall_string: Some(r"C:\Apps\uninstall.exe /remove".into()),
             quiet_uninstall_string: None,
+            system_component: false,
         })
         .unwrap();
         assert_eq!(app.version.as_deref(), Some("1.2.3"));
@@ -223,6 +254,7 @@ mod tests {
             install_location: None,
             uninstall_string: Some(r"C:\Apps\uninstall.exe".into()),
             quiet_uninstall_string: Some(r"C:\Apps\uninstall.exe /quiet".into()),
+            system_component: false,
         })
         .unwrap();
         assert_eq!(
@@ -248,6 +280,7 @@ mod tests {
             install_location: None,
             uninstall_string: None,
             quiet_uninstall_string: Some("not a command".into()),
+            system_component: false,
         })
         .unwrap();
         assert!(!app.can_uninstall);
@@ -276,6 +309,7 @@ mod tests {
             install_location: None,
             uninstall_string: Some(r"C:\Program Files (x86)\Steam\uninstall.exe".into()),
             quiet_uninstall_string: None,
+            system_component: false,
         };
         let metadata = metadata_from_values(&values).unwrap();
         assert_eq!(metadata.name, "Steam");

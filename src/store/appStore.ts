@@ -32,6 +32,8 @@ export interface AppState {
 	collapsedCategories: AppCategory[]
 	categoryOverrides: Record<string, AppCategory>
 	hiddenAppIds: string[]
+	promotedAppIds: string[]
+	promotedAppIdentities: string[]
 	categories: CategoryDefinition[]
 	launchingIds: string[]
 	markLaunching(id: string): void
@@ -61,6 +63,8 @@ export interface AppState {
 	toggleFavorite(id: string): void
 	hideApp(id: string): void
 	restoreApp(id: string): void
+	promoteAuxiliary(id: string): void
+	demoteAuxiliary(id: string): void
 	reorderCategory(active: AppCategory, over: AppCategory): void
 	moveApp(id: string, category: AppCategory): void
 	toggleCategory(category: AppCategory): void
@@ -118,6 +122,8 @@ export function createAppStore(
 				collapsedCategories: state.collapsedCategories,
 				categoryOverrides: state.categoryOverrides,
 				hiddenAppIds: state.hiddenAppIds,
+				promotedAppIds: state.promotedAppIds,
+				promotedAppIdentities: state.promotedAppIdentities,
 			})
 		}
 
@@ -138,6 +144,8 @@ export function createAppStore(
 			collapsedCategories: preferences.collapsedCategories,
 			categoryOverrides: preferences.categoryOverrides,
 			hiddenAppIds: preferences.hiddenAppIds,
+			promotedAppIds: preferences.promotedAppIds,
+			promotedAppIdentities: preferences.promotedAppIdentities,
 			categories: preferences.categories,
 			launchingIds: [],
 			markLaunching(id) {
@@ -167,12 +175,23 @@ export function createAppStore(
 				set({ isLoading: true, error: null })
 				try {
 					const snapshot = await client.getApps()
+					const promotedAppIdentities = new Set(
+						get().promotedAppIdentities,
+					)
+					for (const legacyId of get().promotedAppIds) {
+						const match = snapshot.apps.find(app => app.id === legacyId)
+						if (match)
+							promotedAppIdentities.add(match.canonicalIdentity ?? match.id)
+					}
 					set({
 						apps: snapshot.apps,
 						hasCache: snapshot.hasCache,
 						catalogGeneration: snapshot.generation ?? 0,
 						catalogDiagnostics: snapshot.diagnostics ?? null,
+						promotedAppIds: [],
+						promotedAppIdentities: [...promotedAppIdentities],
 					})
+					persist()
 				} catch (error) {
 					set({ error: errorMessage(error) })
 				} finally {
@@ -327,11 +346,21 @@ export function createAppStore(
 				set({ activeView })
 			},
 			toggleFavorite(id) {
-				set(state => ({
-					favoriteAppIds: state.favoriteAppIds.includes(id)
-						? state.favoriteAppIds.filter(appId => appId !== id)
-						: [...state.favoriteAppIds, id],
-				}))
+				set(state => {
+					const app = state.apps.find(item => item.id === id)
+					const promoted = app
+						? state.promotedAppIds.includes(app.id) ||
+							state.promotedAppIdentities.includes(
+								app.canonicalIdentity ?? app.id,
+							)
+						: false
+					if (app?.visibilityClass === 'auxiliary' && !promoted) return state
+					return {
+						favoriteAppIds: state.favoriteAppIds.includes(id)
+							? state.favoriteAppIds.filter(appId => appId !== id)
+							: [...state.favoriteAppIds, id],
+					}
+				})
 				persist()
 			},
 			hideApp(id) {
@@ -347,6 +376,28 @@ export function createAppStore(
 					hiddenAppIds: state.hiddenAppIds.filter(
 						appId => appId !== id,
 					),
+				}))
+				persist()
+			},
+			promoteAuxiliary(id) {
+				const app = get().apps.find(item => item.id === id)
+				const identity = app?.canonicalIdentity ?? id
+				set(state => ({
+					promotedAppIdentities: state.promotedAppIdentities.includes(identity)
+						? state.promotedAppIdentities
+						: [...state.promotedAppIdentities, identity],
+				}))
+				persist()
+			},
+			demoteAuxiliary(id) {
+				const app = get().apps.find(item => item.id === id)
+				const identity = app?.canonicalIdentity ?? id
+				set(state => ({
+					promotedAppIds: state.promotedAppIds.filter(appId => appId !== id),
+					promotedAppIdentities: state.promotedAppIdentities.filter(
+						item => item !== identity,
+					),
+					favoriteAppIds: state.favoriteAppIds.filter(appId => appId !== id),
 				}))
 				persist()
 			},

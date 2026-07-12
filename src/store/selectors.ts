@@ -9,9 +9,18 @@ export function filterVisibleApps(
 	favoriteAppIds: string[],
 ): AppInfo[] {
 	if (activeView === 'settings') return []
+	if (activeView === 'auxiliary')
+		return categorized.filter(
+			app =>
+				app.visibilityClass === 'auxiliary' &&
+				!hiddenAppIds.includes(app.id),
+		)
 	if (activeView === 'hidden')
 		return categorized.filter(app => hiddenAppIds.includes(app.id))
-	const visible = categorized.filter(app => !hiddenAppIds.includes(app.id))
+	const visible = categorized.filter(
+		app =>
+			app.visibilityClass !== 'auxiliary' && !hiddenAppIds.includes(app.id),
+	)
 	return activeView === 'favorites'
 		? visible.filter(app => favoriteAppIds.includes(app.id))
 		: visible
@@ -30,6 +39,15 @@ export function filterAppsByQuery(apps: AppInfo[], query: string): AppInfo[] {
 			app.description,
 			app.path,
 			app.installLocation,
+			app.productName,
+			app.originalFilename,
+			app.visibilityReasons?.join(' '),
+			app.visibilityReasons?.includes('product_component')
+				? 'helper service component'
+				: null,
+			app.visibilityReasons?.includes('documentation_shortcut')
+				? 'documentation docs'
+				: null,
 		]
 			.filter(Boolean)
 			.join(' ')
@@ -40,10 +58,24 @@ export function filterAppsByQuery(apps: AppInfo[], query: string): AppInfo[] {
 
 export function selectCategorizedApps(state: AppState): AppInfo[] {
 	return deduplicateVisibleApps(
-		state.apps.map(app => ({
-			...app,
-			category: state.categoryOverrides[app.id] ?? app.category,
-		})),
+		state.apps.map(app => {
+			const userPromoted =
+				state.promotedAppIds.includes(app.id) ||
+				state.promotedAppIdentities.includes(
+					app.canonicalIdentity ?? app.id,
+				)
+			const categorized = {
+				...app,
+				category: state.categoryOverrides[app.id] ?? app.category,
+			}
+			return app.visibilityClass === 'auxiliary' && userPromoted
+				? {
+						...categorized,
+						visibilityClass: 'primary' as const,
+						userPromoted: true,
+					}
+				: categorized
+		}),
 	)
 }
 

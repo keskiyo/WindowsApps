@@ -111,46 +111,47 @@ fn scan_root_with_limits(
         statistics: ScanStatistics::default(),
         limit_reached: None,
     };
-    let started_at = Instant::now();
-    visit_directory(
-        root,
-        0,
+    let context = VisitContext {
         previous,
         mode,
         excluded,
-        &is_cancelled,
+        is_cancelled: &is_cancelled,
         limits,
-        started_at,
-        &mut result,
-    );
+        started_at: Instant::now(),
+    };
+    visit_directory(root, 0, &context, &mut result);
     result
         .apps
         .sort_by_cached_key(|app| app.path.to_lowercase());
     result
 }
 
-fn visit_directory(
-    directory: &Path,
-    depth: usize,
-    previous: &FilesystemIndex,
+struct VisitContext<'a, F: Fn() -> bool> {
+    previous: &'a FilesystemIndex,
     mode: ScanMode,
-    excluded: &[PathBuf],
-    is_cancelled: &impl Fn() -> bool,
+    excluded: &'a [PathBuf],
+    is_cancelled: &'a F,
     limits: ScanLimits,
     started_at: Instant,
+}
+
+fn visit_directory<F: Fn() -> bool>(
+    directory: &Path,
+    depth: usize,
+    context: &VisitContext<'_, F>,
     result: &mut IncrementalScanResult,
 ) {
-    if should_stop(result, limits, started_at)
-        || is_cancelled()
+    if should_stop(result, context.limits, context.started_at)
+        || (context.is_cancelled)()
         || !is_scannable_directory(directory)
-        || !portable::should_visit_directory(directory, excluded)
+        || !portable::should_visit_directory(directory, context.excluded)
     {
         return;
     }
     let key = normalized_path(directory);
     let modified_nanos = directory_modified_nanos(directory);
-    let cached = previous.directories.get(&key);
-    let unchanged = mode == ScanMode::Incremental
+    let cached = context.previous.directories.get(&key);
+    let unchanged = context.mode == ScanMode::Incremental
         && cached.is_some_and(|record| record.modified_nanos == modified_nanos);
 
     if unchanged {
@@ -158,22 +159,12 @@ fn visit_directory(
         result.apps.extend(record.apps.iter().cloned());
         result.index.directories.insert(key, record.clone());
         for child in record.child_directories {
-            if depth >= limits.max_depth {
+            if depth >= context.limits.max_depth {
                 mark_limit(result, ScanLimit::Depth);
                 continue;
             }
-            visit_directory(
-                Path::new(&child),
-                depth + 1,
-                previous,
-                mode,
-                excluded,
-                is_cancelled,
-                limits,
-                started_at,
-                result,
-            );
-            if should_stop(result, limits, started_at) {
+            visit_directory(Path::new(&child), depth + 1, context, result);
+            if should_stop(result, context.limits, context.started_at) {
                 return;
             }
         }
@@ -191,10 +182,12 @@ fn visit_directory(
     let mut children = Vec::new();
     let mut direct_apps = Vec::new();
     for entry in entries.filter_map(Result::ok) {
-        if should_stop(result, limits, started_at) {
+        if should_stop(result, context.limits, context.started_at) {
             break;
         }
-        if result.statistics.entries_seen % CANCELLATION_CHECK_INTERVAL == 0 && is_cancelled() {
+        if result.statistics.entries_seen % CANCELLATION_CHECK_INTERVAL == 0
+            && (context.is_cancelled)()
+        {
             break;
         }
         result.statistics.entries_seen += 1;
@@ -208,9 +201,9 @@ fn visit_directory(
         if file_type.is_dir() {
             if is_reparse_point(&path) {
                 continue;
-            } else if depth >= limits.max_depth {
+            } else if depth >= context.limits.max_depth {
                 mark_limit(result, ScanLimit::Depth);
-            } else if portable::should_visit_directory(&path, excluded) {
+            } else if portable::should_visit_directory(&path, context.excluded) {
                 children.push(path.to_string_lossy().into_owned());
             }
         } else if file_type.is_file() && portable::is_portable_candidate(&path) {
@@ -234,20 +227,10 @@ fn visit_directory(
         );
     }
     for child in children {
-        if should_stop(result, limits, started_at) {
+        if should_stop(result, context.limits, context.started_at) {
             return;
         }
-        visit_directory(
-            Path::new(&child),
-            depth + 1,
-            previous,
-            mode,
-            excluded,
-            is_cancelled,
-            limits,
-            started_at,
-            result,
-        );
+        visit_directory(Path::new(&child), depth + 1, context, result);
     }
 }
 

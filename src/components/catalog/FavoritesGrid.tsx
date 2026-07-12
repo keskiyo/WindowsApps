@@ -15,6 +15,7 @@ interface Props {
 	onUninstall(app: AppInfo): void
 	onHide(id: string): void
 	onRestore(id: string): void
+	onDemote(id: string): void
 }
 export function FavoritesGrid({
 	apps,
@@ -29,6 +30,7 @@ export function FavoritesGrid({
 	onUninstall,
 	onHide,
 	onRestore,
+	onDemote,
 }: Props) {
 	if (!apps.length)
 		return (
@@ -70,6 +72,7 @@ export function FavoritesGrid({
 					onUninstall={onUninstall}
 					onHide={onHide}
 					onRestore={onRestore}
+					onDemote={onDemote}
 				/>
 			))}
 		</section>
