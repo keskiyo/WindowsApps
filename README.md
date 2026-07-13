@@ -149,20 +149,6 @@ Primary local artifact:
 src-tauri/target/release/bundle/nsis/Windows Apps_0.2.5_x64-setup.exe
 ```
 
-## Release process
-
-Pushing a `v*` tag runs `.github/workflows/release.yml`. The workflow:
-
-1. validates that the tag matches all version manifests;
-2. installs npm dependencies;
-3. runs frontend and Rust tests;
-4. runs the frontend production build;
-5. uses `tauri-apps/tauri-action` to build and sign the Windows x64 NSIS installer in a draft release;
-6. normalizes `latest.json` to NSIS-only targets, adds package size and release URL, and verifies every updater reference;
-7. publishes the draft only after the manifest, installer, and signature pass validation.
-
-See [Documentation.md](Documentation.md) for architecture, native commands, scanning behavior, troubleshooting, release validation, and updater testing.
-
 ## Support
 
 - [Technical documentation](Documentation.md)
