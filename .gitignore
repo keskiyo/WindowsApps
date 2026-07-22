@@ -20,7 +20,6 @@ npm run tauri dev
 .sentry-native/
 
 .claude
-Release.md
 RELEASE_CHECKLIST.md
 /src-tauri/rufus.ini
 skills-lock.json
