@@ -379,7 +379,6 @@ src-tauri/src/platform/windows/  Windows-specific native integrations
 .github/workflows/release.yml    Tag-driven Windows release pipeline
 scripts/verify-release-version.ps1
 scripts/verify-release-assets.ps1
-ReleaseInfo.md                    Windows release procedure and verification gates
 ```
 
 ## 15. Development workflow
@@ -403,7 +402,7 @@ The workflow:
 9. creates `latest.json` from the signed local NSIS bundle and adds the package size and release URL;
 10. verifies the manifest, installer, signature, date, size, URL, and target agreement, then publishes the release.
 
-Required secrets, exact commands, asset checks, failure handling, and manual gates are maintained in [ReleaseInfo.md](ReleaseInfo.md). `Release.md` and `INFO.md` are local-only and are not used by release automation.
+Release automation depends only on tracked workflow, configuration, and verification scripts. Local planning and release instruction files are not used by CI or stored in the repository.
 
 ## 17. Troubleshooting
 

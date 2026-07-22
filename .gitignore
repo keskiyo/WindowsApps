@@ -23,5 +23,5 @@ npm run tauri dev
 RELEASE_CHECKLIST.md
 /src-tauri/rufus.ini
 skills-lock.json
-Release.md
-INFO.md
+.1localDocuments
+ReleaseInfo.md
