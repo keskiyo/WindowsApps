@@ -99,9 +99,10 @@ jobs:
             - name: Collect signed bundle assets
               shell: pwsh
               run: |
+                  $version = "${{ github.ref_name }}".TrimStart('v')
                   New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-                  Copy-Item -LiteralPath "src-tauri/target/release/bundle/nsis/Windows Apps_${{ github.ref_name }}_x64-setup.exe" -Destination release-assets
-                  Copy-Item -LiteralPath "src-tauri/target/release/bundle/nsis/Windows Apps_${{ github.ref_name }}_x64-setup.exe.sig" -Destination release-assets
+                  Copy-Item -LiteralPath "src-tauri/target/release/bundle/nsis/Windows Apps_${version}_x64-setup.exe" -Destination release-assets
+                  Copy-Item -LiteralPath "src-tauri/target/release/bundle/nsis/Windows Apps_${version}_x64-setup.exe.sig" -Destination release-assets
 
             - name: Prepare updater manifest
               shell: pwsh
