@@ -36,10 +36,6 @@ jobs:
               shell: pwsh
               run: powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag "${{ github.ref_name }}"
 
-            - name: Verify release notes
-              shell: pwsh
-              run: powershell -NoProfile -File scripts/verify-release-notes.ps1 -Path Release.md -Tag "${{ github.ref_name }}"
-
             - name: Lint frontend
               run: npm run lint
 
@@ -90,9 +86,18 @@ jobs:
                   releaseDraft: true
                   prerelease: false
 
-            - name: Apply release notes
+            - name: Generate and apply release notes
               shell: pwsh
-              run: gh release edit "${{ github.ref_name }}" --notes-file Release.md
+              run: |
+                  $notesPath = Join-Path $env:RUNNER_TEMP "release-notes.md"
+                  gh api --method POST "repos/${{ github.repository }}/releases/generate-notes" `
+                    -f "tag_name=${{ github.ref_name }}" `
+                    -f "target_commitish=${{ github.sha }}" `
+                    --jq ".body" | Set-Content -LiteralPath $notesPath -Encoding utf8NoBOM
+                  if (-not (Test-Path -LiteralPath $notesPath -PathType Leaf) -or (Get-Item -LiteralPath $notesPath).Length -eq 0) {
+                    throw "GitHub generated empty release notes"
+                  }
+                  gh release edit "${{ github.ref_name }}" --notes-file $notesPath
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

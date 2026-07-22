@@ -379,7 +379,7 @@ src-tauri/src/platform/windows/  Windows-specific native integrations
 .github/workflows/release.yml    Tag-driven Windows release pipeline
 scripts/verify-release-version.ps1
 scripts/verify-release-assets.ps1
-scripts/verify-release-notes.ps1
+ReleaseInfo.md                    Windows release procedure and verification gates
 ```
 
 ## 15. Development workflow
@@ -398,12 +398,12 @@ The workflow:
 4. validates the tag against `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`;
 5. runs frontend lint, type-checking, tests, and the production build;
 6. runs Rust tests, formatting, and Clippy with warnings denied;
-7. verifies `Release.md`, then runs `tauri-apps/tauri-action`, which builds and signs the NSIS bundle in a draft release;
-8. downloads the draft assets, rewrites `latest.json` to NSIS-only targets, and adds the package size and release URL;
-9. verifies the manifest, installer, signature, date, size, URL, and target agreement;
-10. applies `Release.md` as the GitHub release body and publishes only after every updater check succeeds.
+7. runs `tauri-apps/tauri-action`, which builds and signs the NSIS bundle in a draft release;
+8. asks GitHub to generate release notes from commit history and applies them to the draft;
+9. creates `latest.json` from the signed local NSIS bundle and adds the package size and release URL;
+10. verifies the manifest, installer, signature, date, size, URL, and target agreement, then publishes the release.
 
-Required secrets, exact commands, assets, and manual gates are maintained in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). The release body is maintained separately in [Release.md](Release.md).
+Required secrets, exact commands, asset checks, failure handling, and manual gates are maintained in [ReleaseInfo.md](ReleaseInfo.md). `Release.md` and `INFO.md` are local-only and are not used by release automation.
 
 ## 17. Troubleshooting
 
