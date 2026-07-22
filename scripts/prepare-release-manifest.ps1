@@ -13,30 +13,37 @@ $version = $Tag.TrimStart("v")
 $latestPath = Join-Path $AssetsDir "latest.json"
 $setupName = "Windows Apps_${version}_x64-setup.exe"
 $setupPath = Join-Path $AssetsDir $setupName
+$signaturePath = "$setupPath.sig"
 
-if (-not (Test-Path -LiteralPath $latestPath -PathType Leaf)) {
-  throw "latest.json is missing from $AssetsDir"
-}
 if (-not (Test-Path -LiteralPath $setupPath -PathType Leaf)) {
   throw "$setupName is missing from $AssetsDir"
 }
-
-$manifest = Get-Content -LiteralPath $latestPath -Raw | ConvertFrom-Json
-$nsis = $manifest.platforms."windows-x86_64-nsis"
-if (-not $nsis) {
-  $nsis = $manifest.platforms."windows-x86_64"
-}
-if (-not $nsis) {
-  throw "latest.json has no Windows NSIS updater target"
+if (-not (Test-Path -LiteralPath $signaturePath -PathType Leaf)) {
+  throw "$setupName.sig is missing from $AssetsDir"
 }
 
+$signature = (Get-Content -LiteralPath $signaturePath -Raw).Trim()
+if ([string]::IsNullOrWhiteSpace($signature)) {
+  throw "$setupName.sig is empty"
+}
+
+$downloadUrl = "https://github.com/$Repository/releases/download/$Tag/$([Uri]::EscapeDataString($setupName))"
+$target = [ordered]@{
+  signature = $signature
+  url = $downloadUrl
+}
 $platforms = [ordered]@{
-  "windows-x86_64" = $nsis
-  "windows-x86_64-nsis" = $nsis
+  "windows-x86_64" = $target
+  "windows-x86_64-nsis" = $target
 }
-$manifest.platforms = [PSCustomObject]$platforms
-$manifest | Add-Member -NotePropertyName packageSize -NotePropertyValue (Get-Item -LiteralPath $setupPath).Length -Force
-$manifest | Add-Member -NotePropertyName releaseUrl -NotePropertyValue "https://github.com/$Repository/releases/tag/$Tag" -Force
+$manifest = [ordered]@{
+  version = $version
+  notes = "See the GitHub release notes."
+  pub_date = [DateTime]::UtcNow.ToString("o")
+  platforms = $platforms
+  packageSize = (Get-Item -LiteralPath $setupPath).Length
+  releaseUrl = "https://github.com/$Repository/releases/tag/$Tag"
+}
 
 $json = $manifest | ConvertTo-Json -Depth 20
 [IO.File]::WriteAllText($latestPath, $json, [Text.UTF8Encoding]::new($false))

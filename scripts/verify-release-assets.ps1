@@ -70,7 +70,7 @@ if (Test-Path -LiteralPath $latestPath -PathType Leaf) {
       $errors.Add("latest.json has no publication date")
     }
 
-    if ($manifestText -notmatch [regex]::Escape($setupName)) {
+    if ([Uri]::UnescapeDataString($manifestText) -notmatch [regex]::Escape($setupName)) {
       $errors.Add("latest.json does not reference $setupName")
     }
 
@@ -85,7 +85,7 @@ if (Test-Path -LiteralPath $latestPath -PathType Leaf) {
         continue
       }
 
-      $targetFile = [IO.Path]::GetFileName(([Uri]$target.Value.url).AbsolutePath)
+      $targetFile = [IO.Path]::GetFileName([Uri]::UnescapeDataString(([Uri]$target.Value.url).AbsolutePath))
       if ($targetFile -ne $setupName) {
         $errors.Add("latest.json target '$($target.Name)' references '$targetFile' instead of $setupName")
       }
