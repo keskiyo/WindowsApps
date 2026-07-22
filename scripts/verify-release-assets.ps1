@@ -18,6 +18,7 @@ $latestPath = Join-Path $AssetsDir "latest.json"
 $setupName = "Windows Apps_${version}_x64-setup.exe"
 $setupPath = Join-Path $AssetsDir $setupName
 $signaturePath = "$setupPath.sig"
+$publishedSetupName = $setupName.Replace(" ", ".")
 
 foreach ($path in @($latestPath, $setupPath, $signaturePath)) {
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -70,8 +71,8 @@ if (Test-Path -LiteralPath $latestPath -PathType Leaf) {
       $errors.Add("latest.json has no publication date")
     }
 
-    if ([Uri]::UnescapeDataString($manifestText) -notmatch [regex]::Escape($setupName)) {
-      $errors.Add("latest.json does not reference $setupName")
+    if ([Uri]::UnescapeDataString($manifestText) -notmatch [regex]::Escape($publishedSetupName)) {
+      $errors.Add("latest.json does not reference published asset $publishedSetupName")
     }
 
     $genericTarget = $manifest.platforms."windows-x86_64"
@@ -86,8 +87,8 @@ if (Test-Path -LiteralPath $latestPath -PathType Leaf) {
       }
 
       $targetFile = [IO.Path]::GetFileName([Uri]::UnescapeDataString(([Uri]$target.Value.url).AbsolutePath))
-      if ($targetFile -ne $setupName) {
-        $errors.Add("latest.json target '$($target.Name)' references '$targetFile' instead of $setupName")
+      if ($targetFile -ne $publishedSetupName) {
+        $errors.Add("latest.json target '$($target.Name)' references '$targetFile' instead of $publishedSetupName")
       }
       if (-not $target.Value.signature) {
         $errors.Add("latest.json target '$($target.Name)' has no updater signature")

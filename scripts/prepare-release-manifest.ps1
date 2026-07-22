@@ -14,6 +14,7 @@ $latestPath = Join-Path $AssetsDir "latest.json"
 $setupName = "Windows Apps_${version}_x64-setup.exe"
 $setupPath = Join-Path $AssetsDir $setupName
 $signaturePath = "$setupPath.sig"
+$publishedSetupName = $setupName.Replace(" ", ".")
 
 if (-not (Test-Path -LiteralPath $setupPath -PathType Leaf)) {
   throw "$setupName is missing from $AssetsDir"
@@ -27,7 +28,7 @@ if ([string]::IsNullOrWhiteSpace($signature)) {
   throw "$setupName.sig is empty"
 }
 
-$downloadUrl = "https://github.com/$Repository/releases/download/$Tag/$([Uri]::EscapeDataString($setupName))"
+$downloadUrl = "https://github.com/$Repository/releases/download/$Tag/$([Uri]::EscapeDataString($publishedSetupName))"
 $target = [ordered]@{
   signature = $signature
   url = $downloadUrl
