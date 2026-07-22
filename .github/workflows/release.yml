@@ -61,6 +61,22 @@ jobs:
             - name: Lint Rust
               run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
+            # A failed tag build can leave a draft release with an orphaned tag after a
+            # release tag is corrected. Remove only this version's draft before Tauri
+            # Action creates its authoritative replacement.
+            - name: Remove stale draft release
+              shell: pwsh
+              run: |
+                  $releases = gh api "repos/${{ github.repository }}/releases" | ConvertFrom-Json
+                  $stale = $releases | Where-Object {
+                    $_.draft -and $_.name -eq "Windows Apps ${{ github.ref_name }}"
+                  }
+                  foreach ($release in $stale) {
+                    gh api --method DELETE "repos/${{ github.repository }}/releases/$($release.id)"
+                  }
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
             # Keep the release in draft until latest.json is normalized and verified.
             - name: Build, sign & create draft release
               uses: tauri-apps/tauri-action@42e9df6c59070d114bf90dcd3943a1b8f138b113 # v0.5.20
@@ -80,11 +96,12 @@ jobs:
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Download draft release assets
+            - name: Collect signed bundle assets
               shell: pwsh
-              run: gh release download "${{ github.ref_name }}" --dir release-assets
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+                  Copy-Item -LiteralPath "src-tauri/target/release/bundle/nsis/Windows Apps_${{ github.ref_name }}_x64-setup.exe" -Destination release-assets
+                  Copy-Item -LiteralPath "src-tauri/target/release/bundle/nsis/Windows Apps_${{ github.ref_name }}_x64-setup.exe.sig" -Destination release-assets
 
             - name: Prepare updater manifest
               shell: pwsh
