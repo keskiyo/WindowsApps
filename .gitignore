@@ -16,8 +16,6 @@ dev-launcher.log
 graphify-out/
 docs/
 
-AGENTS.md
-
 npm run tauri dev
 .sentry-native/
 

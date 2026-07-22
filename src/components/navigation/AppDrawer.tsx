@@ -36,6 +36,7 @@ export function AppDrawer(props: Props) {
 	useFocusTrap(panelRef)
 	const { onClose, onExited, open, triggerRef } = props
 	useEffect(() => {
+		const trigger = triggerRef.current
 		panelRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
 		function keydown(event: KeyboardEvent) {
 			if (event.key === 'Escape') onClose()
@@ -43,7 +44,7 @@ export function AppDrawer(props: Props) {
 		document.addEventListener('keydown', keydown)
 		return () => {
 			document.removeEventListener('keydown', keydown)
-			triggerRef.current?.focus()
+			trigger?.focus()
 		}
 	}, [onClose, triggerRef])
 	useEffect(() => {

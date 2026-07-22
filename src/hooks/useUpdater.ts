@@ -39,6 +39,16 @@ interface Options {
 }
 
 const DISMISSED_UPDATE_KEY = 'windows-apps.dismissed-update-version'
+const ACTIVE_UPDATE_PHASES = new Set<UpdateInstallPhase>([
+	'downloading',
+	'verifying',
+	'installing',
+	'restarting',
+])
+
+function isUpdateInstalling(phase: UpdateInstallPhase): boolean {
+	return ACTIVE_UPDATE_PHASES.has(phase)
+}
 
 function dismissedVersion(): string | null {
 	try {
@@ -93,6 +103,14 @@ function updateErrorMessage(error: unknown): string {
 	}
 	if (normalized.includes('signature') || normalized.includes('verify')) {
 		return 'Update verification failed. The package was not installed.'
+	}
+	if (
+		normalized.includes('access is denied') ||
+		normalized.includes('permission') ||
+		normalized.includes('administrator') ||
+		normalized.includes('run as admin')
+	) {
+		return 'The update could not write the new version. Reinstall Windows Apps for the current user or download the installer manually.'
 	}
 	return 'The update could not be installed. Try again or download it manually.'
 }
@@ -158,7 +176,7 @@ export function useUpdater(options?: Options): UpdaterState {
 		if (
 			installInFlightRef.current ||
 			!available ||
-			['downloading', 'verifying', 'installing', 'restarting'].includes(phase)
+			isUpdateInstalling(phase)
 		)
 			return
 		installInFlightRef.current = true
@@ -199,7 +217,6 @@ export function useUpdater(options?: Options): UpdaterState {
 			setPhase('restarting')
 			await relaunch()
 		} catch (error) {
-			console.error('Update installation failed', error)
 			setPhase('failed')
 			setProgress(null)
 			setError(updateErrorMessage(error))
@@ -223,9 +240,7 @@ export function useUpdater(options?: Options): UpdaterState {
 					releaseUrl: httpUrl(available.rawJson.releaseUrl),
 				}
 			: null,
-		installing: ['downloading', 'verifying', 'installing', 'restarting'].includes(
-			phase,
-		),
+		installing: isUpdateInstalling(phase),
 		progress,
 		downloadedBytes,
 		totalBytes,

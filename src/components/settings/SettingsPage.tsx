@@ -1,27 +1,21 @@
 import {
-	ExternalLink,
-	FolderPlus,
-	FolderX,
-	Github,
-	HardDrive,
 	Image,
 	Keyboard,
 	Power,
 	RefreshCw,
 	RotateCcw,
 	Wrench,
-	Send,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useSystemSettings } from '../../hooks/useSystemSettings'
 import {
 	useUpdater,
-	type UpdateCheckStatus,
 	type UpdaterState,
 } from '../../hooks/useUpdater'
 import type { CatalogDiagnostics, SystemClient } from '../../types'
-import { PathEditor } from './PathEditor'
 import { UninstallHistory } from './UninstallHistory'
+import { SettingsDiscoveryControls } from './SettingsDiscoveryControls'
+import { SettingsUpdateControls } from './SettingsUpdateControls'
 
 interface Props {
 	client: SystemClient
@@ -66,8 +60,6 @@ export function SettingsPage({
 		forceFullScan,
 		resetCatalogCache,
 	} = useSystemSettings({ client, onForceFullScan, onResetCatalogCache })
-	const [includedPath, setIncludedPath] = useState('')
-	const [excludedPath, setExcludedPath] = useState('')
 	const [iconAction, setIconAction] = useState<'clear' | 'repair' | null>(null)
 	const [iconMessage, setIconMessage] = useState<string | null>(null)
 	const forceTriggerRef = useRef<HTMLButtonElement>(null)
@@ -88,7 +80,6 @@ export function SettingsPage({
 	// rendering (tests, storybook-style usage) and stays idle when App provides one.
 	const localUpdater = useUpdater({ autoCheck: false })
 	const updater = sharedUpdater ?? localUpdater
-	const updateStatusLabel = updateStatusText(updater.status)
 	async function runIconAction(
 		action: 'clear' | 'repair',
 		operation: (() => Promise<void>) | undefined,
@@ -128,93 +119,14 @@ export function SettingsPage({
 					</p>
 				</div>
 			</div>
-			<div className='settings-surface mt-6 rounded-2xl border border-white/85 bg-white/58 p-5'>
-				<div className='flex items-start gap-4'>
-					<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
-						<HardDrive size={19} aria-hidden='true' />
-					</span>
-					<div className='min-w-0 flex-1'>
-						<h2 className='font-medium'>Application discovery</h2>
-						<p className='mt-1 text-sm leading-6 text-slate-600'>
-							Scan permanent local drives and Steam libraries.
-							Removable and network drives are ignored.
-						</p>
-					</div>
-					<button
-						type='button'
-						role='switch'
-						aria-label='Scan all fixed local drives'
-						aria-checked={
-							settings?.scanSettings.autoScanFixedDrives ?? false
-						}
-						disabled={!settings || saving}
-						onClick={() =>
-							settings &&
-							void saveScanSettings({
-								...settings.scanSettings,
-								autoScanFixedDrives:
-									!settings.scanSettings.autoScanFixedDrives,
-							})
-						}
-						className={`relative h-7 w-12 shrink-0 rounded-full transition focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50 ${settings?.scanSettings.autoScanFixedDrives ? 'bg-violet-600' : 'bg-slate-300'}`}
-					>
-						<span
-							className={`absolute left-1 top-1 size-5 rounded-full bg-slate-50 shadow transition-transform ${settings?.scanSettings.autoScanFixedDrives ? 'translate-x-5' : 'translate-x-0'}`}
-						/>
-					</button>
-				</div>
-
-				<div className='mt-5'>
-					<p className='text-xs font-semibold uppercase tracking-[.14em] text-slate-500'>
-						Fixed local drives
-					</p>
-					<div className='mt-2 flex flex-wrap gap-2'>
-						{settings?.fixedDrives.map(drive => (
-							<code
-								key={drive}
-								className='rounded-lg border border-slate-200 bg-white/70 px-2.5 py-1 text-xs text-slate-600'
-							>
-								{drive}
-							</code>
-						))}
-					</div>
-				</div>
-
-				<div className='mt-5 grid gap-5 md:grid-cols-2'>
-					<PathEditor
-						label='Additional scan folder'
-						buttonLabel='Add scan folder'
-						browseLabel='Browse for scan folder'
-						value={includedPath}
-						paths={settings?.scanSettings.includedPaths ?? []}
-						icon={<FolderPlus size={16} aria-hidden='true' />}
-						disabled={!settings || saving}
-						onChange={setIncludedPath}
-						onAdd={value => {
-							addPath('includedPaths', value)
-							setIncludedPath('')
-						}}
-						onBrowse={() => client.pickFolder()}
-						onRemove={value => removePath('includedPaths', value)}
-					/>
-					<PathEditor
-						label='Excluded folder'
-						buttonLabel='Exclude folder'
-						browseLabel='Browse for excluded folder'
-						value={excludedPath}
-						paths={settings?.scanSettings.excludedPaths ?? []}
-						icon={<FolderX size={16} aria-hidden='true' />}
-						disabled={!settings || saving}
-						onChange={setExcludedPath}
-						onAdd={value => {
-							addPath('excludedPaths', value)
-							setExcludedPath('')
-						}}
-						onBrowse={() => client.pickFolder()}
-						onRemove={value => removePath('excludedPaths', value)}
-					/>
-				</div>
-			</div>
+			<SettingsDiscoveryControls
+				settings={settings}
+				saving={saving}
+				onSaveScanSettings={saveScanSettings}
+				onAddPath={addPath}
+				onRemovePath={removePath}
+				onPickFolder={client.pickFolder}
+			/>
 			<div className='settings-surface mt-5 overflow-hidden rounded-2xl border border-white/85 bg-white/58'>
 				<div className='flex items-center gap-4 border-b border-slate-200 p-5'>
 					<span className='grid size-10 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
@@ -257,68 +169,11 @@ export function SettingsPage({
 						{settings?.shortcut.label ?? 'Win+Shift+Q'}
 					</kbd>
 				</div>
-				<div className='flex items-center gap-4 border-b border-slate-200 p-5'>
-					<span className='grid size-10 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
-						<Github size={19} aria-hidden='true' />
-					</span>
-					<div className='min-w-0 flex-1'>
-						<h2 className='font-medium'>Updates and source</h2>
-						<p className='mt-1 text-sm text-slate-600'>
-							{updater.update
-								? `Version ${updater.update.version} is available.`
-								: updateStatusLabel}
-						</p>
-					</div>
-					<div className='flex shrink-0 flex-wrap justify-end gap-2'>
-						<button
-							type='button'
-							disabled={updater.status === 'checking'}
-							onClick={() => void updater.checkNow()}
-							className='inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-medium text-white shadow-[0_8px_18px_rgba(104,69,216,.18)] hover:bg-violet-500 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50'
-						>
-							<RefreshCw
-								size={16}
-								className={
-									updater.status === 'checking'
-										? 'animate-spin'
-										: ''
-								}
-								aria-hidden='true'
-							/>
-							Check updates
-						</button>
-						<button
-							type='button'
-							aria-label='Open Windows Apps on GitHub'
-							onClick={() => void client.openGithub()}
-							className='inline-flex items-center gap-2 rounded-xl border border-slate-300/70 px-3.5 py-2 text-sm font-medium text-slate-200 hover:bg-white/8 focus-visible:outline-2 focus-visible:outline-violet-500'
-						>
-							<Github size={16} aria-hidden='true' />
-							keskiyo
-						</button>
-					</div>
-				</div>
-				<button
-					type='button'
-					aria-label='Open @keskiyo on Telegram'
-					onClick={() => void client.openTelegram()}
-					className='flex w-full items-center gap-4 p-5 text-left hover:bg-violet-100/55 focus-visible:outline-2 focus-visible:outline-violet-500'
-				>
-					<span className='grid size-10 place-items-center rounded-xl bg-[#229ED9]/15 text-[#5cc8f5]'>
-						<Send size={19} aria-hidden='true' />
-					</span>
-					<span className='flex-1'>
-						<span className='block font-medium'>Telegram</span>
-						<span className='mt-1 block text-sm text-slate-600'>
-							@keskiyo
-						</span>
-					</span>
-					<ExternalLink
-						size={17}
-						className='text-slate-500'
-						aria-hidden='true'
-					/>
-				</button>
+				<SettingsUpdateControls
+					updater={updater}
+					onOpenGithub={client.openGithub}
+					onOpenTelegram={client.openTelegram}
+				/>
 			</div>
 			{settings?.shortcut.error && (
 				<p className='mt-4 text-sm text-amber-700'>
@@ -513,19 +368,4 @@ export function SettingsPage({
 			)}
 		</section>
 	)
-}
-
-function updateStatusText(status: UpdateCheckStatus): string {
-	switch (status) {
-		case 'checking':
-			return 'Checking for updates...'
-		case 'current':
-			return 'You are running the latest version.'
-		case 'available':
-			return 'Update available.'
-		case 'error':
-			return 'Could not check for updates.'
-		default:
-			return 'Check for updates or open the project repository.'
-	}
 }

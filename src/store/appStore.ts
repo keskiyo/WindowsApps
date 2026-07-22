@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { readPreferences, writePreferences } from '../lib/preferences'
-import { tauriAppsClient } from '../lib/tauri'
+import { tauriAppsClient, toAppClientError } from '../lib/tauri'
 import type {
 	AppCategory,
 	AppHydrationPatch,
@@ -81,7 +81,7 @@ export interface AppState {
 const LAUNCH_CEILING_MS = 12000
 
 function errorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error)
+	return toAppClientError(error).message
 }
 
 // Preserve an already-loaded icon when an incoming app record has none, so background

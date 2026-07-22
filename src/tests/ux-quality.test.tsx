@@ -337,4 +337,21 @@ describe('UX quality — keyboard & native (round 3)', () => {
 			await screen.findByRole('button', { name: 'Retry' }),
 		).toBeInTheDocument()
 	})
+
+	it('does not expose launch failure internals in the toast', async () => {
+		renderApp({
+			launchApp: vi
+				.fn()
+				.mockRejectedValue(new Error('C:\\Users\\Maks\\private-launch-detail')),
+		})
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Launch Steam' }),
+		)
+		expect(
+			await screen.findByText('Could not launch Steam'),
+		).toBeInTheDocument()
+		expect(
+			screen.queryByText(/private-launch-detail/),
+		).not.toBeInTheDocument()
+	})
 })

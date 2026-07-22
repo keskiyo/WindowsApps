@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { toAppClientError } from '../lib/tauri'
 import type { ScanSettings, SystemClient, SystemSettings } from '../types'
 
 interface Options {
@@ -35,7 +36,7 @@ export function useSystemSettings({
 				if (active) setSettings(value)
 			})
 			.catch(reason => {
-				if (active) setError(String(reason))
+				if (active) setError(toAppClientError(reason).message)
 			})
 		return () => {
 			active = false
@@ -50,7 +51,7 @@ export function useSystemSettings({
 			await client.setAutostart(enabled)
 			setSettings({ ...settings, autostartEnabled: enabled })
 		} catch (reason) {
-			setError(String(reason))
+			setError(toAppClientError(reason).message)
 		} finally {
 			setSaving(false)
 		}
@@ -64,7 +65,7 @@ export function useSystemSettings({
 			const scanSettings = await client.setScanSettings(next)
 			setSettings({ ...settings, scanSettings })
 		} catch (reason) {
-			setError(String(reason))
+			setError(toAppClientError(reason).message)
 		} finally {
 			setSaving(false)
 		}
@@ -102,7 +103,7 @@ export function useSystemSettings({
 			await onForceFullScan()
 			setConfirmForce(false)
 		} catch (reason) {
-			setError(String(reason))
+			setError(toAppClientError(reason).message)
 		} finally {
 			maintenanceInFlight.current = false
 			setForcing(false)
@@ -118,7 +119,7 @@ export function useSystemSettings({
 			await onResetCatalogCache()
 			setConfirmReset(false)
 		} catch (reason) {
-			setError(String(reason))
+			setError(toAppClientError(reason).message)
 		} finally {
 			maintenanceInFlight.current = false
 			setResetting(false)

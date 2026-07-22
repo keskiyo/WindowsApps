@@ -12,6 +12,42 @@ import type {
 	UninstallPreview,
 } from '../types'
 
+export type AppErrorCode =
+	| 'APP_DATA_UNAVAILABLE'
+	| 'CLEAR_ICON_CACHE_FAILED'
+	| 'CLEAR_UNINSTALL_HISTORY_FAILED'
+	| 'DESKTOP_RUNTIME_UNAVAILABLE'
+	| 'INTERNAL'
+	| 'INVALID_RELEASE_VERSION'
+	| 'LAUNCH_DATA_UNAVAILABLE'
+	| 'LAUNCH_UNAVAILABLE'
+	| 'NO_NEWER_COPY'
+	| 'OPERATION_FAILED'
+	| 'OPERATION_INTERRUPTED'
+	| 'PRODUCT_NAME_MISSING'
+	| 'RESET_CATALOG_CACHE_FAILED'
+	| 'RESET_ICON_CACHE_FAILED'
+	| 'SAVE_SCAN_SETTINGS_FAILED'
+	| 'SCAN_COALESCED'
+	| 'SCAN_PATH_NOT_ABSOLUTE'
+	| 'UNINSTALL_DATA_UNAVAILABLE'
+	| 'UNINSTALL_UNAVAILABLE'
+
+interface AppErrorPayload {
+	code: AppErrorCode
+	message: string
+}
+
+export class AppClientError extends Error {
+	constructor(
+		readonly code: AppErrorCode,
+		message: string,
+	) {
+		super(message)
+		this.name = 'AppClientError'
+	}
+}
+
 type TauriGlobal = typeof globalThis & {
 	__TAURI_INTERNALS__?: unknown
 }
@@ -20,13 +56,77 @@ function isTauriRuntime(): boolean {
 	return Boolean((globalThis as TauriGlobal).__TAURI_INTERNALS__)
 }
 
+function isAppErrorCode(value: unknown): value is AppErrorCode {
+	return typeof value === 'string' && value in APP_ERROR_CODES
+}
+
+const APP_ERROR_CODES = {
+	APP_DATA_UNAVAILABLE: true,
+	CLEAR_ICON_CACHE_FAILED: true,
+	CLEAR_UNINSTALL_HISTORY_FAILED: true,
+	DESKTOP_RUNTIME_UNAVAILABLE: true,
+	INTERNAL: true,
+	INVALID_RELEASE_VERSION: true,
+	LAUNCH_DATA_UNAVAILABLE: true,
+	LAUNCH_UNAVAILABLE: true,
+	NO_NEWER_COPY: true,
+	OPERATION_FAILED: true,
+	OPERATION_INTERRUPTED: true,
+	PRODUCT_NAME_MISSING: true,
+	RESET_CATALOG_CACHE_FAILED: true,
+	RESET_ICON_CACHE_FAILED: true,
+	SAVE_SCAN_SETTINGS_FAILED: true,
+	SCAN_COALESCED: true,
+	SCAN_PATH_NOT_ABSOLUTE: true,
+	UNINSTALL_DATA_UNAVAILABLE: true,
+	UNINSTALL_UNAVAILABLE: true,
+} as const
+
+function readAppErrorPayload(value: unknown): AppErrorPayload | null {
+	if (!value || typeof value !== 'object') return null
+	const candidate = value as { code?: unknown; message?: unknown }
+	return isAppErrorCode(candidate.code) && typeof candidate.message === 'string'
+		? { code: candidate.code, message: candidate.message }
+		: null
+}
+
+export function toAppClientError(error: unknown): AppClientError {
+	if (error instanceof AppClientError) return error
+	const directPayload = readAppErrorPayload(error)
+	if (directPayload)
+		return new AppClientError(directPayload.code, directPayload.message)
+	if (typeof error === 'string') {
+		try {
+			const payload = readAppErrorPayload(JSON.parse(error))
+			if (payload) return new AppClientError(payload.code, payload.message)
+		} catch {
+			// Unknown values must not surface raw transport details in the interface.
+		}
+	}
+	return new AppClientError('INTERNAL', 'The operation could not be completed. Try again.')
+}
+
+export async function invokeTauri<T>(
+	command: string,
+	args?: Record<string, unknown>,
+): Promise<T> {
+	try {
+		return await invoke<T>(command, args)
+	} catch (error) {
+		throw toAppClientError(error)
+	}
+}
+
 async function invokeIfTauri<T>(
 	command: string,
 	args?: Record<string, unknown>,
 ): Promise<T> {
 	if (!isTauriRuntime())
-		throw new Error('This action is available only in the desktop app.')
-	return invoke<T>(command, args)
+		throw new AppClientError(
+			'DESKTOP_RUNTIME_UNAVAILABLE',
+			'This action is available only in the desktop app.',
+		)
+	return invokeTauri<T>(command, args)
 }
 
 async function listenIfTauri<T>(
@@ -40,30 +140,30 @@ async function listenIfTauri<T>(
 export const tauriAppsClient: AppsClient = {
 	getApps: () =>
 		isTauriRuntime()
-			? invoke<CatalogSnapshot>('get_apps')
+			? invokeTauri<CatalogSnapshot>('get_apps')
 			: Promise.resolve({ apps: [], hasCache: false }),
 	refreshApps: () =>
-		isTauriRuntime() ? invoke<AppInfo[]>('refresh_apps') : Promise.resolve([]),
+		isTauriRuntime() ? invokeTauri<AppInfo[]>('refresh_apps') : Promise.resolve([]),
 	forceFullScan: () =>
 		isTauriRuntime()
-			? invoke<AppInfo[]>('force_full_scan')
+			? invokeTauri<AppInfo[]>('force_full_scan')
 			: Promise.resolve([]),
 	resetCatalogCache: () =>
 		isTauriRuntime()
-			? invoke<AppInfo[]>('reset_catalog_cache')
+			? invokeTauri<AppInfo[]>('reset_catalog_cache')
 			: Promise.resolve([]),
 	clearIconCache: () =>
-		isTauriRuntime() ? invoke<void>('clear_icon_cache') : Promise.resolve(),
+		isTauriRuntime() ? invokeTauri<void>('clear_icon_cache') : Promise.resolve(),
 	hydrateVisibleIcons: ids =>
 		isTauriRuntime()
-			? invoke<void>('hydrate_visible_icons', { ids })
+			? invokeTauri<void>('hydrate_visible_icons', { ids })
 			: Promise.resolve(),
 	startBackgroundSync: () =>
 		isTauriRuntime()
-			? invoke<void>('start_background_sync')
+			? invokeTauri<void>('start_background_sync')
 			: Promise.resolve(),
 	cancelScan: () =>
-		isTauriRuntime() ? invoke<void>('cancel_scan') : Promise.resolve(),
+		isTauriRuntime() ? invokeTauri<void>('cancel_scan') : Promise.resolve(),
 	launchApp: app => invokeIfTauri<void>('launch_app', { id: app.id }),
 	getUninstallPreview: id =>
 		invokeIfTauri<UninstallPreview>('get_uninstall_preview', { id }),

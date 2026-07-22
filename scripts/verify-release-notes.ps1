@@ -25,11 +25,8 @@ if (-not $highlightMatch.Success) {
   $errors.Add("Release notes are missing a '## Highlights' section")
 } else {
   $bullets = [regex]::Matches($highlightMatch.Groups[1].Value, '(?m)^\s*[-*]\s+(.+)$')
-  if ($bullets.Count -lt 1) {
-    $errors.Add("Highlights section must contain at least one bullet")
-  }
-  if ($bullets.Count -gt 4) {
-    $errors.Add("Highlights section should contain at most 4 bullets for the updater modal")
+  if ($bullets.Count -ne 4) {
+    $errors.Add("Highlights section must contain exactly 4 bullets for the updater modal; found $($bullets.Count)")
   }
   foreach ($bullet in $bullets) {
     $value = $bullet.Groups[1].Value.Trim()

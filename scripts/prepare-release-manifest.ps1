@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = "Stop"
 $version = $Tag.TrimStart("v")
 $latestPath = Join-Path $AssetsDir "latest.json"
-$setupName = "Windows.Apps_${version}_x64-setup.exe"
+$setupName = "Windows Apps_${version}_x64-setup.exe"
 $setupPath = Join-Path $AssetsDir $setupName
 
 if (-not (Test-Path -LiteralPath $latestPath -PathType Leaf)) {

@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { useSystemSettings } from '../../hooks/useSystemSettings'
 import type { SystemClient } from '../../types'
@@ -25,6 +25,25 @@ const client: SystemClient = {
 }
 
 describe('useSystemSettings', () => {
+	it('does not expose settings failure internals', async () => {
+		const { result } = renderHook(() =>
+			useSystemSettings({
+				client: {
+					...client,
+					getSettings: vi
+						.fn()
+						.mockRejectedValue(new Error('C:\\Users\\Maks\\private-settings-detail')),
+				},
+			}),
+		)
+
+		await waitFor(() =>
+			expect(result.current.error).toBe(
+				'The operation could not be completed. Try again.',
+			),
+		)
+	})
+
 	it('allows only one catalog maintenance operation at a time', async () => {
 		let finishForce: (() => void) | undefined
 		const force = vi.fn(

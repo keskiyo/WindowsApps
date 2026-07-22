@@ -580,9 +580,11 @@ describe('App', () => {
 			screen.getByRole('menuitem', { name: 'Uninstall' }),
 		)
 
-		expect(
-			await screen.findByText('preview unavailable'),
-		).toBeInTheDocument()
+			expect(
+				await screen.findByText(
+					'The operation could not be completed. Try again.',
+				),
+			).toBeInTheDocument()
 		expect(
 			screen.getByRole('button', { name: 'Confirm uninstall' }),
 		).toBeDisabled()

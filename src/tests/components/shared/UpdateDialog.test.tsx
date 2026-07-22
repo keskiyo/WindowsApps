@@ -1,10 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import {
-	releaseHighlights,
-	UpdateDialog,
-} from '../../../components/shared/UpdateDialog'
+import { UpdateDialog } from '../../../components/shared/UpdateDialog'
+import { releaseHighlights } from '../../../components/shared/releaseHighlights'
 
 describe('releaseHighlights', () => {
 	it('extracts the Highlights section from GitHub release markdown', () => {
@@ -158,6 +156,32 @@ describe('UpdateDialog', () => {
 		expect(screen.getByLabelText('Update progress')).toBeInTheDocument()
 		expect(screen.getByText('Downloading')).toBeInTheDocument()
 		expect(screen.getByLabelText('2.3 MB of 5.3 MB')).toBeInTheDocument()
+	})
+
+	it('uses quiet update wording during the install phase', () => {
+		render(
+			<UpdateDialog
+				version='0.2.4'
+				date={null}
+				packageSize={null}
+				releaseUrl={null}
+				notes={'## Highlights\n- Quiet updater.'}
+				installing
+				progress={100}
+				downloadedBytes={5_600_000}
+				totalBytes={5_600_000}
+				phase='installing'
+				error={null}
+				onInstall={vi.fn()}
+				onDismiss={vi.fn()}
+				onOpenRelease={vi.fn()}
+			/>,
+		)
+
+		expect(
+			screen.getByRole('button', { name: 'Finishing update...' }),
+		).toBeInTheDocument()
+		expect(screen.queryByText('Installing...')).not.toBeInTheDocument()
 	})
 
 	it('keeps the dialog open with a retry action after an install error', async () => {

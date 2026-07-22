@@ -5,13 +5,13 @@
 
 **A fast, private application catalog and launcher for Windows 10 and Windows 11.**
 
-[![Version](https://img.shields.io/badge/version-0.2.5-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.5)
+[![Version](https://img.shields.io/badge/version-0.2.6-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.6)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
 ![Local first](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
 
-[Download Windows Apps 0.2.5](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.5) ·
+[Download Windows Apps 0.2.6](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.6) ·
 [Documentation](Documentation.md) ·
 [Telegram](https://t.me/keskiyo)
 
@@ -40,7 +40,7 @@ The catalog is stored locally. On startup, cached names appear immediately while
 - **Launch feedback** — the card shows a launching state (dimmed icon + spinner) and a top activity bar, cleared when the app window is ready or after a short ceiling.
 - **Background icon loading** — visible application cards receive priority without creating duplicate hydration work.
 - **Organization** — automatic and custom categories, category reordering, application moves, Favorites (surfaced first within a category), and reversible Hidden items.
-- **Automatic updates** — signed NSIS-only updates show release date, package size, full notes, byte progress, verification, installation, restart, and retry states.
+- **Automatic updates** — signed NSIS-only updates show release date, package size, full notes, byte progress, verification, quiet installation, restart, and retry states.
 - **Catalog diagnostics** — Settings reports the last scan mode, duration, changes, and privacy-safe source totals.
 - **Icon recovery** — repair missing icons or clear only the icon cache without forcing another filesystem scan.
 - **Responsive navigation** — persistent sidebar from `1024px`; overlay drawer on smaller windows.
@@ -55,8 +55,8 @@ The catalog is stored locally. On startup, cached names appear immediately while
 
 ## Installation
 
-1. Open [Windows Apps 0.2.5](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.5).
-2. Download `Windows.Apps_0.2.5_x64-setup.exe`.
+1. Open [Windows Apps 0.2.6](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.6).
+2. Download `Windows Apps_0.2.6_x64-setup.exe`.
 3. Run the installer.
 4. Start **Windows Apps** and select **Scan for apps** when prompted.
 
@@ -131,6 +131,8 @@ npm run tauri dev
 Verification:
 
 ```powershell
+npm run lint
+npm run typecheck
 npm test
 npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
@@ -146,7 +148,7 @@ npm run tauri build
 Primary local artifact:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.5_x64-setup.exe
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.6_x64-setup.exe
 ```
 
 ## Support

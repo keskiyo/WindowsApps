@@ -34,4 +34,23 @@ describe('tauri app client browser fallback', () => {
 		expect(invokeMock).not.toHaveBeenCalled()
 		expect(listenMock).not.toHaveBeenCalled()
 	})
+
+	it('preserves structured backend error codes and hides unknown transport details', async () => {
+		const { toAppClientError } = await import('../../lib/tauri')
+		expect(
+			toAppClientError({
+				code: 'LAUNCH_UNAVAILABLE',
+				message: 'This application is not available for launch.',
+			}),
+		).toMatchObject({
+			code: 'LAUNCH_UNAVAILABLE',
+			message: 'This application is not available for launch.',
+		})
+		expect(
+			toAppClientError(new Error('C:\\Users\\Maks\\private-detail')),
+		).toMatchObject({
+			code: 'INTERNAL',
+			message: 'The operation could not be completed. Try again.',
+		})
+	})
 })

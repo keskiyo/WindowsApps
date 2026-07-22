@@ -29,6 +29,7 @@ import { useDesktopNavigation } from './hooks/useDesktopNavigation'
 import { useUpdater } from './hooks/useUpdater'
 import { catalogChangeMessage } from './lib/catalogChanges'
 import { tauriSystemClient } from './lib/system'
+import { toAppClientError } from './lib/tauri'
 import {
 	appStore,
 	filterAppsByQuery,
@@ -54,10 +55,27 @@ export function App({
 	systemClient = tauriSystemClient,
 }: AppProps) {
 	const state = useStore(store)
+	const {
+		activeView,
+		catalogChange,
+		clearCatalogChange,
+		error,
+		getUninstallPreview,
+		hydrateVisibleIcons,
+		initialize,
+		isLoading,
+		isRefreshing,
+	} = state
 	// Dedup is O(N) but still recomputed only when the catalog actually changes; query
 	// typing, scan progress, favorites and drawer toggles reuse the memoized result.
 	const categorizedApps = useMemo(
-		() => selectCategorizedApps(state),
+		() =>
+			selectCategorizedApps({
+				apps: state.apps,
+				categoryOverrides: state.categoryOverrides,
+				promotedAppIds: state.promotedAppIds,
+				promotedAppIdentities: state.promotedAppIdentities,
+			}),
 		[
 			state.apps,
 			state.categoryOverrides,
@@ -131,11 +149,8 @@ export function App({
 	})
 	async function confirmUninstall() {
 		if (!uninstallApp) return
-		try {
-			await feedback.uninstall(uninstallApp)
-		} catch {
-			return // toast already shown; keep dialog open
-		}
+		const result = await feedback.uninstall(uninstallApp)
+		if (!result.ok) return
 		setUninstallApp(null)
 		try {
 			await state.refresh()
@@ -150,16 +165,13 @@ export function App({
 		setUninstallPreview(null)
 		setUninstallPreviewError(null)
 		setUninstallPreviewLoading(true)
-		void state
-			.getUninstallPreview(uninstallApp.id)
+		void getUninstallPreview(uninstallApp.id)
 			.then(preview => {
 				if (active) setUninstallPreview(preview)
 			})
 			.catch(error => {
 				if (active)
-					setUninstallPreviewError(
-						error instanceof Error ? error.message : String(error),
-					)
+					setUninstallPreviewError(toAppClientError(error).message)
 			})
 			.finally(() => {
 				if (active) setUninstallPreviewLoading(false)
@@ -167,12 +179,12 @@ export function App({
 		return () => {
 			active = false
 		}
-	}, [state.getUninstallPreview, uninstallApp])
+	}, [getUninstallPreview, uninstallApp])
 
 	useEffect(() => {
 		let dispose: (() => void) | undefined
 		let cancelled = false
-		void state.initialize().then(value => {
+		void initialize().then(value => {
 			if (cancelled) value()
 			else dispose = value
 		})
@@ -180,13 +192,13 @@ export function App({
 			cancelled = true
 			dispose?.()
 		}
-	}, [state.initialize])
+	}, [initialize])
 
 	useEffect(() => {
-		if (state.error) {
-			toast.error(state.error)
+		if (error) {
+			toast.error(error)
 		}
-	}, [state.error])
+	}, [error])
 
 	// Global keyboard shortcuts: Ctrl+K opens the quick-launch palette; Ctrl+F or "/"
 	// jump to the search field (a launcher should be keyboard-first).
@@ -230,13 +242,13 @@ export function App({
 	}, [])
 
 	useEffect(() => {
-		if (!state.catalogChange) return
-		if (!state.isRefreshing) {
-			const message = catalogChangeMessage(state.catalogChange)
+		if (!catalogChange) return
+		if (!isRefreshing) {
+			const message = catalogChangeMessage(catalogChange)
 			if (message) toast.success(message)
 		}
-		state.clearCatalogChange()
-	}, [state.catalogChange, state.isRefreshing, state.clearCatalogChange])
+		clearCatalogChange()
+	}, [catalogChange, clearCatalogChange, isRefreshing])
 
 	useEffect(() => {
 		if (desktopNavigation) setDrawerOpen(false)
@@ -247,13 +259,13 @@ export function App({
 	}, [drawerOpen])
 
 	useEffect(() => {
-		if (state.activeView === 'settings' || state.isLoading) return
+		if (activeView === 'settings' || isLoading) return
 		const ids = visibleHydrationIds.split('|').filter(Boolean)
-		if (ids.length) void state.hydrateVisibleIcons(ids)
+		if (ids.length) void hydrateVisibleIcons(ids)
 	}, [
-		state.activeView,
-		state.hydrateVisibleIcons,
-		state.isLoading,
+		activeView,
+		hydrateVisibleIcons,
+		isLoading,
 		visibleHydrationIds,
 	])
 

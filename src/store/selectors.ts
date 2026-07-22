@@ -56,7 +56,12 @@ export function filterAppsByQuery(apps: AppInfo[], query: string): AppInfo[] {
 	})
 }
 
-export function selectCategorizedApps(state: AppState): AppInfo[] {
+type CategorizedAppsState = Pick<
+	AppState,
+	'apps' | 'categoryOverrides' | 'promotedAppIds' | 'promotedAppIdentities'
+>
+
+export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 	return deduplicateVisibleApps(
 		state.apps.map(app => {
 			const userPromoted =

@@ -547,7 +547,9 @@ describe('app store', () => {
 		await expect(store.getState().launch(apps[0])).rejects.toThrow(
 			'Access denied',
 		)
-		expect(store.getState().error).toBe('Access denied')
+		expect(store.getState().error).toBe(
+			'The operation could not be completed. Try again.',
+		)
 	})
 
 	it('subscribes to background updates', async () => {

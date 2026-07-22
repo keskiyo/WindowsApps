@@ -1,9 +1,9 @@
 # Windows Apps Technical Documentation
 
-Technical reference for Windows Apps `0.2.5`.
+Technical reference for Windows Apps `0.2.6`.
 
 [README](README.md) ·
-[Release 0.2.5](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.5) ·
+[Release 0.2.6](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.6) ·
 [Telegram](https://t.me/keskiyo)
 
 ---
@@ -326,10 +326,11 @@ https://github.com/keskiyo/WindowsApps/releases/latest/download/latest.json
 - If an update is available the UI shows a fixed-size modal with version, release date,
   package size, highlights, and a link to the complete GitHub release notes.
   The user chooses when to download and restart — updates are never forced.
-- Progress follows Downloading, Verifying, Installing, and Restarting. Downloading reports
+- Progress follows Downloading, Verifying, Finishing update, and Restarting. Downloading reports
   real bytes and percentage; later stages are indeterminate because Tauri does not expose
-  internal installer percentages. A failed update remains in the dialog with a safe
-  explanation and a Retry update action.
+  internal installer percentages. Windows `quiet` mode hides the separate NSIS progress
+  window and requires a user-writable install location. A failed update remains in the dialog
+  with a safe explanation and a Retry update action.
 - The check is silent when offline, when no newer release exists, or when running outside
   the desktop app (development browser and tests).
 - The private signing key lives outside the repository and is provided to CI through the
@@ -369,6 +370,9 @@ src/lib/                         Tauri clients, preferences, catalog utilities
 src/store/                       Zustand application state
 src/tests/                       Frontend tests grouped by layer
 src/types/                       Shared TypeScript contracts
+src-tauri/src/app_state.rs       Process-wide trusted catalog target state
+src-tauri/src/catalog_sync.rs    Scan, cache, watcher, and hydration orchestration
+src-tauri/src/commands.rs        Tauri IPC transport handlers
 src-tauri/src/catalog/           Discovery, cache, scanning, hydration, deduplication
 src-tauri/src/lifecycle/         Tray and window lifecycle
 src-tauri/src/platform/windows/  Windows-specific native integrations
@@ -380,43 +384,7 @@ scripts/verify-release-notes.ps1
 
 ## 15. Development workflow
 
-### Prerequisites
-
-- Node.js 22 and npm;
-- stable Rust with `x86_64-pc-windows-msvc`;
-- Microsoft C++ Build Tools and Windows SDK;
-- WebView2 Runtime;
-- [Tauri prerequisites for Windows](https://v2.tauri.app/start/prerequisites/).
-
-### Install and run
-
-```powershell
-npm install
-npm run tauri dev
-```
-
-### Verification
-
-```powershell
-npm test
-npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
-cargo check --manifest-path src-tauri/Cargo.toml
-```
-
-### Production build
-
-```powershell
-npm run tauri build
-```
-
-Expected Windows x64 bundle:
-
-```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.5_x64-setup.exe
-```
-
-The NSIS setup executable is the primary public artifact.
+The supported toolchain, local development commands, verification commands, and bundle path are maintained in [README.md](README.md#development).
 
 ## 16. Release automation
 
@@ -428,44 +396,14 @@ The workflow:
 2. configures Node.js 22 and stable Rust;
 3. runs `npm ci`;
 4. validates the tag against `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`;
-5. runs frontend tests and the production build;
-6. runs Rust tests;
-7. runs `tauri-apps/tauri-action`, which builds and signs the NSIS bundle in a draft release;
+5. runs frontend lint, type-checking, tests, and the production build;
+6. runs Rust tests, formatting, and Clippy with warnings denied;
+7. verifies `Release.md`, then runs `tauri-apps/tauri-action`, which builds and signs the NSIS bundle in a draft release;
 8. downloads the draft assets, rewrites `latest.json` to NSIS-only targets, and adds the package size and release URL;
 9. verifies the manifest, installer, signature, date, size, URL, and target agreement;
-10. publishes the release only after every updater check succeeds.
+10. applies `Release.md` as the GitHub release body and publishes only after every updater check succeeds.
 
-The `TAURI_SIGNING_PRIVATE_KEY` (and optional `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) repository
-secrets must be configured before the first signed release, or the update manifest is not produced.
-
-Prepare a release:
-
-```powershell
-npm test
-npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
-cargo check --manifest-path src-tauri/Cargo.toml
-npm run tauri build
-powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag v0.2.5
-powershell -NoProfile -File scripts/verify-release-notes.ps1 -Path Release.md -Tag v0.2.5
-```
-
-After the GitHub Action publishes a release, download the assets into a local folder and run:
-
-```powershell
-powershell -NoProfile -File scripts/verify-release-assets.ps1 -AssetsDir path\to\downloaded-assets -Tag v0.2.5
-```
-
-Publish:
-
-```powershell
-git tag -a v0.2.5 -m "Windows Apps 0.2.5"
-git push origin v0.2.5
-```
-
-Do not reuse or move a tag after a public Release has been published. Increase the version for the next release.
-
-The production updater path cannot be proven while the release is still a draft because the configured `/releases/latest/download/latest.json` endpoint serves only a published latest release. Keep an installed copy of the previous version ready and validate the signed update immediately after publication, before announcing the release broadly. If validation fails, publish a new patch version rather than replacing assets under the same tag.
+Required secrets, exact commands, assets, and manual gates are maintained in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). The release body is maintained separately in [Release.md](Release.md).
 
 ## 17. Troubleshooting
 
@@ -501,40 +439,12 @@ Windows did not expose a valid registered vendor, MSI, or MSIX uninstall target 
 
 The installer is not Authenticode-signed. Download it only from the official project Releases. After the first install, updates are delivered as cryptographically signed packages that the app verifies against its embedded public key before installing.
 
-## 18. Release verification checklist
+## 18. Release verification
 
-### Automated checks
-
-- [ ] Frontend tests pass.
-- [ ] TypeScript and Vite production build pass.
-- [ ] Rust tests pass.
-- [ ] Cargo check passes.
-- [ ] Version verification passes for the intended tag.
-- [ ] Tauri production build completes.
-- [ ] `TAURI_SIGNING_PRIVATE_KEY` secret is configured.
-- [ ] Installer, `latest.json`, and signature are attached to the Release.
-- [ ] A prior install detects and installs the update from the new Release.
-
-### Windows 10 x64
-
-- [ ] Installer and WebView2 bootstrap work.
-- [ ] First scan, Refresh, Force full scan, cancellation, and cache reset work.
-- [ ] Launching works for shortcuts, executables, and packaged apps.
-- [ ] Favorites, Hidden items, custom categories, and category ordering persist.
-- [ ] Registered uninstall and unavailable states behave correctly.
-- [ ] Tray Open/Quit, global shortcut, and autostart work.
-
-### Windows 11 x64
-
-- [ ] Installer and WebView2 bootstrap work.
-- [ ] First scan, Refresh, Force full scan, cancellation, and cache reset work.
-- [ ] Launching works for shortcuts, executables, and packaged apps.
-- [ ] Favorites, Hidden items, custom categories, and category ordering persist.
-- [ ] Registered uninstall and unavailable states behave correctly.
-- [ ] Tray Open/Quit, global shortcut, and autostart work.
+Use [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) as the single source for automated checks, Windows smoke tests, updater validation, and publishable assets.
 
 ---
 
 [README](README.md) ·
-[Release 0.2.5](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.5) ·
+[Release 0.2.6](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.6) ·
 [Telegram: @keskiyo](https://t.me/keskiyo)

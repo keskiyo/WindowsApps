@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUpdater } from '../../hooks/useUpdater'
 
 const check = vi.fn()
@@ -32,6 +32,10 @@ describe('useUpdater', () => {
 		check.mockReset()
 		relaunch.mockReset()
 		localStorage.clear()
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
 	})
 
 	it('does not auto-show an update version dismissed earlier', async () => {
@@ -127,6 +131,44 @@ describe('useUpdater', () => {
 		expect(download).toHaveBeenCalledTimes(2)
 		expect(install).toHaveBeenCalledOnce()
 		expect(relaunch).toHaveBeenCalledOnce()
+	})
+
+	it('shows a permission-specific error when quiet install cannot write files', async () => {
+		const download = vi.fn().mockResolvedValue(undefined)
+		const install = vi
+			.fn()
+			.mockRejectedValue(new Error('Access is denied. Permission denied'))
+		check.mockResolvedValue({
+			...update('0.2.4'),
+			download,
+			install,
+		})
+
+		const { result } = renderHook(() => useUpdater({ autoCheck: false }))
+		await act(async () => result.current.checkNow())
+		await act(async () => result.current.install())
+
+		expect(result.current.phase).toBe('failed')
+		expect(result.current.error).toBe(
+			'The update could not write the new version. Reinstall Windows Apps for the current user or download the installer manually.',
+		)
+		expect(relaunch).not.toHaveBeenCalled()
+	})
+
+	it('does not log raw updater failures to the browser console', async () => {
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		check.mockResolvedValue({
+			...update('0.2.4'),
+			download: vi
+				.fn()
+				.mockRejectedValue(new Error('C:\\Users\\Maks\\private-updater-detail')),
+		})
+
+		const { result } = renderHook(() => useUpdater({ autoCheck: false }))
+		await act(async () => result.current.checkNow())
+		await act(async () => result.current.install())
+
+		expect(consoleError).not.toHaveBeenCalled()
 	})
 
 	it('tracks downloaded bytes and uses separate download and install stages', async () => {
