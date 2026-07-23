@@ -26,6 +26,8 @@ import { WorkspaceSummary } from './components/shared/WorkspaceSummary'
 import { useAppFeedback } from './hooks/useAppFeedback'
 import { useCatalogNavigation } from './hooks/useCatalogNavigation'
 import { useDesktopNavigation } from './hooks/useDesktopNavigation'
+
+import { useIconRecovery } from './hooks/useIconRecovery'
 import { useUpdater } from './hooks/useUpdater'
 import { catalogChangeMessage } from './lib/catalogChanges'
 import { tauriSystemClient } from './lib/system'
@@ -322,6 +324,7 @@ export function App({
 	const activityActive =
 		state.launchingIds.length > 0 || state.isRefreshing
 	const updater = useUpdater()
+	useIconRecovery(state.repairMissingIcons)
 	const [staleCopy, setStaleCopy] = useState<StaleCopyInfo | null>(null)
 	useEffect(() => {
 		let active = true
@@ -403,8 +406,6 @@ export function App({
 								onResetCatalogCache={state.resetCatalogCache}
 								catalogDiagnostics={state.catalogDiagnostics}
 								visibilityCounts={{ primary: primaryCount, auxiliary: auxiliaryCount }}
-								onClearIconCache={state.clearIconCache}
-								onRepairMissingIcons={state.repairMissingIcons}
 								updater={updater}
 							/>
 						) : !state.isLoading &&

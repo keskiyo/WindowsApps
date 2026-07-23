@@ -1,5 +1,4 @@
 import {
-	Image,
 	Keyboard,
 	Power,
 	RefreshCw,
@@ -22,8 +21,6 @@ interface Props {
 	onForceFullScan?: () => Promise<void>
 	onResetCatalogCache?: () => Promise<void>
 	catalogDiagnostics?: CatalogDiagnostics | null
-	onClearIconCache?: () => Promise<void>
-	onRepairMissingIcons?: () => Promise<void>
 	visibilityCounts?: { primary: number; auxiliary: number }
 	/**
 	 * Shared updater state from App. Without it, "Check updates" would run on a second
@@ -38,8 +35,6 @@ export function SettingsPage({
 	onForceFullScan,
 	onResetCatalogCache,
 	catalogDiagnostics,
-	onClearIconCache,
-	onRepairMissingIcons,
 	visibilityCounts,
 	updater: sharedUpdater,
 }: Props) {
@@ -60,8 +55,7 @@ export function SettingsPage({
 		forceFullScan,
 		resetCatalogCache,
 	} = useSystemSettings({ client, onForceFullScan, onResetCatalogCache })
-	const [iconAction, setIconAction] = useState<'clear' | 'repair' | null>(null)
-	const [iconMessage, setIconMessage] = useState<string | null>(null)
+	const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false)
 	const forceTriggerRef = useRef<HTMLButtonElement>(null)
 	const resetTriggerRef = useRef<HTMLButtonElement>(null)
 	const previousConfirmForce = useRef(false)
@@ -80,26 +74,6 @@ export function SettingsPage({
 	// rendering (tests, storybook-style usage) and stays idle when App provides one.
 	const localUpdater = useUpdater({ autoCheck: false })
 	const updater = sharedUpdater ?? localUpdater
-	async function runIconAction(
-		action: 'clear' | 'repair',
-		operation: (() => Promise<void>) | undefined,
-	) {
-		if (!operation || iconAction) return
-		setIconAction(action)
-		setIconMessage(null)
-		try {
-			await operation()
-			setIconMessage(
-				action === 'clear'
-					? 'Icon cache cleared and icon recovery started.'
-					: 'Missing icon recovery started.',
-			)
-		} catch {
-			setIconMessage('Icon maintenance could not be completed.')
-		} finally {
-			setIconAction(null)
-		}
-	}
 	return (
 		<section aria-labelledby='settings-title' className='mx-auto max-w-3xl'>
 			<div className='mb-8 flex items-center gap-4'>
@@ -292,11 +266,21 @@ export function SettingsPage({
 					)}
 					{catalogDiagnostics && (
 						<div className='mt-5 border-t border-slate-200/80 pt-4'>
-							<div className='flex items-center gap-2 text-sm font-medium text-slate-800'>
+							<button
+								type='button'
+								aria-expanded={diagnosticsExpanded}
+								aria-controls='catalog-diagnostics'
+								onClick={() =>
+									setDiagnosticsExpanded(expanded => !expanded)
+								}
+								className='flex items-center gap-2 text-sm font-medium text-slate-800 focus-visible:outline-2 focus-visible:outline-violet-500'
+							>
 								<Wrench size={16} aria-hidden='true' />
 								Last scan diagnostics
-							</div>
-							<div className='mt-3 grid grid-cols-2 gap-x-5 gap-y-2 text-sm sm:grid-cols-4'>
+							</button>
+							{diagnosticsExpanded && (
+								<div id='catalog-diagnostics'>
+									<div className='mt-3 grid grid-cols-2 gap-x-5 gap-y-2 text-sm sm:grid-cols-4'>
 								<span className='text-slate-600'>Mode</span>
 								<span>{catalogDiagnostics.mode}</span>
 								<span className='text-slate-600'>Duration</span>
@@ -308,53 +292,20 @@ export function SettingsPage({
 									+{catalogDiagnostics.added} / ~{catalogDiagnostics.updated} / -
 									{catalogDiagnostics.removed}
 								</span>
-							</div>
-							<p className='mt-3 text-xs leading-5 text-slate-600'>
+									</div>
+									<p className='mt-3 text-xs leading-5 text-slate-600'>
 								{Object.entries(catalogDiagnostics.sourceCounts)
 									.map(([source, count]) => `${source}: ${count}`)
 									.join(' · ')}
-							</p>
-							{catalogDiagnostics.visibilityCounts && (
-								<p className='mt-1 text-xs leading-5 text-slate-600'>
+									</p>
+									{catalogDiagnostics.visibilityCounts && (
+										<p className='mt-1 text-xs leading-5 text-slate-600'>
 									{Object.entries(catalogDiagnostics.visibilityCounts)
 										.map(([visibility, count]) => `${visibility}: ${count}`)
 										.join(' · ')}
-								</p>
-							)}
-						</div>
-					)}
-					{(onRepairMissingIcons || onClearIconCache) && (
-						<div className='mt-5 flex flex-wrap items-center gap-2 border-t border-slate-200/80 pt-4'>
-							{onRepairMissingIcons && (
-								<button
-									type='button'
-									disabled={iconAction !== null}
-									onClick={() =>
-										void runIconAction('repair', onRepairMissingIcons)
-									}
-									className='inline-flex items-center gap-2 rounded-lg border border-violet-300/60 px-3 py-2 text-sm text-violet-700 hover:bg-violet-100/70 disabled:opacity-50'
-								>
-									<Wrench size={15} aria-hidden='true' />
-									{iconAction === 'repair' ? 'Repairing...' : 'Repair missing icons'}
-								</button>
-							)}
-							{onClearIconCache && (
-								<button
-									type='button'
-									disabled={iconAction !== null}
-									onClick={() =>
-										void runIconAction('clear', onClearIconCache)
-									}
-									className='inline-flex items-center gap-2 rounded-lg border border-slate-300/80 px-3 py-2 text-sm text-slate-700 hover:bg-violet-100/70 disabled:opacity-50'
-								>
-									<Image size={15} aria-hidden='true' />
-									{iconAction === 'clear' ? 'Clearing...' : 'Clear icon cache'}
-								</button>
-							)}
-							{iconMessage && (
-								<span role='status' className='text-xs text-slate-600'>
-									{iconMessage}
-								</span>
+										</p>
+									)}
+								</div>
 							)}
 						</div>
 					)}

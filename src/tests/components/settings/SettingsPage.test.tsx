@@ -74,6 +74,56 @@ describe('SettingsPage', () => {
 		).toBeTruthy()
 	})
 
+	it('keeps scan diagnostics collapsed until toggled', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+				catalogDiagnostics={{
+					completedAt: 1,
+					durationMs: 1936,
+					mode: 'startup',
+					totalApps: 269,
+					sourceCounts: { registry: 9 },
+					added: 0,
+					removed: 0,
+					updated: 77,
+				}}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+
+		const toggle = screen.getByRole('button', {
+			name: 'Last scan diagnostics',
+		})
+		expect(toggle).toHaveAttribute('aria-expanded', 'false')
+		expect(screen.queryByText('Duration')).not.toBeInTheDocument()
+
+		await userEvent.click(toggle)
+		expect(toggle).toHaveAttribute('aria-expanded', 'true')
+		expect(screen.getByText('Duration')).toBeInTheDocument()
+
+		await userEvent.click(toggle)
+		expect(screen.queryByText('Duration')).not.toBeInTheDocument()
+	})
+
+	it('does not render manual icon-maintenance controls', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+
+		expect(
+			screen.queryByRole('button', { name: 'Repair missing icons' }),
+		).not.toBeInTheDocument()
+		expect(
+			screen.queryByRole('button', { name: 'Clear icon cache' }),
+		).not.toBeInTheDocument()
+	})
+
 	it('confirms and starts a forced full scan', async () => {
 		const onForceFullScan = vi.fn().mockResolvedValue(undefined)
 		render(
