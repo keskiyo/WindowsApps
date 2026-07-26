@@ -63,12 +63,12 @@ Most launchers just re-list what Windows already knows. Windows Apps earns its p
 - **Registered, signed, reversible** — vendor / MSI / MSIX uninstall from Windows' own registration; signed NSIS-only auto-updates with full notes, byte progress, and verification; nothing forced.
 - **Lives in the tray** — closing hides to the notification area; `Win+Shift+Q` (physical key, layout-independent) brings it back; optional launch at sign-in.
 - **Accessible and responsive** — focus-trapped dialogs, arrow-key menus, `aria-current` navigation, reduced-motion support, and a persistent sidebar that becomes an overlay drawer on narrow windows.
-- **Catalog maintenance** — Settings exposes scan diagnostics, icon repair, icon-cache clear, force full scan, and cache reset.
+- **Catalog maintenance** — Settings exposes scan diagnostics, force full scan, and cache reset.
 
 ## Installation
 
 1. Open [Windows Apps 0.2.7](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.7).
-2. Download `Windows Apps_0.2.7_x64-setup.exe`.
+2. Download `Windows.Apps_0.2.7_x64-setup.exe`.
 3. Run the installer.
 4. Start **Windows Apps** and select **Scan for apps** when prompted.
 
