@@ -41,7 +41,11 @@ export function TitleBar() {
 					onClick={controls.toggleMaximize}
 					className='grid h-9 w-11 place-items-center text-slate-400 transition-colors hover:bg-slate-700/70 hover:text-white'
 				>
-					{controls.maximized ? <Copy size={12} /> : <Square size={11} />}
+					{controls.maximized ? (
+						<Copy size={12} />
+					) : (
+						<Square size={11} />
+					)}
 				</button>
 				<button
 					type='button'

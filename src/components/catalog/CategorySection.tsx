@@ -2,7 +2,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
-import { AppCard } from '../apps/AppCard'
+import { AppCard } from '../apps/AppCard/AppCard'
 import { DeleteCategoryDialog } from '../dialogs/DeleteCategoryDialog'
 import { CategoryNameEditor } from '../shared/CategoryNameEditor'
 

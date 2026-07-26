@@ -1,5 +1,6 @@
-import { ExternalLink, Github, RefreshCw, Send } from 'lucide-react'
+import { ExternalLink, RefreshCw, Send } from 'lucide-react'
 import type { UpdateCheckStatus, UpdaterState } from '../../hooks/useUpdater'
+import { GithubIcon } from '../shared/GithubIcon'
 
 interface Props {
 	updater: UpdaterState
@@ -16,7 +17,7 @@ export function SettingsUpdateControls({
 		<>
 			<div className='flex flex-wrap items-center gap-4 border-b border-slate-200 p-5'>
 				<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
-					<Github size={19} aria-hidden='true' />
+					<GithubIcon size={19} aria-hidden='true' />
 				</span>
 				<div className='min-w-60 flex-1'>
 					<h2 className='font-medium'>Updates and source</h2>
@@ -35,7 +36,11 @@ export function SettingsUpdateControls({
 					>
 						<RefreshCw
 							size={16}
-							className={updater.status === 'checking' ? 'animate-spin' : ''}
+							className={
+								updater.status === 'checking'
+									? 'animate-spin'
+									: ''
+							}
 							aria-hidden='true'
 						/>
 						Check updates
@@ -46,7 +51,7 @@ export function SettingsUpdateControls({
 						onClick={() => void onOpenGithub()}
 						className='inline-flex items-center gap-2 rounded-xl border border-slate-300/70 px-3.5 py-2 text-sm font-medium text-slate-200 hover:bg-white/8 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
-						<Github size={16} aria-hidden='true' />
+						<GithubIcon size={16} aria-hidden='true' />
 						keskiyo
 					</button>
 				</div>
@@ -62,9 +67,15 @@ export function SettingsUpdateControls({
 				</span>
 				<span className='flex-1'>
 					<span className='block font-medium'>Telegram</span>
-					<span className='mt-1 block text-sm text-slate-600'>@keskiyo</span>
+					<span className='mt-1 block text-sm text-slate-600'>
+						@keskiyo
+					</span>
 				</span>
-				<ExternalLink size={17} className='text-slate-500' aria-hidden='true' />
+				<ExternalLink
+					size={17}
+					className='text-slate-500'
+					aria-hidden='true'
+				/>
 			</button>
 		</>
 	)

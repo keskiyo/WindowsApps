@@ -2,7 +2,12 @@ import { relaunch } from '@tauri-apps/plugin-process'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-export type UpdateCheckStatus = 'idle' | 'checking' | 'current' | 'available' | 'error'
+export type UpdateCheckStatus =
+	| 'idle'
+	| 'checking'
+	| 'current'
+	| 'available'
+	| 'error'
 export type UpdateInstallPhase =
 	| 'idle'
 	| 'downloading'
@@ -67,7 +72,10 @@ function rememberDismissedVersion(version: string) {
 	}
 }
 
-function shouldShowUpdate(found: Update | null, ignoreDismissed: boolean): boolean {
+function shouldShowUpdate(
+	found: Update | null,
+	ignoreDismissed: boolean,
+): boolean {
 	if (!found) return false
 	return ignoreDismissed || dismissedVersion() !== found.version
 }
@@ -136,7 +144,8 @@ export function useUpdater(options?: Options): UpdaterState {
 	const requestCheck = useCallback(() => {
 		if (checkPromiseRef.current) return checkPromiseRef.current
 		const request = check().finally(() => {
-			if (checkPromiseRef.current === request) checkPromiseRef.current = null
+			if (checkPromiseRef.current === request)
+				checkPromiseRef.current = null
 		})
 		checkPromiseRef.current = request
 		return request
@@ -201,7 +210,10 @@ export function useUpdater(options?: Options): UpdaterState {
 						setDownloadedBytes(downloaded)
 						setProgress(
 							total
-								? Math.min(100, Math.round((downloaded / total) * 100))
+								? Math.min(
+										100,
+										Math.round((downloaded / total) * 100),
+									)
 								: null,
 						)
 						break

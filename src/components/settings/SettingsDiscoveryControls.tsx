@@ -35,15 +35,17 @@ export function SettingsDiscoveryControls({
 				<div className='min-w-0 flex-1'>
 					<h2 className='font-medium'>Application discovery</h2>
 					<p className='mt-1 text-sm leading-6 text-slate-600'>
-						Scan permanent local drives and Steam libraries. Removable and
-						network drives are ignored.
+						Scan permanent local drives and Steam libraries.
+						Removable and network drives are ignored.
 					</p>
 				</div>
 				<button
 					type='button'
 					role='switch'
 					aria-label='Scan all fixed local drives'
-					aria-checked={settings?.scanSettings.autoScanFixedDrives ?? false}
+					aria-checked={
+						settings?.scanSettings.autoScanFixedDrives ?? false
+					}
 					disabled={disabled}
 					onClick={() =>
 						settings &&
@@ -53,7 +55,7 @@ export function SettingsDiscoveryControls({
 								!settings.scanSettings.autoScanFixedDrives,
 						})
 					}
-					className={`relative h-7 w-12 shrink-0 rounded-full transition focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50 ${settings?.scanSettings.autoScanFixedDrives ? 'bg-violet-600' : 'bg-slate-300'}`}
+					className={`relative h-7 w-12 shrink-0 rounded-full transition focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50 ${settings?.scanSettings.autoScanFixedDrives ? 'utility-accent-button' : 'bg-slate-300'}`}
 				>
 					<span
 						className={`absolute left-1 top-1 size-5 rounded-full bg-slate-50 shadow transition-transform ${settings?.scanSettings.autoScanFixedDrives ? 'translate-x-5' : 'translate-x-0'}`}

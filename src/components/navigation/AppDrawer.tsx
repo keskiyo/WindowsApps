@@ -8,7 +8,7 @@ import type {
 	AppView,
 	CategoryDefinition,
 } from '../../types'
-import { AppNavigation } from './AppNavigation'
+import { AppNavigation } from './AppNavigation/AppNavigation'
 
 interface Props {
 	open: boolean
@@ -56,7 +56,9 @@ export function AppDrawer(props: Props) {
 	for (const app of props.apps)
 		counts.set(app.category, (counts.get(app.category) ?? 0) + 1)
 	return (
-		<div className={`drawer-shell fixed inset-0 z-400 ${open ? 'is-open' : 'is-closing'}`}>
+		<div
+			className={`drawer-shell fixed inset-0 z-400 ${open ? 'is-open' : 'is-closing'}`}
+		>
 			<button
 				type='button'
 				aria-label='Close navigation backdrop'
@@ -94,7 +96,7 @@ export function AppDrawer(props: Props) {
 					counts={counts}
 					activeView={props.activeView}
 					favoriteCount={props.favoriteCount}
-					 hiddenCount={props.hiddenCount ?? 0}
+					hiddenCount={props.hiddenCount ?? 0}
 					auxiliaryCount={props.auxiliaryCount ?? 0}
 					onSelectView={props.onSelectView}
 					onSelectCategory={props.onSelectCategory}

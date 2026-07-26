@@ -22,7 +22,11 @@ export function GlobalActivityBar({ active, label }: Props) {
 			</div>
 			{label && (
 				<div className='mt-2 flex items-center gap-2 rounded-full border border-violet-400/30 bg-slate-900/70 px-3.5 py-1.5 text-xs font-medium text-violet-100 shadow-lg backdrop-blur'>
-					<Loader2 size={13} className='animate-spin' aria-hidden='true' />
+					<Loader2
+						size={13}
+						className='animate-spin'
+						aria-hidden='true'
+					/>
 					{label}
 				</div>
 			)}

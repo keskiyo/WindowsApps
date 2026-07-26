@@ -7,7 +7,7 @@ export default defineConfig({
 	clearScreen: false,
 	test: {
 		environment: 'jsdom',
-		setupFiles: './src/tests/setup.ts',
+		setupFiles: './tests/frontend/setup.ts',
 	},
 	server: {
 		strictPort: true,

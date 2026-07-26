@@ -18,11 +18,14 @@ export function PreferencesNotSavedBanner() {
 				aria-hidden='true'
 			/>
 			<span className='min-w-0 flex-1'>
-				<span className='font-medium'>Your changes are not being saved</span>
+				<span className='font-medium'>
+					Your changes are not being saved
+				</span>
 				<span className='text-slate-400'>
 					{' '}
-					— browser storage is full or unavailable, so favorites, hidden apps
-					and custom categories will be lost when Windows Apps restarts.
+					— browser storage is full or unavailable, so favorites,
+					hidden apps and custom categories will be lost when Windows
+					Apps restarts.
 				</span>
 			</span>
 		</div>

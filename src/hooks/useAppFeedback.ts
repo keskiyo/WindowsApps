@@ -22,11 +22,11 @@ export function useAppFeedback({
 				toast.success(`${app.name} launched`)
 			} catch {
 				toast.error(`Could not launch ${app.name}`, {
-						action: {
-							label: 'Retry',
-							onClick: () => void launch(app),
-						},
-					})
+					action: {
+						label: 'Retry',
+						onClick: () => void launch(app),
+					},
+				})
 			}
 		},
 		[onLaunch],
@@ -56,7 +56,7 @@ export function useAppFeedback({
 				toast.error(`Could not uninstall ${app.name}`)
 				return { ok: false }
 			}
-	},
+		},
 		[onUninstall],
 	)
 

@@ -71,8 +71,9 @@ export function UninstallDialog({
 					<div className='flex-1'>
 						<h2 className='font-semibold'>Uninstall {appName}?</h2>
 						<p className='mt-2 text-sm leading-6 text-slate-600'>
-							Review the registered uninstall route before starting.
-							Application files will never be deleted directly.
+							Review the registered uninstall route before
+							starting. Application files will never be deleted
+							directly.
 						</p>
 					</div>
 					<button
@@ -124,7 +125,12 @@ export function UninstallDialog({
 					</button>
 					<button
 						type='button'
-						disabled={pending || isPreviewLoading || !preview || !!previewError}
+						disabled={
+							pending ||
+							isPreviewLoading ||
+							!preview ||
+							!!previewError
+						}
 						onClick={() => void confirm()}
 						className='rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-400 focus-visible:outline-2 focus-visible:outline-red-300 disabled:opacity-60'
 					>

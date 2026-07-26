@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react'
-import { AppNavigation } from './AppNavigation'
+import { AppNavigation } from './AppNavigation/AppNavigation'
 
 export function AppSidebar(props: ComponentProps<typeof AppNavigation>) {
 	return (

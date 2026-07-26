@@ -144,7 +144,9 @@ export function normalizePreferences(value: unknown): AppPreferencesV5 {
 				)
 			: {}
 	const unknownFields = Object.fromEntries(
-		Object.entries(raw).filter(([key]) => !KNOWN_PREFERENCE_FIELDS.has(key)),
+		Object.entries(raw).filter(
+			([key]) => !KNOWN_PREFERENCE_FIELDS.has(key),
+		),
 	)
 	return {
 		version: 5,
@@ -220,8 +222,7 @@ function storedVersionIsNewer(storage: Storage): boolean {
 		if (!raw) return false
 		const version = (JSON.parse(raw) as { version?: unknown }).version
 		return (
-			typeof version === 'number' &&
-			version > CURRENT_PREFERENCES_VERSION
+			typeof version === 'number' && version > CURRENT_PREFERENCES_VERSION
 		)
 	} catch {
 		return false

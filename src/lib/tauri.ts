@@ -58,7 +58,9 @@ export const tauriAppsClient: AppsClient = {
 			? invokeTauri<CatalogSnapshot>('get_apps')
 			: Promise.resolve({ apps: [], hasCache: false }),
 	refreshApps: () =>
-		isTauriRuntime() ? invokeTauri<AppInfo[]>('refresh_apps') : Promise.resolve([]),
+		isTauriRuntime()
+			? invokeTauri<AppInfo[]>('refresh_apps')
+			: Promise.resolve([]),
 	forceFullScan: () =>
 		isTauriRuntime()
 			? invokeTauri<AppInfo[]>('force_full_scan')
@@ -68,7 +70,9 @@ export const tauriAppsClient: AppsClient = {
 			? invokeTauri<AppInfo[]>('reset_catalog_cache')
 			: Promise.resolve([]),
 	clearIconCache: () =>
-		isTauriRuntime() ? invokeTauri<void>('clear_icon_cache') : Promise.resolve(),
+		isTauriRuntime()
+			? invokeTauri<void>('clear_icon_cache')
+			: Promise.resolve(),
 	hydrateVisibleIcons: ids =>
 		isTauriRuntime()
 			? invokeTauri<void>('hydrate_visible_icons', { ids })
@@ -90,10 +94,7 @@ export const tauriAppsClient: AppsClient = {
 		return listenIfTauri<CatalogDelta>('catalog://delta', handler)
 	},
 	async onCatalogPatches(handler) {
-		return listenIfTauri<AppHydrationPatch[]>(
-			'catalog://patches',
-			handler,
-		)
+		return listenIfTauri<AppHydrationPatch[]>('catalog://patches', handler)
 	},
 	async onCatalogChanged(handler) {
 		return listenIfTauri<CatalogChangeSummary>('catalog://changed', handler)

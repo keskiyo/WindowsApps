@@ -228,9 +228,13 @@ export function createAppStore(
 						get().promotedAppIdentities,
 					)
 					for (const legacyId of get().promotedAppIds) {
-						const match = snapshot.apps.find(app => app.id === legacyId)
+						const match = snapshot.apps.find(
+							app => app.id === legacyId,
+						)
 						if (match)
-							promotedAppIdentities.add(match.canonicalIdentity ?? match.id)
+							promotedAppIdentities.add(
+								match.canonicalIdentity ?? match.id,
+							)
 					}
 					const favorites = reconcileSelection(
 						snapshot.apps,
@@ -270,7 +274,7 @@ export function createAppStore(
 							registration:
 								| ((
 										handler: (value: T) => void,
-									) => Promise<() => void>)
+								  ) => Promise<() => void>)
 								| undefined,
 							handler: (value: T) => void,
 						) => {
@@ -358,7 +362,9 @@ export function createAppStore(
 			async clearIconCache() {
 				if (!client.clearIconCache) return
 				await client.clearIconCache()
-				await client.hydrateVisibleIcons?.(get().apps.map(app => app.id))
+				await client.hydrateVisibleIcons?.(
+					get().apps.map(app => app.id),
+				)
 			},
 			async repairMissingIcons() {
 				await client.hydrateVisibleIcons?.(
@@ -417,7 +423,8 @@ export function createAppStore(
 								app.canonicalIdentity ?? app.id,
 							)
 						: false
-					if (app?.visibilityClass === 'auxiliary' && !promoted) return state
+					if (app?.visibilityClass === 'auxiliary' && !promoted)
+						return state
 					const identity = app?.canonicalIdentity ?? id
 					const wasFavorite = state.favoriteAppIds.includes(id)
 					return {
@@ -425,7 +432,9 @@ export function createAppStore(
 							? state.favoriteAppIds.filter(appId => appId !== id)
 							: [...state.favoriteAppIds, id],
 						favoriteAppIdentities: wasFavorite
-							? state.favoriteAppIdentities.filter(item => item !== identity)
+							? state.favoriteAppIdentities.filter(
+									item => item !== identity,
+								)
 							: addUnique(state.favoriteAppIdentities, identity),
 					}
 				})
@@ -451,7 +460,9 @@ export function createAppStore(
 					const app = state.apps.find(item => item.id === id)
 					const identity = app?.canonicalIdentity ?? id
 					return {
-						hiddenAppIds: state.hiddenAppIds.filter(appId => appId !== id),
+						hiddenAppIds: state.hiddenAppIds.filter(
+							appId => appId !== id,
+						),
 						hiddenAppIdentities: state.hiddenAppIdentities.filter(
 							item => item !== identity,
 						),
@@ -463,7 +474,9 @@ export function createAppStore(
 				const app = get().apps.find(item => item.id === id)
 				const identity = app?.canonicalIdentity ?? id
 				set(state => ({
-					promotedAppIdentities: state.promotedAppIdentities.includes(identity)
+					promotedAppIdentities: state.promotedAppIdentities.includes(
+						identity,
+					)
 						? state.promotedAppIdentities
 						: [...state.promotedAppIdentities, identity],
 				}))
@@ -473,11 +486,15 @@ export function createAppStore(
 				const app = get().apps.find(item => item.id === id)
 				const identity = app?.canonicalIdentity ?? id
 				set(state => ({
-					promotedAppIds: state.promotedAppIds.filter(appId => appId !== id),
+					promotedAppIds: state.promotedAppIds.filter(
+						appId => appId !== id,
+					),
 					promotedAppIdentities: state.promotedAppIdentities.filter(
 						item => item !== identity,
 					),
-					favoriteAppIds: state.favoriteAppIds.filter(appId => appId !== id),
+					favoriteAppIds: state.favoriteAppIds.filter(
+						appId => appId !== id,
+					),
 					favoriteAppIdentities: state.favoriteAppIdentities.filter(
 						item => item !== identity,
 					),
@@ -602,7 +619,11 @@ export function createAppStore(
 					const previous = new Map(
 						state.apps.map(app => [app.id, app]),
 					)
-					return { apps: apps.map(app => mergeIcon(previous.get(app.id), app)) }
+					return {
+						apps: apps.map(app =>
+							mergeIcon(previous.get(app.id), app),
+						),
+					}
 				})
 			},
 			applyDelta(delta) {
@@ -654,10 +675,10 @@ export function createAppStore(
 // Pure selectors/filters live in ./selectors. Re-exported here so existing imports from
 // '../store/appStore' keep working after the split.
 export {
-	filterVisibleApps,
 	filterAppsByQuery,
+	filterVisibleApps,
 	rankAppsByQuery,
-	selectVisibleApps,
-	selectFilteredApps,
 	selectCategorizedApps,
+	selectFilteredApps,
+	selectVisibleApps,
 } from './selectors'

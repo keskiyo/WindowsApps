@@ -36,7 +36,8 @@ export function StaleCopyBanner({
 				</span>
 				<span className='text-slate-400'>
 					{' '}
-					— version {installedVersion} is installed at {installLocation}
+					— version {installedVersion} is installed at{' '}
+					{installLocation}
 				</span>
 			</span>
 			<button

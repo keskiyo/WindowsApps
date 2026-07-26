@@ -63,7 +63,8 @@ function isAppErrorCode(value: unknown): value is AppErrorCode {
 function readAppErrorPayload(value: unknown): AppErrorPayload | null {
 	if (!value || typeof value !== 'object') return null
 	const candidate = value as { code?: unknown; message?: unknown }
-	return isAppErrorCode(candidate.code) && typeof candidate.message === 'string'
+	return isAppErrorCode(candidate.code) &&
+		typeof candidate.message === 'string'
 		? { code: candidate.code, message: candidate.message }
 		: null
 }
@@ -76,7 +77,8 @@ export function toAppClientError(error: unknown): AppClientError {
 	if (typeof error === 'string') {
 		try {
 			const payload = readAppErrorPayload(JSON.parse(error))
-			if (payload) return new AppClientError(payload.code, payload.message)
+			if (payload)
+				return new AppClientError(payload.code, payload.message)
 		} catch {
 			// Unknown values must not surface raw transport details in the interface.
 		}

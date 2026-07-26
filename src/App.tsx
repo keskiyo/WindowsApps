@@ -9,32 +9,32 @@ import {
 import { toast, Toaster } from 'sonner'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
-import { AppGrid } from './components/catalog/AppGrid'
+import { AppGrid } from './components/catalog/AppGrid/AppGrid'
 import { AppInfoDialog } from './components/dialogs/AppInfoDialog'
 import { UninstallDialog } from './components/dialogs/UninstallDialog'
 import { AppDrawer } from './components/navigation/AppDrawer'
 import { AppSidebar } from './components/navigation/AppSidebar'
-import { SettingsPage } from './components/settings/SettingsPage'
-import { CommandPalette } from './components/shared/CommandPalette'
+import { SettingsPage } from './components/settings/SettingsPage/SettingsPage'
+import { CommandPalette } from './components/shared/CommandPalette/CommandPalette'
 import { GlobalActivityBar } from './components/shared/GlobalActivityBar'
-import { Header } from './components/shared/Header'
+import { Header } from './components/shared/Header/Header'
 import { PreferencesNotSavedBanner } from './components/shared/PreferencesNotSavedBanner'
 import { ScanPrompt } from './components/shared/ScanPrompt'
 import { StaleCopyBanner } from './components/shared/StaleCopyBanner'
 import { TitleBar } from './components/shared/TitleBar'
-import { UpdateDialog } from './components/shared/UpdateDialog'
-import { WorkspaceSummary } from './components/shared/WorkspaceSummary'
+import { UpdateDialog } from './components/shared/UpdateDialog/UpdateDialog'
 import { useAppFeedback } from './hooks/useAppFeedback'
 import { useCatalogNavigation } from './hooks/useCatalogNavigation'
 import { useDesktopNavigation } from './hooks/useDesktopNavigation'
 
+import { WorkspaceSummary } from './components/shared/WorkspaceSummary/WorkspaceSummary'
 import { useIconRecovery } from './hooks/useIconRecovery'
 import { useUpdater } from './hooks/useUpdater'
 import { catalogChangeMessage } from './lib/catalogChanges'
 import { toAppClientError } from './lib/clientError'
 import {
-	rankAppsByQuery,
 	filterVisibleApps,
+	rankAppsByQuery,
 	selectCategorizedApps,
 	type AppState,
 } from './store/appStore'
@@ -268,12 +268,7 @@ export function App({ store, systemClient }: AppProps) {
 		if (activeView === 'settings' || isLoading) return
 		const ids = visibleHydrationIds.split('|').filter(Boolean)
 		if (ids.length) void hydrateVisibleIcons(ids)
-	}, [
-		activeView,
-		hydrateVisibleIcons,
-		isLoading,
-		visibleHydrationIds,
-	])
+	}, [activeView, hydrateVisibleIcons, isLoading, visibleHydrationIds])
 
 	const auxiliaryCount = categorizedApps.filter(
 		app => app.visibilityClass === 'auxiliary',
@@ -323,8 +318,7 @@ export function App({ store, systemClient }: AppProps) {
 				: state.isRefreshing
 					? 'Scanning applications…'
 					: ''
-	const activityActive =
-		state.launchingIds.length > 0 || state.isRefreshing
+	const activityActive = state.launchingIds.length > 0 || state.isRefreshing
 	const updater = useUpdater()
 	useIconRecovery(state.repairMissingIcons)
 	const [staleCopy, setStaleCopy] = useState<StaleCopyInfo | null>(null)
@@ -352,7 +346,8 @@ export function App({ store, systemClient }: AppProps) {
 						installedVersion={staleCopy.installedVersion}
 						installLocation={staleCopy.installLocation}
 						onOpenInstalled={() =>
-							systemClient.openInstalledCopy?.() ?? Promise.resolve()
+							systemClient.openInstalledCopy?.() ??
+							Promise.resolve()
 						}
 						onDismiss={() => setStaleCopy(null)}
 					/>
@@ -374,12 +369,18 @@ export function App({ store, systemClient }: AppProps) {
 						onInstall={() => void updater.install()}
 						onDismiss={updater.dismiss}
 						onOpenRelease={() =>
-							void (systemClient.openRelease?.(updater.update?.version ?? '') ??
-								systemClient.openGithub())
+							void (
+								systemClient.openRelease?.(
+									updater.update?.version ?? '',
+								) ?? systemClient.openGithub()
+							)
 						}
 					/>
 				)}
-				<GlobalActivityBar active={activityActive} label={activityLabel} />
+				<GlobalActivityBar
+					active={activityActive}
+					label={activityLabel}
+				/>
 				<div className='flex min-h-0 flex-1 gap-2 px-2 pb-2'>
 					{desktopNavigation && <AppSidebar {...navigationProps} />}
 					<div
@@ -402,125 +403,142 @@ export function App({ store, systemClient }: AppProps) {
 							showMenu={!desktopNavigation}
 						/>
 						<main className='mx-auto w-full max-w-375 px-5 pb-12 pt-7 sm:px-8'>
-						{state.activeView === 'settings' ? (
-							<SettingsPage
-								client={systemClient}
-								onForceFullScan={state.forceFullScan}
-								onResetCatalogCache={state.resetCatalogCache}
-								catalogDiagnostics={state.catalogDiagnostics}
-								visibilityCounts={{ primary: primaryCount, auxiliary: auxiliaryCount }}
-								updater={updater}
-							/>
-						) : !state.isLoading &&
-						  !state.hasCache &&
-						  !state.apps.length &&
-						  !scanPromptDismissed ? (
-							<ScanPrompt
-								isScanning={state.isRefreshing}
-								onDismiss={() => setScanPromptDismissed(true)}
-								onScan={feedback.refresh}
-							/>
-						) : (
-							<>
-								{!state.isLoading && (
-									<WorkspaceSummary
-										activeView={state.activeView}
-										allCount={visibleCategorizedApps.length}
-										favoriteCount={favoriteCount}
-										hiddenCount={hiddenCount}
-										auxiliaryCount={auxiliaryCount}
-										onSelectView={navigation.selectView}
-									/>
-								)}
-								<AppGrid
-									apps={filteredApps}
-									isLoading={state.isLoading}
-									hasQuery={hasQuery}
-									activeView={state.activeView}
-									categoryOrder={state.categoryOrder}
-									categories={state.categories}
-									collapsedCategories={
-										state.collapsedCategories
+							{state.activeView === 'settings' ? (
+								<SettingsPage
+									client={systemClient}
+									onForceFullScan={state.forceFullScan}
+									onResetCatalogCache={
+										state.resetCatalogCache
 									}
-									favoriteAppIds={state.favoriteAppIds}
-									onToggleCategory={state.toggleCategory}
-									onToggleFavorite={state.toggleFavorite}
-									onReorderCategory={state.reorderCategory}
-									onMoveApp={state.moveApp}
-									onLaunch={feedback.launch}
-									onInfo={setInfoApp}
-									onUninstall={setUninstallApp}
-									onHide={state.hideApp}
-									onRestore={state.restoreApp}
-									onPromoteAuxiliary={state.promoteAuxiliary}
-									onDemoteAuxiliary={state.demoteAuxiliary}
-									onRenameCategory={state.renameCategory}
-									onDeleteCategory={state.deleteCategory}
+									catalogDiagnostics={
+										state.catalogDiagnostics
+									}
+									visibilityCounts={{
+										primary: primaryCount,
+										auxiliary: auxiliaryCount,
+									}}
+									updater={updater}
 								/>
-							</>
-						)}
-					</main>
+							) : !state.isLoading &&
+							  !state.hasCache &&
+							  !state.apps.length &&
+							  !scanPromptDismissed ? (
+								<ScanPrompt
+									isScanning={state.isRefreshing}
+									onDismiss={() =>
+										setScanPromptDismissed(true)
+									}
+									onScan={feedback.refresh}
+								/>
+							) : (
+								<>
+									{!state.isLoading && (
+										<WorkspaceSummary
+											activeView={state.activeView}
+											allCount={
+												visibleCategorizedApps.length
+											}
+											favoriteCount={favoriteCount}
+											hiddenCount={hiddenCount}
+											auxiliaryCount={auxiliaryCount}
+											onSelectView={navigation.selectView}
+										/>
+									)}
+									<AppGrid
+										apps={filteredApps}
+										isLoading={state.isLoading}
+										hasQuery={hasQuery}
+										activeView={state.activeView}
+										categoryOrder={state.categoryOrder}
+										categories={state.categories}
+										collapsedCategories={
+											state.collapsedCategories
+										}
+										favoriteAppIds={state.favoriteAppIds}
+										onToggleCategory={state.toggleCategory}
+										onToggleFavorite={state.toggleFavorite}
+										onReorderCategory={
+											state.reorderCategory
+										}
+										onMoveApp={state.moveApp}
+										onLaunch={feedback.launch}
+										onInfo={setInfoApp}
+										onUninstall={setUninstallApp}
+										onHide={state.hideApp}
+										onRestore={state.restoreApp}
+										onPromoteAuxiliary={
+											state.promoteAuxiliary
+										}
+										onDemoteAuxiliary={
+											state.demoteAuxiliary
+										}
+										onRenameCategory={state.renameCategory}
+										onDeleteCategory={state.deleteCategory}
+									/>
+								</>
+							)}
+						</main>
+					</div>
 				</div>
+				{drawerMounted && !desktopNavigation && (
+					<AppDrawer
+						open={drawerOpen}
+						apps={visibleCategorizedApps}
+						categoryOrder={state.categoryOrder}
+						categories={state.categories}
+						activeView={state.activeView}
+						favoriteCount={
+							categorizedApps.filter(app =>
+								state.favoriteAppIds.includes(app.id),
+							).length
+						}
+						hiddenCount={navigationProps.hiddenCount}
+						auxiliaryCount={navigationProps.auxiliaryCount}
+						triggerRef={menuButtonRef}
+						onSelectView={navigation.selectView}
+						onSelectCategory={navigation.selectCategory}
+						onReorderCategory={state.reorderCategory}
+						onCreateCategory={state.createCategory}
+						onClose={closeDrawer}
+						onExited={() => setDrawerMounted(false)}
+					/>
+				)}
+				{paletteOpen && (
+					<CommandPalette
+						apps={visibleCategorizedApps}
+						onLaunch={feedback.launch}
+						onClose={() => setPaletteOpen(false)}
+					/>
+				)}
+				{infoApp && (
+					<AppInfoDialog
+						app={infoApp}
+						categories={state.categories}
+						onClose={closeInfo}
+					/>
+				)}
+				{uninstallApp && (
+					<UninstallDialog
+						appName={uninstallApp.name}
+						preview={uninstallPreview}
+						isPreviewLoading={uninstallPreviewLoading}
+						previewError={uninstallPreviewError}
+						onClose={closeUninstall}
+						onConfirm={confirmUninstall}
+					/>
+				)}
+				<Toaster
+					className='app-toaster'
+					theme='light'
+					position='bottom-right'
+					expand
+					visibleToasts={5}
+					gap={10}
+					offset={16}
+					richColors
+					closeButton
+				/>
 			</div>
-			{drawerMounted && !desktopNavigation && (
-				<AppDrawer
-					open={drawerOpen}
-					apps={visibleCategorizedApps}
-					categoryOrder={state.categoryOrder}
-					categories={state.categories}
-					activeView={state.activeView}
-					favoriteCount={
-						categorizedApps.filter(app =>
-							state.favoriteAppIds.includes(app.id),
-						).length
-					}
-					hiddenCount={navigationProps.hiddenCount}
-					auxiliaryCount={navigationProps.auxiliaryCount}
-					triggerRef={menuButtonRef}
-					onSelectView={navigation.selectView}
-					onSelectCategory={navigation.selectCategory}
-					onReorderCategory={state.reorderCategory}
-					onCreateCategory={state.createCategory}
-					onClose={closeDrawer}
-					onExited={() => setDrawerMounted(false)}
-				/>
-			)}
-			{paletteOpen && (
-				<CommandPalette
-					apps={visibleCategorizedApps}
-					onLaunch={feedback.launch}
-					onClose={() => setPaletteOpen(false)}
-				/>
-			)}
-			{infoApp && (
-				<AppInfoDialog
-					app={infoApp}
-					categories={state.categories}
-					onClose={closeInfo}
-				/>
-			)}
-			{uninstallApp && (
-				<UninstallDialog
-					appName={uninstallApp.name}
-					preview={uninstallPreview}
-					isPreviewLoading={uninstallPreviewLoading}
-					previewError={uninstallPreviewError}
-					onClose={closeUninstall}
-					onConfirm={confirmUninstall}
-				/>
-			)}
-			<Toaster
-				className='app-toaster'
-				theme='light'
-				position='bottom-right'
-				expand
-				visibleToasts={5}
-				gap={10}
-				offset={16}
-				richColors
-				closeButton
-			/>
-		</div>
 		</AppStoreProvider>
 	)
 }

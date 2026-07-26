@@ -1,7 +1,7 @@
 import { Star } from 'lucide-react'
 import { sortFavoritesFirst } from '../../lib/catalog'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
-import { AppCard } from '../apps/AppCard'
+import { AppCard } from '../apps/AppCard/AppCard'
 
 interface Props {
 	apps: AppInfo[]

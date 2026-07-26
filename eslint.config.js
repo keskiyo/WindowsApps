@@ -41,7 +41,7 @@ export default tseslint.config(
 		ignores: ['dist', 'coverage', 'graphify-out', 'node_modules', 'src-tauri/target'],
 	},
 	{
-		files: ['src/**/*.{ts,tsx}'],
+		files: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}'],
 		extends: [
 			js.configs.recommended,
 			...tseslint.configs.recommended,

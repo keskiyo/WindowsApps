@@ -95,27 +95,27 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::get_apps,
-            commands::refresh_apps,
-            commands::force_full_scan,
-            commands::reset_catalog_cache,
-            commands::clear_icon_cache,
-            commands::hydrate_visible_icons,
-            commands::start_background_sync,
-            commands::cancel_scan,
-            commands::launch_app,
-            commands::get_uninstall_preview,
-            commands::uninstall_app,
-            commands::get_uninstall_history,
-            commands::clear_uninstall_history,
-            commands::get_system_settings,
-            commands::set_autostart,
-            commands::set_scan_settings,
-            commands::open_telegram,
-            commands::open_github,
-            commands::open_release,
-            commands::stale_copy_status,
-            commands::open_installed_copy
+            commands::catalog::get_apps,
+            commands::catalog::refresh_apps,
+            commands::catalog::force_full_scan,
+            commands::catalog::reset_catalog_cache,
+            commands::catalog::clear_icon_cache,
+            commands::catalog::hydrate_visible_icons,
+            commands::catalog::start_background_sync,
+            commands::settings::cancel_scan,
+            commands::launch::launch_app,
+            commands::uninstall::get_uninstall_preview,
+            commands::uninstall::uninstall_app,
+            commands::uninstall::get_uninstall_history,
+            commands::uninstall::clear_uninstall_history,
+            commands::settings::get_system_settings,
+            commands::settings::set_autostart,
+            commands::settings::set_scan_settings,
+            commands::links::open_telegram,
+            commands::links::open_github,
+            commands::links::open_release,
+            commands::links::stale_copy_status,
+            commands::links::open_installed_copy
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -388,7 +388,6 @@ src/components/shared/           Header, title bar, scan prompt, shared UI
 src/hooks/                       Navigation, spotlight, and scroll-lock hooks
 src/lib/                         Tauri clients, preferences, catalog utilities
 src/store/                       Zustand application state
-src/tests/                       Frontend tests grouped by layer
 src/types/                       Shared TypeScript contracts
 src-tauri/src/app_state.rs       Process-wide trusted catalog target state
 src-tauri/src/catalog_sync.rs    Scan, cache, watcher, and hydration orchestration
@@ -396,9 +395,16 @@ src-tauri/src/commands.rs        Tauri IPC transport handlers
 src-tauri/src/catalog/           Discovery, cache, scanning, hydration, deduplication
 src-tauri/src/lifecycle/         Tray and window lifecycle
 src-tauri/src/platform/windows/  Windows-specific native integrations
+tests/frontend/                  Frontend tests, mirroring src/ layout by layer
 .github/workflows/release.yml    Tag-driven Windows release pipeline
 scripts/                         Release version/source/asset checks, manifest prep, boundary verifiers
 ```
+
+A component that holds a private subcomponent or local static data lives in its own folder
+`components/<layer>/<ComponentName>/`: the main component in `<ComponentName>.tsx`, each private
+subcomponent in its own file, local types in `types.ts`, and static data or item-builders in
+`data.ts`. No `index.ts` barrels — components are imported by their explicit file path. Single-file
+components stay flat. Reference: `components/shared/WorkspaceSummary/`.
 
 ## 15. Development workflow
 

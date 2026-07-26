@@ -1,6 +1,6 @@
 use super::{
-    classify, is_invalid_display_name, is_maintenance_entry, stable_id, AppInfo, LaunchKind,
-    SourceKind, UninstallTarget,
+    classify::classify, filters::is_invalid_display_name, filters::is_maintenance_entry, stable_id,
+    AppInfo, LaunchKind, SourceKind, UninstallTarget,
 };
 use serde::Deserialize;
 use serde_json::Value;

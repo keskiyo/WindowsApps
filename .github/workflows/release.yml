@@ -46,6 +46,10 @@ jobs:
               shell: pwsh
               run: powershell -NoProfile -File scripts/test-prepare-release-manifest.ps1
 
+            - name: Test release notes preparation
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-release-notes.ps1
+
             - name: Lint frontend
               run: npm run lint
 
@@ -99,14 +103,16 @@ jobs:
             - name: Generate and apply release notes
               shell: pwsh
               run: |
+                  $generatedPath = Join-Path $env:RUNNER_TEMP "generated-release-notes.md"
                   $notesPath = Join-Path $env:RUNNER_TEMP "release-notes.md"
                   gh api --method POST "repos/${{ github.repository }}/releases/generate-notes" `
                     -f "tag_name=${{ github.ref_name }}" `
                     -f "target_commitish=${{ github.sha }}" `
-                    --jq ".body" | Set-Content -LiteralPath $notesPath -Encoding utf8NoBOM
-                  if (-not (Test-Path -LiteralPath $notesPath -PathType Leaf) -or (Get-Item -LiteralPath $notesPath).Length -eq 0) {
-                    throw "GitHub generated empty release notes"
-                  }
+                    --jq ".body" | Set-Content -LiteralPath $generatedPath -Encoding utf8NoBOM
+                  powershell -NoProfile -File scripts/compose-release-notes.ps1 `
+                    -CuratedPath ".github/release-notes.md" `
+                    -GeneratedPath $generatedPath `
+                    -OutputPath $notesPath
                   gh release edit "${{ github.ref_name }}" --notes-file $notesPath
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -38,7 +38,11 @@ export function deduplicateVisibleApps(apps: AppInfo[]): AppInfo[] {
 }
 
 function normalizeVisiblePath(value: string): string {
-	return value.trim().replace(/\//g, '\\').replace(/\\+$/g, '').toLocaleLowerCase()
+	return value
+		.trim()
+		.replace(/\//g, '\\')
+		.replace(/\\+$/g, '')
+		.toLocaleLowerCase()
 }
 
 function mergeVisibleApp(primary: AppInfo, secondary: AppInfo): AppInfo {
@@ -49,11 +53,13 @@ function mergeVisibleApp(primary: AppInfo, secondary: AppInfo): AppInfo {
 		version: primary.version ?? secondary.version,
 		publisher: primary.publisher ?? secondary.publisher,
 		productName: primary.productName ?? secondary.productName,
-		originalFilename: primary.originalFilename ?? secondary.originalFilename,
+		originalFilename:
+			primary.originalFilename ?? secondary.originalFilename,
 		installLocation: primary.installLocation ?? secondary.installLocation,
 		canonicalIdentity:
 			primary.canonicalIdentity ?? secondary.canonicalIdentity,
-		userPromoted: primary.userPromoted || secondary.userPromoted || undefined,
+		userPromoted:
+			primary.userPromoted || secondary.userPromoted || undefined,
 		visibilityClass:
 			primary.userPromoted || secondary.userPromoted
 				? 'primary'

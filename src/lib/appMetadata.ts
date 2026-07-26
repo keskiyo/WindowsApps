@@ -41,7 +41,9 @@ const VISIBILITY_REASON_LABELS = {
 export function displayVersion(version: string): string {
 	// Strip a leading "v"/"version" marker only when a digit follows, so real names that merely
 	// start with "v" (e.g. a product literally called "Vista …") are left untouched.
-	return version.replace(/^\s*v(?:ersion)?[\s.:]*(?=\d)/i, '').trim() || version
+	return (
+		version.replace(/^\s*v(?:ersion)?[\s.:]*(?=\d)/i, '').trim() || version
+	)
 }
 
 export function descriptionLabel(description: string | null): string {

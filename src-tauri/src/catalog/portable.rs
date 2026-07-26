@@ -66,7 +66,9 @@ pub(super) fn is_portable_candidate(path: &Path) -> bool {
         .unwrap_or_default()
         .to_string_lossy()
         .to_lowercase();
-    if super::is_installer_file_name(&stem) || super::is_helper_executable_stem(&stem) {
+    if super::filters::is_installer_file_name(&stem)
+        || super::filters::is_helper_executable_stem(&stem)
+    {
         return false;
     }
     let name = path

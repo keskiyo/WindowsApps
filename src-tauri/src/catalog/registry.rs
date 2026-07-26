@@ -1,6 +1,6 @@
 use super::{
-    classify, clean_display_icon, find_executable_named, stable_id, AppInfo, LaunchKind,
-    SourceKind, UninstallTarget,
+    classify::classify, filters::clean_display_icon, find_executable_named, stable_id, AppInfo,
+    LaunchKind, SourceKind, UninstallTarget,
 };
 use crate::platform::windows::uninstall_registry;
 pub(super) use crate::platform::windows::uninstall_registry::RegistryEntry as RegistryValues;
@@ -47,7 +47,7 @@ pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
         .and_then(clean_display_icon)
         .filter(|path| {
             super::is_launchable(path)
-                && !super::is_noise(&values.display_name, &path.to_string_lossy())
+                && !super::filters::is_noise(&values.display_name, &path.to_string_lossy())
         })
         .or_else(|| {
             values
@@ -56,7 +56,9 @@ pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
                 .and_then(|location| find_executable_named(location, Some(&values.display_name)))
         })?;
     let path_text = path.to_string_lossy().trim().to_string();
-    if values.display_name.trim().is_empty() || super::is_noise(&values.display_name, &path_text) {
+    if values.display_name.trim().is_empty()
+        || super::filters::is_noise(&values.display_name, &path_text)
+    {
         return None;
     }
     let uninstall = uninstall_from_values(&values);
@@ -98,7 +100,7 @@ pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
 
 fn metadata_from_values(values: &RegistryValues) -> Option<RegistryMetadata> {
     let name = values.display_name.trim().to_string();
-    if name.is_empty() || super::is_invalid_display_name(&name) {
+    if name.is_empty() || super::filters::is_invalid_display_name(&name) {
         return None;
     }
     Some(RegistryMetadata {

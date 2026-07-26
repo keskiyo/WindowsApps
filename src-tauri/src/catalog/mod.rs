@@ -1,14 +1,17 @@
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::env;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 pub(crate) mod cache;
+mod classify;
 mod dedup;
+mod filters;
 pub(crate) mod hydration;
 pub(crate) mod icon_cache;
 pub(crate) mod incremental;
+mod model;
+mod naming;
 mod portable;
 mod registry;
 pub(crate) mod scan_coordinator;
@@ -19,111 +22,10 @@ mod steam;
 pub(crate) mod sync;
 mod visibility;
 
+pub(crate) use model::{
+    AppCategory, AppInfo, LaunchKind, ScanProgress, SourceKind, UninstallTarget,
+};
 pub(crate) use visibility::{VisibilityClass, VisibilityReason};
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum AppCategory {
-    Games,
-    Ai,
-    Editors,
-    Development,
-    Browsers,
-    Media,
-    Communication,
-    Utilities,
-    System,
-    WindowsFeatures,
-    #[default]
-    Other,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum LaunchKind {
-    #[default]
-    Executable,
-    Shortcut,
-    AppUserModelId,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum SourceKind {
-    #[default]
-    Registry,
-    StartMenu,
-    StartApps,
-    Msix,
-    Steam,
-    Portable,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum UninstallTarget {
-    Command {
-        executable: String,
-        arguments: String,
-    },
-    Msix {
-        package_full_name: String,
-    },
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AppInfo {
-    pub id: String,
-    pub name: String,
-    pub path: String,
-    pub icon_base64: Option<String>,
-    #[serde(default)]
-    pub category: AppCategory,
-    #[serde(default)]
-    pub launch_kind: LaunchKind,
-    #[serde(default)]
-    pub source_kind: SourceKind,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default)]
-    pub version: Option<String>,
-    #[serde(default)]
-    pub publisher: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub product_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub original_filename: Option<String>,
-    #[serde(default)]
-    pub install_location: Option<String>,
-    #[serde(default)]
-    pub can_uninstall: bool,
-    #[serde(default)]
-    pub uninstall: Option<UninstallTarget>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resolved_path: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub shortcut_icon_path: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub launch_arguments: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub canonical_identity: Option<String>,
-    #[serde(default)]
-    pub visibility_class: VisibilityClass,
-    #[serde(default)]
-    pub visibility_score: i16,
-    #[serde(default)]
-    pub visibility_reasons: Vec<VisibilityReason>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ScanProgress {
-    pub stage: String,
-    pub location: Option<String>,
-    pub completed_roots: usize,
-    pub total_roots: usize,
-}
 
 fn steam_app(game: steam::SteamGame) -> AppInfo {
     let path = format!("steam://rungameid/{}", game.app_id);
@@ -166,7 +68,8 @@ pub(super) fn portable_app(path: PathBuf) -> Option<AppInfo> {
         .parent()
         .and_then(Path::file_name)
         .is_some_and(|parent| {
-            normalized_portable_name(&parent.to_string_lossy()) == normalized_portable_name(&stem)
+            naming::normalized_portable_name(&parent.to_string_lossy())
+                == naming::normalized_portable_name(&stem)
         });
     if !has_metadata && !parent_matches && !is_known_standalone_portable(&stem) {
         return None;
@@ -175,12 +78,12 @@ pub(super) fn portable_app(path: PathBuf) -> Option<AppInfo> {
         .parent()
         .and_then(Path::file_name)
         .map(|parent| parent.to_string_lossy().into_owned());
-    let name = portable_display_name(
+    let name = naming::portable_display_name(
         &stem,
         parent_name.as_deref(),
         metadata.product_name.as_deref(),
     );
-    if is_maintenance_entry(&name, &path.to_string_lossy(), None) {
+    if filters::is_maintenance_entry(&name, &path.to_string_lossy(), None) {
         return None;
     }
     let mut app = make_app(name, path.clone());
@@ -188,7 +91,7 @@ pub(super) fn portable_app(path: PathBuf) -> Option<AppInfo> {
     app.description = metadata.description;
     app.version = metadata
         .version
-        .or_else(|| portable_version_from_stem(&stem));
+        .or_else(|| naming::portable_version_from_stem(&stem));
     app.publisher = metadata.publisher;
     app.product_name = metadata.product_name;
     app.original_filename = metadata.original_filename;
@@ -196,120 +99,6 @@ pub(super) fn portable_app(path: PathBuf) -> Option<AppInfo> {
         .parent()
         .map(|value| value.to_string_lossy().into_owned());
     Some(app)
-}
-
-/// Chooses a portable app's display name. When the executable name carries no product
-/// identity (`32.exe`, `x64.exe`, …) the embedded metadata is unreliable (a Yandex-derived
-/// binary inside a "Крипто 4" folder reports ProductName "Yandex"), so the parent folder
-/// wins. Otherwise use the metadata product name, falling back to the cleaned file stem.
-fn portable_display_name(stem: &str, parent: Option<&str>, product_name: Option<&str>) -> String {
-    let folder = if is_generic_executable_stem(stem) {
-        parent
-            .map(clean_folder_name)
-            .filter(|value| !value.is_empty() && !is_generic_executable_stem(value))
-    } else {
-        None
-    };
-    folder
-        .or_else(|| {
-            product_name
-                .map(str::to_string)
-                .filter(|value| !is_generic_product_name(value))
-        })
-        .unwrap_or_else(|| clean_portable_name(stem))
-}
-
-/// Light cleanup for a folder used as a display name: normalize separators and whitespace,
-/// but keep trailing numbers ("Крипто 4" must not lose its "4", unlike version-suffix
-/// stripping applied to executable stems).
-fn clean_folder_name(value: &str) -> String {
-    value
-        .replace(['_', '-'], " ")
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-/// An executable name that identifies the platform/arch, not the product (`32.exe`,
-/// `x64.exe`, `win32.exe`, purely numeric). For these the parent folder is a better name.
-fn is_generic_executable_stem(stem: &str) -> bool {
-    let normalized = stem.trim().to_lowercase();
-    if normalized.is_empty() {
-        return true;
-    }
-    if normalized
-        .chars()
-        .all(|character| character.is_ascii_digit())
-    {
-        return true;
-    }
-    matches!(
-        normalized.as_str(),
-        "x86"
-            | "x64"
-            | "x86_64"
-            | "amd64"
-            | "ia64"
-            | "arm64"
-            | "win32"
-            | "win64"
-            | "app"
-            | "application"
-            | "launcher"
-            | "main"
-            | "run"
-            | "start"
-            | "program"
-    )
-}
-
-fn is_generic_product_name(value: &str) -> bool {
-    [
-        "godot engine",
-        "electron",
-        "chromium",
-        "application",
-        "java",
-        "python",
-        "runtime",
-        "launcher",
-        "windows application",
-    ]
-    .iter()
-    .any(|generic| value.trim().eq_ignore_ascii_case(generic))
-}
-
-fn normalized_portable_name(value: &str) -> String {
-    clean_portable_name(value)
-        .chars()
-        .filter(|character| character.is_alphanumeric())
-        .flat_map(char::to_lowercase)
-        .collect()
-}
-
-fn clean_portable_name(value: &str) -> String {
-    let trimmed = value.trim();
-    let version_start = trimmed
-        .char_indices()
-        .find(|(index, character)| {
-            *index > 0 && character.is_ascii_digit() && trimmed[..*index].ends_with(['-', '_', ' '])
-        })
-        .map(|(index, _)| index.saturating_sub(1));
-    version_start
-        .map_or(trimmed, |index| &trimmed[..index])
-        .replace(['_', '-'], " ")
-        .trim()
-        .to_string()
-}
-
-fn portable_version_from_stem(value: &str) -> Option<String> {
-    let trimmed = value.trim();
-    let start = trimmed.char_indices().find_map(|(index, character)| {
-        (index > 0 && character.is_ascii_digit() && trimmed[..index].ends_with(['-', '_', ' ']))
-            .then_some(index)
-    })?;
-    let version = trimmed[start..].trim();
-    (!version.is_empty()).then(|| version.to_string())
 }
 
 fn default_portable_exclusions() -> Vec<PathBuf> {
@@ -400,7 +189,7 @@ fn registry_metadata_matches(app: &AppInfo, record: &registry::RegistryMetadata)
 fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
     let classified = apps
         .into_iter()
-        .filter(|app| !is_invalid_display_name(&app.name))
+        .filter(|app| !filters::is_invalid_display_name(&app.name))
         .map(|mut app| {
             visibility::apply_visibility(&mut app);
             app
@@ -414,7 +203,7 @@ fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
 }
 
 pub(crate) fn sanitize(apps: Vec<AppInfo>) -> Vec<AppInfo> {
-    dedup::deduplicate(filter_maintenance(apps), classify_app)
+    dedup::deduplicate(filter_maintenance(apps), classify::classify_app)
 }
 
 /// Like `sanitize`, but also refreshes the dev-only dedup report. Call this from the full
@@ -426,11 +215,11 @@ pub(crate) fn sanitize_reported(apps: Vec<AppInfo>) -> Vec<AppInfo> {
     if dedup::dev_report_enabled() {
         dedup::write_dev_report(&filtered);
     }
-    dedup::deduplicate(filtered, classify_app)
+    dedup::deduplicate(filtered, classify::classify_app)
 }
 
 fn is_known_standalone_portable(stem: &str) -> bool {
-    let normalized = normalized_portable_name(stem);
+    let normalized = naming::normalized_portable_name(stem);
     [
         "rufus",
         "putty",
@@ -446,7 +235,7 @@ fn is_known_standalone_portable(stem: &str) -> bool {
         "processexplorer",
     ]
     .iter()
-    .any(|known| normalized == normalized_portable_name(known))
+    .any(|known| normalized == naming::normalized_portable_name(known))
         || normalized.starts_with("rufus")
         || normalized.starts_with("putty")
         || normalized.starts_with("winscp")
@@ -507,7 +296,11 @@ fn scan_start_menu() -> Vec<AppInfo> {
                 .as_ref()
                 .map(|value| value.to_string_lossy().into_owned());
             (!name.is_empty()
-                && !is_maintenance_entry(&name, &path.to_string_lossy(), target.as_deref()))
+                && !filters::is_maintenance_entry(
+                    &name,
+                    &path.to_string_lossy(),
+                    target.as_deref(),
+                ))
             .then(|| {
                 let mut app = make_app(name, path);
                 app.source_kind = SourceKind::StartMenu;
@@ -535,7 +328,7 @@ fn make_app(name: String, path: PathBuf) -> AppInfo {
     let path = path.to_string_lossy().to_string();
     let normalized = path.to_lowercase();
     let id = format!("{:x}", Sha256::digest(normalized.as_bytes()));
-    let category = classify(&name, &path);
+    let category = classify::classify(&name, &path);
     let launch_kind = if Path::new(&path)
         .extension()
         .is_some_and(|extension| extension.eq_ignore_ascii_case("lnk"))
@@ -577,544 +370,6 @@ fn stable_id(identity: &str) -> String {
     )
 }
 
-/// Final category for a fully resolved catalog entry. Runs after deduplication on the merged
-/// record, so it can weigh the strongest signals — the Steam source, a game-store install path,
-/// and a known publisher — before falling back to name/path keywords. A user can always override
-/// the category, so a rare miss is not costly.
-pub(crate) fn classify_app(app: &AppInfo) -> AppCategory {
-    // Strongest, near-certain signals first.
-    if app.source_kind == SourceKind::Steam
-        || is_game_install_path(app)
-        || is_game_publisher(app.publisher.as_deref())
-    {
-        return AppCategory::Games;
-    }
-    if let Some(category) = publisher_category(app.publisher.as_deref()) {
-        return category;
-    }
-    // Match keywords over the target exe too, not just the shortcut. The resolved executable name
-    // is often the telling signal a neutral display name hides — `SotaVPN.exe`, `MongoDBCompass.exe`.
-    classify_keywords(
-        &format!(
-            "{} {} {}",
-            app.name,
-            app.path,
-            app.resolved_path.as_deref().unwrap_or_default()
-        )
-        .to_lowercase(),
-    )
-}
-
-/// The install tree of a known game store. Matched on path/resolved/install so a Battle.net or
-/// Epic game lands in Games even when its name carries no obvious game word.
-fn is_game_install_path(app: &AppInfo) -> bool {
-    const MARKERS: &[&str] = &[
-        r"\steamapps\",
-        r"\battle.net\",
-        r"\epic games\",
-        r"\riot games\",
-        r"\gog galaxy\",
-        r"\ea games\",
-        r"\origin games\",
-        r"\ubisoft\",
-        r"\rockstar games\",
-        r"\wargaming.net\",
-        r"\hoyoplay\",
-        r"\mihoyo\",
-    ];
-    [
-        app.path.as_str(),
-        app.resolved_path.as_deref().unwrap_or_default(),
-        app.install_location.as_deref().unwrap_or_default(),
-    ]
-    .iter()
-    .any(|value| {
-        let lower = value.to_lowercase();
-        MARKERS.iter().any(|marker| lower.contains(marker))
-    })
-}
-
-/// Unambiguous game publishers — distinctive enough not to collide with non-game vendors (so no
-/// bare "ea"/"riot" that would catch "Realtek"/"Patriot").
-fn is_game_publisher(publisher: Option<&str>) -> bool {
-    const PUBLISHERS: &[&str] = &[
-        "blizzard",
-        "valve",
-        "riot games",
-        "electronic arts",
-        "ea games",
-        "ea sports",
-        "ubisoft",
-        "epic games",
-        "rockstar games",
-        "bethesda",
-        "cd projekt",
-        "mihoyo",
-        "hoyoverse",
-        "cognosphere",
-        "wargaming",
-        "activision",
-        "2k games",
-        "square enix",
-        "bandai namco",
-        "capcom",
-        "gaijin",
-        "larian",
-        "warhorse",
-    ];
-    publisher.is_some_and(|value| {
-        let value = value.to_lowercase();
-        PUBLISHERS.iter().any(|marker| value.contains(marker))
-    })
-}
-
-/// A few unambiguous publishers that pin a category by themselves.
-fn publisher_category(publisher: Option<&str>) -> Option<AppCategory> {
-    let publisher = publisher?.to_lowercase();
-    const EDITORS: &[&str] = &["adobe", "maxon", "blackmagic", "affinity", "corel"];
-    const DEVELOPMENT: &[&str] = &[
-        "jetbrains",
-        "github, inc",
-        "docker, inc",
-        "gitkraken",
-        "mongodb",
-    ];
-    if EDITORS.iter().any(|marker| publisher.contains(marker)) {
-        return Some(AppCategory::Editors);
-    }
-    if DEVELOPMENT.iter().any(|marker| publisher.contains(marker)) {
-        return Some(AppCategory::Development);
-    }
-    None
-}
-
-fn classify(name: &str, path: &str) -> AppCategory {
-    classify_keywords(&format!("{name} {path}").to_lowercase())
-}
-
-/// Category from curated keyword lists over a pre-lowercased blob (name + paths). First match wins.
-fn classify_keywords(value: &str) -> AppCategory {
-    let contains = |keywords: &[&str]| keywords.iter().any(|keyword| value.contains(keyword));
-
-    if is_windows_feature(value) {
-        AppCategory::WindowsFeatures
-    } else if contains(&[
-        "steam",
-        "battle.net",
-        "epic games",
-        "gog",
-        "game",
-        "minecraft",
-        "roblox",
-        "backpack battles",
-        "warcraft",
-        "hearthstone",
-        "dota",
-        "valorant",
-        "league of legends",
-        "apex legends",
-        "fortnite",
-        "grand theft auto",
-        "gta",
-        "witcher",
-        "cyberpunk",
-        "overwatch",
-        "diablo",
-        "starcraft",
-        "genshin",
-        "honkai",
-        "counter-strike",
-        "cs2",
-        "csgo",
-        "pubg",
-        "terraria",
-        "stardew",
-        "elden ring",
-        "dark souls",
-        "baldur",
-        "warframe",
-        "path of exile",
-        "dead by daylight",
-        "rainbow six",
-        "call of duty",
-        "warzone",
-        "battlefield",
-        "world of tanks",
-        "war thunder",
-        "palworld",
-        "valheim",
-        "clash of clans",
-        "clash royale",
-    ]) {
-        AppCategory::Games
-    } else if contains(&[
-        "claude",
-        "chatgpt",
-        "openai",
-        "codex",
-        "ollama",
-        "lm studio",
-        "gemini",
-        "copilot",
-        "cursor",
-        "ai agent",
-        "perplexity",
-        "mistral",
-        "anythingllm",
-        "msty",
-        "opencode",
-        "aider",
-        "cline",
-        "roo code",
-    ]) {
-        AppCategory::Ai
-    } else if contains(&[
-        "visual studio",
-        "vscode",
-        "code.exe",
-        "rustrover",
-        "pycharm",
-        "webstorm",
-        "intellij",
-        "android studio",
-        "git",
-        "docker",
-        "postman",
-        "terminal",
-        "sublime text",
-        "notepad++",
-        "node.js",
-        "nodejs",
-        "python",
-        "github desktop",
-        "sourcetree",
-        "gitkraken",
-        "dbeaver",
-        "tableplus",
-        "heidisql",
-        "insomnia",
-        "clion",
-        "datagrip",
-        "phpstorm",
-        "cmake",
-        "mongodb",
-        "studio 3t",
-        "robo 3t",
-        "dbgate",
-        "beekeeper",
-    ]) {
-        AppCategory::Development
-    } else if contains(&[
-        "photoshop",
-        "illustrator",
-        "lightroom",
-        "figma",
-        "gimp",
-        "inkscape",
-        "blender",
-        "paint",
-        "canva",
-        "davinci resolve",
-        "premiere",
-        "after effects",
-        "affinity",
-        "krita",
-        "clip studio",
-        "capcut",
-        "darktable",
-    ]) {
-        AppCategory::Editors
-    } else if contains(&[
-        "chrome", "firefox", "edge", "opera", "brave", "vivaldi", "browser", "yandex", "chromium",
-        "thorium",
-    ]) {
-        AppCategory::Browsers
-    } else if contains(&[
-        "vlc",
-        "spotify",
-        "foobar",
-        "audacity",
-        "obs",
-        "media player",
-        "music",
-        "video",
-        "potplayer",
-        "mpc-hc",
-        "mpc-be",
-        "kmplayer",
-        "aimp",
-        "winamp",
-        "itunes",
-        "plex",
-        "kodi",
-        "deezer",
-        "tidal",
-        "jellyfin",
-    ]) {
-        AppCategory::Media
-    } else if contains(&[
-        "discord",
-        "telegram",
-        "whatsapp",
-        "slack",
-        "teams",
-        "zoom",
-        "skype",
-        "signal",
-        "viber",
-        "wechat",
-        "element",
-        "thunderbird",
-    ]) {
-        AppCategory::Communication
-    } else if contains(&[
-        "character map",
-        "command prompt",
-        "powershell",
-        "windows terminal",
-        "task manager",
-        "таблица символов",
-        "командная строка",
-        "диспетчер задач",
-    ]) {
-        AppCategory::System
-    } else if contains(&[
-        "7-zip",
-        "winrar",
-        "everything",
-        "powertoys",
-        "rufus",
-        "verifier",
-        "configure",
-        "utility",
-        "uninstaller",
-        // VPN / proxy clients.
-        "vpn",
-        "proxy",
-        "wireguard",
-        "openvpn",
-        "hiddify",
-        "nekoray",
-        "nekobox",
-        "clash verge",
-        "clashx",
-        "mihomo",
-        "v2ray",
-        "xray",
-        "sing-box",
-        "shadowsocks",
-        "outline",
-        "cloudflare warp",
-        "mullvad",
-        "proton vpn",
-        "nordvpn",
-        "expressvpn",
-        "surfshark",
-        "windscribe",
-        "ipvanish",
-        "tunnelbear",
-        "psiphon",
-        // System / hardware tools.
-        "cpu-z",
-        "gpu-z",
-        "hwinfo",
-        "hwmonitor",
-        "crystaldisk",
-        "aida64",
-        "msi afterburner",
-        "rivatuner",
-        "treesize",
-        "windirstat",
-        "ccleaner",
-        "revo uninstaller",
-        "display driver uninstaller",
-        "victoria",
-        "memtest",
-        "furmark",
-        "winmtr",
-    ]) {
-        AppCategory::Utilities
-    } else {
-        AppCategory::Other
-    }
-}
-
-fn is_windows_feature(value: &str) -> bool {
-    const FEATURES: &[&str] = &[
-        // Windows shell, inbox applications and accessibility tools.
-        "file explorer",
-        "explorer.exe",
-        "проводник",
-        "snipping tool",
-        "snippingtool.exe",
-        "microsoft.screensketch",
-        "ножницы",
-        "get help",
-        "microsoft.gethelp",
-        "техническая поддержка",
-        "remote desktop connection",
-        "mstsc.exe",
-        "подключение к удаленному рабочему столу",
-        "calculator",
-        "microsoft.windowscalculator",
-        "калькулятор",
-        "notepad",
-        "microsoft.windowsnotepad",
-        "блокнот",
-        "microsoft paint",
-        "mspaint.exe",
-        "microsoft.paint",
-        "камера",
-        "microsoft.windowscamera",
-        "clock",
-        "microsoft.windowsalarms",
-        "часы",
-        "voice recorder",
-        "sound recorder",
-        "microsoft.windowssoundrecorder",
-        "запись голоса",
-        "звукозапись",
-        "magnifier",
-        "magnify.exe",
-        "экранная лупа",
-        "on-screen keyboard",
-        "osk.exe",
-        "экранная клавиатура",
-        "narrator",
-        "narrator.exe",
-        "экранный диктор",
-        "quick assist",
-        "microsoftcorporationii.quickassist",
-        "быстрая помощь",
-        "windows security",
-        "microsoft.sechealthui",
-        "безопасность windows",
-        "windows settings",
-        "systemsettings.exe",
-        "параметры",
-        "microsoft.windows.administrativetools",
-        "инструменты windows",
-        "windows backup",
-        "windowsbackup",
-        "архивация windows",
-        "microsoft.windowsstore",
-        "microsoft store",
-        "microsoft.windows.photos",
-        "фотографии",
-        "microsoft.bingweather",
-        "погода",
-        "microsoft.bingnews",
-        "новости",
-        "microsoft.microsoftstickynotes",
-        "sticky notes",
-        "записки",
-        "microsoft.yourphone",
-        "phone link",
-        "связь с телефоном",
-        "microsoft.windowsfeedbackhub",
-        "feedback hub",
-        "центр отзывов",
-        "microsoft.windows.shell.rundialog",
-        "выполнить",
-        "windows media player legacy",
-        "steps recorder",
-        "psr.exe",
-        "средство записи действий",
-        "memory diagnostics tool",
-        "mdsched.exe",
-        "средство проверки памяти windows",
-        "recoverydrive",
-        "recoverydrive.exe",
-        "диск восстановления",
-        "iscsi initiator",
-        "iscsicpl.exe",
-        "инициатор iscsi",
-        // Management consoles and administrative tools.
-        "computer management",
-        "compmgmt.msc",
-        "управление компьютером",
-        "print management",
-        "printmanagement.msc",
-        "управление печатью",
-        "device manager",
-        "devmgmt.msc",
-        "диспетчер устройств",
-        "disk management",
-        "diskmgmt.msc",
-        "управление дисками",
-        "event viewer",
-        "eventvwr.msc",
-        "просмотр событий",
-        "task scheduler",
-        "taskschd.msc",
-        "планировщик задач",
-        "планировщик заданий",
-        "local security policy",
-        "secpol.msc",
-        "локальная политика безопасности",
-        "group policy",
-        "gpedit.msc",
-        "групповая политика",
-        "system configuration",
-        "msconfig.exe",
-        "конфигурация системы",
-        "resource monitor",
-        "resmon.exe",
-        "монитор ресурсов",
-        "performance monitor",
-        "perfmon.msc",
-        "системный монитор",
-        "component services",
-        "comexp.msc",
-        "службы компонентов",
-        "odbc data sources",
-        "odbcad32.exe",
-        "источники данных odbc",
-        "system information",
-        "msinfo32.exe",
-        "сведения о системе",
-        "control panel",
-        "control.exe",
-        "панель управления",
-        "administrative tools",
-        "windows tools",
-        "администрирование",
-        "средства windows",
-        "registry editor",
-        "regedit.exe",
-        "редактор реестра",
-        "disk cleanup",
-        "cleanmgr.exe",
-        "очистка диска",
-        "defragment",
-        "dfrgui.exe",
-        "дефрагментация",
-        "windows defender firewall",
-        "wf.msc",
-        "брандмауэр",
-        "system restore",
-        "rstrui.exe",
-        "восстановление системы",
-        "services.msc",
-        "службы",
-        "character map",
-        "charmap.exe",
-        "таблица символов",
-        "command prompt",
-        "cmd.exe",
-        "командная строка",
-        "windows powershell",
-        "powershell.exe",
-        "windows terminal",
-        "microsoft.windowsterminal",
-        "task manager",
-        "taskmgr.exe",
-        "диспетчер задач",
-    ];
-
-    FEATURES.iter().any(|feature| value.contains(feature))
-}
-
 fn find_executable(location: &str) -> Option<PathBuf> {
     find_executable_named(location, None)
 }
@@ -1131,18 +386,20 @@ fn find_executable_named(location: &str, name: Option<&str>) -> Option<PathBuf> 
         return None;
     }
     let target = name
-        .map(normalized_portable_name)
+        .map(naming::normalized_portable_name)
         .filter(|key| !key.is_empty());
     WalkDir::new(&root)
         .max_depth(2)
         .into_iter()
         .filter_map(Result::ok)
         .map(|entry| entry.into_path())
-        .filter(|path| is_launchable(path) && !is_maintenance_path(&path.to_string_lossy()))
+        .filter(|path| {
+            is_launchable(path) && !filters::is_maintenance_path(&path.to_string_lossy())
+        })
         .min_by_key(|path| {
             let stem = path
                 .file_stem()
-                .map(|value| normalized_portable_name(&value.to_string_lossy()))
+                .map(|value| naming::normalized_portable_name(&value.to_string_lossy()))
                 .unwrap_or_default();
             let name_score = match &target {
                 Some(target) if stem == *target => 0u8,
@@ -1237,223 +494,16 @@ pub(crate) fn demote_console_applications(apps: &mut [AppInfo]) {
     }
 }
 
-fn clean_display_icon(value: &str) -> Option<PathBuf> {
-    let trimmed = value.trim().trim_start_matches('\\').trim();
-    let path = if let Some(rest) = trimmed.strip_prefix('"') {
-        rest.split('"').next().unwrap_or(rest)
-    } else {
-        trimmed.split(',').next().unwrap_or(trimmed)
-    };
-    let path = path.trim().trim_matches('"');
-    (!path.is_empty()).then(|| PathBuf::from(path))
-}
-
-fn is_invalid_display_name(name: &str) -> bool {
-    let name = name.trim();
-    name.is_empty() || name.to_lowercase().starts_with("ms-resource:") || name.contains('\u{fffd}')
-}
-
-fn is_noise(name: &str, path: &str) -> bool {
-    is_maintenance_entry(name, path, None)
-}
-
-fn is_maintenance_entry(name: &str, path: &str, resolved_path: Option<&str>) -> bool {
-    if is_invalid_display_name(name) {
-        return true;
-    }
-    is_documentation_name(name)
-        || is_maintenance_path(path)
-        || resolved_path.is_some_and(is_maintenance_path)
-        || is_maintenance_text(name)
-}
-
-fn is_maintenance_path(path: &str) -> bool {
-    if is_runtime_internal_path(path) {
-        return true;
-    }
-    let path_buf = Path::new(path);
-    if path_buf
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .is_some_and(is_helper_executable_stem)
-    {
-        return true;
-    }
-    if path_buf.extension().is_some_and(|extension| {
-        [
-            "ico", "dll", "mui", "cpl", "chm", "pdf", "html", "htm", "txt", "rtf", "md", "url",
-            "hlp", "xml", "log", "ini",
-        ]
-        .iter()
-        .any(|value| extension.eq_ignore_ascii_case(value))
-    }) {
-        return true;
-    }
-    if path_buf
-        .file_stem()
-        .is_some_and(|stem| is_installer_file_name(&stem.to_string_lossy()))
-    {
-        return true;
-    }
-    is_maintenance_text(path)
-}
-
-fn is_helper_executable_stem(stem: &str) -> bool {
-    let normalized = stem.to_lowercase();
-    matches!(
-        normalized.as_str(),
-        "git-lfs"
-            | "git-credential-manager"
-            | "gettext"
-            | "printf_gettext"
-            | "printf_ngettext"
-            | "envsubst"
-            | "msgfmt"
-    )
-}
-
-fn is_runtime_internal_path(path: &str) -> bool {
-    let normalized = path.replace('/', r"\").to_lowercase();
-    [
-        r"\.cache\codex-runtimes\",
-        r"\.codex\.sandbox-bin\",
-        r"\appdata\local\openai\codex\runtimes\",
-    ]
-    .iter()
-    .any(|marker| normalized.contains(marker))
-}
-
-/// Junk-detection for installer/updater executables by file name (stem, no extension).
-/// Splits the stem into alphanumeric tokens to catch `setup-app`, `app-installer`,
-/// `setup_x64`, and also matches glued names like `AppSetup` via prefix/suffix.
-pub(crate) fn is_installer_file_name(stem: &str) -> bool {
-    let lower = stem.to_lowercase();
-    // 7-Zip installers are named like `7z2501-x64`; the real app is `7zFM`/`7zG`/`7z`.
-    if lower.starts_with("7z")
-        && lower[2..]
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_ascii_digit())
-    {
-        return true;
-    }
-    const TOKENS: [&str; 8] = [
-        "setup",
-        "unins",
-        "unins000",
-        "updater",
-        "bootstrapper",
-        "установщик",
-        "деинсталляция",
-        "удаление",
-    ];
-    let has_token = lower
-        .split(|character: char| !character.is_alphanumeric())
-        .filter(|token| !token.is_empty())
-        // `contains` catches install/installer/instaler/installation, uninstall, and
-        // vcredist2005_x64 / vc_redist / redistributables, including misspellings.
-        .any(|token| {
-            token.contains("instal")
-                || token.contains("redist")
-                || token.ends_with("setup")
-                || TOKENS.contains(&token)
-        });
-    if has_token {
-        return true;
-    }
-    ["setup", "install", "uninstall"]
-        .iter()
-        .any(|marker| lower.ends_with(marker))
-}
-
-/// Junk-detection for documentation / website shortcut display names.
-/// Matches whole words at the start or end (so "HelpDesk Pro" survives) plus a few
-/// multi-word phrases anywhere in the normalized name.
-fn is_documentation_name(name: &str) -> bool {
-    const WORDS: [&str; 25] = [
-        "documentation",
-        "docs",
-        "readme",
-        "manual",
-        "help",
-        "faq",
-        "license",
-        "licence",
-        "eula",
-        "changelog",
-        "tutorial",
-        "website",
-        "homepage",
-        "support",
-        "samples",
-        "sample",
-        "sdk",
-        "example",
-        "examples",
-        "demo",
-        "документация",
-        "справка",
-        "руководство",
-        "лицензия",
-        "сайт",
-    ];
-    const PHRASES: [&str; 9] = [
-        "release notes",
-        "what's new",
-        "home page",
-        "getting started",
-        "visit website",
-        "support center",
-        "заметки о выпуске",
-        "что нового",
-        "веб сайт",
-    ];
-    let normalized = dedup::normalize_name(name);
-    if PHRASES.iter().any(|phrase| normalized.contains(phrase)) {
-        return true;
-    }
-    let words = normalized.split_whitespace().collect::<Vec<_>>();
-    match (words.first(), words.last()) {
-        (Some(first), Some(last)) => WORDS.contains(first) || WORDS.contains(last),
-        _ => false,
-    }
-}
-
-fn is_maintenance_text(value: &str) -> bool {
-    let value = value.to_lowercase();
-    [
-        "uninstall",
-        "unins000",
-        "installer",
-        "installation notes",
-        "setup.exe",
-        "updater",
-        "update.exe",
-        "repair.exe",
-        "bootstrap",
-        "remove ",
-        "delete ",
-        "удалить",
-        "деинстал",
-        "microsoft visual c++ update",
-        "hotfix",
-        "security update",
-        "redistributable",
-        "subprocess",
-        "kb[",
-        "file://",
-    ]
-    .iter()
-    .any(|needle| value.contains(needle))
-}
-
 #[cfg(test)]
 fn deduplicate(apps: Vec<AppInfo>) -> Vec<AppInfo> {
-    dedup::deduplicate(apps, classify_app)
+    dedup::deduplicate(apps, classify::classify_app)
 }
 
 #[cfg(test)]
 mod tests {
+    use super::classify::{classify, classify_app};
+    use super::filters::*;
+    use super::naming::*;
     use super::*;
     use std::path::PathBuf;
 
