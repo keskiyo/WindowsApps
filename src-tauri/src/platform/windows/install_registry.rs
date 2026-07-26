@@ -6,7 +6,7 @@ const UNINSTALL_ROOT: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninsta
 
 /// A newer version of the app is registered at a different directory than the running exe —
 /// the user is launching an outdated leftover copy (e.g. after an update landed elsewhere).
-pub struct StaleCopyInfo {
+pub(crate) struct StaleCopyInfo {
     pub installed_version: String,
     pub install_location: String,
 }
@@ -14,7 +14,7 @@ pub struct StaleCopyInfo {
 /// Directory of the running executable, but only when it looks like an installed copy
 /// (NSIS drops `uninstall.exe` next to the binary). Dev builds and loose portable copies
 /// have no uninstaller and must never touch the install registry.
-pub fn installed_copy_dir() -> Option<PathBuf> {
+pub(crate) fn installed_copy_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?.to_path_buf();
     has_uninstaller(&dir).then_some(dir)
@@ -28,7 +28,7 @@ fn has_uninstaller(dir: &Path) -> bool {
 /// pointed at the directory this installed copy actually runs from. The installer reads
 /// that key to reuse the user's chosen folder on update; if it was written under an older
 /// publisher name (or lost), updates would silently land in the default directory instead.
-pub fn sync_install_dir(publisher: &str, product: &str, dir: &Path) {
+pub(crate) fn sync_install_dir(publisher: &str, product: &str, dir: &Path) {
     if publisher.is_empty() || product.is_empty() {
         return;
     }
@@ -45,7 +45,7 @@ pub fn sync_install_dir(publisher: &str, product: &str, dir: &Path) {
 
 /// Detect the "running an outdated leftover copy" situation: the uninstall registry says a
 /// newer version is installed in a different directory than the running executable.
-pub fn stale_copy_info(product: &str) -> Option<StaleCopyInfo> {
+pub(crate) fn stale_copy_info(product: &str) -> Option<StaleCopyInfo> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
     let key = RegKey::predef(HKEY_CURRENT_USER)
         .open_subkey(format!(r"{UNINSTALL_ROOT}\{product}"))
@@ -85,11 +85,18 @@ fn version_newer(candidate: &str, current: &str) -> bool {
 }
 
 fn version_key(version: &str) -> Vec<u64> {
-    version
+    let mut key = version
         .split(|character: char| !character.is_ascii_digit())
         .filter(|segment| !segment.is_empty())
         .filter_map(|segment| segment.parse().ok())
-        .collect()
+        .collect::<Vec<u64>>();
+    // Trailing zeros are not a different version: "0.2.0" must compare equal to "0.2", otherwise
+    // `Vec` ordering ([0,2] < [0,2,0]) reports the shorter form as older and the app decides it
+    // is an outdated leftover copy of itself.
+    while key.last() == Some(&0) {
+        key.pop();
+    }
+    key
 }
 
 #[cfg(test)]
@@ -102,6 +109,15 @@ mod tests {
         assert!(version_newer("0.10.0", "0.9.9"));
         assert!(!version_newer("0.2.3", "0.2.3"));
         assert!(!version_newer("0.2.2", "0.2.3"));
+    }
+
+    #[test]
+    fn trailing_zeros_do_not_change_a_version() {
+        // "0.2.0" and "0.2" are the same release; neither is newer than the other.
+        assert!(!version_newer("0.2.0", "0.2"));
+        assert!(!version_newer("0.2", "0.2.0"));
+        assert!(!version_newer("1.0.0.0", "1"));
+        assert!(version_newer("0.2.1", "0.2.0"));
     }
 
     #[test]

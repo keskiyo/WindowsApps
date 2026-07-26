@@ -4,7 +4,7 @@ use std::path::Path;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum VisibilityClass {
+pub(crate) enum VisibilityClass {
     #[default]
     Primary,
     Auxiliary,
@@ -13,7 +13,7 @@ pub enum VisibilityClass {
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum VisibilityReason {
+pub(crate) enum VisibilityReason {
     StartMenuRegistration,
     WindowsAppRegistration,
     SteamRegistration,
@@ -26,17 +26,19 @@ pub enum VisibilityReason {
     DocumentationShortcut,
     Installer,
     MaintenanceExecutable,
+    CommandEnvironment,
+    ConsoleApplication,
     InsufficientLaunchEvidence,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct VisibilityDecision {
+pub(crate) struct VisibilityDecision {
     pub class: VisibilityClass,
     pub score: i16,
     pub reasons: Vec<VisibilityReason>,
 }
 
-pub fn classify_visibility(app: &AppInfo) -> VisibilityDecision {
+pub(crate) fn classify_visibility(app: &AppInfo) -> VisibilityDecision {
     let name = app.name.to_lowercase();
     let path = app.path.to_lowercase().replace('/', r"\");
     let resolved_path = app
@@ -138,11 +140,19 @@ pub fn classify_visibility(app: &AppInfo) -> VisibilityDecision {
         score -= 20;
         reasons.push(VisibilityReason::ProductComponent);
     }
+    if is_command_environment(app) {
+        reasons.push(VisibilityReason::CommandEnvironment);
+    }
 
-    let class = if reasons
-        .iter()
-        .any(|reason| matches!(reason, VisibilityReason::ProductComponent))
-    {
+    // A command environment and a product component are auxiliary regardless of score or launch
+    // kind — including the AppUserModelId fast-path, which is exactly how the VS developer prompts
+    // reach the catalog.
+    let class = if reasons.iter().any(|reason| {
+        matches!(
+            reason,
+            VisibilityReason::ProductComponent | VisibilityReason::CommandEnvironment
+        )
+    }) {
         VisibilityClass::Auxiliary
     } else if score >= 20 || app.launch_kind == LaunchKind::AppUserModelId {
         VisibilityClass::Primary
@@ -195,7 +205,65 @@ fn is_bundled_toolchain_path(path: &str) -> bool {
     )
 }
 
-pub fn apply_visibility(app: &mut AppInfo) {
+/// A command environment opens a configured interpreter shell (a VS developer prompt, a
+/// Node.js prompt) rather than an application. A regular user launching software does not pick
+/// these; they belong in Auxiliary tools. Plain `Windows PowerShell` / `Command Prompt` — an
+/// interpreter with no arguments — stay primary.
+fn is_command_environment(app: &AppInfo) -> bool {
+    let name = app.name.to_lowercase();
+    const NAME_MARKERS: &[&str] = &[
+        "developer command prompt",
+        "developer powershell",
+        "native tools command prompt",
+        "cross tools command prompt",
+        "command prompt for vs",
+        "command line client",
+        // A setup/toolchain action ("Install Additional Tools for Node.js") is not an app.
+        "additional tools for node",
+        // A diagnostic "safe mode" launcher opens the real app in a recovery mode — not the way
+        // a user launches it day to day.
+        "safe mode",
+        "безопасный режим",
+    ];
+    if NAME_MARKERS.iter().any(|marker| name.contains(marker)) {
+        return true;
+    }
+    let has_arguments = app
+        .launch_arguments
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty());
+    has_arguments
+        && app
+            .resolved_path
+            .as_deref()
+            .is_some_and(is_interpreter_host_path)
+}
+
+fn is_interpreter_host_path(path: &str) -> bool {
+    let file = Path::new(path.trim().trim_matches('"'))
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or(path)
+        .to_ascii_lowercase();
+    matches!(
+        file.as_str(),
+        "cmd.exe"
+            | "powershell.exe"
+            | "pwsh.exe"
+            | "wscript.exe"
+            | "cscript.exe"
+            | "mshta.exe"
+            | "rundll32.exe"
+            | "python.exe"
+            | "pythonw.exe"
+            | "py.exe"
+            | "mysql.exe"
+            | "node.exe"
+            | "wsl.exe"
+    )
+}
+
+pub(crate) fn apply_visibility(app: &mut AppInfo) {
     let decision = classify_visibility(app);
     app.visibility_class = decision.class;
     app.visibility_score = decision.score;
@@ -214,7 +282,7 @@ struct RejectedEntry<'a> {
     original_filename: Option<&'a str>,
 }
 
-pub fn write_dev_report(apps: &[AppInfo]) {
+pub(crate) fn write_dev_report(apps: &[AppInfo]) {
     if !super::dedup::dev_report_enabled() {
         return;
     }
@@ -314,6 +382,14 @@ fn is_maintenance_executable(value: &str) -> bool {
             "crash handler",
             "crashpad",
             "uninstall.exe",
+            // "Reset preferences and cache files"-style shortcuts run the app in a wipe mode
+            // instead of opening it; they belong with maintenance, not the player itself.
+            "reset preferences",
+            "reset cache",
+            "reset config",
+            "reset settings",
+            "сброс настроек",
+            "сброс кэш",
         ],
     )
 }
@@ -342,6 +418,9 @@ fn is_product_component(value: &str) -> bool {
             "intelliphp.ls",
             "language server",
             "openjdk platform binary",
+            // Oracle Java runtime entries ("Java(TM) Platform SE", "Java(TM) SE") are the JRE, a
+            // runtime component, not an application a user launches.
+            "java(tm)",
             "the curl executable",
             "openssl command",
             "credential manager",
@@ -355,6 +434,9 @@ fn is_product_component(value: &str) -> bool {
             "-helper",
             " service.exe",
             " daemon",
+            // A bundled utility executable (`AstUtil.exe`, `*Util.exe`) is a maintenance/config
+            // helper of its product, not the application a user launches.
+            "util.exe",
         ],
     )
 }
@@ -620,6 +702,156 @@ mod tests {
             redact_path(r"C:\Users\Maks\Downloads\setup.exe", Some(profile)),
             r"<USERPROFILE>\Downloads\setup.exe"
         );
+    }
+
+    // "VLC media player - reset preferences and cache files" runs vlc.exe in a wipe mode; it must
+    // not be shown as the player.
+    #[test]
+    fn vlc_reset_maintenance_shortcut_is_rejected() {
+        let mut app = candidate(
+            "VLC media player - reset preferences and cache files",
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\VideoLAN\VLC media player - reset preferences and cache files.lnk",
+            SourceKind::StartMenu,
+        );
+        app.resolved_path = Some(r"C:\Program Files\VideoLAN\VLC\vlc.exe".into());
+
+        assert_eq!(classify_visibility(&app).class, VisibilityClass::Rejected);
+    }
+
+    // A VS developer prompt reaches the catalog as an AUMID Start-App, which normally forces
+    // Primary. As a command environment it must still be Auxiliary.
+    #[test]
+    fn visual_studio_command_prompt_is_auxiliary_despite_aumid() {
+        let mut native = candidate(
+            "x64 Native Tools Command Prompt for VS 2019",
+            "Microsoft.AutoGenerated.{FF70D809-A022-5972-850F-19E0AA8C07C2}",
+            SourceKind::StartApps,
+        );
+        native.launch_kind = LaunchKind::AppUserModelId;
+
+        let decision = classify_visibility(&native);
+        assert_eq!(decision.class, VisibilityClass::Auxiliary);
+        assert!(decision
+            .reasons
+            .contains(&VisibilityReason::CommandEnvironment));
+    }
+
+    // A `cmd.exe /k <bat>` wrapper is a command environment; a plain interpreter with no
+    // arguments is a normal launcher entry and stays Primary.
+    #[test]
+    fn interpreter_wrapper_is_auxiliary_but_plain_shell_stays_primary() {
+        let mut node = candidate(
+            "Node.js command prompt",
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Node.js\Node.js command prompt.lnk",
+            SourceKind::StartMenu,
+        );
+        node.resolved_path = Some(r"C:\Windows\System32\cmd.exe".into());
+        node.launch_arguments = Some(r#"/k "C:\Program Files\nodejs\nodevars.bat""#.into());
+        assert_eq!(classify_visibility(&node).class, VisibilityClass::Auxiliary);
+
+        let mut shell = candidate(
+            "Windows PowerShell",
+            r"C:\Menu\Windows PowerShell\Windows PowerShell.lnk",
+            SourceKind::StartMenu,
+        );
+        shell.resolved_path =
+            Some(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe".into());
+        assert_eq!(classify_visibility(&shell).class, VisibilityClass::Primary);
+    }
+
+    // The command-environment rule requires an interpreter host: a normal application launched
+    // with arguments (but resolving to its own exe) must not be demoted to auxiliary.
+    #[test]
+    fn app_with_arguments_but_non_host_target_stays_primary() {
+        let mut app = candidate("Some App", r"C:\Menu\Some App.lnk", SourceKind::StartMenu);
+        app.resolved_path = Some(r"C:\Program Files\SomeApp\app.exe".into());
+        app.launch_arguments = Some("--flag value".into());
+        assert_eq!(classify_visibility(&app).class, VisibilityClass::Primary);
+    }
+
+    // Real corpus: interpreter-hosted dev tools and a diagnostic launcher are auxiliary, not
+    // applications a launcher user picks to open.
+    #[test]
+    fn python_idle_mysql_client_and_safe_mode_are_auxiliary() {
+        let mut idle = candidate(
+            "IDLE (Python 3.14 64-bit)",
+            r"C:\Menu\Python 3.14\IDLE (Python 3.14 64-bit).lnk",
+            SourceKind::StartMenu,
+        );
+        idle.resolved_path = Some(r"C:\Python314\pythonw.exe".into());
+        idle.launch_arguments = Some(r#""C:\Python314\Lib\idlelib\idle.pyw""#.into());
+        assert_eq!(classify_visibility(&idle).class, VisibilityClass::Auxiliary);
+
+        let mut mysql = candidate(
+            "MySQL 8.0 Command Line Client",
+            r"C:\Menu\MySQL\MySQL 8.0 Command Line Client.lnk",
+            SourceKind::StartMenu,
+        );
+        mysql.resolved_path = Some(r"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe".into());
+        mysql.launch_arguments = Some(r#""-uroot" "-p""#.into());
+        assert_eq!(
+            classify_visibility(&mysql).class,
+            VisibilityClass::Auxiliary
+        );
+
+        // Name-based: soffice.exe is the app itself, so only the "safe mode" name marks it.
+        let mut safe = candidate(
+            "LibreOffice (Безопасный режим)",
+            r"C:\Menu\LibreOffice\LibreOffice (Безопасный режим).lnk",
+            SourceKind::StartMenu,
+        );
+        safe.resolved_path = Some(r"C:\Program Files\LibreOffice\program\soffice.exe".into());
+        safe.launch_arguments = Some("--safe-mode".into());
+        assert_eq!(classify_visibility(&safe).class, VisibilityClass::Auxiliary);
+    }
+
+    // A `rundll32.exe`-hosted config shortcut (Configure x264vfw) and a setup Start-App (Install
+    // Additional Tools for Node.js) are not applications.
+    #[test]
+    fn rundll32_config_and_node_setup_are_auxiliary() {
+        let mut x264 = candidate(
+            "Configure x264vfw",
+            r"C:\Menu\x264vfw\Configure x264vfw.lnk",
+            SourceKind::StartMenu,
+        );
+        x264.resolved_path = Some(r"C:\Windows\SysWOW64\rundll32.exe".into());
+        x264.launch_arguments = Some("x264vfw.dll,Configure".into());
+        assert_eq!(classify_visibility(&x264).class, VisibilityClass::Auxiliary);
+
+        let mut node = candidate(
+            "Install Additional Tools for Node.js",
+            "Microsoft.AutoGenerated.{04770C2D}",
+            SourceKind::StartApps,
+        );
+        node.launch_kind = LaunchKind::AppUserModelId;
+        assert_eq!(classify_visibility(&node).class, VisibilityClass::Auxiliary);
+    }
+
+    // A bundled `*Util.exe` (e.g. AstUtil.exe of "Ассистент") is a utility component, not the app.
+    #[test]
+    fn bundled_utility_executable_is_auxiliary() {
+        let app = candidate(
+            "Ассистент",
+            r"D:\разный хлам\Ассистент\AstUtil.exe",
+            SourceKind::Portable,
+        );
+        assert_eq!(classify_visibility(&app).class, VisibilityClass::Auxiliary);
+    }
+
+    #[test]
+    fn oracle_java_runtime_entries_are_auxiliary() {
+        for name in ["Java(TM) Platform SE", "Java(TM) SE Development Kit"] {
+            let app = candidate(
+                name,
+                r"C:\Program Files\Java\jre\bin\javaw.exe",
+                SourceKind::StartMenu,
+            );
+            assert_eq!(
+                classify_visibility(&app).class,
+                VisibilityClass::Auxiliary,
+                "{name}"
+            );
+        }
     }
 
     #[test]

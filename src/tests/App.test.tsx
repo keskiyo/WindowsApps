@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
@@ -62,7 +62,6 @@ function renderApp(
 			publisher: 'Microsoft',
 			source: 'registry',
 			mechanism: 'registered_command',
-			command: 'C:\\Code\\uninstall.exe /quiet',
 		}),
 		uninstallApp: vi.fn().mockResolvedValue(undefined),
 		onAppsUpdated: vi.fn().mockResolvedValue(() => undefined),
@@ -190,17 +189,37 @@ describe('App', () => {
 		).toHaveAttribute('title', 'Development')
 	})
 
-	it('renders a workspace summary for the visible organizer state', async () => {
+	it('shows the app version under the name and omits it when absent', async () => {
 		renderApp()
+		const version = await screen.findByText('v1.99')
+		expect(version).toHaveAttribute('title', 'Version 1.99')
+		const codeCard = screen
+			.getByRole('button', { name: 'Launch Visual Studio Code' })
+			.closest('article')
+		expect(codeCard).toContainElement(version)
+		// A version-less entry renders no version line: the launch button shows only the name.
+		const steamButton = screen.getByRole('button', { name: 'Launch Steam' })
+		expect(steamButton).toHaveTextContent(/^Steam$/)
+	})
+
+	it('renders catalog filters and navigates without opening the drawer', async () => {
+		const { store } = renderApp()
+		const filters = await screen.findByRole('region', {
+			name: 'Catalog filters',
+		})
 		expect(
-			await screen.findByRole('region', { name: 'Workspace summary' }),
-		).toBeInTheDocument()
-		expect(screen.getByText('Visible apps')).toBeInTheDocument()
-		expect(screen.getByText('3')).toBeInTheDocument()
-		expect(screen.getByText('Categories')).toBeInTheDocument()
-		expect(screen.getByText('3 active')).toBeInTheDocument()
-		expect(screen.getByText('Favorites')).toBeInTheDocument()
-		expect(screen.getByText('Hidden')).toBeInTheDocument()
+			within(filters).getByRole('button', {
+				name: 'All applications 3',
+			}),
+		).toHaveAttribute('aria-current', 'page')
+
+		await userEvent.click(
+			within(filters).getByRole('button', { name: 'Favorites 0' }),
+		)
+		expect(store.getState().activeView).toBe('favorites')
+		expect(
+			within(filters).getByRole('button', { name: 'Favorites 0' }),
+		).toHaveAttribute('aria-current', 'page')
 	})
 
 	it('updates the header count to show search matches', async () => {
@@ -404,7 +423,9 @@ describe('App', () => {
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Open navigation' }),
 		)
-		const hidden = screen.getByRole('button', { name: /Hidden/ })
+		const hidden = within(
+			screen.getByRole('dialog', { name: 'App navigation' }),
+		).getByRole('button', { name: /Hidden/ })
 		expect(hidden).toHaveTextContent('1')
 		await userEvent.click(hidden)
 		expect(
@@ -435,7 +456,12 @@ describe('App', () => {
 		})
 		await screen.findByRole('button', { name: 'Launch Steam' })
 		await userEvent.click(screen.getByRole('button', { name: 'Open navigation' }))
-		await userEvent.click(screen.getByRole('button', { name: /Auxiliary tools/ }))
+		await userEvent.click(
+			within(screen.getByRole('dialog', { name: 'App navigation' })).getByRole(
+				'button',
+				{ name: /Auxiliary tools/ },
+			),
+		)
 
 		expect(
 			screen.queryByRole('button', { name: 'Add Runtime Helper to favorites' }),
@@ -507,18 +533,35 @@ describe('App', () => {
 		await userEvent.click(
 			screen.getByRole('menuitem', { name: 'App info' }),
 		)
-		expect(
-			screen.getByRole('dialog', {
-				name: 'Visual Studio Code information',
-			}),
-		).toBeInTheDocument()
-		expect(screen.getByText('Microsoft')).toBeInTheDocument()
-		expect(screen.getByText('1.99')).toBeInTheDocument()
+		const dialog = screen.getByRole('dialog', {
+			name: 'Visual Studio Code information',
+		})
+		expect(dialog).toBeInTheDocument()
+		// Version also renders on the card, so scope the dialog assertions to the dialog.
+		expect(within(dialog).getByText('Microsoft')).toBeInTheDocument()
+		expect(within(dialog).getByText('1.99')).toBeInTheDocument()
 		expect(document.body.style.overflow).toBe('hidden')
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Close app information' }),
 		)
 		expect(document.body.style.overflow).toBe('')
+	})
+
+	it('closes the grip menu when the grip is pressed again', async () => {
+		renderApp()
+		const manage = await screen.findByRole('button', {
+			name: 'Manage Visual Studio Code',
+		})
+		await userEvent.click(manage)
+		expect(
+			screen.getByRole('menu', { name: 'Visual Studio Code actions' }),
+		).toBeInTheDocument()
+		await userEvent.click(manage)
+		expect(
+			screen.queryByRole('menu', {
+				name: 'Visual Studio Code actions',
+			}),
+		).not.toBeInTheDocument()
 	})
 
 	it('requires confirmation before starting uninstall', async () => {
@@ -539,8 +582,8 @@ describe('App', () => {
 			screen.getByText('Registered uninstall command'),
 		).toBeInTheDocument()
 		expect(
-			screen.getByText('C:\\Code\\uninstall.exe /quiet'),
-		).toBeInTheDocument()
+			screen.queryByText('C:\\Code\\uninstall.exe /quiet'),
+		).not.toBeInTheDocument()
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Confirm uninstall' }),
 		)
@@ -637,7 +680,12 @@ describe('App', () => {
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Open navigation' }),
 		)
-		await userEvent.click(screen.getByRole('button', { name: /Favorites/ }))
+		await userEvent.click(
+			within(screen.getByRole('dialog', { name: 'App navigation' })).getByRole(
+				'button',
+				{ name: /Favorites/ },
+			),
+		)
 		expect(await screen.findByText('Steam')).toBeInTheDocument()
 		expect(
 			screen.queryByRole('heading', { name: 'Games' }),

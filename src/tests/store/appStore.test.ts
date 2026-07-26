@@ -64,7 +64,6 @@ function client(overrides: Partial<AppsClient> = {}): AppsClient {
 			publisher: 'Microsoft',
 			source: 'registry',
 			mechanism: 'registered_command',
-			command: 'uninstall.exe',
 		}),
 		uninstallApp: vi.fn().mockResolvedValue(undefined),
 		onAppsUpdated: vi.fn().mockResolvedValue(() => undefined),
@@ -120,6 +119,72 @@ describe('app store', () => {
 		])
 	})
 
+	// Favorites are keyed by canonicalIdentity, so a favorite survives a release that changes an
+	// app's id (its id is a function of the dedup grouping, the identity is stable).
+	it('keeps a favorite when the app id changes but its identity does not', async () => {
+		const storage = localStorage
+		storage.clear()
+		const before = app({
+			id: 'target:old',
+			name: 'Editor',
+			path: String.raw`C:\Editor.exe`,
+			category: 'development',
+			canonicalIdentity: 'identity:editor',
+		})
+		const store = createAppStore(
+			client({ getApps: vi.fn().mockResolvedValue({ apps: [before], hasCache: true }) }),
+			storage,
+		)
+		store.setState({ apps: [before] })
+		store.getState().toggleFavorite('target:old')
+
+		expect(
+			JSON.parse(storage.getItem(PREFERENCES_KEY) ?? '{}').favoriteAppIdentities,
+		).toEqual(['identity:editor'])
+
+		// A later release loads the same app under a different id.
+		const after = { ...before, id: 'target:new' }
+		const reopened = createAppStore(
+			client({ getApps: vi.fn().mockResolvedValue({ apps: [after], hasCache: true }) }),
+			storage,
+		)
+		await reopened.getState().load()
+
+		expect(reopened.getState().favoriteAppIds).toEqual(['target:new'])
+		expect(
+			selectVisibleApps({ ...reopened.getState(), activeView: 'favorites' }).map(
+				item => item.id,
+			),
+		).toEqual(['target:new'])
+	})
+
+	it('keeps an app hidden across an id change', async () => {
+		const storage = localStorage
+		storage.clear()
+		const before = app({
+			id: 'target:old',
+			name: 'Helper',
+			path: String.raw`C:\Helper.exe`,
+			category: 'development',
+			canonicalIdentity: 'identity:helper',
+		})
+		const store = createAppStore(
+			client({ getApps: vi.fn().mockResolvedValue({ apps: [before], hasCache: true }) }),
+			storage,
+		)
+		store.setState({ apps: [before] })
+		store.getState().hideApp('target:old')
+
+		const after = { ...before, id: 'target:new' }
+		const reopened = createAppStore(
+			client({ getApps: vi.fn().mockResolvedValue({ apps: [after], hasCache: true }) }),
+			storage,
+		)
+		await reopened.getState().load()
+
+		expect(reopened.getState().hiddenAppIds).toEqual(['target:new'])
+	})
+
 	it('persists an auxiliary tool promoted by the user', () => {
 		const storage = localStorage
 		storage.clear()
@@ -144,6 +209,35 @@ describe('app store', () => {
 		expect(JSON.parse(storage.getItem(PREFERENCES_KEY) ?? '{}')).toMatchObject({
 			promotedAppIdentities: ['iconv'],
 		})
+	})
+
+	// A refused write must reach the UI: the grid keeps showing the change either way, so
+	// without this flag the user loses favorites and hidden apps with no explanation.
+	it('flags preferences as unsaved when storage refuses the write', () => {
+		const storage = {
+			getItem: () => null,
+			setItem: () => {
+				throw new Error('QuotaExceededError')
+			},
+		} as unknown as Storage
+		const store = createAppStore(client(), storage)
+		store.setState({
+			apps: [
+				app({
+					id: 'editor',
+					name: 'Editor',
+					path: String.raw`C:\Editor.exe`,
+					category: 'development',
+				}),
+			],
+		})
+
+		expect(store.getState().preferencesPersisted).toBe(true)
+
+		store.getState().toggleFavorite('editor')
+
+		expect(store.getState().preferencesPersisted).toBe(false)
+		expect(store.getState().favoriteAppIds).toEqual(['editor'])
 	})
 
 	it('migrates a legacy promoted id and survives a launcher source change', async () => {

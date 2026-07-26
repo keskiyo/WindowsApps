@@ -23,21 +23,21 @@ fn tray_action(id: &str) -> Option<TrayAction> {
 }
 
 #[derive(Default)]
-pub struct LifecycleState {
+pub(crate) struct LifecycleState {
     quitting: AtomicBool,
 }
 
 impl LifecycleState {
-    pub fn mark_quitting(&self) {
+    pub(crate) fn mark_quitting(&self) {
         self.quitting.store(true, Ordering::SeqCst);
     }
 
-    pub fn should_hide_on_close(&self) -> bool {
+    pub(crate) fn should_hide_on_close(&self) -> bool {
         !self.quitting.load(Ordering::SeqCst)
     }
 }
 
-pub fn show_main_window(app: &AppHandle) {
+pub(crate) fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.show();
@@ -45,7 +45,7 @@ pub fn show_main_window(app: &AppHandle) {
     }
 }
 
-pub fn setup_tray(app: &AppHandle, state: Arc<LifecycleState>) -> tauri::Result<()> {
+pub(crate) fn setup_tray(app: &AppHandle, state: Arc<LifecycleState>) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open Windows Apps", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &quit])?;

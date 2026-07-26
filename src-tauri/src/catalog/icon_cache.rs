@@ -8,7 +8,21 @@ fn icons_dir(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join("icons")
 }
 
-fn safe_id(value: &str) -> String {
+/// Cache key for an application id. Hashing keeps it injective: the previous scheme *dropped*
+/// every character outside `[A-Za-z0-9-]`, so ids differing only in separators — and any two
+/// non-Latin paths, which lost nearly all of their characters — collapsed onto the same key.
+/// Colliding applications then evicted each other's icons through the prefix cleanup below,
+/// so their icons never survived a restart and were re-extracted on every scan.
+fn cache_key(value: &str) -> String {
+    format!("{:x}", Sha256::digest(value.as_bytes()))
+}
+
+/// Hex SHA-256, used to recognize file names written under the current scheme.
+const CACHE_KEY_LENGTH: usize = 64;
+
+/// The pre-hash key, kept only so files written under it can be removed when the same
+/// application is hydrated again.
+fn legacy_cache_key(value: &str) -> String {
     value
         .chars()
         .filter(|character| character.is_ascii_alphanumeric() || *character == '-')
@@ -16,14 +30,14 @@ fn safe_id(value: &str) -> String {
 }
 
 fn icon_path(app_data_dir: &Path, app_id: &str, fingerprint: &str) -> PathBuf {
-    icons_dir(app_data_dir).join(format!("{}-{fingerprint}.png", safe_id(app_id)))
+    icons_dir(app_data_dir).join(format!("{}-{fingerprint}.png", cache_key(app_id)))
 }
 
-pub fn read_icon(app_data_dir: &Path, app_id: &str, fingerprint: &str) -> Option<Vec<u8>> {
+pub(crate) fn read_icon(app_data_dir: &Path, app_id: &str, fingerprint: &str) -> Option<Vec<u8>> {
     fs::read(icon_path(app_data_dir, app_id, fingerprint)).ok()
 }
 
-pub fn write_icon(
+pub(crate) fn write_icon(
     app_data_dir: &Path,
     app_id: &str,
     fingerprint: &str,
@@ -35,21 +49,35 @@ pub fn write_icon(
     let temporary = destination.with_extension("png.tmp");
     fs::write(&temporary, bytes)?;
     fs::rename(temporary, &destination)?;
-    let prefix = format!("{}-", safe_id(app_id));
+    // Superseded files for this application: earlier fingerprints, plus the one it may still
+    // have under the pre-hash naming scheme. This enumerates the icons directory once per
+    // written icon, which is quadratic across a full hydration — see the note on E-02 in the
+    // audit. Left as is deliberately: the alternative that avoids the scan (a constant file
+    // name plus a fingerprint sidecar) is a cache-format change, and dropping the sweep without
+    // that redesign would leak one orphaned file per icon refresh.
+    let prefix = format!("{}-", cache_key(app_id));
+    let legacy = legacy_cache_key(app_id);
+    let legacy_prefix = (!legacy.is_empty()).then(|| format!("{legacy}-"));
     for entry in fs::read_dir(directory)?.filter_map(Result::ok) {
         let path = entry.path();
-        if path != destination
-            && path
-                .file_name()
-                .is_some_and(|name| name.to_string_lossy().starts_with(&prefix))
-        {
+        let Some(name) = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+        else {
+            continue;
+        };
+        let superseded = name.starts_with(&prefix)
+            || legacy_prefix
+                .as_deref()
+                .is_some_and(|legacy| name.starts_with(legacy));
+        if path != destination && superseded {
             let _ = fs::remove_file(path);
         }
     }
     Ok(())
 }
 
-pub fn source_fingerprint(source: &str) -> String {
+pub(crate) fn source_fingerprint(source: &str) -> String {
     let path = Path::new(source);
     let metadata = fs::metadata(path).ok();
     let size = metadata.as_ref().map_or(0, fs::Metadata::len);
@@ -61,7 +89,38 @@ pub fn source_fingerprint(source: &str) -> String {
     format!("{:x}", Sha256::digest(identity.as_bytes()))
 }
 
-pub fn clear(app_data_dir: &Path) -> io::Result<()> {
+/// Drop icons belonging to applications that are no longer in the catalog.
+///
+/// `write_icon` only ever removes files for the application it is writing, so an application
+/// that disappears — uninstalled, or filtered out by a rules change — left its icon behind for
+/// good. Nothing bounded the directory except the user manually clearing the icon cache.
+/// Runs once per scan, not per icon.
+pub(crate) fn retain_only(app_data_dir: &Path, live_ids: &[String]) {
+    let directory = icons_dir(app_data_dir);
+    let Ok(entries) = fs::read_dir(&directory) else {
+        return;
+    };
+    let live = live_ids
+        .iter()
+        .map(|id| cache_key(id))
+        .collect::<std::collections::HashSet<_>>();
+    for entry in entries.filter_map(Result::ok) {
+        let path = entry.path();
+        let Some(name) = path.file_name().map(|name| name.to_string_lossy()) else {
+            continue;
+        };
+        // `{key}-{fingerprint}.png`; anything not in that shape predates the current naming and
+        // is swept by `write_icon` when its application is next hydrated.
+        let Some((key, _)) = name.split_once('-') else {
+            continue;
+        };
+        if key.len() == CACHE_KEY_LENGTH && !live.contains(key) {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+
+pub(crate) fn clear(app_data_dir: &Path) -> io::Result<()> {
     let directory = icons_dir(app_data_dir);
     if directory.exists() {
         fs::remove_dir_all(directory)?;
@@ -86,6 +145,56 @@ mod tests {
         assert_eq!(read_icon(dir.path(), "editor", "different"), None);
     }
 
+    // Under the pre-hash key both of these collapsed to the same string (every non-ASCII
+    // character was dropped), so writing one deleted the other's icon through the prefix
+    // cleanup and neither ever survived a restart.
+    #[test]
+    fn applications_under_non_latin_paths_keep_separate_icons() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = r"D:\Программы\Редактор.exe";
+        let second = r"D:\Файлы\Просмотр.exe";
+        assert_eq!(legacy_cache_key(first), legacy_cache_key(second));
+
+        write_icon(dir.path(), first, "fp1", b"first").unwrap();
+        write_icon(dir.path(), second, "fp2", b"second").unwrap();
+
+        assert_eq!(read_icon(dir.path(), first, "fp1"), Some(b"first".to_vec()));
+        assert_eq!(
+            read_icon(dir.path(), second, "fp2"),
+            Some(b"second".to_vec())
+        );
+    }
+
+    #[test]
+    fn separator_only_differences_do_not_share_a_key() {
+        assert_eq!(
+            legacy_cache_key(r"C:\Tools\Git\bin\git.exe"),
+            legacy_cache_key(r"C:\Tools\Gitbin\git.exe")
+        );
+        assert_ne!(
+            cache_key(r"C:\Tools\Git\bin\git.exe"),
+            cache_key(r"C:\Tools\Gitbin\git.exe")
+        );
+    }
+
+    #[test]
+    fn a_new_icon_replaces_the_file_left_by_the_previous_naming_scheme() {
+        let dir = tempfile::tempdir().unwrap();
+        let app_id = r"C:\Editor.exe";
+        let icons = icons_dir(dir.path());
+        std::fs::create_dir_all(&icons).unwrap();
+        let stale = icons.join(format!("{}-old.png", legacy_cache_key(app_id)));
+        std::fs::write(&stale, b"legacy").unwrap();
+
+        write_icon(dir.path(), app_id, "fp", b"current").unwrap();
+
+        assert!(!stale.exists());
+        assert_eq!(
+            read_icon(dir.path(), app_id, "fp"),
+            Some(b"current".to_vec())
+        );
+    }
+
     #[test]
     fn source_fingerprint_changes_with_file_size() {
         let dir = tempfile::tempdir().unwrap();
@@ -96,6 +205,35 @@ mod tests {
         let second = source_fingerprint(&executable.to_string_lossy());
 
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn icons_of_applications_no_longer_in_the_catalog_are_dropped() {
+        let dir = tempfile::tempdir().unwrap();
+        let kept = r"C:\Kept.exe";
+        let removed = r"C:\Removed.exe";
+        write_icon(dir.path(), kept, "fp1", b"kept").unwrap();
+        write_icon(dir.path(), removed, "fp2", b"removed").unwrap();
+
+        retain_only(dir.path(), &[kept.to_string()]);
+
+        assert_eq!(read_icon(dir.path(), kept, "fp1"), Some(b"kept".to_vec()));
+        assert_eq!(read_icon(dir.path(), removed, "fp2"), None);
+    }
+
+    #[test]
+    fn retaining_leaves_unrecognized_file_names_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let icons = icons_dir(dir.path());
+        std::fs::create_dir_all(&icons).unwrap();
+        // A name from the pre-hash scheme: swept by `write_icon`, not by this pass, so that a
+        // stray file can never take a live icon with it.
+        let legacy = icons.join("CEditorexe-old.png");
+        std::fs::write(&legacy, b"legacy").unwrap();
+
+        retain_only(dir.path(), &[]);
+
+        assert!(legacy.exists());
     }
 
     #[test]

@@ -1,41 +1,15 @@
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { Copy, Minus, Square, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useWindowControls } from '../../hooks/useWindowControls'
 
 /**
  * Custom window title bar (native decorations are disabled) so the very top matches the
  * app's surface instead of the OS chrome. The bar is the drag region; the buttons drive
- * the window via Tauri's window API. The maximize button reflects the current window state
- * (Windows 11 shows a restore glyph when maximized).
+ * the window through `useWindowControls`, which owns the Tauri window API. The maximize
+ * button reflects the current window state (Windows 11 shows a restore glyph when
+ * maximized).
  */
 export function TitleBar() {
-	const [maximized, setMaximized] = useState(false)
-	const action =
-		(run: (win: ReturnType<typeof getCurrentWindow>) => Promise<unknown>) =>
-		() => {
-			try {
-				void run(getCurrentWindow())
-			} catch {
-				/* not running inside Tauri (e.g. tests) */
-			}
-		}
-	useEffect(() => {
-		let unlisten: (() => void) | undefined
-		try {
-			const win = getCurrentWindow()
-			void win.isMaximized().then(setMaximized)
-			void win
-				.onResized(() => {
-					void win.isMaximized().then(setMaximized)
-				})
-				.then(stop => {
-					unlisten = stop
-				})
-		} catch {
-			/* not running inside Tauri (e.g. tests) */
-		}
-		return () => unlisten?.()
-	}, [])
+	const controls = useWindowControls()
 	return (
 		<div
 			data-tauri-drag-region
@@ -56,23 +30,23 @@ export function TitleBar() {
 				<button
 					type='button'
 					aria-label='Minimize'
-					onClick={action(win => win.minimize())}
+					onClick={controls.minimize}
 					className='grid h-9 w-11 place-items-center text-slate-400 transition-colors hover:bg-slate-700/70 hover:text-white'
 				>
 					<Minus size={15} />
 				</button>
 				<button
 					type='button'
-					aria-label={maximized ? 'Restore' : 'Maximize'}
-					onClick={action(win => win.toggleMaximize())}
+					aria-label={controls.maximized ? 'Restore' : 'Maximize'}
+					onClick={controls.toggleMaximize}
 					className='grid h-9 w-11 place-items-center text-slate-400 transition-colors hover:bg-slate-700/70 hover:text-white'
 				>
-					{maximized ? <Copy size={12} /> : <Square size={11} />}
+					{controls.maximized ? <Copy size={12} /> : <Square size={11} />}
 				</button>
 				<button
 					type='button'
 					aria-label='Close'
-					onClick={action(win => win.close())}
+					onClick={controls.close}
 					className='grid h-9 w-11 place-items-center text-slate-500 transition-colors hover:bg-red-500 hover:text-white'
 				>
 					<X size={16} />

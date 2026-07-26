@@ -25,3 +25,9 @@ RELEASE_CHECKLIST.md
 skills-lock.json
 .1localDocuments
 ReleaseInfo.md
+
+# AI-agent instructions — local working files, never committed
+/AGENTS.md
+/src/AGENTS.md
+/src-tauri/AGENTS.md
+CLAUDE.md

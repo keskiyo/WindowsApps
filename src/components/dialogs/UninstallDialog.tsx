@@ -62,7 +62,7 @@ export function UninstallDialog({
 				role='alertdialog'
 				aria-modal='true'
 				aria-label={`Uninstall ${appName}`}
-				className='motion-panel w-full max-w-lg rounded-2xl border border-red-300/55 bg-slate-50 p-5 text-slate-800 shadow-[0_24px_70px_rgba(48,56,76,.28)]'
+				className='motion-panel w-full max-w-lg rounded-2xl border border-red-300/55 bg-slate-50 p-5 text-slate-800 shadow-[var(--shadow-dialog)]'
 			>
 				<header className='flex items-start gap-3'>
 					<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-red-100 text-red-700'>
@@ -109,14 +109,6 @@ export function UninstallDialog({
 								<dt className='text-slate-500'>Method</dt>
 								<dd>{METHOD_LABELS[preview.mechanism]}</dd>
 							</dl>
-							<div>
-								<p className='mb-1 text-xs font-semibold uppercase tracking-[.14em] text-slate-500'>
-									Command
-								</p>
-								<code className='block max-h-32 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-slate-200 bg-slate-100 p-3 text-xs leading-5 text-slate-700'>
-									{preview.command}
-								</code>
-							</div>
 						</div>
 					) : null}
 				</div>

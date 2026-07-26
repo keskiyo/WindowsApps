@@ -31,7 +31,7 @@ export function DeleteCategoryDialog({
 				role='alertdialog'
 				aria-modal='true'
 				aria-label={`Delete ${name} category`}
-				className='motion-panel w-full max-w-md rounded-2xl border border-red-300/55 bg-slate-50 p-5 text-slate-800 shadow-[0_24px_70px_rgba(48,56,76,.28)]'
+				className='motion-panel w-full max-w-md rounded-2xl border border-red-300/55 bg-slate-50 p-5 text-slate-800 shadow-[var(--shadow-dialog)]'
 			>
 				<div className='flex items-start gap-3'>
 					<Trash2 className='mt-0.5 text-red-600' size={20} />

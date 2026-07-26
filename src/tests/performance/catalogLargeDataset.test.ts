@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { filterAppsByQuery, filterVisibleApps } from '../../store/selectors'
+import {
+	filterAppsByQuery,
+	filterVisibleApps,
+	selectCategorizedApps,
+} from '../../store/selectors'
 import type { AppInfo } from '../../types'
 
 function app(index: number): AppInfo {
@@ -38,5 +42,33 @@ describe('large catalog selector behavior', () => {
 			'app-200',
 		])
 		expect(searchMatches).toHaveLength(100)
+	})
+
+	// Identity is what keeps memo(AppCard) effective while icon hydration streams in:
+	// a patch event must not hand every card a new reference.
+	it('preserves every record reference through a single-app patch', () => {
+		const apps = Array.from({ length: 10000 }, (_, index) => app(index))
+		const before = selectCategorizedApps({
+			apps,
+			categoryOverrides: {},
+			promotedAppIds: [],
+			promotedAppIdentities: [],
+		})
+		expect(before[0]).toBe(apps[0])
+
+		const patched = apps.map(entry =>
+			entry.id === 'app-500'
+				? { ...entry, iconBase64: 'data:png' }
+				: entry,
+		)
+		const after = selectCategorizedApps({
+			apps: patched,
+			categoryOverrides: {},
+			promotedAppIds: [],
+			promotedAppIdentities: [],
+		})
+		const changed = after.filter((entry, index) => entry !== before[index])
+		expect(changed).toHaveLength(1)
+		expect(changed[0].id).toBe('app-500')
 	})
 })

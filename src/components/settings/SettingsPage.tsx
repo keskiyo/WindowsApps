@@ -156,11 +156,11 @@ export function SettingsPage({
 			)}
 			{onForceFullScan && (
 				<div className='settings-surface mt-5 rounded-2xl border border-white/85 bg-white/58 p-5'>
-					<div className='flex items-center gap-4'>
+					<div className='flex flex-wrap items-center gap-4'>
 						<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
 							<RefreshCw size={19} aria-hidden='true' />
 						</span>
-						<div className='min-w-0 flex-1'>
+						<div className='min-w-60 flex-1'>
 							<h2 className='font-medium'>Catalog maintenance</h2>
 							<p className='mt-1 text-sm leading-6 text-slate-600'>
 								Discard the incremental scan index and inspect
@@ -168,13 +168,13 @@ export function SettingsPage({
 								Favorites and Hidden apps are preserved.
 							</p>
 						</div>
-						<div className='flex shrink-0 flex-wrap gap-2'>
+						<div className='ml-auto flex shrink-0 flex-wrap gap-2'>
 							<button
 								ref={forceTriggerRef}
 								type='button'
 								disabled={forcing || resetting}
 								onClick={() => setConfirmForce(true)}
-								className='rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white shadow-[0_8px_18px_rgba(104,69,216,.18)] hover:bg-violet-500 disabled:opacity-50'
+								className='utility-accent-button rounded-xl px-4 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-accent-soft)] disabled:opacity-50'
 							>
 								Force full scan
 							</button>
@@ -215,7 +215,7 @@ export function SettingsPage({
 									type='button'
 									disabled={forcing}
 									onClick={() => void forceFullScan()}
-									className='rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white shadow-[0_8px_18px_rgba(124,58,237,.22)] transition-colors hover:bg-violet-500 focus-visible:outline-2 focus-visible:outline-violet-300 disabled:opacity-50'
+									className='rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white shadow-[var(--shadow-accent-vivid)] transition-colors hover:bg-violet-500 focus-visible:outline-2 focus-visible:outline-violet-300 disabled:opacity-50'
 								>
 									{forcing
 										? 'Scanning…'

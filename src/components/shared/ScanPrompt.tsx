@@ -9,7 +9,7 @@ interface Props {
 export function ScanPrompt({ isScanning, onScan, onDismiss }: Props) {
 	return (
 		<section className='grid min-h-[55vh] place-items-center px-4 text-center'>
-			<div className='relative w-full max-w-md rounded-2xl border border-white/85 bg-white/58 px-8 py-10 shadow-[8px_9px_22px_rgba(104,114,136,.13),-7px_-7px_18px_rgba(255,255,255,.78)] backdrop-blur-xl'>
+			<div className='relative w-full max-w-md rounded-2xl border border-white/85 bg-white/58 px-8 py-10 shadow-[var(--shadow-soft-panel)] backdrop-blur-xl'>
 				<button
 					type='button'
 					aria-label='Dismiss scan prompt'
@@ -34,7 +34,7 @@ export function ScanPrompt({ isScanning, onScan, onDismiss }: Props) {
 					type='button'
 					disabled={isScanning}
 					onClick={() => void onScan()}
-					className='mt-6 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(104,69,216,.22)] hover:bg-violet-500 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-60'
+					className='mt-6 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[var(--shadow-accent)] hover:bg-violet-500 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-60'
 				>
 					{isScanning ? 'Scanning applications…' : 'Scan for apps'}
 				</button>

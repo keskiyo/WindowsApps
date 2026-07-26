@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
+import { toAppClientError } from '../lib/clientError'
 import { readPreferences, writePreferences } from '../lib/preferences'
-import { tauriAppsClient, toAppClientError } from '../lib/tauri'
 import type {
 	AppCategory,
 	AppHydrationPatch,
@@ -27,13 +27,20 @@ export interface AppState {
 	catalogDiagnostics: CatalogDiagnostics | null
 	error: string | null
 	activeView: AppView
+	// `*AppIds` are the runtime projection the components read (`.includes(app.id)`); they are
+	// re-derived from `*AppIdentities` against the current catalog on load, so favorites and
+	// hidden survive an id change from a dedup rule change. `*AppIdentities` is the durable form.
 	favoriteAppIds: string[]
+	favoriteAppIdentities: string[]
 	categoryOrder: AppCategory[]
 	collapsedCategories: AppCategory[]
 	categoryOverrides: Record<string, AppCategory>
 	hiddenAppIds: string[]
+	hiddenAppIdentities: string[]
 	promotedAppIds: string[]
 	promotedAppIdentities: string[]
+	/** False once a preferences write was refused (quota, private mode, storage disabled). */
+	preferencesPersisted: boolean
 	categories: CategoryDefinition[]
 	launchingIds: string[]
 	markLaunching(id: string): void
@@ -84,6 +91,37 @@ function errorMessage(error: unknown): string {
 	return toAppClientError(error).message
 }
 
+function identityOf(app: AppInfo): string {
+	return app.canonicalIdentity ?? app.id
+}
+
+function addUnique(list: string[], value: string): string[] {
+	return list.includes(value) ? list : [...list, value]
+}
+
+/**
+ * Reconcile a favorite/hidden set against a freshly loaded catalog. Legacy ids (saved before
+ * identities existed, or by an older app version) are resolved to their identity, then the
+ * runtime id list is re-derived from the identities against the current apps — so a selection
+ * follows the app across a dedup rule change that renamed its id.
+ */
+function reconcileSelection(
+	apps: AppInfo[],
+	ids: string[],
+	identities: string[],
+): { ids: string[]; identities: string[] } {
+	const byId = new Map(apps.map(app => [app.id, app]))
+	const mergedIdentities = new Set(identities)
+	for (const legacyId of ids) {
+		const app = byId.get(legacyId)
+		if (app) mergedIdentities.add(identityOf(app))
+	}
+	const currentIds = apps
+		.filter(app => mergedIdentities.has(identityOf(app)))
+		.map(app => app.id)
+	return { ids: currentIds, identities: [...mergedIdentities] }
+}
+
 // Preserve an already-loaded icon when an incoming app record has none, so background
 // syncs (which ship icon-less app data) don't blank the grid before patches re-arrive.
 function mergeIcon(previous: AppInfo | undefined, next: AppInfo): AppInfo {
@@ -114,17 +152,25 @@ export function createAppStore(
 	return createStore<AppState>((set, get) => {
 		function persist() {
 			const state = get()
-			writePreferences(storage, {
-				version: 4,
+			const persisted = writePreferences(storage, {
+				version: 5,
 				categories: state.categories,
 				categoryOrder: state.categoryOrder,
 				favoriteAppIds: state.favoriteAppIds,
+				favoriteAppIdentities: state.favoriteAppIdentities,
 				collapsedCategories: state.collapsedCategories,
 				categoryOverrides: state.categoryOverrides,
 				hiddenAppIds: state.hiddenAppIds,
+				hiddenAppIdentities: state.hiddenAppIdentities,
 				promotedAppIds: state.promotedAppIds,
 				promotedAppIdentities: state.promotedAppIdentities,
+				unknownFields: preferences.unknownFields,
 			})
+			// A refused write leaves the UI showing changes that will not survive a restart,
+			// so the condition is surfaced instead of being swallowed.
+			if (persisted !== state.preferencesPersisted) {
+				set({ preferencesPersisted: persisted })
+			}
 		}
 
 		return {
@@ -140,12 +186,15 @@ export function createAppStore(
 			error: null,
 			activeView: 'all',
 			favoriteAppIds: preferences.favoriteAppIds,
+			favoriteAppIdentities: preferences.favoriteAppIdentities,
 			categoryOrder: preferences.categoryOrder,
 			collapsedCategories: preferences.collapsedCategories,
 			categoryOverrides: preferences.categoryOverrides,
 			hiddenAppIds: preferences.hiddenAppIds,
+			hiddenAppIdentities: preferences.hiddenAppIdentities,
 			promotedAppIds: preferences.promotedAppIds,
 			promotedAppIdentities: preferences.promotedAppIdentities,
+			preferencesPersisted: true,
 			categories: preferences.categories,
 			launchingIds: [],
 			markLaunching(id) {
@@ -183,6 +232,16 @@ export function createAppStore(
 						if (match)
 							promotedAppIdentities.add(match.canonicalIdentity ?? match.id)
 					}
+					const favorites = reconcileSelection(
+						snapshot.apps,
+						get().favoriteAppIds,
+						get().favoriteAppIdentities,
+					)
+					const hidden = reconcileSelection(
+						snapshot.apps,
+						get().hiddenAppIds,
+						get().hiddenAppIdentities,
+					)
 					set({
 						apps: snapshot.apps,
 						hasCache: snapshot.hasCache,
@@ -190,6 +249,10 @@ export function createAppStore(
 						catalogDiagnostics: snapshot.diagnostics ?? null,
 						promotedAppIds: [],
 						promotedAppIdentities: [...promotedAppIdentities],
+						favoriteAppIds: favorites.ids,
+						favoriteAppIdentities: favorites.identities,
+						hiddenAppIds: hidden.ids,
+						hiddenAppIdentities: hidden.identities,
 					})
 					persist()
 				} catch (error) {
@@ -355,28 +418,45 @@ export function createAppStore(
 							)
 						: false
 					if (app?.visibilityClass === 'auxiliary' && !promoted) return state
+					const identity = app?.canonicalIdentity ?? id
+					const wasFavorite = state.favoriteAppIds.includes(id)
 					return {
-						favoriteAppIds: state.favoriteAppIds.includes(id)
+						favoriteAppIds: wasFavorite
 							? state.favoriteAppIds.filter(appId => appId !== id)
 							: [...state.favoriteAppIds, id],
+						favoriteAppIdentities: wasFavorite
+							? state.favoriteAppIdentities.filter(item => item !== identity)
+							: addUnique(state.favoriteAppIdentities, identity),
 					}
 				})
 				persist()
 			},
 			hideApp(id) {
-				set(state => ({
-					hiddenAppIds: state.hiddenAppIds.includes(id)
-						? state.hiddenAppIds
-						: [...state.hiddenAppIds, id],
-				}))
+				set(state => {
+					if (state.hiddenAppIds.includes(id)) return state
+					const app = state.apps.find(item => item.id === id)
+					const identity = app?.canonicalIdentity ?? id
+					return {
+						hiddenAppIds: [...state.hiddenAppIds, id],
+						hiddenAppIdentities: addUnique(
+							state.hiddenAppIdentities,
+							identity,
+						),
+					}
+				})
 				persist()
 			},
 			restoreApp(id) {
-				set(state => ({
-					hiddenAppIds: state.hiddenAppIds.filter(
-						appId => appId !== id,
-					),
-				}))
+				set(state => {
+					const app = state.apps.find(item => item.id === id)
+					const identity = app?.canonicalIdentity ?? id
+					return {
+						hiddenAppIds: state.hiddenAppIds.filter(appId => appId !== id),
+						hiddenAppIdentities: state.hiddenAppIdentities.filter(
+							item => item !== identity,
+						),
+					}
+				})
 				persist()
 			},
 			promoteAuxiliary(id) {
@@ -398,6 +478,9 @@ export function createAppStore(
 						item => item !== identity,
 					),
 					favoriteAppIds: state.favoriteAppIds.filter(appId => appId !== id),
+					favoriteAppIdentities: state.favoriteAppIdentities.filter(
+						item => item !== identity,
+					),
 				}))
 				persist()
 			},
@@ -568,13 +651,12 @@ export function createAppStore(
 	})
 }
 
-export const appStore = createAppStore(tauriAppsClient)
-
 // Pure selectors/filters live in ./selectors. Re-exported here so existing imports from
 // '../store/appStore' keep working after the split.
 export {
 	filterVisibleApps,
 	filterAppsByQuery,
+	rankAppsByQuery,
 	selectVisibleApps,
 	selectFilteredApps,
 	selectCategorizedApps,

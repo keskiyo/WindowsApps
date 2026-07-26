@@ -20,17 +20,32 @@ describe('catalog utilities', () => {
 		expect(apps).toEqual(original)
 	})
 
-	it('moves favorites to the front while keeping the rest stable', () => {
+	it('keeps every member of a category in encounter order', () => {
+		const many = [
+			{ id: 'a', name: 'A', category: 'games' },
+			{ id: 'b', name: 'B', category: 'development' },
+			{ id: 'c', name: 'C', category: 'games' },
+			{ id: 'd', name: 'D', category: 'games' },
+		] as AppInfo[]
+		const groups = groupAppsByCategory(many)
+		expect(groups.get('games')?.map(app => app.id)).toEqual(['a', 'c', 'd'])
+		expect(groups.get('development')?.map(app => app.id)).toEqual(['b'])
+	})
+
+	it('puts favorites first, each group sorted alphabetically by name', () => {
 		const games = [
 			{ id: 'steam', name: 'Steam', category: 'games' },
 			{ id: 'telegram', name: 'Telegram', category: 'games' },
 			{ id: 'discord', name: 'Discord', category: 'games' },
+			{ id: 'battlenet', name: 'Battle.net', category: 'games' },
 		] as AppInfo[]
-		const ordered = sortFavoritesFirst(games, ['telegram'])
+		// Favorites come first sorted alphabetically among themselves, then the rest alphabetically.
+		const ordered = sortFavoritesFirst(games, ['telegram', 'battlenet'])
 		expect(ordered.map(app => app.id)).toEqual([
+			'battlenet',
 			'telegram',
-			'steam',
 			'discord',
+			'steam',
 		])
 		// Original array is not mutated.
 		expect(games[0].id).toBe('steam')

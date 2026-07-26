@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { toAppClientError } from '../lib/tauri'
+import { toAppClientError } from '../lib/clientError'
 import type { ScanSettings, SystemClient, SystemSettings } from '../types'
 
 interface Options {

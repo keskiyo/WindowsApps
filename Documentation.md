@@ -1,9 +1,9 @@
 # Windows Apps Technical Documentation
 
-Technical reference for Windows Apps `0.2.6`.
+Technical reference for Windows Apps `0.2.7`.
 
 [README](README.md) ·
-[Release 0.2.6](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.6) ·
+[Release 0.2.7](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.7) ·
 [Telegram](https://t.me/keskiyo)
 
 ---
@@ -37,7 +37,7 @@ auto-updates the third-party applications it catalogs.
 | Tests            | Vitest/Testing Library and Rust unit tests   |
 | Package target   | NSIS setup executable                        |
 
-The main window uses custom decorations, supports resizing, and has a minimum size of `760 × 520`.
+The main window uses custom decorations, supports resizing, and has a minimum size of `560 × 520`. At minimum width, application grids retain two columns and the header keeps navigation, search, and Refresh on one row while hiding the application identity. The catalog summary cards navigate directly to All applications, Favorites, Hidden, and Auxiliary tools.
 
 ## 3. Architecture
 
@@ -75,6 +75,7 @@ The Rust backend owns:
 - filesystem and registry watchers.
 
 The frontend sends application IDs for native actions. Rust resolves those IDs through trusted maps built from the catalog, so the webview cannot supply an arbitrary executable path.
+Raw registry access and Windows handles are owned by `src-tauri/src/platform/windows/`; catalog and command modules consume typed platform results.
 
 ## 4. Tauri command surface
 
@@ -89,7 +90,7 @@ The frontend sends application IDs for native actions. Rust resolves those IDs t
 | `start_background_sync`   | Start background validation after the cached catalog is displayed.           |
 | `cancel_scan`             | Cancel active and queued scanning work.                                      |
 | `launch_app`              | Launch a trusted catalog entry by ID.                                        |
-| `get_uninstall_preview`   | Return publisher, source, removal mechanism, and command.                    |
+| `get_uninstall_preview`   | Return application identity, publisher, source, and safe removal mechanism.  |
 | `uninstall_app`           | Execute the trusted uninstall target and record its result.                  |
 | `get_uninstall_history`   | Return the local uninstall history newest-first.                             |
 | `clear_uninstall_history` | Delete uninstall history without modifying applications.                     |
@@ -97,6 +98,10 @@ The frontend sends application IDs for native actions. Rust resolves those IDs t
 | `set_autostart`           | Enable or disable startup for the current Windows account.                   |
 | `set_scan_settings`       | Save automatic fixed-drive, included-path, and excluded-path settings.       |
 | `open_telegram`           | Open the fixed project contact URL.                                          |
+| `open_github`             | Open the fixed project repository URL.                                       |
+| `open_release`            | Open the GitHub release-notes page for a validated version string.           |
+| `stale_copy_status`       | Report when this process is an outdated leftover copy of a newer install.    |
+| `open_installed_copy`     | Launch the newer registered installed copy and exit this outdated one.       |
 
 ## 5. Catalog discovery
 
@@ -122,7 +127,11 @@ Automatic portable discovery excludes:
 - junctions, symbolic links, and other reparse-point directories;
 - configured excluded paths;
 - dependency, cache, system, and maintenance locations;
+- Python virtual environments and package trees (`.venv`, `venv`, `env`, `site-packages`);
+- driver-installer staging trees (`Chipset_Software`) and InstallShield prerequisite payload (`ISSetupPrerequisites`);
 - installers, uninstallers, updaters, crash reporters, helper binaries, and documentation shortcuts.
+
+Entries whose launch target no longer exists on a mounted drive are dropped (a Start-Menu shortcut left behind by an uninstalled application). A target on a currently-unmounted drive is kept, so unplugging a removable or second disk does not erase its apps.
 
 ### Scan limits
 
@@ -181,7 +190,9 @@ Discovery and visibility are separate stages. Every retained candidate receives 
 
 Normal categories, search, Favorites, and command surfaces exclude `auxiliary` entries. The **Auxiliary tools** view keeps uncertain runtime and maintenance components inspectable. A user can restore an entry to the main catalog; its canonical identity is persisted in local preferences and survives incremental refresh, full scan, and cache reset.
 
-User visibility overrides now prefer a separate hashed canonical identity. AUMID and Steam identities are strongest; normalized ProductName, publisher, and install root provide cross-source stability; resolved target and normalized path are conservative fallbacks. Legacy promoted IDs remain as fallback and are migrated when a current catalog entry can be matched. Portable roots remain part of identity so independent copies do not collapse.
+Beyond product components, two further classes are auxiliary. **Command environments** open a configured interpreter shell rather than an application: a shortcut whose target is a generic host (`cmd`, `powershell`, `pwsh`, `rundll32`, `python`/`pythonw`, `mysql`, `node`, `wsl`, `wscript`/`cscript`) carrying arguments, or a named developer prompt (Visual Studio Developer/Native Tools/Cross Tools command prompt, Python IDLE, a database command-line client, a Node.js tools installer). A plain interpreter with no arguments (`Windows PowerShell`, `Command Prompt`) stays primary. **Diagnostic launchers** — a "safe mode" / "reset preferences and cache" variant — are auxiliary or rejected. Oracle Java runtime entries are auxiliary. A command-environment or product-component classification is sticky: it survives a merge, so an AUMID sibling that is primary only by the launch-kind fast-path cannot promote the merged card back into the main catalog.
+
+User visibility overrides now prefer a separate hashed canonical identity. AUMID and Steam identities are strongest; normalized ProductName, publisher, and install root provide cross-source stability; resolved target and normalized path are conservative fallbacks. Legacy promoted IDs remain as fallback and are migrated when a current catalog entry can be matched. Portable roots remain part of identity, so copies at a different (or unknown) version do not collapse; copies at the same exact version are merged.
 
 The model retains PE `ProductName` and `OriginalFilename`, plus shortcut arguments. OriginalFilename contributes installer/helper evidence but is never sufficient by itself to reject a normal registered product. Only known user-facing shortcut modes (`--profile-directory`, `--user-data-dir`, `--app`, `--app-id`, `--class`, Firefox `-p`) split target identity.
 
@@ -189,13 +200,16 @@ Debug builds write `%LOCALAPPDATA%\WindowsApps\visibility-report.json` for rejec
 
 Definite installers, uninstallers, documentation shortcuts, broken resource names, and maintenance executables are rejected. Ambiguous executable names are not rejected solely by name. Registry records marked `SystemComponent=1` remain metadata-only and cannot create a launch card.
 
+Deduplication is **order-independent and idempotent**: the input is canonicalized (by candidate quality, then path) before resolution, so the same catalog produces the same groups regardless of the order the scanners emitted entries, and re-running changes nothing. This is what keeps the frontend delta path from accumulating a less-merged variant across background syncs.
+
 Duplicate matching considers:
 
 - case-insensitive paths;
-- resolved shortcut targets;
+- resolved shortcut targets — except a **generic interpreter host** (`cmd`, `powershell`, `rundll32`, `python`, …), which is not an identifying target, so distinct tools that merely share an interpreter (a Node.js prompt and a VS command prompt) neither collide on one identity nor over-merge;
 - normalized product families;
-- architecture suffixes such as `x64`, `x86`, `64-bit`, and `32-bit`;
+- architecture markers anywhere in the name — `x86`, `x64`, `x86_x64`, `(x86)`/`(x64)`, `WOW`/`WOW64`, `32-bit`/`64-bit` — treated as noise, so the 32-bit and 64-bit builds of one tool collapse to a single card that keeps the 64-bit build;
 - version suffixes;
+- exact version: two copies of the same product at the same version merge across install roots (a portable copy beside its installed shortcut, or the same portable in two folders) — a **different** version is treated as a different program and stays separate;
 - shortcut/executable pairs in the same product folder;
 - package and desktop identity;
 - publishers when both are available.
@@ -207,7 +221,7 @@ Candidate priority is:
 3. `.exe` executable;
 4. packaged application identity.
 
-Metadata and uninstall data from the secondary record are merged into the preferred record when safe. Conflicting publishers and products that merely share a prefix remain separate. Deduplication intentionally prefers a possible duplicate over hiding a legitimate application when identity evidence is weak.
+On a merge the entry surfaced is the higher-priority one, preferring the 64-bit build when two differ only by architecture. Metadata and uninstall data from the secondary record are merged into the preferred record when safe. Conflicting publishers and products that merely share a prefix remain separate. Deduplication intentionally prefers a possible duplicate over hiding a legitimate application when identity evidence is weak.
 
 ## 9. Categories and navigation
 
@@ -225,6 +239,8 @@ Built-in categories:
 - Windows Features;
 - Other.
 
+Category assignment runs after deduplication on the merged record and weighs several signals, not the name alone: the Steam source and a game-store install path (`\steamapps\`, `\Battle.net\`, `\Epic Games\`, …) or an unambiguous game publisher (Blizzard, Valve, Riot, …) map to Games; a few distinctive publishers pin a category (Adobe/Blackmagic → Editors, JetBrains → Development); everything else falls back to curated keyword lists over the name **and the resolved target executable** (so a neutrally named shortcut to `SotaVPN.exe` still reads as a VPN → Utilities), including VPN/proxy clients and database tools. A user override always wins.
+
 Windows Features is based on known names, targets, and package identities. A generic Microsoft publisher/name is not enough to classify an application as a Windows component.
 
 Users can:
@@ -240,6 +256,8 @@ Deleting a custom category moves its applications to Other. Hidden is a separate
 
 At widths of `1024px` and above, navigation uses a persistent sidebar. Below `1024px`, the same navigation is presented as an overlay drawer.
 
+Frontend preferences use schema version 4. Reads tolerate any earlier shape — missing or unfamiliar fields are defaulted rather than migrated per version — preserve unknown root fields, recover from the previous valid backup when the primary document is malformed, and refuse to overwrite a document written by a newer version.
+
 ## 10. Launching
 
 Launch kinds:
@@ -250,6 +268,7 @@ Launch kinds:
 - Steam-managed application identity.
 
 The backend stores each trusted launch kind and target against its stable application ID. `launch_app` accepts only that ID and resolves the actual target inside Rust.
+Input-idle wait capacity belongs to `AppState`, so each application runtime owns and releases its bounded process-handle permits independently.
 
 ## 11. Uninstalling
 
@@ -264,8 +283,9 @@ Before confirmation, the UI requests an uninstall preview containing:
 - application name;
 - publisher;
 - catalog source;
-- removal mechanism;
-- exact command.
+- safe removal-mechanism label.
+
+Executable paths, arguments, package identities, registry keys, and command lines remain backend-only.
 
 If Rust cannot resolve a concrete safe target, the action remains disabled as **Uninstall unavailable**.
 
@@ -377,8 +397,7 @@ src-tauri/src/catalog/           Discovery, cache, scanning, hydration, deduplic
 src-tauri/src/lifecycle/         Tray and window lifecycle
 src-tauri/src/platform/windows/  Windows-specific native integrations
 .github/workflows/release.yml    Tag-driven Windows release pipeline
-scripts/verify-release-version.ps1
-scripts/verify-release-assets.ps1
+scripts/                         Release version/source/asset checks, manifest prep, boundary verifiers
 ```
 
 ## 15. Development workflow
@@ -391,10 +410,10 @@ The supported toolchain, local development commands, verification commands, and 
 
 The workflow:
 
-1. checks out the tag;
+1. checks out the tag with full history and rejects its commit unless it is reachable from `origin/master`;
 2. configures Node.js 22 and stable Rust;
 3. runs `npm ci`;
-4. validates the tag against `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`;
+4. validates the tag against npm and Cargo manifests, both lockfiles, and `src-tauri/tauri.conf.json`;
 5. runs frontend lint, type-checking, tests, and the production build;
 6. runs Rust tests, formatting, and Clippy with warnings denied;
 7. runs `tauri-apps/tauri-action`, which builds and signs the NSIS bundle in a draft release;
@@ -440,10 +459,10 @@ The installer is not Authenticode-signed. Download it only from the official pro
 
 ## 18. Release verification
 
-Use [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) as the single source for automated checks, Windows smoke tests, updater validation, and publishable assets.
+Run the complete verification commands in [README.md](README.md#development), then run the tracked release scripts for version consistency, source ancestry, manifest preparation, and asset validation. Publication still requires the Windows updater smoke test and the exact asset checks described by the release workflow.
 
 ---
 
 [README](README.md) ·
-[Release 0.2.6](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.6) ·
+[Release 0.2.7](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.7) ·
 [Telegram: @keskiyo](https://t.me/keskiyo)

@@ -28,8 +28,21 @@ const VISIBILITY_REASON_LABELS = {
 	documentation_shortcut: 'Documentation shortcut',
 	installer: 'Installer',
 	maintenance_executable: 'Maintenance executable',
+	command_environment: 'Command environment',
+	console_application: 'Console application',
 	insufficient_launch_evidence: 'Insufficient launch evidence',
 } as const
+
+/**
+ * Version string for display. Executable metadata sometimes stores the version with its own
+ * "Version " or "v" prefix (e.g. World of Warcraft reports "Version 12.0.7.68887"); the UI already
+ * prepends "v", so strip a leading marker to avoid "vVersion 12.0.7".
+ */
+export function displayVersion(version: string): string {
+	// Strip a leading "v"/"version" marker only when a digit follows, so real names that merely
+	// start with "v" (e.g. a product literally called "Vista …") are left untouched.
+	return version.replace(/^\s*v(?:ersion)?[\s.:]*(?=\d)/i, '').trim() || version
+}
 
 export function descriptionLabel(description: string | null): string {
 	return description?.trim() || 'No description available'
@@ -54,7 +67,7 @@ export function metadataRows(
 	includeDiagnostics = false,
 ): [string, string][] {
 	const rows: [string, string][] = [
-		['Version', app.version ?? 'Unknown'],
+		['Version', app.version ? displayVersion(app.version) : 'Unknown'],
 		['Publisher', app.publisher ?? 'Unknown'],
 		['Product', app.productName ?? 'Unknown'],
 		['Original executable', app.originalFilename ?? 'Unknown'],

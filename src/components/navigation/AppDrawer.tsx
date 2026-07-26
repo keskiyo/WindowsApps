@@ -68,7 +68,7 @@ export function AppDrawer(props: Props) {
 				role='dialog'
 				aria-modal='true'
 				aria-label='App navigation'
-				className='drawer-panel absolute inset-y-0 left-0 flex w-[min(22rem,88vw)] flex-col border-r border-slate-300/70 bg-slate-50 shadow-[24px_0_70px_rgba(50,58,78,.24)]'
+				className='drawer-panel absolute inset-y-0 left-0 flex w-[min(22rem,88vw)] flex-col border-r border-slate-300/70 bg-slate-50 shadow-[var(--shadow-drawer)]'
 			>
 				<div className='flex items-center justify-between border-b border-slate-300/65 px-5 py-5'>
 					<div>

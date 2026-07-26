@@ -1,4 +1,5 @@
 import { Wrench } from 'lucide-react'
+import { sortFavoritesFirst } from '../../lib/catalog'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
 import { AppCard } from '../apps/AppCard'
 
@@ -45,7 +46,7 @@ export function AuxiliaryGrid(props: Props) {
 			aria-label='Auxiliary tools'
 			className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
 		>
-			{props.apps.map(app => (
+			{sortFavoritesFirst(props.apps, props.favoriteAppIds).map(app => (
 				<AppCard
 					key={app.id}
 					app={app}

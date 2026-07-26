@@ -1,4 +1,5 @@
 import { Star } from 'lucide-react'
+import { sortFavoritesFirst } from '../../lib/catalog'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
 import { AppCard } from '../apps/AppCard'
 
@@ -58,7 +59,7 @@ export function FavoritesGrid({
 			aria-label='Favorite applications'
 			className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
 		>
-			{apps.map(app => (
+			{sortFavoritesFirst(apps, favoriteAppIds).map(app => (
 				<AppCard
 					key={app.id}
 					app={app}

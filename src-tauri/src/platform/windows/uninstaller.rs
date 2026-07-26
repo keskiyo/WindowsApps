@@ -1,42 +1,11 @@
+use super::exec_target::{self, RejectedTarget};
 use crate::catalog::UninstallTarget;
 use serde::{Deserialize, Serialize};
 use std::os::windows::process::CommandExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-/// Living-off-the-land binaries whose behaviour is fully controlled by their arguments. A
-/// tampered `UninstallString` such as `powershell.exe -Command <payload>` or `cmd.exe /C
-/// <payload>` would otherwise run attacker code, so these are never accepted as uninstall
-/// executables (msiexec is handled separately with a strict argument allowlist).
-const INTERPRETER_EXECUTABLES: &[&str] = &[
-    "cmd.exe",
-    "powershell.exe",
-    "pwsh.exe",
-    "wscript.exe",
-    "cscript.exe",
-    "rundll32.exe",
-    "regsvr32.exe",
-    "mshta.exe",
-    "conhost.exe",
-    "wmic.exe",
-    "forfiles.exe",
-    "bash.exe",
-    "sh.exe",
-    "wsl.exe",
-    "python.exe",
-    "pythonw.exe",
-    "py.exe",
-    "node.exe",
-    "java.exe",
-    "javaw.exe",
-    "msbuild.exe",
-    "installutil.exe",
-    "regsvcs.exe",
-    "regasm.exe",
-    "mavinject.exe",
-];
 
 /// Extra MSI switches accepted alongside the uninstall verb and product code. Anything else
 /// (install verbs, properties like `EVIL=1`, transforms, log paths) is rejected.
@@ -44,7 +13,7 @@ const ALLOWED_MSI_SWITCHES: &[&str] = &["/quiet", "/qn", "/qb", "/qb-", "/passiv
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum UninstallMechanism {
+pub(crate) enum UninstallMechanism {
     RegisteredCommand,
     Msi,
     Msix,
@@ -52,9 +21,8 @@ pub enum UninstallMechanism {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct UninstallTargetPreview {
+pub(crate) struct UninstallTargetPreview {
     pub mechanism: UninstallMechanism,
-    pub command: String,
 }
 
 /// A validated, normalized uninstall action. Both `preview` and `execute` derive their
@@ -99,39 +67,20 @@ fn validate(target: &UninstallTarget) -> Result<Validated, String> {
 }
 
 fn validate_process(executable: &str, arguments: &str) -> Result<Validated, String> {
-    let expanded = expand_env(executable.trim());
-    let candidate = expanded.trim().trim_matches('"').trim();
-    if candidate.is_empty() {
-        return Err("The uninstaller path is empty".into());
-    }
-    // Reject UNC (`\\server\share`) and device (`\\?\`, `\\.\`) paths, in both slash forms.
-    if candidate.starts_with(r"\\") || candidate.starts_with("//") {
-        return Err("Network or device uninstaller paths are not allowed".into());
-    }
-    let path = Path::new(candidate);
-    let extension_is_exe = path
-        .extension()
-        .and_then(|value| value.to_str())
-        .is_some_and(|value| value.eq_ignore_ascii_case("exe"));
-    if !extension_is_exe {
-        return Err("The uninstaller must be an .exe".into());
-    }
-    if !path.is_absolute() {
-        return Err("The uninstaller path must be absolute".into());
-    }
-    let file_name = path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    if INTERPRETER_EXECUTABLES.contains(&file_name.as_str()) {
-        return Err("Script interpreters are not allowed as uninstallers".into());
-    }
+    let program = exec_target::validate_executable_path(executable).map_err(|rejection| {
+        match rejection {
+            RejectedTarget::Empty => "The uninstaller path is empty",
+            RejectedTarget::NetworkOrDevice => {
+                "Network or device uninstaller paths are not allowed"
+            }
+            RejectedTarget::NotExecutable => "The uninstaller must be an .exe",
+            RejectedTarget::NotAbsolute => "The uninstaller path must be absolute",
+            RejectedTarget::Interpreter => "Script interpreters are not allowed as uninstallers",
+        }
+        .to_string()
+    })?;
     let args = parse_arguments(arguments)?;
-    Ok(Validated::Process {
-        program: path.to_path_buf(),
-        args,
-    })
+    Ok(Validated::Process { program, args })
 }
 
 /// Validate `msiexec` uninstall arguments: exactly one product code (GUID) with the uninstall
@@ -180,12 +129,12 @@ fn validate_msi(arguments: &str) -> Result<Validated, String> {
     let mut args = vec!["/x".to_string(), code];
     args.extend(switches);
     Ok(Validated::Process {
-        program: system_msiexec(),
+        program: exec_target::system_msiexec(),
         args,
     })
 }
 
-pub fn preview(target: &UninstallTarget) -> UninstallTargetPreview {
+pub(crate) fn preview(target: &UninstallTarget) -> UninstallTargetPreview {
     let mechanism = match target {
         UninstallTarget::Command { executable, .. } if is_msiexec(executable) => {
             UninstallMechanism::Msi
@@ -193,25 +142,10 @@ pub fn preview(target: &UninstallTarget) -> UninstallTargetPreview {
         UninstallTarget::Command { .. } => UninstallMechanism::RegisteredCommand,
         UninstallTarget::Msix { .. } => UninstallMechanism::Msix,
     };
-    // Show the validated, normalized command — never the raw registry string. Blocked targets
-    // show a safe message so a malicious command is not surfaced (or later stored) at all.
-    let command = match validate(target) {
-        Ok(Validated::Process { program, args }) => {
-            if args.is_empty() {
-                format!("\"{}\"", program.display())
-            } else {
-                format!("\"{}\" {}", program.display(), args.join(" "))
-            }
-        }
-        Ok(Validated::Msix { package_full_name }) => format!(
-            "powershell.exe -NoLogo -NoProfile -NonInteractive -Command Remove-AppxPackage -Package '{package_full_name}'"
-        ),
-        Err(_) => "This uninstaller was blocked for safety.".to_string(),
-    };
-    UninstallTargetPreview { mechanism, command }
+    UninstallTargetPreview { mechanism }
 }
 
-pub fn execute(target: Option<UninstallTarget>) -> Result<(), String> {
+pub(crate) fn execute(target: Option<UninstallTarget>) -> Result<(), String> {
     let Some(target) = target else {
         return Err("Uninstall is unavailable for this application".into());
     };
@@ -228,7 +162,7 @@ pub fn execute(target: Option<UninstallTarget>) -> Result<(), String> {
             // Identity is strictly `[A-Za-z0-9._~-]` (no quotes/spaces/metacharacters), so it
             // cannot break out of the single-quoted PowerShell string.
             let script = format!("Remove-AppxPackage -Package '{package_full_name}'");
-            let status = Command::new(system_powershell())
+            let status = Command::new(exec_target::system_powershell())
                 .args([
                     "-NoLogo",
                     "-NoProfile",
@@ -301,8 +235,8 @@ fn ensure_success(code: Option<i32>, success: bool) -> Result<(), String> {
 }
 
 fn is_msiexec(executable: &str) -> bool {
-    let candidate = expand_env(executable.trim());
-    let name = Path::new(candidate.trim().trim_matches('"').trim())
+    let candidate = exec_target::expand_env(executable.trim());
+    let name = std::path::Path::new(candidate.trim().trim_matches('"').trim())
         .file_name()
         .and_then(|value| value.to_str())
         .unwrap_or(executable);
@@ -334,52 +268,6 @@ fn valid_package_name(value: &str) -> bool {
         && value.chars().all(|character| {
             character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-' | '~')
         })
-}
-
-fn system_msiexec() -> PathBuf {
-    system_root().join("System32").join("msiexec.exe")
-}
-
-fn system_powershell() -> PathBuf {
-    system_root()
-        .join("System32")
-        .join("WindowsPowerShell")
-        .join("v1.0")
-        .join("powershell.exe")
-}
-
-fn system_root() -> PathBuf {
-    std::env::var("SystemRoot")
-        .or_else(|_| std::env::var("windir"))
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from(r"C:\Windows"))
-}
-
-/// Expand `%VAR%` environment references (registry `REG_EXPAND_SZ` values arrive unexpanded).
-/// Unknown variables are left verbatim so validation still rejects them as non-absolute.
-fn expand_env(value: &str) -> String {
-    let mut result = String::with_capacity(value.len());
-    let mut rest = value;
-    while let Some(start) = rest.find('%') {
-        result.push_str(&rest[..start]);
-        let after = &rest[start + 1..];
-        let Some(end) = after.find('%') else {
-            result.push_str(&rest[start..]);
-            return result;
-        };
-        let name = &after[..end];
-        match std::env::var(name) {
-            Ok(replacement) => result.push_str(&replacement),
-            Err(_) => {
-                result.push('%');
-                result.push_str(name);
-                result.push('%');
-            }
-        }
-        rest = &after[end + 1..];
-    }
-    result.push_str(rest);
-    result
 }
 
 #[cfg(test)]
@@ -583,26 +471,14 @@ mod tests {
         assert!(validate(&msix("")).is_err());
     }
 
-    // ---- preview cannot leak a dangerous command ------------------------
-
     #[test]
-    fn preview_blocks_dangerous_targets_without_showing_them() {
-        let blocked = preview(&command(
-            r"C:\Windows\System32\cmd.exe",
-            "/C rmdir /S /Q C:\\Windows",
-        ));
-        assert_eq!(blocked.command, "This uninstaller was blocked for safety.");
-        assert!(!blocked.command.contains("rmdir"));
-
-        let bad_msix = preview(&msix("evil'; Remove-Item C:\\"));
-        assert!(!bad_msix.command.contains("Remove-Item C:\\"));
-    }
-
-    #[test]
-    fn preview_shows_normalized_command_for_valid_targets() {
+    fn preview_exposes_only_the_removal_mechanism() {
         let exe = preview(&command(r"C:\App\uninstall.exe", "/S"));
-        assert_eq!(exe.command, "\"C:\\App\\uninstall.exe\" /S");
         assert_eq!(exe.mechanism, UninstallMechanism::RegisteredCommand);
+        assert_eq!(
+            serde_json::to_value(exe).unwrap(),
+            serde_json::json!({ "mechanism": "registered_command" })
+        );
 
         assert_eq!(
             preview(&command(

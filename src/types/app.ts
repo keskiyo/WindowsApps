@@ -23,6 +23,8 @@ export type AppVisibilityReason =
 	| 'documentation_shortcut'
 	| 'installer'
 	| 'maintenance_executable'
+	| 'command_environment'
+	| 'console_application'
 	| 'insufficient_launch_evidence'
 
 export interface AppInfo {
@@ -74,7 +76,6 @@ export interface UninstallPreview {
 	publisher: string | null
 	source: AppSourceKind
 	mechanism: UninstallMechanism
-	command: string
 }
 
 export interface CatalogChangeSummary {

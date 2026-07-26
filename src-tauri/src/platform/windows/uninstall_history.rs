@@ -12,14 +12,14 @@ const MAX_HISTORY_ENTRIES: usize = 100;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum UninstallResult {
+pub(crate) enum UninstallResult {
     Succeeded,
     Failed,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct UninstallHistoryEntry {
+pub(crate) struct UninstallHistoryEntry {
     pub id: String,
     pub timestamp: u64,
     pub app_name: String,
@@ -28,7 +28,7 @@ pub struct UninstallHistoryEntry {
     pub result: UninstallResult,
 }
 
-pub fn read(app_data_dir: &Path) -> Vec<UninstallHistoryEntry> {
+pub(crate) fn read(app_data_dir: &Path) -> Vec<UninstallHistoryEntry> {
     let path = app_data_dir.join(HISTORY_FILE);
     let Ok(text) = fs::read_to_string(path) else {
         return Vec::new();
@@ -40,7 +40,7 @@ pub fn read(app_data_dir: &Path) -> Vec<UninstallHistoryEntry> {
     entries
 }
 
-pub fn append(app_data_dir: &Path, mut entry: UninstallHistoryEntry) -> io::Result<()> {
+pub(crate) fn append(app_data_dir: &Path, mut entry: UninstallHistoryEntry) -> io::Result<()> {
     let mut entries = read(app_data_dir);
     if entry.id.trim().is_empty() {
         entry.id = entry_id(&entry);
@@ -50,7 +50,7 @@ pub fn append(app_data_dir: &Path, mut entry: UninstallHistoryEntry) -> io::Resu
     write(app_data_dir, &entries)
 }
 
-pub fn clear(app_data_dir: &Path) -> io::Result<()> {
+pub(crate) fn clear(app_data_dir: &Path) -> io::Result<()> {
     write(app_data_dir, &[])
 }
 

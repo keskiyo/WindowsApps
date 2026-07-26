@@ -1,3 +1,5 @@
+#![deny(unreachable_pub)]
+
 // Custom title bar (decorations disabled) needs window drag/min/max/close permissions;
 // see src-tauri/capabilities/default.json.
 mod app_state;
@@ -44,7 +46,20 @@ pub fn run() {
             }
         })
         .setup(move |app| {
-            global_shortcut::register(app.handle().clone());
+            // Held in managed state so the hotkey registration and its thread are released with
+            // the app instead of being detached for the lifetime of the process.
+            let registered = global_shortcut::register(app.handle().clone());
+            {
+                let state = app.state::<AppState>();
+                if let Ok(mut status) = state.shortcut_status.lock() {
+                    *status = registered.status;
+                }
+                if let Some(guard) = registered.guard {
+                    if let Ok(mut current) = state.global_shortcut.lock() {
+                        *current = Some(guard);
+                    }
+                }
+            }
             if let Err(error) = lifecycle::setup_tray(app.handle(), Arc::clone(&tray_lifecycle)) {
                 log::error!("Could not create the system tray: {error}");
             }

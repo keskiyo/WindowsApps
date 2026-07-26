@@ -14,11 +14,11 @@ export function SettingsUpdateControls({
 }: Props) {
 	return (
 		<>
-			<div className='flex items-center gap-4 border-b border-slate-200 p-5'>
-				<span className='grid size-10 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
+			<div className='flex flex-wrap items-center gap-4 border-b border-slate-200 p-5'>
+				<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
 					<Github size={19} aria-hidden='true' />
 				</span>
-				<div className='min-w-0 flex-1'>
+				<div className='min-w-60 flex-1'>
 					<h2 className='font-medium'>Updates and source</h2>
 					<p className='mt-1 text-sm text-slate-600'>
 						{updater.update
@@ -26,12 +26,12 @@ export function SettingsUpdateControls({
 							: updateStatusText(updater.status)}
 					</p>
 				</div>
-				<div className='flex shrink-0 flex-wrap justify-end gap-2'>
+				<div className='ml-auto grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end'>
 					<button
 						type='button'
 						disabled={updater.status === 'checking'}
 						onClick={() => void updater.checkNow()}
-						className='inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-medium text-white shadow-[0_8px_18px_rgba(104,69,216,.18)] hover:bg-violet-500 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50'
+						className='utility-accent-button inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium text-white shadow-[var(--shadow-accent-soft)] focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50'
 					>
 						<RefreshCw
 							size={16}
@@ -57,7 +57,7 @@ export function SettingsUpdateControls({
 				onClick={() => void onOpenTelegram()}
 				className='flex w-full items-center gap-4 p-5 text-left hover:bg-violet-100/55 focus-visible:outline-2 focus-visible:outline-violet-500'
 			>
-				<span className='grid size-10 place-items-center rounded-xl bg-[#229ED9]/15 text-[#5cc8f5]'>
+				<span className='telegram-accent grid size-10 place-items-center rounded-xl'>
 					<Send size={19} aria-hidden='true' />
 				</span>
 				<span className='flex-1'>

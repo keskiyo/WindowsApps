@@ -36,7 +36,7 @@ describe('tauri app client browser fallback', () => {
 	})
 
 	it('preserves structured backend error codes and hides unknown transport details', async () => {
-		const { toAppClientError } = await import('../../lib/tauri')
+		const { toAppClientError } = await import('../../lib/clientError')
 		expect(
 			toAppClientError({
 				code: 'LAUNCH_UNAVAILABLE',
@@ -52,5 +52,36 @@ describe('tauri app client browser fallback', () => {
 			code: 'INTERNAL',
 			message: 'The operation could not be completed. Try again.',
 		})
+	})
+
+	// The error-code set is a cross-language contract. The Rust half is pinned by
+	// `error_codes_form_the_expected_stable_contract`; this pins the frontend half so the two
+	// cannot drift silently: every backend code is recognized, plus exactly the two the frontend
+	// owns. Adding a backend code without mirroring it here fails this test.
+	it('mirrors the backend AppError code contract exactly', async () => {
+		const { APP_ERROR_CODES } = await import('../../lib/clientError')
+		const backend = [
+			'APP_DATA_UNAVAILABLE',
+			'CLEAR_ICON_CACHE_FAILED',
+			'CLEAR_UNINSTALL_HISTORY_FAILED',
+			'INVALID_RELEASE_VERSION',
+			'LAUNCH_DATA_UNAVAILABLE',
+			'LAUNCH_UNAVAILABLE',
+			'NO_NEWER_COPY',
+			'OPERATION_FAILED',
+			'OPERATION_INTERRUPTED',
+			'PRODUCT_NAME_MISSING',
+			'RESET_CATALOG_CACHE_FAILED',
+			'RESET_ICON_CACHE_FAILED',
+			'SAVE_SCAN_SETTINGS_FAILED',
+			'SCAN_COALESCED',
+			'SCAN_PATH_NOT_ABSOLUTE',
+			'UNINSTALL_DATA_UNAVAILABLE',
+			'UNINSTALL_UNAVAILABLE',
+		]
+		const frontendOnly = ['DESKTOP_RUNTIME_UNAVAILABLE', 'INTERNAL']
+		expect(Object.keys(APP_ERROR_CODES).sort()).toEqual(
+			[...backend, ...frontendOnly].sort(),
+		)
 	})
 })

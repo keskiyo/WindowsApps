@@ -4,7 +4,7 @@ use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetLogicalDrives};
 
 const DRIVE_FIXED_TYPE: u32 = 3;
 
-pub fn fixed_drive_roots() -> Vec<PathBuf> {
+pub(crate) fn fixed_drive_roots() -> Vec<PathBuf> {
     let mask = unsafe { GetLogicalDrives() };
     let drives = (0..26).filter_map(|index| {
         if mask & (1 << index) == 0 {

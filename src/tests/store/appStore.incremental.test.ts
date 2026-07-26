@@ -32,7 +32,6 @@ function client(): AppsClient {
 			publisher: 'Microsoft',
 			source: 'registry',
 			mechanism: 'registered_command',
-			command: 'uninstall.exe',
 		}),
 		uninstallApp: vi.fn().mockResolvedValue(undefined),
 		onAppsUpdated: vi.fn().mockResolvedValue(() => undefined),

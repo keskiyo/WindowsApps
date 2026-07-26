@@ -41,22 +41,44 @@ struct PackageRow {
     install_location: Option<String>,
 }
 
-pub(super) fn scan() -> Vec<AppInfo> {
-    let apps_json = run_powershell(START_APPS_SCRIPT).unwrap_or_default();
-    let mut apps = parse_start_apps(&apps_json).unwrap_or_default();
+/// Returns `None` when PowerShell could not be run at all, as opposed to `Some(vec![])` for
+/// "this machine has no Start apps". The caller must not replace the stored snapshot on
+/// failure: doing so reports every Store application as removed and wipes them from the
+/// catalog until the next successful scan.
+pub(super) fn scan() -> Option<Vec<AppInfo>> {
+    let primary = run_powershell(START_APPS_SCRIPT);
+    let mut powershell_ran = primary.is_some();
+    let mut apps = primary
+        .as_deref()
+        .and_then(|json| parse_start_apps(json).ok())
+        .unwrap_or_default();
     if apps.is_empty() {
         // Apps-folder enumeration failed; fall back to Get-StartApps (no launch target).
-        let fallback = run_powershell(START_APPS_FALLBACK_SCRIPT).unwrap_or_default();
-        apps = parse_start_apps(&fallback).unwrap_or_default();
+        let fallback = run_powershell(START_APPS_FALLBACK_SCRIPT);
+        powershell_ran = powershell_ran || fallback.is_some();
+        apps = fallback
+            .as_deref()
+            .and_then(|json| parse_start_apps(json).ok())
+            .unwrap_or_default();
+    }
+    if !powershell_ran {
+        return None;
     }
     let packages_json = run_powershell(PACKAGES_SCRIPT).unwrap_or_default();
     let packages: Vec<PackageRow> = parse_rows(&packages_json).unwrap_or_default();
+    // Lowercase each side once instead of inside the pairwise comparison: the inner closure
+    // used to allocate two Strings for every (app, package) pair.
+    let package_prefixes = packages
+        .iter()
+        .map(|package| package.package_family_name.to_lowercase())
+        .collect::<Vec<_>>();
     for app in &mut apps {
-        if let Some(package) = packages.iter().find(|package| {
-            app.path
-                .to_lowercase()
-                .starts_with(&package.package_family_name.to_lowercase())
-        }) {
+        let path = app.path.to_lowercase();
+        if let Some(package) = package_prefixes
+            .iter()
+            .position(|prefix| path.starts_with(prefix))
+            .map(|index| &packages[index])
+        {
             app.source_kind = SourceKind::Msix;
             app.publisher = display_publisher(&package.name, package.publisher.clone());
             app.version = package
@@ -75,7 +97,7 @@ pub(super) fn scan() -> Vec<AppInfo> {
             });
         }
     }
-    apps
+    Some(apps)
 }
 
 fn display_publisher(package_name: &str, publisher: Option<String>) -> Option<String> {
@@ -135,7 +157,10 @@ fn is_generic_host_target(target: &str) -> bool {
 
 fn run_powershell(script: &str) -> Option<String> {
     let script = format!("{UTF8_PREFIX}{script}");
-    let output = Command::new("powershell.exe")
+    // Resolve the interpreter by full path: `CreateProcess` searches the directory of the
+    // running executable first, so a bare name would run a `powershell.exe` planted next to
+    // the app (its per-user install directory is writable) on every scan.
+    let output = Command::new(crate::platform::windows::exec_target::system_powershell())
         .args([
             "-NoLogo",
             "-NoProfile",

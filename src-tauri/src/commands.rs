@@ -12,11 +12,25 @@ use crate::catalog_sync::{
 };
 use crate::error::AppError;
 use crate::platform::windows::{
-    autostart, global_shortcut, install_registry, launcher, uninstall_history, uninstaller,
+    autostart, exec_target, global_shortcut, install_registry, launcher, uninstall_history,
+    uninstaller,
 };
 use serde::Serialize;
 use std::path::Path;
 use tauri::{Emitter, Manager};
+
+async fn run_blocking<T, F>(context: &'static str, work: F) -> Result<T, AppError>
+where
+    T: Send + 'static,
+    F: FnOnce() -> T + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|error| AppError::Interrupted {
+            context,
+            source: error.to_string(),
+        })
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -81,22 +95,29 @@ fn normalize_scan_settings(
 
 #[tauri::command]
 pub(crate) async fn get_system_settings(app: tauri::AppHandle) -> Result<SystemSettings, AppError> {
-    let autostart_enabled = tauri::async_runtime::spawn_blocking(autostart::is_enabled)
-        .await
-        .map_err(|error| AppError::Interrupted {
-            context: "Startup check",
-            source: error.to_string(),
-        })??;
     let app_data_dir = app
         .path()
         .app_data_dir()
         .map_err(|error| AppError::AppDataDir(error.to_string()))?;
-    let fixed_drives = crate::platform::windows::drives::fixed_drive_roots();
+    let (autostart_enabled, scan_settings, fixed_drives) =
+        run_blocking("System settings read", move || {
+            let autostart_enabled = autostart::is_enabled()?;
+            let scan_settings = catalog::scan_settings::read(&app_data_dir);
+            let fixed_drives = crate::platform::windows::drives::fixed_drive_roots();
+            Ok::<_, String>((autostart_enabled, scan_settings, fixed_drives))
+        })
+        .await??;
+    let shortcut = app
+        .state::<AppState>()
+        .shortcut_status
+        .lock()
+        .map(|status| status.clone())
+        .unwrap_or_default();
     Ok(SystemSettings {
         version: env!("CARGO_PKG_VERSION"),
         autostart_enabled,
-        shortcut: global_shortcut::status(),
-        scan_settings: catalog::scan_settings::read(&app_data_dir),
+        shortcut,
+        scan_settings,
         fixed_drives: fixed_drives
             .into_iter()
             .map(|path| path.to_string_lossy().into_owned())
@@ -114,9 +135,14 @@ pub(crate) async fn set_scan_settings(
         .path()
         .app_data_dir()
         .map_err(|error| AppError::AppDataDir(error.to_string()))?;
-    catalog::scan_settings::write(&app_data_dir, &settings)
-        .map_err(|error| AppError::SaveScanSettings(error.to_string()))?;
-    restart_change_watcher(app, &settings);
+    let watcher_settings = settings.clone();
+    run_blocking("Scan settings update", move || {
+        catalog::scan_settings::write(&app_data_dir, &watcher_settings)
+            .map_err(|error| AppError::SaveScanSettings(error.to_string()))?;
+        restart_change_watcher(app, &watcher_settings);
+        Ok::<_, AppError>(())
+    })
+    .await??;
     Ok(settings)
 }
 
@@ -173,6 +199,11 @@ pub(crate) fn open_installed_copy(app: tauri::AppHandle) -> Result<(), AppError>
         .and_then(|path| path.file_name().map(|name| name.to_os_string()))
         .unwrap_or_else(|| "app.exe".into());
     let target = std::path::Path::new(&info.install_location).join(binary);
+    // `InstallLocation` comes from HKCU, which any process running as the user can write.
+    // Validate it exactly like an uninstaller target before handing it to the shell, so a
+    // poisoned key cannot turn this button into "run an arbitrary executable".
+    let target = exec_target::validate_executable_path(&target.to_string_lossy())
+        .map_err(|_| AppError::LaunchUnavailable)?;
     launcher::shell_execute(&target.to_string_lossy())?;
     // Give the invoke response a moment to reach the webview before exiting.
     std::thread::spawn(move || {
@@ -223,7 +254,11 @@ pub(crate) async fn get_apps(app: tauri::AppHandle) -> Result<CatalogSnapshot, A
         .path()
         .app_data_dir()
         .map_err(|error| AppError::AppDataDir(error.to_string()))?;
-    let cached = load_sanitized_document(&app_data_dir);
+    let cache_dir = app_data_dir.clone();
+    let cached = run_blocking("Catalog cache read", move || {
+        load_sanitized_document(&cache_dir)
+    })
+    .await?;
     let has_cache = cached.is_some();
     let document = cached.unwrap_or_default();
     let generation = document.generation;
@@ -280,15 +315,24 @@ pub(crate) async fn force_full_scan(app: tauri::AppHandle) -> Result<Vec<AppInfo
 #[tauri::command]
 pub(crate) async fn reset_catalog_cache(app: tauri::AppHandle) -> Result<Vec<AppInfo>, AppError> {
     tauri::async_runtime::spawn_blocking(move || {
-        app.state::<AppState>().scan_coordinator.cancel_all();
         let app_data_dir = app
             .path()
             .app_data_dir()
             .map_err(|error| AppError::AppDataDir(error.to_string()))?;
-        cache::reset(&app_data_dir)
-            .map_err(|error| AppError::ResetCatalogCache(error.to_string()))?;
-        catalog::icon_cache::clear(&app_data_dir)
-            .map_err(|error| AppError::ResetIconCache(error.to_string()))?;
+        {
+            let state = app.state::<AppState>();
+            state.scan_coordinator.cancel_all();
+            // `cancel_all` only raises the flag. Acquiring the cache lock waits for any scan
+            // still finishing to release it, so the files are deleted with no scan mid-write.
+            // The guard is dropped here — the fresh scan below takes the same lock.
+            let _guard = state.sync_lock.lock().map_err(|_| {
+                AppError::ResetCatalogCache("catalog synchronization is unavailable".into())
+            })?;
+            cache::reset(&app_data_dir)
+                .map_err(|error| AppError::ResetCatalogCache(error.to_string()))?;
+            catalog::icon_cache::clear(&app_data_dir)
+                .map_err(|error| AppError::ResetIconCache(error.to_string()))?;
+        }
         run_coordinated_scan(&app, SyncRequest::Force, true)?.ok_or(AppError::Coalesced {
             what: "Catalog reset scan",
         })
@@ -306,8 +350,11 @@ pub(crate) async fn clear_icon_cache(app: tauri::AppHandle) -> Result<(), AppErr
         .path()
         .app_data_dir()
         .map_err(|error| AppError::AppDataDir(error.to_string()))?;
-    catalog::icon_cache::clear(&app_data_dir)
-        .map_err(|error| AppError::ClearIconCache(error.to_string()))
+    run_blocking("Icon cache clear", move || {
+        catalog::icon_cache::clear(&app_data_dir)
+    })
+    .await?
+    .map_err(|error| AppError::ClearIconCache(error.to_string()))
 }
 
 #[tauri::command]
@@ -322,7 +369,12 @@ pub(crate) async fn hydrate_visible_icons(
         .path()
         .app_data_dir()
         .map_err(|error| AppError::AppDataDir(error.to_string()))?;
-    let Some(document) = cache::read_document(&app_data_dir) else {
+    let cache_dir = app_data_dir.clone();
+    let Some(document) = run_blocking("Catalog cache read", move || {
+        cache::read_document(&cache_dir)
+    })
+    .await?
+    else {
         return Ok(());
     };
     enqueue_hydration(app, app_data_dir, document.generation, ids, true);
@@ -344,29 +396,24 @@ pub(crate) fn start_background_sync(app: tauri::AppHandle) {
 /// waiting for input (or the timeout/no-message-queue case returns). Always resolves to
 /// "ready" so the UI clears its launching state as soon as any signal arrives; genuine
 /// launch failures surface earlier via the `launch_app` error path.
-fn wait_for_launch_ready(raw_handle: isize) -> &'static str {
-    use windows::Win32::Foundation::{CloseHandle, HANDLE};
-    use windows::Win32::System::Threading::WaitForInputIdle;
-    let handle = HANDLE(raw_handle as *mut core::ffi::c_void);
-    unsafe {
-        WaitForInputIdle(handle, 12000);
-        let _ = CloseHandle(handle);
-    }
+fn wait_for_launch_ready(handle: &launcher::OwnedProcessHandle) -> &'static str {
+    launcher::wait_for_input_idle(handle, 12000);
     "ready"
 }
 
 #[tauri::command]
 pub(crate) async fn launch_app(app: tauri::AppHandle, id: String) -> Result<(), AppError> {
-    let (launch_kind, path) = {
+    let (launch_kind, path, launch_waits) = {
         let state = app.state::<AppState>();
         let stored = state
             .launch_targets
             .lock()
             .map_err(|_| AppError::LaunchDataUnavailable)?;
-        stored
+        let (kind, path) = stored
             .get(&id)
             .cloned()
-            .ok_or(AppError::LaunchUnavailable)?
+            .ok_or(AppError::LaunchUnavailable)?;
+        (kind, path, state.launch_waits.clone())
     };
     let handle = tauri::async_runtime::spawn_blocking(move || launcher::launch(launch_kind, &path))
         .await
@@ -374,11 +421,17 @@ pub(crate) async fn launch_app(app: tauri::AppHandle, id: String) -> Result<(), 
             context: "Application launch",
             source: error.to_string(),
         })??;
-    if let Some(raw_handle) = handle {
+    if let Some(handle) = handle {
         let emitter = app.clone();
         let launch_id = id.clone();
+        // Held for the whole wait; when no slot is free the process handle is still closed and
+        // the UI falls back to its ceiling timer.
+        let Some(permit) = launch_waits.acquire() else {
+            return Ok(());
+        };
         tauri::async_runtime::spawn_blocking(move || {
-            let state = wait_for_launch_ready(raw_handle);
+            let _permit = permit;
+            let state = wait_for_launch_ready(&handle);
             let _ = emitter.emit(
                 "launch://status",
                 LaunchStatusPayload {
@@ -417,7 +470,10 @@ pub(crate) async fn get_uninstall_history(
         .path()
         .app_data_dir()
         .map_err(|error| AppError::AppDataDir(error.to_string()))?;
-    Ok(uninstall_history::read(&app_data_dir))
+    run_blocking("Uninstall history read", move || {
+        uninstall_history::read(&app_data_dir)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -426,8 +482,11 @@ pub(crate) async fn clear_uninstall_history(app: tauri::AppHandle) -> Result<(),
         .path()
         .app_data_dir()
         .map_err(|error| AppError::AppDataDir(error.to_string()))?;
-    uninstall_history::clear(&app_data_dir)
-        .map_err(|error| AppError::ClearUninstallHistory(error.to_string()))
+    run_blocking("Uninstall history clear", move || {
+        uninstall_history::clear(&app_data_dir)
+    })
+    .await?
+    .map_err(|error| AppError::ClearUninstallHistory(error.to_string()))
 }
 
 #[tauri::command]
@@ -463,6 +522,17 @@ pub(crate) async fn uninstall_app(app: tauri::AppHandle, id: String) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn blocking_adapter_runs_work_off_the_calling_thread() {
+        let calling_thread = std::thread::current().id();
+        let worker_thread = tauri::async_runtime::block_on(run_blocking("Test operation", || {
+            std::thread::current().id()
+        }))
+        .unwrap();
+
+        assert_ne!(calling_thread, worker_thread);
+    }
 
     #[test]
     fn normalizes_scan_paths_and_accepts_any_absolute_location() {

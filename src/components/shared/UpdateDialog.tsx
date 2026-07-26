@@ -8,6 +8,7 @@ import {
 	X,
 } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 import type { UpdateInstallPhase } from '../../hooks/useUpdater'
 import { releaseHighlights } from './releaseHighlights'
 
@@ -87,6 +88,11 @@ export function UpdateDialog({
 						? 'Restarting...'
 					: 'Update & restart'
 
+	useBodyScrollLock()
+	// The Tab cycling below is deliberately not replaced by `useFocusTrap`: that hook keeps only
+	// elements with `offsetParent !== null`, which jsdom never provides, so under test it
+	// collapses to the currently focused element and stops trapping. This copy is the one the
+	// dialog's own regression test exercises.
 	useEffect(() => {
 		const previousFocus = document.activeElement
 		closeButtonRef.current?.focus()
@@ -135,7 +141,7 @@ export function UpdateDialog({
 				aria-modal='true'
 				aria-labelledby='update-dialog-title'
 				aria-describedby='update-dialog-description'
-				className='update-modal-panel relative flex min-h-[31rem] max-h-[calc(100vh-3rem)] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-violet-300/35 bg-[#363940] text-slate-100 shadow-[0_24px_70px_rgba(0,0,0,0.45),0_0_38px_rgba(167,139,250,0.18)]'
+				className='update-modal-panel relative flex min-h-[31rem] max-h-[calc(100vh-3rem)] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-violet-300/35 bg-[var(--color-update-surface)] text-slate-100 shadow-[var(--shadow-update-dialog)]'
 			>
 				<div className='flex items-start gap-4 border-b border-white/10 px-6 py-5'>
 					<div className='grid size-11 shrink-0 place-items-center rounded-xl border border-violet-300/25 bg-violet-500/18 text-violet-200'>

@@ -18,6 +18,7 @@ import { SettingsPage } from './components/settings/SettingsPage'
 import { CommandPalette } from './components/shared/CommandPalette'
 import { GlobalActivityBar } from './components/shared/GlobalActivityBar'
 import { Header } from './components/shared/Header'
+import { PreferencesNotSavedBanner } from './components/shared/PreferencesNotSavedBanner'
 import { ScanPrompt } from './components/shared/ScanPrompt'
 import { StaleCopyBanner } from './components/shared/StaleCopyBanner'
 import { TitleBar } from './components/shared/TitleBar'
@@ -30,11 +31,9 @@ import { useDesktopNavigation } from './hooks/useDesktopNavigation'
 import { useIconRecovery } from './hooks/useIconRecovery'
 import { useUpdater } from './hooks/useUpdater'
 import { catalogChangeMessage } from './lib/catalogChanges'
-import { tauriSystemClient } from './lib/system'
-import { toAppClientError } from './lib/tauri'
+import { toAppClientError } from './lib/clientError'
 import {
-	appStore,
-	filterAppsByQuery,
+	rankAppsByQuery,
 	filterVisibleApps,
 	selectCategorizedApps,
 	type AppState,
@@ -48,14 +47,11 @@ import type {
 } from './types'
 
 interface AppProps {
-	store?: StoreApi<AppState>
-	systemClient?: SystemClient
+	store: StoreApi<AppState>
+	systemClient: SystemClient
 }
 
-export function App({
-	store = appStore,
-	systemClient = tauriSystemClient,
-}: AppProps) {
+export function App({ store, systemClient }: AppProps) {
 	const state = useStore(store)
 	const {
 		activeView,
@@ -67,6 +63,7 @@ export function App({
 		initialize,
 		isLoading,
 		isRefreshing,
+		preferencesPersisted,
 	} = state
 	// Dedup is O(N) but still recomputed only when the catalog actually changes; query
 	// typing, scan progress, favorites and drawer toggles reuse the memoized result.
@@ -104,7 +101,7 @@ export function App({
 	// the grid with the deferred value while keeping the input state current.
 	const deferredQuery = useDeferredValue(state.query)
 	const filteredApps = useMemo(
-		() => filterAppsByQuery(visibleApps, deferredQuery),
+		() => rankAppsByQuery(visibleApps, deferredQuery),
 		[visibleApps, deferredQuery],
 	)
 	const visibleHydrationIds = filteredApps
@@ -186,10 +183,17 @@ export function App({
 	useEffect(() => {
 		let dispose: (() => void) | undefined
 		let cancelled = false
-		void initialize().then(value => {
-			if (cancelled) value()
-			else dispose = value
-		})
+		void initialize()
+			.then(value => {
+				if (cancelled) value()
+				else dispose = value
+			})
+			// Subscribing to the catalog can fail before the store ever reaches its own
+			// error state. Surface it through the existing toast path, but never after
+			// unmount, and never as an unhandled rejection.
+			.catch(error => {
+				if (!cancelled) toast.error(toAppClientError(error).message)
+			})
 		return () => {
 			cancelled = true
 			dispose?.()
@@ -286,8 +290,6 @@ export function App({
 			app.category,
 			(navigationCounts.get(app.category) ?? 0) + 1,
 		)
-	const filteredCategoryCount = new Set(filteredApps.map(app => app.category))
-		.size
 	const hasQuery = deferredQuery.trim().length > 0
 	const favoriteCount = visibleCategorizedApps.filter(app =>
 		state.favoriteAppIds.includes(app.id),
@@ -355,6 +357,7 @@ export function App({
 						onDismiss={() => setStaleCopy(null)}
 					/>
 				)}
+				{!preferencesPersisted && <PreferencesNotSavedBanner />}
 				{updater.update && (
 					<UpdateDialog
 						version={updater.update.version}
@@ -421,13 +424,12 @@ export function App({
 							<>
 								{!state.isLoading && (
 									<WorkspaceSummary
-										visibleCount={filteredApps.length}
-										activeCategoryCount={
-											filteredCategoryCount
-										}
+										activeView={state.activeView}
+										allCount={visibleCategorizedApps.length}
 										favoriteCount={favoriteCount}
 										hiddenCount={hiddenCount}
-										hasQuery={hasQuery}
+										auxiliaryCount={auxiliaryCount}
+										onSelectView={navigation.selectView}
 									/>
 								)}
 								<AppGrid

@@ -4,6 +4,7 @@ import { AppWindow, Grip, Loader2, Star } from 'lucide-react'
 import { memo, useCallback, useRef, useState } from 'react'
 import { useSpotlight } from '../../hooks/useSpotlight'
 import { useIsLaunching } from '../../store/useIsLaunching'
+import { displayVersion } from '../../lib/appMetadata'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
 import { SpotlightLayer } from '../shared/SpotlightLayer'
 import { AppActionsMenu } from './AppActionsMenu'
@@ -78,7 +79,7 @@ function AppCardComponent({
 				title={launching ? 'Launching…' : app.name}
 				className='relative z-1 flex min-h-34 w-full flex-col items-center justify-center gap-3 px-4 py-4 text-center focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-violet-500 disabled:cursor-progress'
 			>
-				<span className='relative grid size-13 place-items-center rounded-xl bg-white/52 shadow-[inset_1px_1px_3px_rgba(111,124,146,.13),inset_-2px_-2px_5px_rgba(255,255,255,.55),0_0_0_1px_rgba(167,139,250,.18)] ring-1 ring-inset ring-violet-300/70'>
+				<span className='relative grid size-13 place-items-center rounded-xl bg-white/52 shadow-[var(--shadow-app-icon)] ring-1 ring-inset ring-violet-300/70'>
 					<span
 						className={
 							launching
@@ -109,11 +110,21 @@ function AppCardComponent({
 						/>
 					)}
 				</span>
-				<span
-					title={app.name}
-					className={`w-full truncate text-sm font-semibold ${launching ? 'text-violet-500' : 'text-slate-700 group-hover:text-slate-900'}`}
-				>
-					{launching ? 'Launching…' : app.name}
+				<span className='flex w-full flex-col items-center gap-0.5'>
+					<span
+						title={app.name}
+						className={`w-full truncate text-sm font-semibold ${launching ? 'text-violet-500' : 'text-slate-700 group-hover:text-slate-900'}`}
+					>
+						{launching ? 'Launching…' : app.name}
+					</span>
+					{!launching && app.version && (
+						<span
+							title={`Version ${displayVersion(app.version)}`}
+							className='w-full truncate text-xs text-slate-400'
+						>
+							v{displayVersion(app.version)}
+						</span>
+					)}
 				</span>
 			</button>
 			<button

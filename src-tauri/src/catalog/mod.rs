@@ -3,28 +3,27 @@ use sha2::{Digest, Sha256};
 use std::env;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
 
-pub mod cache;
+pub(crate) mod cache;
 mod dedup;
-pub mod hydration;
-pub mod icon_cache;
-pub mod incremental;
+pub(crate) mod hydration;
+pub(crate) mod icon_cache;
+pub(crate) mod incremental;
 mod portable;
 mod registry;
-pub mod scan_coordinator;
-pub mod scan_settings;
-pub mod source;
+pub(crate) mod scan_coordinator;
+pub(crate) mod scan_settings;
+pub(crate) mod source;
 mod start_apps;
 mod steam;
-pub mod sync;
+pub(crate) mod sync;
 mod visibility;
 
-pub use visibility::{VisibilityClass, VisibilityReason};
+pub(crate) use visibility::{VisibilityClass, VisibilityReason};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum AppCategory {
+pub(crate) enum AppCategory {
     Games,
     Ai,
     Editors,
@@ -41,7 +40,7 @@ pub enum AppCategory {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum LaunchKind {
+pub(crate) enum LaunchKind {
     #[default]
     Executable,
     Shortcut,
@@ -50,7 +49,7 @@ pub enum LaunchKind {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SourceKind {
+pub(crate) enum SourceKind {
     #[default]
     Registry,
     StartMenu,
@@ -62,7 +61,7 @@ pub enum SourceKind {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum UninstallTarget {
+pub(crate) enum UninstallTarget {
     Command {
         executable: String,
         arguments: String,
@@ -74,7 +73,7 @@ pub enum UninstallTarget {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AppInfo {
+pub(crate) struct AppInfo {
     pub id: String,
     pub name: String,
     pub path: String,
@@ -119,7 +118,7 @@ pub struct AppInfo {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ScanProgress {
+pub(crate) struct ScanProgress {
     pub stage: String,
     pub location: Option<String>,
     pub completed_roots: usize,
@@ -328,7 +327,7 @@ fn default_portable_exclusions() -> Vec<PathBuf> {
     .collect()
 }
 
-pub fn watcher_paths(settings: &scan_settings::ScanSettings) -> Vec<PathBuf> {
+pub(crate) fn watcher_paths(settings: &scan_settings::ScanSettings) -> Vec<PathBuf> {
     let mut paths = vec![PathBuf::from(
         r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
     )];
@@ -349,27 +348,8 @@ pub fn watcher_paths(settings: &scan_settings::ScanSettings) -> Vec<PathBuf> {
 }
 
 fn scan_registry() -> (Vec<AppInfo>, Vec<registry::RegistryMetadata>) {
-    let mut apps = Vec::new();
-    let mut metadata = Vec::new();
-    let scans = [
-        registry::scan(
-            HKEY_LOCAL_MACHINE,
-            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-        ),
-        registry::scan(
-            HKEY_LOCAL_MACHINE,
-            r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
-        ),
-        registry::scan(
-            HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
-        ),
-    ];
-    for scan in scans {
-        apps.extend(scan.apps);
-        metadata.extend(scan.metadata);
-    }
-    (apps, metadata)
+    let scan = registry::scan();
+    (scan.apps, scan.metadata)
 }
 
 fn attach_registry_metadata(apps: &mut [AppInfo], metadata: &[registry::RegistryMetadata]) {
@@ -433,19 +413,20 @@ fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
         .collect()
 }
 
-pub fn sanitize(apps: Vec<AppInfo>) -> Vec<AppInfo> {
-    dedup::deduplicate(filter_maintenance(apps), classify)
+pub(crate) fn sanitize(apps: Vec<AppInfo>) -> Vec<AppInfo> {
+    dedup::deduplicate(filter_maintenance(apps), classify_app)
 }
 
 /// Like `sanitize`, but also refreshes the dev-only dedup report. Call this from the full
-/// catalog assembly (merge_sources) so the report reflects every app — never a partial
-/// sub-list — and is overwritten once per scan (no accumulation).
-pub fn sanitize_reported(apps: Vec<AppInfo>) -> Vec<AppInfo> {
+/// catalog assembly (`sync::synchronize`, after registry metadata is attached) so the report
+/// reflects every app — never a partial sub-list — and is overwritten once per scan (no
+/// accumulation).
+pub(crate) fn sanitize_reported(apps: Vec<AppInfo>) -> Vec<AppInfo> {
     let filtered = filter_maintenance(apps);
     if dedup::dev_report_enabled() {
         dedup::write_dev_report(&filtered);
     }
-    dedup::deduplicate(filtered, classify)
+    dedup::deduplicate(filtered, classify_app)
 }
 
 fn is_known_standalone_portable(stem: &str) -> bool {
@@ -596,11 +577,126 @@ fn stable_id(identity: &str) -> String {
     )
 }
 
+/// Final category for a fully resolved catalog entry. Runs after deduplication on the merged
+/// record, so it can weigh the strongest signals — the Steam source, a game-store install path,
+/// and a known publisher — before falling back to name/path keywords. A user can always override
+/// the category, so a rare miss is not costly.
+pub(crate) fn classify_app(app: &AppInfo) -> AppCategory {
+    // Strongest, near-certain signals first.
+    if app.source_kind == SourceKind::Steam
+        || is_game_install_path(app)
+        || is_game_publisher(app.publisher.as_deref())
+    {
+        return AppCategory::Games;
+    }
+    if let Some(category) = publisher_category(app.publisher.as_deref()) {
+        return category;
+    }
+    // Match keywords over the target exe too, not just the shortcut. The resolved executable name
+    // is often the telling signal a neutral display name hides — `SotaVPN.exe`, `MongoDBCompass.exe`.
+    classify_keywords(
+        &format!(
+            "{} {} {}",
+            app.name,
+            app.path,
+            app.resolved_path.as_deref().unwrap_or_default()
+        )
+        .to_lowercase(),
+    )
+}
+
+/// The install tree of a known game store. Matched on path/resolved/install so a Battle.net or
+/// Epic game lands in Games even when its name carries no obvious game word.
+fn is_game_install_path(app: &AppInfo) -> bool {
+    const MARKERS: &[&str] = &[
+        r"\steamapps\",
+        r"\battle.net\",
+        r"\epic games\",
+        r"\riot games\",
+        r"\gog galaxy\",
+        r"\ea games\",
+        r"\origin games\",
+        r"\ubisoft\",
+        r"\rockstar games\",
+        r"\wargaming.net\",
+        r"\hoyoplay\",
+        r"\mihoyo\",
+    ];
+    [
+        app.path.as_str(),
+        app.resolved_path.as_deref().unwrap_or_default(),
+        app.install_location.as_deref().unwrap_or_default(),
+    ]
+    .iter()
+    .any(|value| {
+        let lower = value.to_lowercase();
+        MARKERS.iter().any(|marker| lower.contains(marker))
+    })
+}
+
+/// Unambiguous game publishers — distinctive enough not to collide with non-game vendors (so no
+/// bare "ea"/"riot" that would catch "Realtek"/"Patriot").
+fn is_game_publisher(publisher: Option<&str>) -> bool {
+    const PUBLISHERS: &[&str] = &[
+        "blizzard",
+        "valve",
+        "riot games",
+        "electronic arts",
+        "ea games",
+        "ea sports",
+        "ubisoft",
+        "epic games",
+        "rockstar games",
+        "bethesda",
+        "cd projekt",
+        "mihoyo",
+        "hoyoverse",
+        "cognosphere",
+        "wargaming",
+        "activision",
+        "2k games",
+        "square enix",
+        "bandai namco",
+        "capcom",
+        "gaijin",
+        "larian",
+        "warhorse",
+    ];
+    publisher.is_some_and(|value| {
+        let value = value.to_lowercase();
+        PUBLISHERS.iter().any(|marker| value.contains(marker))
+    })
+}
+
+/// A few unambiguous publishers that pin a category by themselves.
+fn publisher_category(publisher: Option<&str>) -> Option<AppCategory> {
+    let publisher = publisher?.to_lowercase();
+    const EDITORS: &[&str] = &["adobe", "maxon", "blackmagic", "affinity", "corel"];
+    const DEVELOPMENT: &[&str] = &[
+        "jetbrains",
+        "github, inc",
+        "docker, inc",
+        "gitkraken",
+        "mongodb",
+    ];
+    if EDITORS.iter().any(|marker| publisher.contains(marker)) {
+        return Some(AppCategory::Editors);
+    }
+    if DEVELOPMENT.iter().any(|marker| publisher.contains(marker)) {
+        return Some(AppCategory::Development);
+    }
+    None
+}
+
 fn classify(name: &str, path: &str) -> AppCategory {
-    let value = format!("{name} {path}").to_lowercase();
+    classify_keywords(&format!("{name} {path}").to_lowercase())
+}
+
+/// Category from curated keyword lists over a pre-lowercased blob (name + paths). First match wins.
+fn classify_keywords(value: &str) -> AppCategory {
     let contains = |keywords: &[&str]| keywords.iter().any(|keyword| value.contains(keyword));
 
-    if is_windows_feature(&value) {
+    if is_windows_feature(value) {
         AppCategory::WindowsFeatures
     } else if contains(&[
         "steam",
@@ -612,6 +708,43 @@ fn classify(name: &str, path: &str) -> AppCategory {
         "roblox",
         "backpack battles",
         "warcraft",
+        "hearthstone",
+        "dota",
+        "valorant",
+        "league of legends",
+        "apex legends",
+        "fortnite",
+        "grand theft auto",
+        "gta",
+        "witcher",
+        "cyberpunk",
+        "overwatch",
+        "diablo",
+        "starcraft",
+        "genshin",
+        "honkai",
+        "counter-strike",
+        "cs2",
+        "csgo",
+        "pubg",
+        "terraria",
+        "stardew",
+        "elden ring",
+        "dark souls",
+        "baldur",
+        "warframe",
+        "path of exile",
+        "dead by daylight",
+        "rainbow six",
+        "call of duty",
+        "warzone",
+        "battlefield",
+        "world of tanks",
+        "war thunder",
+        "palworld",
+        "valheim",
+        "clash of clans",
+        "clash royale",
     ]) {
         AppCategory::Games
     } else if contains(&[
@@ -625,6 +758,14 @@ fn classify(name: &str, path: &str) -> AppCategory {
         "copilot",
         "cursor",
         "ai agent",
+        "perplexity",
+        "mistral",
+        "anythingllm",
+        "msty",
+        "opencode",
+        "aider",
+        "cline",
+        "roo code",
     ]) {
         AppCategory::Ai
     } else if contains(&[
@@ -640,6 +781,27 @@ fn classify(name: &str, path: &str) -> AppCategory {
         "docker",
         "postman",
         "terminal",
+        "sublime text",
+        "notepad++",
+        "node.js",
+        "nodejs",
+        "python",
+        "github desktop",
+        "sourcetree",
+        "gitkraken",
+        "dbeaver",
+        "tableplus",
+        "heidisql",
+        "insomnia",
+        "clion",
+        "datagrip",
+        "phpstorm",
+        "cmake",
+        "mongodb",
+        "studio 3t",
+        "robo 3t",
+        "dbgate",
+        "beekeeper",
     ]) {
         AppCategory::Development
     } else if contains(&[
@@ -652,10 +814,19 @@ fn classify(name: &str, path: &str) -> AppCategory {
         "blender",
         "paint",
         "canva",
+        "davinci resolve",
+        "premiere",
+        "after effects",
+        "affinity",
+        "krita",
+        "clip studio",
+        "capcut",
+        "darktable",
     ]) {
         AppCategory::Editors
     } else if contains(&[
-        "chrome", "firefox", "edge", "opera", "brave", "vivaldi", "browser",
+        "chrome", "firefox", "edge", "opera", "brave", "vivaldi", "browser", "yandex", "chromium",
+        "thorium",
     ]) {
         AppCategory::Browsers
     } else if contains(&[
@@ -667,10 +838,33 @@ fn classify(name: &str, path: &str) -> AppCategory {
         "media player",
         "music",
         "video",
+        "potplayer",
+        "mpc-hc",
+        "mpc-be",
+        "kmplayer",
+        "aimp",
+        "winamp",
+        "itunes",
+        "plex",
+        "kodi",
+        "deezer",
+        "tidal",
+        "jellyfin",
     ]) {
         AppCategory::Media
     } else if contains(&[
-        "discord", "telegram", "whatsapp", "slack", "teams", "zoom", "skype", "signal",
+        "discord",
+        "telegram",
+        "whatsapp",
+        "slack",
+        "teams",
+        "zoom",
+        "skype",
+        "signal",
+        "viber",
+        "wechat",
+        "element",
+        "thunderbird",
     ]) {
         AppCategory::Communication
     } else if contains(&[
@@ -694,6 +888,50 @@ fn classify(name: &str, path: &str) -> AppCategory {
         "configure",
         "utility",
         "uninstaller",
+        // VPN / proxy clients.
+        "vpn",
+        "proxy",
+        "wireguard",
+        "openvpn",
+        "hiddify",
+        "nekoray",
+        "nekobox",
+        "clash verge",
+        "clashx",
+        "mihomo",
+        "v2ray",
+        "xray",
+        "sing-box",
+        "shadowsocks",
+        "outline",
+        "cloudflare warp",
+        "mullvad",
+        "proton vpn",
+        "nordvpn",
+        "expressvpn",
+        "surfshark",
+        "windscribe",
+        "ipvanish",
+        "tunnelbear",
+        "psiphon",
+        // System / hardware tools.
+        "cpu-z",
+        "gpu-z",
+        "hwinfo",
+        "hwmonitor",
+        "crystaldisk",
+        "aida64",
+        "msi afterburner",
+        "rivatuner",
+        "treesize",
+        "windirstat",
+        "ccleaner",
+        "revo uninstaller",
+        "display driver uninstaller",
+        "victoria",
+        "memtest",
+        "furmark",
+        "winmtr",
     ]) {
         AppCategory::Utilities
     } else {
@@ -924,11 +1162,79 @@ fn find_executable_named(location: &str, name: Option<&str>) -> Option<PathBuf> 
         })
 }
 
+/// Directory containment for already-lowercased paths, stopping at a component boundary.
+///
+/// A plain `starts_with` also matches partial component names, which silently changes meaning
+/// in both directions: an excluded `d:\games` would also swallow `d:\gamesbackup`, and an
+/// install root of `c:\prog` would "contain" `c:\program files\other.exe`. Both separators are
+/// accepted because scan settings are typed by hand.
+pub(super) fn path_is_within(path: &str, root: &str) -> bool {
+    let root = root.trim_end_matches(['\\', '/']);
+    if root.is_empty() {
+        return false;
+    }
+    let Some(rest) = path.strip_prefix(root) else {
+        return false;
+    };
+    rest.is_empty() || rest.starts_with('\\') || rest.starts_with('/')
+}
+
 fn is_launchable(path: &Path) -> bool {
     path.is_file()
         && path.extension().is_some_and(|extension| {
             extension.eq_ignore_ascii_case("exe") || extension.eq_ignore_ascii_case("lnk")
         })
+}
+
+/// Whether an app's launch target still exists. A Start-Menu shortcut or registry entry left
+/// behind by an uninstalled application points at a file that is gone; such phantoms should not
+/// appear. Non-file targets — Store AUMIDs, `steam://` URIs, UNC paths — always pass. A target on
+/// a drive that is not currently mounted is kept, so unplugging a removable or second disk does
+/// not erase its apps until it is genuinely known to be gone.
+pub(crate) fn target_is_present(app: &AppInfo) -> bool {
+    if app.launch_kind == LaunchKind::AppUserModelId {
+        return true;
+    }
+    let target = app.resolved_path.as_deref().unwrap_or(&app.path).trim();
+    if target.is_empty() || target.contains("://") || target.starts_with(r"\\") {
+        return true;
+    }
+    let path = Path::new(target);
+    if !path.is_absolute() {
+        return true;
+    }
+    let drive_present = path.ancestors().last().is_some_and(|root| root.exists());
+    !drive_present || path.exists()
+}
+
+/// Move console (CLI) executables — a "7-Zip Console", `git.exe` — out of the primary catalog into
+/// Auxiliary. The PE subsystem is a reliable, launch-free signal that generalizes to any
+/// executable (including ones nobody can test by hand), so it beats name/description heuristics.
+/// Runs on the scan path only (it reads the target file), after classification.
+pub(crate) fn demote_console_applications(apps: &mut [AppInfo]) {
+    for app in apps.iter_mut() {
+        if app.visibility_class != VisibilityClass::Primary
+            || app.launch_kind == LaunchKind::AppUserModelId
+        {
+            continue;
+        }
+        let target = app.resolved_path.as_deref().unwrap_or(&app.path);
+        let path = Path::new(target);
+        if path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
+            && crate::platform::windows::executable_metadata::is_console_subsystem(path)
+        {
+            app.visibility_class = VisibilityClass::Auxiliary;
+            if !app
+                .visibility_reasons
+                .contains(&VisibilityReason::ConsoleApplication)
+            {
+                app.visibility_reasons
+                    .push(VisibilityReason::ConsoleApplication);
+            }
+        }
+    }
 }
 
 fn clean_display_icon(value: &str) -> Option<PathBuf> {
@@ -1143,7 +1449,7 @@ fn is_maintenance_text(value: &str) -> bool {
 
 #[cfg(test)]
 fn deduplicate(apps: Vec<AppInfo>) -> Vec<AppInfo> {
-    dedup::deduplicate(apps, classify)
+    dedup::deduplicate(apps, classify_app)
 }
 
 #[cfg(test)]
@@ -1217,6 +1523,90 @@ mod tests {
         assert_eq!(app.name, "rufus");
         assert_eq!(app.path, path.to_string_lossy());
         assert_eq!(app.source_kind, SourceKind::Portable);
+    }
+
+    // Shared by scan exclusions and by registry-install containment in deduplication, so its
+    // exact boundary behaviour is what keeps both from matching partial component names.
+    #[test]
+    fn path_containment_stops_at_component_boundaries() {
+        assert!(path_is_within(r"c:\prog\app.exe", r"c:\prog"));
+        assert!(path_is_within(r"c:\prog\app.exe", r"c:\prog\"));
+        assert!(path_is_within(r"c:\prog", r"c:\prog"));
+        assert!(path_is_within("c:/prog/app.exe", "c:/prog"));
+        assert!(!path_is_within(r"c:\program files\app.exe", r"c:\prog"));
+        assert!(!path_is_within(r"c:\progbackup", r"c:\prog"));
+        assert!(!path_is_within(r"c:\prog\app.exe", ""));
+        assert!(!path_is_within(r"c:\prog\app.exe", r"\"));
+    }
+
+    #[test]
+    fn phantom_entries_whose_target_is_gone_are_dropped() {
+        let dir = tempfile::tempdir().unwrap();
+        let real = dir.path().join("app.exe");
+        std::fs::write(&real, []).unwrap();
+
+        // A shortcut resolving to an existing exe is kept; one resolving to a deleted exe is not.
+        let mut present = app("App", &dir.path().join("App.lnk").to_string_lossy());
+        present.launch_kind = LaunchKind::Shortcut;
+        present.resolved_path = Some(real.to_string_lossy().into_owned());
+        assert!(target_is_present(&present));
+
+        let mut gone = app(
+            "uTorrent",
+            &dir.path().join("uTorrent.lnk").to_string_lossy(),
+        );
+        gone.launch_kind = LaunchKind::Shortcut;
+        gone.resolved_path = Some(
+            dir.path()
+                .join("uTorrent.exe")
+                .to_string_lossy()
+                .into_owned(),
+        );
+        assert!(!target_is_present(&gone));
+
+        // Non-file targets are never dropped.
+        let mut store = app("Store App", "Some.Store_App!App");
+        store.launch_kind = LaunchKind::AppUserModelId;
+        assert!(target_is_present(&store));
+        let mut steam = app("Game", "steam://rungameid/12345");
+        steam.launch_kind = LaunchKind::Executable;
+        assert!(target_is_present(&steam));
+    }
+
+    // Minimal PE with a chosen Subsystem (3 = console, 2 = GUI).
+    fn minimal_pe(subsystem: u16) -> Vec<u8> {
+        let mut buffer = vec![0_u8; 64];
+        buffer[0] = b'M';
+        buffer[1] = b'Z';
+        buffer[60..64].copy_from_slice(&64_u32.to_le_bytes());
+        buffer.extend_from_slice(b"PE\0\0");
+        buffer.extend_from_slice(&[0_u8; 20]);
+        buffer.extend_from_slice(&[0_u8; 68]);
+        buffer.extend_from_slice(&subsystem.to_le_bytes());
+        buffer
+    }
+
+    #[test]
+    fn console_executables_are_demoted_to_auxiliary() {
+        let dir = tempfile::tempdir().unwrap();
+        let cli = dir.path().join("7z.exe");
+        std::fs::write(&cli, minimal_pe(3)).unwrap();
+        let gui = dir.path().join("game.exe");
+        std::fs::write(&gui, minimal_pe(2)).unwrap();
+
+        let mut console = app("7-Zip Console", &cli.to_string_lossy());
+        console.source_kind = SourceKind::Portable;
+        let mut window = app("Game", &gui.to_string_lossy());
+        window.source_kind = SourceKind::Portable;
+
+        let mut apps = vec![console, window];
+        demote_console_applications(&mut apps);
+
+        assert_eq!(apps[0].visibility_class, VisibilityClass::Auxiliary);
+        assert!(apps[0]
+            .visibility_reasons
+            .contains(&VisibilityReason::ConsoleApplication));
+        assert_eq!(apps[1].visibility_class, VisibilityClass::Primary);
     }
 
     #[test]
@@ -1885,6 +2275,75 @@ mod tests {
     }
 
     #[test]
+    fn classify_app_uses_source_publisher_and_install_path() {
+        // Steam source → Games regardless of the name.
+        let mut steam = app("Some Steam Title", "steam://rungameid/1");
+        steam.source_kind = SourceKind::Steam;
+        assert_eq!(classify_app(&steam), AppCategory::Games);
+
+        // A Blizzard game whose name carries no game word.
+        let mut hearthstone = app(
+            "Hearthstone",
+            r"C:\Program Files\Hearthstone\Hearthstone.exe",
+        );
+        hearthstone.publisher = Some("Blizzard Entertainment".into());
+        assert_eq!(classify_app(&hearthstone), AppCategory::Games);
+
+        // A game reached via a store install tree.
+        let mut store_game = app("Launcher Title", r"C:\Menu\Launcher Title.lnk");
+        store_game.resolved_path = Some(r"D:\Games\Battle.net\Diablo IV\game.exe".into());
+        assert_eq!(classify_app(&store_game), AppCategory::Games);
+
+        // Publisher pins the category.
+        let mut resolve = app(
+            "Untitled Project",
+            r"C:\Program Files\Blackmagic Design\Resolve\Resolve.exe",
+        );
+        resolve.publisher = Some("Blackmagic Design Pty. Ltd.".into());
+        assert_eq!(classify_app(&resolve), AppCategory::Editors);
+
+        // A VPN client falls to Utilities by keyword.
+        assert_eq!(
+            classify_app(&app("Hiddify", r"C:\Users\Maks\Hiddify\Hiddify.exe")),
+            AppCategory::Utilities
+        );
+
+        // A hardware vendor is NOT a game publisher (no bare "ea"/"riot" substring hit).
+        let mut driver = app("Realtek Audio Console", r"C:\Program Files\Realtek\rtk.exe");
+        driver.publisher = Some("Realtek Semiconductor Corp.".into());
+        assert_ne!(classify_app(&driver), AppCategory::Games);
+    }
+
+    #[test]
+    fn classify_app_reads_the_resolved_executable_name() {
+        // Sota Connect: neutral display name and .lnk, but the real target is SotaVPN.exe.
+        let mut sota = app("Sota Connect", r"C:\Menu\Sota Connect.lnk");
+        sota.launch_kind = LaunchKind::Shortcut;
+        sota.source_kind = SourceKind::StartMenu;
+        sota.resolved_path = Some(r"D:\Apps\SotaConnect\SotaVPN.exe".into());
+        assert_eq!(classify_app(&sota), AppCategory::Utilities);
+
+        // OpenCode → AI, even though its exe path contains "code.exe" (AI is matched before Dev).
+        let mut opencode = app("OpenCode", r"C:\Menu\OpenCode.lnk");
+        opencode.launch_kind = LaunchKind::Shortcut;
+        opencode.resolved_path = Some(r"D:\Apps\OpenCode\OpenCode.exe".into());
+        assert_eq!(classify_app(&opencode), AppCategory::Ai);
+
+        // MongoDB Compass → Development (publisher-pinned).
+        let mut mongo = app("MongoDB Compass", r"C:\Menu\MongoDB Compass.lnk");
+        mongo.publisher = Some("MongoDB Inc".into());
+        mongo.resolved_path =
+            Some(r"C:\Users\Maks\AppData\Local\MongoDBCompass\MongoDBCompass.exe".into());
+        assert_eq!(classify_app(&mongo), AppCategory::Development);
+
+        // The Hiddify VPN client stays Utilities.
+        assert_eq!(
+            classify_app(&app("Hiddify", r"C:\Program Files\Hiddify\Hiddify.exe")),
+            AppCategory::Utilities
+        );
+    }
+
+    #[test]
     fn stable_ids_ignore_windows_path_case() {
         assert_eq!(
             stable_id(r"C:\Apps\Codex.exe"),
@@ -1973,7 +2432,10 @@ mod tests {
     }
 
     #[test]
-    fn prefers_newer_portable_version_when_duplicate_copies_exist() {
+    fn different_portable_versions_are_kept_as_separate_apps() {
+        // A different version is a different application: two portable Rufus builds must stay two
+        // cards rather than collapsing to the newest. (Same-version copies still merge — see
+        // dedup::tests::portable_copies_merge_on_equal_version_only.)
         let mut old = app("Rufus", r"E:\Tools\rufus-3.11p.exe");
         old.source_kind = SourceKind::Portable;
         old.version = Some("3.11.0".into());
@@ -1981,10 +2443,7 @@ mod tests {
         current.source_kind = SourceKind::Portable;
         current.version = Some("4.11.2285".into());
 
-        let merged = deduplicate(vec![old, current]);
-
-        assert_eq!(merged.len(), 1);
-        assert_eq!(merged[0].path, r"D:\Tools\rufus-4.11p.exe");
+        assert_eq!(deduplicate(vec![old, current]).len(), 2);
     }
 
     #[test]

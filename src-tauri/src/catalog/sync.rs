@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum SyncRequest {
+pub(crate) enum SyncRequest {
     Watch,
     Startup,
     Refresh,
@@ -17,7 +17,7 @@ pub enum SyncRequest {
 }
 
 impl SyncRequest {
-    pub fn is_interactive(self) -> bool {
+    pub(crate) fn is_interactive(self) -> bool {
         matches!(self, Self::Refresh | Self::Force)
     }
 
@@ -33,7 +33,7 @@ impl SyncRequest {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CatalogChangeSummary {
+pub(crate) struct CatalogChangeSummary {
     pub added: usize,
     pub removed: usize,
     pub updated: usize,
@@ -41,14 +41,18 @@ pub struct CatalogChangeSummary {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CatalogDelta {
+pub(crate) struct CatalogDelta {
     pub generation: u64,
     pub upserted: Vec<AppInfo>,
     pub removed_ids: Vec<String>,
     pub summary: CatalogChangeSummary,
 }
 
-pub fn compute_delta(generation: u64, previous: &[AppInfo], current: &[AppInfo]) -> CatalogDelta {
+pub(crate) fn compute_delta(
+    generation: u64,
+    previous: &[AppInfo],
+    current: &[AppInfo],
+) -> CatalogDelta {
     let old = previous
         .iter()
         .map(|app| (app.id.as_str(), app))
@@ -86,7 +90,7 @@ pub fn compute_delta(generation: u64, previous: &[AppInfo], current: &[AppInfo])
     }
 }
 
-pub fn synchronize(
+pub(crate) fn synchronize(
     previous: &CatalogCache,
     settings: &ScanSettings,
     request: SyncRequest,
@@ -100,9 +104,10 @@ pub fn synchronize(
         completed_roots: 0,
         total_roots: 0,
     });
-    let (mut windows_apps, registry_metadata) = catalog::scan_registry();
-    windows_apps.extend(catalog::scan_start_menu());
-    windows_apps.extend(catalog::start_apps::scan());
+    let (registry_apps, registry_metadata) = catalog::scan_registry();
+    let start_menu_apps = catalog::scan_start_menu();
+    // `None` means PowerShell could not run, not "no Start apps" — see `start_apps::scan`.
+    let start_apps = catalog::start_apps::scan();
 
     let libraries = catalog::steam::installed_libraries();
     let mut steam_apps = Vec::new();
@@ -189,11 +194,20 @@ pub fn synchronize(
         });
     }
 
-    let updates = vec![
+    // One snapshot per scanner, so a scanner that failed can be left out of `updates` and keep
+    // its previous snapshot instead of being replaced by an empty one. Merging all of Windows
+    // into a single key meant one transient PowerShell failure deleted every Store application
+    // from the catalog.
+    let mut updates = vec![
         SourceSnapshot {
-            key: SourceKey("windows".into()),
+            key: SourceKey(catalog::source::REGISTRY_SOURCE.into()),
             fingerprint: None,
-            apps: windows_apps,
+            apps: registry_apps,
+        },
+        SourceSnapshot {
+            key: SourceKey(catalog::source::START_MENU_SOURCE.into()),
+            fingerprint: None,
+            apps: start_menu_apps,
         },
         SourceSnapshot {
             key: SourceKey("steam".into()),
@@ -206,10 +220,27 @@ pub fn synchronize(
             apps: portable_apps,
         },
     ];
+    if let Some(apps) = start_apps {
+        updates.push(SourceSnapshot {
+            key: SourceKey(catalog::source::START_APPS_SOURCE.into()),
+            fingerprint: None,
+            apps,
+        });
+    }
     let merged = merge_sources(previous.sources.clone(), updates);
     let mut apps = merged.apps;
+    // Metadata first, deduplication second, exactly once: publisher and install location come
+    // from the registry records and are what makes a shortcut and its registered product
+    // recognizable as the same application.
     catalog::attach_registry_metadata(&mut apps, &registry_metadata);
-    apps = catalog::sanitize(apps);
+    // Drop entries whose launch target no longer exists (a shortcut left by an uninstalled app)
+    // before dedup, so phantoms neither merge nor reach the catalog. Filesystem-touching, so it
+    // stays here on the scan path rather than in the pure sanitize/dedup passes.
+    apps.retain(catalog::target_is_present);
+    apps = catalog::sanitize_reported(apps);
+    // Console (CLI) executables are command-line tools, not GUI applications — move them to
+    // Auxiliary by their PE subsystem. Filesystem-touching, so it stays here on the scan path.
+    catalog::demote_console_applications(&mut apps);
     for app in &mut apps {
         app.icon_base64 = None;
     }

@@ -107,7 +107,13 @@ export function AppActionsMenu({
 			if (event.key === 'Escape') onClose()
 		}
 		function pointerdown(event: PointerEvent) {
-			if (!menuRef.current?.contains(event.target as Node)) onClose()
+			const target = event.target as Node
+			// Ignore clicks on the anchor (grip) button: it owns the open/close toggle. Without
+			// this, a click on the grip while open fires pointerdown (closing) then click
+			// (re-toggling open), so the menu never closes on a repeat press.
+			if (menuRef.current?.contains(target)) return
+			if (anchorRef.current?.contains(target)) return
+			onClose()
 		}
 		document.addEventListener('keydown', keydown)
 		document.addEventListener('pointerdown', pointerdown)
@@ -115,7 +121,7 @@ export function AppActionsMenu({
 			document.removeEventListener('keydown', keydown)
 			document.removeEventListener('pointerdown', pointerdown)
 		}
-	}, [onClose])
+	}, [onClose, anchorRef])
 	// WAI-ARIA menu pattern: move focus into the menu on open so arrow keys work immediately.
 	useEffect(() => {
 		const first = menuRef.current?.querySelector<HTMLElement>(
@@ -152,7 +158,7 @@ export function AppActionsMenu({
 			}
 			role='menu'
 			aria-label={`${app.name} actions`}
-			className='motion-panel fixed z-[600] flex max-h-[calc(100vh-1.5rem)] w-56 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 overflow-y-auto rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-[0_18px_45px_rgba(53,61,82,.2)]'
+			className='motion-panel fixed z-[600] flex max-h-[calc(100vh-1.5rem)] w-56 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 overflow-y-auto rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-[var(--shadow-menu)]'
 		>
 			{!isHidden && (
 				<button

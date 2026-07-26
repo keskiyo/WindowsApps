@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct SteamGame {
@@ -27,17 +26,39 @@ pub(super) fn parse_manifest(value: &str, library: &Path) -> Option<SteamGame> {
             .find(|pair| pair[0].eq_ignore_ascii_case(key))
             .map(|pair| pair[1].clone())
     };
-    let app_id = value_for("appid")?;
+    let app_id = value_for("appid").filter(|value| is_app_id(value))?;
     let name = value_for("name")?;
     let install_dir = library
         .join("steamapps")
         .join("common")
-        .join(value_for("installdir")?);
+        .join(safe_install_dir(&value_for("installdir")?)?);
     Some(SteamGame {
         app_id,
         name,
         install_dir,
     })
+}
+
+/// The application id ends up in the `steam://rungameid/<id>` launch target, which the shell
+/// hands to Steam's protocol handler. It comes from a user-writable `.acf` file, so anything
+/// other than the digits Steam actually uses is refused rather than passed through into a URI.
+fn is_app_id(value: &str) -> bool {
+    !value.is_empty() && value.chars().all(|character| character.is_ascii_digit())
+}
+
+/// `installdir` names a folder directly under `steamapps\common`. It comes from an `.acf` file
+/// that any process running as the user can write, and `Path::join` discards the base entirely
+/// when handed an absolute path — so `C:\Windows\System32` or `..\..` would silently move the
+/// game's directory outside the library. Accept a plain folder name and nothing else.
+fn safe_install_dir(value: &str) -> Option<&str> {
+    let value = value.trim();
+    let rejected = value.is_empty()
+        || value == "."
+        || value == ".."
+        || value.contains('\\')
+        || value.contains('/')
+        || value.contains(':');
+    (!rejected).then_some(value)
 }
 
 pub(super) fn scan_library(library: &Path) -> Vec<SteamGame> {
@@ -57,17 +78,8 @@ pub(super) fn scan_library(library: &Path) -> Vec<SteamGame> {
         .collect()
 }
 
-/// Main Steam install directory (contains `appcache/librarycache`), from the registry.
-pub(crate) fn steam_root() -> Option<PathBuf> {
-    let steam = RegKey::predef(HKEY_CURRENT_USER)
-        .open_subkey(r"Software\Valve\Steam")
-        .ok()?;
-    let path = steam.get_value::<String, _>("SteamPath").ok()?;
-    Some(PathBuf::from(path.replace('/', r"\")))
-}
-
 pub(super) fn installed_libraries() -> Vec<PathBuf> {
-    let Some(main) = steam_root() else {
+    let Some(main) = crate::platform::windows::steam_registry::install_root() else {
         return Vec::new();
     };
     let mut libraries = vec![main.clone()];
@@ -129,6 +141,56 @@ mod tests {
 
         assert_eq!(game.app_id, "2183900");
         assert_eq!(game.name, "Warhammer 40,000: Space Marine 2");
+        assert_eq!(
+            game.install_dir,
+            PathBuf::from(r"D:\SteamLibrary\steamapps\common\Space Marine 2")
+        );
+    }
+
+    // `.acf` files live in Steam's own directory, which is writable by any process running as
+    // the user, so `installdir` is untrusted input.
+    #[test]
+    fn a_manifest_cannot_move_a_game_outside_the_library() {
+        for hostile in [
+            r"C:\Windows\System32",
+            r"..\..\..\Windows",
+            "../../etc",
+            r"sub\dir",
+            "",
+            "..",
+        ] {
+            let manifest =
+                format!(r#""AppState" {{ "appid" "1" "name" "Evil" "installdir" "{hostile}" }}"#);
+            assert!(
+                parse_manifest(&manifest, Path::new(r"D:\SteamLibrary")).is_none(),
+                "installdir {hostile:?} must be refused"
+            );
+        }
+    }
+
+    // `appid` is interpolated into the `steam://rungameid/<id>` launch target, so a manifest
+    // must not be able to put anything but digits there.
+    #[test]
+    fn a_manifest_with_a_non_numeric_app_id_is_refused() {
+        for hostile in ["1/../install/999", "abc", "1 2", "", "rungameid/1\" \"x"] {
+            let manifest = format!(
+                r#""AppState" {{ "appid" "{hostile}" "name" "Evil" "installdir" "Game" }}"#
+            );
+            assert!(
+                parse_manifest(&manifest, Path::new(r"D:\SteamLibrary")).is_none(),
+                "appid {hostile:?} must be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn a_manifest_still_accepts_an_ordinary_folder_name() {
+        let game = parse_manifest(
+            r#""AppState" { "appid" "42" "name" "Game" "installdir" "Space Marine 2" }"#,
+            Path::new(r"D:\SteamLibrary"),
+        )
+        .unwrap();
+
         assert_eq!(
             game.install_dir,
             PathBuf::from(r"D:\SteamLibrary\steamapps\common\Space Marine 2")

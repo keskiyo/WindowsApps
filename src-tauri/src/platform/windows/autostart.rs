@@ -9,7 +9,7 @@ fn command() -> Result<String, String> {
     Ok(format!(r#""{}""#, executable.display()))
 }
 
-pub fn is_enabled() -> Result<bool, String> {
+pub(crate) fn is_enabled() -> Result<bool, String> {
     let key = match RegKey::predef(HKEY_CURRENT_USER).open_subkey(RUN_KEY) {
         Ok(key) => key,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
@@ -18,7 +18,7 @@ pub fn is_enabled() -> Result<bool, String> {
     Ok(key.get_value::<String, _>(VALUE_NAME).is_ok())
 }
 
-pub fn set_enabled(enabled: bool) -> Result<(), String> {
+pub(crate) fn set_enabled(enabled: bool) -> Result<(), String> {
     let (key, _) = RegKey::predef(HKEY_CURRENT_USER)
         .create_subkey(RUN_KEY)
         .map_err(|error| format!("Could not open Windows startup settings: {error}"))?;

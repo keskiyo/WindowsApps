@@ -13,9 +13,7 @@ use windows::Win32::Graphics::Gdi::{
     BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ,
 };
 use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
-use windows::Win32::System::Com::{
-    CoInitializeEx, CoTaskMemFree, CoUninitialize, COINIT_APARTMENTTHREADED,
-};
+use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::UI::Shell::{
     FOLDERID_AppsFolder, IShellItemImageFactory, SHCreateItemFromIDList, SHCreateItemInKnownFolder,
     SHGetFileInfoW, SHParseDisplayName, KF_FLAG_DEFAULT, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON,
@@ -23,10 +21,29 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO};
 
+/// Largest icon we are willing to decode. Steam library art is far below this; the bound exists
+/// so a crafted or corrupt file cannot make the decoder allocate unbounded memory.
+const MAX_ICON_DIMENSION: u32 = 4096;
+const MAX_ICON_ALLOCATION: u64 = 64 * 1024 * 1024;
+
 /// Decode an on-disk image (JPG/PNG/ICO) and re-encode it as a PNG data URL.
 /// Used for Steam library-cache icons, which are not embedded in an executable.
-pub fn image_file_to_png_data_url(path: &Path) -> Option<String> {
-    let image = image::open(path).ok()?;
+///
+/// The source directory is writable by any process running as the user, so the file is
+/// untrusted: decoding runs under explicit limits. Without them a "decompression bomb" — a
+/// few kilobytes declaring enormous dimensions — would allocate gigabytes and take the
+/// application down during an ordinary scan.
+pub(crate) fn image_file_to_png_data_url(path: &Path) -> Option<String> {
+    let mut reader = image::ImageReader::open(path)
+        .ok()?
+        .with_guessed_format()
+        .ok()?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_ICON_DIMENSION);
+    limits.max_image_height = Some(MAX_ICON_DIMENSION);
+    limits.max_alloc = Some(MAX_ICON_ALLOCATION);
+    reader.limits(limits);
+    let image = reader.decode().ok()?;
     let mut png = Cursor::new(Vec::new());
     image.write_to(&mut png, ImageFormat::Png).ok()?;
     Some(format!(
@@ -35,7 +52,9 @@ pub fn image_file_to_png_data_url(path: &Path) -> Option<String> {
     ))
 }
 
-pub fn extract_icon(path: &Path) -> Option<String> {
+pub(crate) fn extract_icon(path: &Path) -> Option<String> {
+    // `SHGetFileInfo` documents COM as a prerequisite; shell icon handlers are COM objects.
+    super::com::ensure_initialized();
     let wide = wide(path.as_os_str());
     let mut file_info = SHFILEINFOW::default();
     let result = unsafe {
@@ -55,13 +74,9 @@ pub fn extract_icon(path: &Path) -> Option<String> {
     encoded
 }
 
-pub fn extract_app_id_icon(app_id: &str) -> Option<String> {
-    let initialized = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok() };
-    let encoded = extract_app_id_icon_inner(app_id).ok().flatten();
-    if initialized {
-        unsafe { CoUninitialize() };
-    }
-    encoded
+pub(crate) fn extract_app_id_icon(app_id: &str) -> Option<String> {
+    super::com::ensure_initialized();
+    extract_app_id_icon_inner(app_id).ok().flatten()
 }
 
 fn extract_app_id_icon_inner(app_id: &str) -> windows::core::Result<Option<String>> {
@@ -100,12 +115,15 @@ unsafe fn encode_hicon(icon: windows::Win32::UI::WindowsAndMessaging::HICON) -> 
     let mut info: ICONINFO = unsafe { zeroed() };
     unsafe { GetIconInfo(icon, &mut info).ok()? };
 
-    let bitmap_handle = if !info.hbmColor.0.is_null() {
-        info.hbmColor
+    // Only the colour bitmap is a plain top-down image. `hbmMask` is a 1bpp, double-height
+    // AND+XOR mask; feeding it to the 32bpp path produced a black-and-white image of twice the
+    // height. There is no icon we can honestly render from it, so skip it — the card shows its
+    // placeholder instead of garbage.
+    let encoded = if info.hbmColor.0.is_null() {
+        None
     } else {
-        info.hbmMask
+        unsafe { encode_hbitmap(info.hbmColor) }
     };
-    let encoded = unsafe { encode_hbitmap(bitmap_handle) };
     cleanup_icon_info(&info);
     encoded
 }
@@ -125,7 +143,17 @@ unsafe fn encode_hbitmap(bitmap_handle: windows::Win32::Graphics::Gdi::HBITMAP) 
 
     let width = bitmap.bmWidth as u32;
     let height = bitmap.bmHeight.unsigned_abs();
-    let mut pixels = vec![0_u8; (width * height * 4) as usize];
+    // Dimensions come from a bitmap the shell produced, so they are not ours to trust. The
+    // product was computed in `u32` and wrapped: a 32768×32768 bitmap yielded a zero-length
+    // buffer that `GetDIBits` then filled with `height` rows — a heap overflow in release
+    // builds, where overflow wraps instead of panicking.
+    if width > MAX_ICON_DIMENSION || height > MAX_ICON_DIMENSION {
+        return None;
+    }
+    let byte_count = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|pixels| pixels.checked_mul(4))?;
+    let mut pixels = vec![0_u8; byte_count];
     let mut bitmap_info = BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
             biSize: size_of::<BITMAPINFOHEADER>() as u32,
@@ -203,6 +231,34 @@ mod tests {
             apps_folder_shell_name("Microsoft.WindowsCamera_8wekyb3d8bbwe!App"),
             r"shell:AppsFolder\Microsoft.WindowsCamera_8wekyb3d8bbwe!App",
         );
+    }
+
+    // The Steam library cache is writable by any process running as the user, so an oversized
+    // image must be refused rather than decoded into memory.
+    #[test]
+    fn refuses_images_beyond_the_decode_limits() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("huge.png");
+        let oversized = MAX_ICON_DIMENSION + 1;
+        let image = RgbaImage::from_pixel(oversized, 1, image::Rgba([0, 0, 0, 255]));
+        DynamicImage::ImageRgba8(image)
+            .save_with_format(&path, ImageFormat::Png)
+            .unwrap();
+
+        assert_eq!(image_file_to_png_data_url(&path), None);
+    }
+
+    #[test]
+    fn decodes_an_image_within_the_limits() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("small.png");
+        let image = RgbaImage::from_pixel(32, 32, image::Rgba([0, 128, 255, 255]));
+        DynamicImage::ImageRgba8(image)
+            .save_with_format(&path, ImageFormat::Png)
+            .unwrap();
+
+        assert!(image_file_to_png_data_url(&path)
+            .is_some_and(|url| url.starts_with("data:image/png;base64,")));
     }
 
     #[test]

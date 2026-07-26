@@ -3,16 +3,30 @@ param(
   [string]$Tag
 )
 
-$expected = $Tag -replace '^v', ''
+if ($Tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+  throw "Release tag must use v<major>.<minor>.<patch>: $Tag"
+}
+$expected = $Matches.version
 $package = (Get-Content package.json -Raw | ConvertFrom-Json).version
+$packageLockRoot = (& node -e "process.stdout.write(require('./package-lock.json').packages[''].version)").Trim()
+if ($LASTEXITCODE -ne 0) {
+  throw "Could not read the root package-lock.json version"
+}
 $tauriConfig = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
 $tauri = $tauriConfig.version
 $cargoText = Get-Content src-tauri/Cargo.toml -Raw
 $cargo = [regex]::Match($cargoText, '(?ms)^\[package\].*?^version\s*=\s*"([^"]+)"').Groups[1].Value
+$cargoLockText = Get-Content src-tauri/Cargo.lock -Raw
+$cargoLock = [regex]::Match(
+  $cargoLockText,
+  '(?ms)^\[\[package\]\]\r?\nname = "app"\r?\nversion = "([^"]+)"'
+).Groups[1].Value
 
 $versions = @{
   package = $package
+  packageLock = $packageLockRoot
   cargo = $cargo
+  cargoLock = $cargoLock
   tauri = $tauri
 }
 

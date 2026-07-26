@@ -2,7 +2,7 @@ import { AppWindow, CornerDownLeft, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
-import { filterAppsByQuery } from '../../store/appStore'
+import { rankAppsByQuery } from '../../store/appStore'
 import type { AppInfo } from '../../types'
 
 interface Props {
@@ -28,7 +28,7 @@ export function CommandPalette({ apps, onLaunch, onClose }: Props) {
 	useFocusTrap(dialogRef)
 
 	const results = useMemo(
-		() => filterAppsByQuery(apps, query).slice(0, MAX_RESULTS),
+		() => rankAppsByQuery(apps, query).slice(0, MAX_RESULTS),
 		[apps, query],
 	)
 
@@ -91,7 +91,7 @@ export function CommandPalette({ apps, onLaunch, onClose }: Props) {
 				aria-modal='true'
 				aria-label='Quick launch'
 				onKeyDown={onKeyDown}
-				className='motion-panel flex h-[min(22rem,calc(100vh-7rem))] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/90 bg-slate-50 shadow-[0_28px_80px_rgba(48,56,76,.34)]'
+				className='motion-panel flex h-[min(22rem,calc(100vh-7rem))] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/90 bg-slate-50 shadow-[var(--shadow-palette)]'
 			>
 				<div className='flex items-center gap-3 border-b border-slate-200 px-4'>
 					<Search

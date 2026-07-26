@@ -16,6 +16,12 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+              with:
+                  fetch-depth: 0
+
+            - name: Verify release source
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/verify-release-source.ps1 -Commit "${{ github.sha }}" -MasterRef "origin/master"
 
             - name: Setup Node.js
               uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
@@ -35,6 +41,10 @@ jobs:
             - name: Verify release version
               shell: pwsh
               run: powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag "${{ github.ref_name }}"
+
+            - name: Test release manifest preparation
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-prepare-release-manifest.ps1
 
             - name: Lint frontend
               run: npm run lint
@@ -111,7 +121,12 @@ jobs:
 
             - name: Prepare updater manifest
               shell: pwsh
-              run: powershell -NoProfile -File scripts/prepare-release-manifest.ps1 -AssetsDir release-assets -Tag "${{ github.ref_name }}"
+              run: |
+                  $notesPath = Join-Path $env:RUNNER_TEMP "release-notes.md"
+                  powershell -NoProfile -File scripts/prepare-release-manifest.ps1 `
+                    -AssetsDir release-assets `
+                    -Tag "${{ github.ref_name }}" `
+                    -NotesPath $notesPath
 
             - name: Verify release assets
               shell: pwsh

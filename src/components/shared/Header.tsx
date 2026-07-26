@@ -43,43 +43,41 @@ export function Header({
 			? `${visibleCount} ${visibleCount === 1 ? 'match' : 'matches'}`
 			: `${appCount} ${appCount === 1 ? 'app' : 'apps'}`
 	return (
-		<header className='app-header-glass sticky top-0 z-300 border-b border-slate-300/65 shadow-[0_10px_30px_rgba(74,82,105,0.08)]'>
-			<div className='mx-auto flex w-full max-w-375 flex-col gap-4 px-5 pt-4.75 pb-4.75 sm:px-8 md:flex-row md:items-center'>
-				<div className='flex min-w-60 items-center gap-3'>
-					{showMenu && (
-						<button
-							ref={menuButtonRef}
-							type='button'
-							aria-label='Open navigation'
-							onClick={onOpenNavigation}
-							className='grid size-10 place-items-center rounded-xl border border-white/85 bg-white/65 text-slate-600 shadow-sm hover:border-violet-400/35 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
-						>
-							<Menu size={19} />
-						</button>
-					)}
+		<header className='app-header-glass sticky top-0 z-300 border-b border-slate-300/65 shadow-[var(--shadow-header)]'>
+			<div className='mx-auto flex w-full max-w-375 items-start gap-3 px-5 pt-4.75 pb-4.75 sm:px-8 md:items-center'>
+				{showMenu && (
 					<button
+						ref={menuButtonRef}
 						type='button'
-						aria-label='Go to All Apps'
-						onClick={onGoHome}
-						className='flex items-center gap-3 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-violet-500'
+						aria-label='Open navigation'
+						onClick={onOpenNavigation}
+						className='grid size-10 shrink-0 place-items-center rounded-xl border border-white/85 bg-white/65 text-slate-600 shadow-sm hover:border-violet-400/35 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
 					>
-						<img
-							src='/app-icon.png'
-							alt=''
-							className='size-10 rounded-xl object-cover ring-1 ring-inset ring-violet-400/25'
-						/>
-						<span>
-							<span className='block text-[1.05rem] font-semibold tracking-tight'>
-								Windows Apps
-							</span>
-							<span className='block text-xs text-slate-500'>
-								{countLabel}
-							</span>
-						</span>
+						<Menu size={19} />
 					</button>
-				</div>
-				<div className='flex flex-1 items-start gap-3 md:items-center md:justify-end'>
-					<div className='w-full max-w-2xl'>
+				)}
+				<button
+					type='button'
+					aria-label='Go to All Apps'
+					onClick={onGoHome}
+					className='hidden shrink-0 items-center gap-3 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-violet-500 md:flex'
+				>
+					<img
+						src='/app-icon.png'
+						alt=''
+						className='size-10 rounded-xl object-cover ring-1 ring-inset ring-violet-400/25'
+					/>
+					<span>
+						<span className='block text-[1.05rem] font-semibold tracking-tight'>
+							Windows Apps
+						</span>
+						<span className='block text-xs text-slate-500'>
+							{countLabel}
+						</span>
+					</span>
+				</button>
+				<div className='flex min-w-0 flex-1 items-start gap-3 md:items-center'>
+					<div className='min-w-0 flex-1'>
 						{/* Outside <label> so it doesn't pollute the input's computed accessible name */}
 						<span id='search-hint' className='sr-only'>
 							Searches app name, publisher, description, and install
@@ -149,7 +147,7 @@ export function Header({
 						onPointerMove={scanSpotlight.onPointerMove}
 						onPointerEnter={scanSpotlight.onPointerEnter}
 						onPointerLeave={scanSpotlight.onPointerLeave}
-						className={`relative grid size-11 shrink-0 place-items-center rounded-xl text-white shadow-[0_8px_18px_rgba(104,69,216,.22)] focus-visible:outline-2 ${isRefreshing ? 'bg-red-500 hover:bg-red-400 focus-visible:outline-red-300' : 'bg-violet-600 hover:bg-violet-500 focus-visible:outline-violet-500'}`}
+						className={`relative grid size-11 shrink-0 place-items-center rounded-xl text-white shadow-[var(--shadow-accent-soft)] focus-visible:outline-2 ${isRefreshing ? 'bg-red-500 hover:bg-red-400 focus-visible:outline-red-300' : 'utility-accent-button focus-visible:outline-violet-500'}`}
 					>
 						<SpotlightLayer size={70} />
 						{isRefreshing ? (

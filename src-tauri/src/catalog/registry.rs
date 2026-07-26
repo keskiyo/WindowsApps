@@ -2,19 +2,8 @@ use super::{
     classify, clean_display_icon, find_executable_named, stable_id, AppInfo, LaunchKind,
     SourceKind, UninstallTarget,
 };
-use winreg::RegKey;
-
-pub(super) struct RegistryValues {
-    pub display_name: String,
-    pub display_icon: Option<String>,
-    pub display_version: Option<String>,
-    pub publisher: Option<String>,
-    pub comments: Option<String>,
-    pub install_location: Option<String>,
-    pub uninstall_string: Option<String>,
-    pub quiet_uninstall_string: Option<String>,
-    pub system_component: bool,
-}
+use crate::platform::windows::uninstall_registry;
+pub(super) use crate::platform::windows::uninstall_registry::RegistryEntry as RegistryValues;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct RegistryMetadata {
@@ -32,32 +21,12 @@ pub(super) struct RegistryScan {
     pub metadata: Vec<RegistryMetadata>,
 }
 
-pub(super) fn scan(hive: winreg::HKEY, subkey: &str) -> RegistryScan {
-    let Ok(uninstall) = RegKey::predef(hive).open_subkey(subkey) else {
-        return RegistryScan::default();
-    };
+pub(super) fn scan() -> RegistryScan {
     let mut result = RegistryScan::default();
-    for key in uninstall
-        .enum_keys()
-        .filter_map(Result::ok)
-        .filter_map(|name| uninstall.open_subkey(name).ok())
+    for values in uninstall_registry::entries()
+        .into_iter()
+        .map(expand_registry_paths)
     {
-        let Ok(display_name) = key.get_value("DisplayName") else {
-            continue;
-        };
-        let values = RegistryValues {
-            display_name,
-            display_icon: key.get_value("DisplayIcon").ok(),
-            display_version: key.get_value("DisplayVersion").ok(),
-            publisher: key.get_value("Publisher").ok(),
-            comments: key.get_value("Comments").ok(),
-            install_location: key.get_value("InstallLocation").ok(),
-            uninstall_string: key.get_value("UninstallString").ok(),
-            quiet_uninstall_string: key.get_value("QuietUninstallString").ok(),
-            system_component: key
-                .get_value::<u32, _>("SystemComponent")
-                .is_ok_and(|value| value == 1),
-        };
         if let Some(metadata) = metadata_from_values(&values) {
             result.metadata.push(metadata);
         }
@@ -154,6 +123,21 @@ fn uninstall_from_values(values: &RegistryValues) -> Option<UninstallTarget> {
         })
 }
 
+/// Registry paths routinely arrive as `REG_EXPAND_SZ` (`%ProgramFiles%\App\app.exe`), which
+/// `winreg` hands back unexpanded. Nothing downstream expands them, so an unexpanded value
+/// fails `is_launchable` (`Path::is_file`) and the whole entry is dropped — the application is
+/// registered with Windows but silently absent from the catalog. Expand once, here, before any
+/// on-disk resolution is attempted.
+fn expand_registry_paths(mut values: RegistryValues) -> RegistryValues {
+    values.display_icon = values
+        .display_icon
+        .map(|value| crate::platform::windows::exec_target::expand_env(&value));
+    values.install_location = values
+        .install_location
+        .map(|value| crate::platform::windows::exec_target::expand_env(&value));
+    values
+}
+
 fn clean(value: Option<String>) -> Option<String> {
     value
         .map(|text| text.trim().to_string())
@@ -190,6 +174,47 @@ mod tests {
             quiet_uninstall_string: None,
             system_component: false,
         }
+    }
+
+    // `REG_EXPAND_SZ` values arrive unexpanded. Before expansion these entries failed the
+    // `is_file` check and vanished from the catalog even though Windows had them registered.
+    // The variable name is unique to this test: the test binary is multi-threaded and the
+    // process environment is shared.
+    #[test]
+    fn expands_environment_variables_in_registry_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        std::env::set_var("WINAPPS_TEST_REG_ROOT", dir.path());
+        let raw = values("Editor", Some(r"%WINAPPS_TEST_REG_ROOT%\Editor.exe".into()));
+
+        let expanded = expand_registry_paths(raw);
+
+        assert_eq!(
+            expanded.display_icon.as_deref(),
+            Some(dir.path().join("Editor.exe").to_string_lossy().as_ref())
+        );
+    }
+
+    #[test]
+    fn an_expanded_registry_path_produces_a_catalog_entry() {
+        let dir = tempfile::tempdir().unwrap();
+        let executable = dir.path().join("Editor.exe");
+        std::fs::write(&executable, []).unwrap();
+        std::env::set_var("WINAPPS_TEST_REG_ENTRY_ROOT", dir.path());
+        let raw = values(
+            "Editor",
+            Some(r"%WINAPPS_TEST_REG_ENTRY_ROOT%\Editor.exe".into()),
+        );
+
+        // Unexpanded the same value resolves to nothing and the entry is dropped.
+        assert!(from_values(values(
+            "Editor",
+            Some(r"%WINAPPS_TEST_REG_ENTRY_ROOT%\Editor.exe".into()),
+        ))
+        .is_none());
+
+        let app = from_values(expand_registry_paths(raw)).expect("expanded path is launchable");
+        assert_eq!(app.name, "Editor");
+        assert_eq!(app.path, executable.to_string_lossy());
     }
 
     #[test]

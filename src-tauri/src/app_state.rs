@@ -7,7 +7,45 @@ use crate::platform::windows::{uninstall_history, uninstaller};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+
+const MAX_CONCURRENT_LAUNCH_WAITS: usize = 8;
+
+pub(crate) struct LaunchWaitLimiter {
+    active: AtomicUsize,
+}
+
+impl Default for LaunchWaitLimiter {
+    fn default() -> Self {
+        Self {
+            active: AtomicUsize::new(0),
+        }
+    }
+}
+
+impl LaunchWaitLimiter {
+    pub(crate) fn acquire(self: &Arc<Self>) -> Option<LaunchWaitPermit> {
+        self.active
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |active| {
+                (active < MAX_CONCURRENT_LAUNCH_WAITS).then_some(active + 1)
+            })
+            .ok()
+            .map(|_| LaunchWaitPermit {
+                limiter: Arc::clone(self),
+            })
+    }
+}
+
+pub(crate) struct LaunchWaitPermit {
+    limiter: Arc<LaunchWaitLimiter>,
+}
+
+impl Drop for LaunchWaitPermit {
+    fn drop(&mut self) {
+        self.limiter.active.fetch_sub(1, Ordering::AcqRel);
+    }
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct UninstallRecord {
@@ -24,7 +62,6 @@ pub(crate) struct UninstallPreview {
     pub(crate) publisher: Option<String>,
     pub(crate) source: SourceKind,
     pub(crate) mechanism: uninstaller::UninstallMechanism,
-    pub(crate) command: String,
 }
 
 /// All process-wide mutable catalog state, owned by the Tauri app instance through
@@ -37,6 +74,8 @@ pub(crate) struct AppState {
     pub(crate) uninstall_targets: Mutex<HashMap<String, UninstallRecord>>,
     /// Trusted launch targets (kind + path) keyed by catalog id.
     pub(crate) launch_targets: Mutex<HashMap<String, (LaunchKind, String)>>,
+    /// Bounds process readiness waits for this application instance.
+    pub(crate) launch_waits: Arc<LaunchWaitLimiter>,
     /// Serializes catalog synchronization so scans never write the cache concurrently.
     pub(crate) sync_lock: Mutex<()>,
     /// Coalesces overlapping scan requests into a single in-flight job.
@@ -46,6 +85,11 @@ pub(crate) struct AppState {
     /// Active filesystem-change watcher guard (dropped to stop watching).
     pub(crate) change_watcher:
         Mutex<Option<crate::platform::windows::change_watcher::WatcherGuard>>,
+    /// Global hotkey registration and its message-loop thread (dropped to unregister).
+    pub(crate) global_shortcut:
+        Mutex<Option<crate::platform::windows::global_shortcut::ShortcutGuard>>,
+    /// Last known registration status of the global hotkey, shown on the settings page.
+    pub(crate) shortcut_status: Mutex<crate::platform::windows::global_shortcut::Status>,
 }
 
 pub(crate) fn remember_uninstall_targets(state: &AppState, apps: &[AppInfo]) {
@@ -90,7 +134,6 @@ pub(crate) fn preview_for(record: &UninstallRecord) -> UninstallPreview {
         publisher: record.publisher.clone(),
         source: record.source_kind,
         mechanism: target.mechanism,
-        command: target.command,
     }
 }
 
@@ -172,6 +215,20 @@ mod tests {
         assert!(stored.get("unknown-id").is_none());
     }
 
+    #[test]
+    fn launch_wait_capacity_is_app_scoped() {
+        let first = AppState::default();
+        let second = AppState::default();
+        let permits = (0..8)
+            .map(|_| first.launch_waits.acquire().unwrap())
+            .collect::<Vec<_>>();
+
+        assert!(first.launch_waits.acquire().is_none());
+        assert!(second.launch_waits.acquire().is_some());
+        drop(permits);
+        assert!(first.launch_waits.acquire().is_some());
+    }
+
     fn uninstall_record(name: &str) -> UninstallRecord {
         UninstallRecord {
             app_name: name.into(),
@@ -200,6 +257,15 @@ mod tests {
         assert!(serialized.get("command").is_none());
         assert!(serialized.get("path").is_none());
         assert!(serialized.get("error").is_none());
+    }
+
+    #[test]
+    fn uninstall_preview_excludes_command_details() {
+        let serialized = serde_json::to_value(preview_for(&uninstall_record("Editor"))).unwrap();
+
+        assert_eq!(serialized.get("command"), None);
+        assert_eq!(serialized.get("path"), None);
+        assert_eq!(serialized["mechanism"], "registered_command");
     }
 
     #[test]

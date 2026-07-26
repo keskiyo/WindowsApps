@@ -6,48 +6,48 @@ use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, UNIX_EPOCH};
 
-pub const DEFAULT_MAX_DEPTH: usize = 16;
-pub const DEFAULT_MAX_ENTRIES: usize = 500_000;
-pub const DEFAULT_MAX_DURATION: Duration = Duration::from_secs(3 * 60);
+pub(crate) const DEFAULT_MAX_DEPTH: usize = 16;
+pub(crate) const DEFAULT_MAX_ENTRIES: usize = 500_000;
+pub(crate) const DEFAULT_MAX_DURATION: Duration = Duration::from_secs(3 * 60);
 const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
 const CANCELLATION_CHECK_INTERVAL: usize = 128;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ScanMode {
+pub(crate) enum ScanMode {
     Incremental,
     Force,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FilesystemIndex {
+pub(crate) struct FilesystemIndex {
     pub directories: BTreeMap<String, DirectoryRecord>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DirectoryRecord {
+pub(crate) struct DirectoryRecord {
     pub modified_nanos: u128,
     pub child_directories: Vec<String>,
     pub apps: Vec<AppInfo>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct ScanStatistics {
+pub(crate) struct ScanStatistics {
     pub directories_enumerated: usize,
     pub executables_inspected: usize,
     pub entries_seen: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ScanLimit {
+pub(crate) enum ScanLimit {
     Depth,
     Entries,
     Time,
 }
 
 impl ScanLimit {
-    pub fn message(self) -> &'static str {
+    pub(crate) fn message(self) -> &'static str {
         match self {
             Self::Depth => "maximum folder depth reached",
             Self::Entries => "maximum file count reached",
@@ -57,7 +57,7 @@ impl ScanLimit {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct ScanLimits {
+pub(crate) struct ScanLimits {
     pub max_depth: usize,
     pub max_entries: usize,
     pub max_duration: Duration,
@@ -73,14 +73,14 @@ impl Default for ScanLimits {
     }
 }
 
-pub struct IncrementalScanResult {
+pub(crate) struct IncrementalScanResult {
     pub apps: Vec<AppInfo>,
     pub index: FilesystemIndex,
     pub statistics: ScanStatistics,
     pub limit_reached: Option<ScanLimit>,
 }
 
-pub fn scan_root(
+pub(crate) fn scan_root(
     root: &Path,
     previous: &FilesystemIndex,
     mode: ScanMode,

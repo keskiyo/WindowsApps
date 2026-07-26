@@ -157,6 +157,74 @@ mod tests {
         );
     }
 
+    // The error-code set is a cross-language contract mirrored in `src/lib/tauri.ts`
+    // (`AppErrorCode`). This pins the Rust half: every code is a unique, non-empty
+    // SCREAMING_SNAKE value with a non-empty safe message, and the whole set is exactly the
+    // documented list. A drift here (renamed or duplicated code) fails the build; the frontend
+    // has the mirror test.
+    #[test]
+    fn error_codes_form_the_expected_stable_contract() {
+        let all = [
+            AppError::AppDataDir(String::new()),
+            AppError::Interrupted {
+                context: "x",
+                source: String::new(),
+            },
+            AppError::Coalesced { what: "x" },
+            AppError::SaveScanSettings(String::new()),
+            AppError::ResetCatalogCache(String::new()),
+            AppError::ResetIconCache(String::new()),
+            AppError::ClearIconCache(String::new()),
+            AppError::ClearUninstallHistory(String::new()),
+            AppError::ScanPathNotAbsolute(String::new()),
+            AppError::InvalidReleaseVersion,
+            AppError::LaunchDataUnavailable,
+            AppError::LaunchUnavailable,
+            AppError::UninstallDataUnavailable,
+            AppError::UninstallUnavailable,
+            AppError::ProductNameMissing,
+            AppError::NoNewerCopy,
+            AppError::Other(String::new()),
+        ];
+        for error in &all {
+            let code = error.code();
+            assert!(!code.is_empty());
+            assert!(
+                code.chars()
+                    .all(|c| c.is_ascii_uppercase() || c == '_' || c.is_ascii_digit()),
+                "code not SCREAMING_SNAKE: {code}"
+            );
+            assert!(!error.safe_message().is_empty());
+        }
+        let mut codes = all.iter().map(AppError::code).collect::<Vec<_>>();
+        let total = codes.len();
+        codes.sort_unstable();
+        codes.dedup();
+        assert_eq!(codes.len(), total, "duplicate error codes");
+        assert_eq!(
+            codes,
+            [
+                "APP_DATA_UNAVAILABLE",
+                "CLEAR_ICON_CACHE_FAILED",
+                "CLEAR_UNINSTALL_HISTORY_FAILED",
+                "INVALID_RELEASE_VERSION",
+                "LAUNCH_DATA_UNAVAILABLE",
+                "LAUNCH_UNAVAILABLE",
+                "NO_NEWER_COPY",
+                "OPERATION_FAILED",
+                "OPERATION_INTERRUPTED",
+                "PRODUCT_NAME_MISSING",
+                "RESET_CATALOG_CACHE_FAILED",
+                "RESET_ICON_CACHE_FAILED",
+                "SAVE_SCAN_SETTINGS_FAILED",
+                "SCAN_COALESCED",
+                "SCAN_PATH_NOT_ABSOLUTE",
+                "UNINSTALL_DATA_UNAVAILABLE",
+                "UNINSTALL_UNAVAILABLE",
+            ]
+        );
+    }
+
     #[test]
     fn context_variants_have_safe_messages() {
         assert_eq!(

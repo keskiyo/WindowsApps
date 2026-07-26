@@ -2,9 +2,9 @@ use super::sync::SyncRequest;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 
-pub type ScanResult<T> = Result<T, String>;
+pub(crate) type ScanResult<T> = Result<T, String>;
 
-pub struct ScanJob<T> {
+pub(crate) struct ScanJob<T> {
     pub request: SyncRequest,
     pub cancelled: Arc<AtomicBool>,
     waiters: Arc<Mutex<Vec<mpsc::Sender<ScanResult<T>>>>>,
@@ -26,7 +26,7 @@ struct Active<T> {
     waiters: Arc<Mutex<Vec<mpsc::Sender<ScanResult<T>>>>>,
 }
 
-pub enum Submission<T> {
+pub(crate) enum Submission<T> {
     Start {
         job: ScanJob<T>,
         receiver: Option<mpsc::Receiver<ScanResult<T>>>,
@@ -35,7 +35,7 @@ pub enum Submission<T> {
     Coalesced,
 }
 
-pub struct ScanCoordinator<T> {
+pub(crate) struct ScanCoordinator<T> {
     state: Mutex<State<T>>,
 }
 
@@ -51,7 +51,7 @@ impl<T: Clone> Default for ScanCoordinator<T> {
 }
 
 impl<T: Clone> ScanCoordinator<T> {
-    pub fn submit(&self, request: SyncRequest, wants_result: bool) -> Submission<T> {
+    pub(crate) fn submit(&self, request: SyncRequest, wants_result: bool) -> Submission<T> {
         let (sender, receiver) = mpsc::channel();
         let mut state = self.state.lock().expect("scan coordinator poisoned");
         let waiters = wants_result
@@ -113,7 +113,7 @@ impl<T: Clone> ScanCoordinator<T> {
         Submission::Coalesced
     }
 
-    pub fn complete(&self, job: ScanJob<T>, result: ScanResult<T>) -> Option<ScanJob<T>> {
+    pub(crate) fn complete(&self, job: ScanJob<T>, result: ScanResult<T>) -> Option<ScanJob<T>> {
         for waiter in job.waiters.lock().expect("scan waiters poisoned").drain(..) {
             let _ = waiter.send(result.clone());
         }
@@ -134,7 +134,7 @@ impl<T: Clone> ScanCoordinator<T> {
         })
     }
 
-    pub fn cancel_all(&self) {
+    pub(crate) fn cancel_all(&self) {
         let mut state = self.state.lock().expect("scan coordinator poisoned");
         if let Some(active) = &state.active {
             active.cancelled.store(true, Ordering::Relaxed);

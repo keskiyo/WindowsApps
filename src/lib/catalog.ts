@@ -14,15 +14,21 @@ export function groupAppsByCategory(
 	apps: readonly AppInfo[],
 ): Map<AppCategory, AppInfo[]> {
 	const groups = new Map<AppCategory, AppInfo[]>()
+	// Append to the array already in the map. Rebuilding it per app copies the whole
+	// group every time, which is O(n²) for a large category — and this runs on every
+	// grid render.
 	for (const app of apps) {
-		groups.set(app.category, [...(groups.get(app.category) ?? []), app])
+		const group = groups.get(app.category)
+		if (group) group.push(app)
+		else groups.set(app.category, [app])
 	}
 	return groups
 }
 
 /**
- * Surfaces favorited apps at the top of a category while preserving the original
- * relative order within each group (Array.sort is stable). Returns a new array.
+ * Orders a category: favorited apps first, then the rest, each group sorted alphabetically by
+ * name. The alphabetical tiebreak is locale-aware (`localeCompare`), so mixed Latin/Cyrillic and
+ * case sort the way a user reads them rather than by raw code point. Returns a new array.
  */
 export function sortFavoritesFirst(
 	apps: readonly AppInfo[],
@@ -32,7 +38,10 @@ export function sortFavoritesFirst(
 	return [...apps].sort((a, b) => {
 		const aFav = isFavorite.has(a.id) ? 0 : 1
 		const bFav = isFavorite.has(b.id) ? 0 : 1
-		return aFav - bFav
+		return (
+			aFav - bFav ||
+			a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+		)
 	})
 }
 

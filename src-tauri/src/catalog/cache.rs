@@ -4,15 +4,17 @@ use crate::catalog::AppInfo;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
-use std::io;
+use std::io::{self, Write};
 use std::path::Path;
 
 const CACHE_FILE: &str = "apps-cache.json";
-pub const CACHE_SCHEMA_VERSION: u32 = 4;
+/// 5 split the single combined Windows source snapshot into one per scanner, so a scanner that
+/// fails keeps its previous snapshot instead of clearing the catalog.
+pub(crate) const CACHE_SCHEMA_VERSION: u32 = 5;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CatalogDiagnostics {
+pub(crate) struct CatalogDiagnostics {
     pub completed_at: u64,
     pub duration_ms: u64,
     pub mode: String,
@@ -27,7 +29,7 @@ pub struct CatalogDiagnostics {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CatalogCache {
+pub(crate) struct CatalogCache {
     pub schema_version: u32,
     pub generation: u64,
     pub apps: Vec<AppInfo>,
@@ -55,7 +57,7 @@ impl Default for CatalogCache {
     }
 }
 
-pub fn read_document(app_data_dir: &Path) -> Option<CatalogCache> {
+pub(crate) fn read_document(app_data_dir: &Path) -> Option<CatalogCache> {
     let primary = app_data_dir.join(CACHE_FILE);
     let backup = app_data_dir.join("apps-cache.json.bak");
     fs::read(&primary)
@@ -73,10 +75,18 @@ fn parse_document(bytes: &[u8]) -> Option<CatalogCache> {
         if document.schema_version == CACHE_SCHEMA_VERSION {
             return Some(document);
         }
-        if matches!(document.schema_version, 2 | 3) {
-            for app in &mut document.apps {
-                super::visibility::apply_visibility(app);
+        if matches!(document.schema_version, 2..=4) {
+            // Visibility classification arrived in 4; older documents need it recomputed.
+            if document.schema_version < 4 {
+                for app in &mut document.apps {
+                    super::visibility::apply_visibility(app);
+                }
             }
+            // 5 replaced the combined Windows snapshot with one per scanner. The apps stay —
+            // only the stale snapshot goes, and the next scan repopulates the new keys.
+            document
+                .sources
+                .retain(|snapshot| snapshot.key.0 != super::source::LEGACY_COMBINED_SOURCE);
             document.schema_version = CACHE_SCHEMA_VERSION;
             return Some(document);
         }
@@ -93,13 +103,21 @@ fn parse_document(bytes: &[u8]) -> Option<CatalogCache> {
     })
 }
 
-pub fn write_document(app_data_dir: &Path, document: &CatalogCache) -> io::Result<()> {
+pub(crate) fn write_document(app_data_dir: &Path, document: &CatalogCache) -> io::Result<()> {
     fs::create_dir_all(app_data_dir)?;
     let cache = app_data_dir.join(CACHE_FILE);
     let temporary = app_data_dir.join("apps-cache.json.tmp");
     let backup = app_data_dir.join("apps-cache.json.bak");
     let bytes = serde_json::to_vec(document).map_err(io::Error::other)?;
-    fs::write(&temporary, bytes)?;
+    // Flush the temp file to disk before it is renamed into place. Without this a power loss
+    // between the rename and the OS flushing its cache could leave `apps-cache.json` present but
+    // empty — and the still-good `.bak` is deleted moments later. `sync_all` costs a stat's worth
+    // of latency and the cache is written at most once per scan.
+    {
+        let mut file = fs::File::create(&temporary)?;
+        file.write_all(&bytes)?;
+        file.sync_all()?;
+    }
     if cache.exists() {
         if backup.exists() {
             fs::remove_file(&backup)?;
@@ -118,7 +136,7 @@ pub fn write_document(app_data_dir: &Path, document: &CatalogCache) -> io::Resul
     Ok(())
 }
 
-pub fn reset(app_data_dir: &Path) -> io::Result<()> {
+pub(crate) fn reset(app_data_dir: &Path) -> io::Result<()> {
     let cache = app_data_dir.join(CACHE_FILE);
     let temporary = app_data_dir.join("apps-cache.json.tmp");
     let backup = app_data_dir.join("apps-cache.json.bak");
@@ -344,6 +362,42 @@ mod tests {
             migrated.apps[0].visibility_class,
             crate::catalog::VisibilityClass::Auxiliary
         );
+    }
+
+    // 5 split the combined Windows snapshot into one per scanner. Leaving the old snapshot in
+    // place would keep merging its stale apps in forever, alongside the new per-scanner ones.
+    #[test]
+    fn migrates_v4_by_dropping_the_combined_windows_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let document = serde_json::json!({
+            "schemaVersion": 4,
+            "generation": 12,
+            "apps": [],
+            "sources": [
+                { "key": "windows", "fingerprint": null, "apps": [] },
+                { "key": "steam", "fingerprint": null, "apps": [] },
+                { "key": "portable", "fingerprint": null, "apps": [] }
+            ],
+            "filesystemIndex": { "directories": {} },
+            "lastSuccessfulSync": null,
+            "diagnostics": null
+        });
+        std::fs::write(
+            dir.path().join(CACHE_FILE),
+            serde_json::to_vec(&document).unwrap(),
+        )
+        .unwrap();
+
+        let migrated = read_document(dir.path()).unwrap();
+
+        assert_eq!(migrated.schema_version, CACHE_SCHEMA_VERSION);
+        assert_eq!(migrated.generation, 12);
+        let keys = migrated
+            .sources
+            .iter()
+            .map(|snapshot| snapshot.key.0.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(keys, vec!["steam", "portable"]);
     }
 
     #[test]

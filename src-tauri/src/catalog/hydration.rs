@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AppHydrationPatch {
+pub(crate) struct AppHydrationPatch {
     pub id: String,
     pub generation: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -28,12 +28,16 @@ pub struct AppHydrationPatch {
     pub can_uninstall: Option<bool>,
 }
 
-pub fn hydrate_one(app_data_dir: &Path, app: &AppInfo, generation: u64) -> AppHydrationPatch {
+pub(crate) fn hydrate_one(
+    app_data_dir: &Path,
+    app: &AppInfo,
+    generation: u64,
+) -> AppHydrationPatch {
     hydrate_app(app_data_dir, app, generation)
 }
 
 #[derive(Default)]
-pub struct HydrationQueue {
+pub(crate) struct HydrationQueue {
     generation: u64,
     foreground: VecDeque<String>,
     background: VecDeque<String>,
@@ -42,7 +46,7 @@ pub struct HydrationQueue {
 }
 
 impl HydrationQueue {
-    pub fn enqueue(
+    pub(crate) fn enqueue(
         &mut self,
         generation: u64,
         ids: impl IntoIterator<Item = String>,
@@ -80,7 +84,7 @@ impl HydrationQueue {
         }
     }
 
-    pub fn pop(&mut self, generation: u64) -> Option<String> {
+    pub(crate) fn pop(&mut self, generation: u64) -> Option<String> {
         if self.generation != generation {
             return None;
         }
@@ -89,13 +93,13 @@ impl HydrationQueue {
             .or_else(|| self.background.pop_front())
     }
 
-    pub fn complete(&mut self, generation: u64, id: &str) {
+    pub(crate) fn complete(&mut self, generation: u64, id: &str) {
         if self.generation == generation {
             self.queued.remove(id);
         }
     }
 
-    pub fn finish(&mut self, generation: u64) {
+    pub(crate) fn finish(&mut self, generation: u64) {
         if self.generation == generation {
             self.running = false;
         }
@@ -208,7 +212,7 @@ fn is_image_file(path: &Path) -> bool {
 /// Resolve a Steam game's icon from `<SteamPath>/appcache/librarycache`.
 fn steam_library_icon(app: &AppInfo) -> Option<String> {
     let app_id = app.path.strip_prefix("steam://rungameid/")?;
-    let cache = super::steam::steam_root()?
+    let cache = crate::platform::windows::steam_registry::install_root()?
         .join("appcache")
         .join("librarycache");
     let candidate = steam_icon_file(&cache, app_id)?;

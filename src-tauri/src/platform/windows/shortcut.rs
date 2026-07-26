@@ -2,13 +2,12 @@ use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use windows::core::{Interface, PCWSTR};
 use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CoUninitialize, IPersistFile, CLSCTX_INPROC_SERVER,
-    COINIT_APARTMENTTHREADED, STGM_READ,
+    CoCreateInstance, IPersistFile, CLSCTX_INPROC_SERVER, STGM_READ,
 };
 use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
 
 #[derive(Debug, Default)]
-pub struct ShortcutDetails {
+pub(crate) struct ShortcutDetails {
     pub target: Option<PathBuf>,
     pub icon_location: Option<PathBuf>,
     /// Command-line arguments stored in the shortcut. A non-empty value usually marks a
@@ -18,13 +17,10 @@ pub struct ShortcutDetails {
     pub arguments: Option<String>,
 }
 
-pub fn resolve(path: &Path) -> ShortcutDetails {
-    let initialized = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok() };
-    let details = unsafe { resolve_inner(path) }.unwrap_or_default();
-    if initialized {
-        unsafe { CoUninitialize() };
-    }
-    details
+pub(crate) fn resolve(path: &Path) -> ShortcutDetails {
+    // One apartment per worker thread, not one per shortcut — see `platform::windows::com`.
+    super::com::ensure_initialized();
+    unsafe { resolve_inner(path) }.unwrap_or_default()
 }
 
 unsafe fn resolve_inner(path: &Path) -> windows::core::Result<ShortcutDetails> {
@@ -33,21 +29,47 @@ unsafe fn resolve_inner(path: &Path) -> windows::core::Result<ShortcutDetails> {
     let path_wide = wide(path.as_os_str());
     unsafe { persist.Load(PCWSTR(path_wide.as_ptr()), STGM_READ)? };
 
-    let mut target = vec![0_u16; 32768];
-    let _ = unsafe { link.GetPath(&mut target, std::ptr::null_mut(), 0) };
-    let mut icon = vec![0_u16; 32768];
-    let mut icon_index = 0;
-    let _ = unsafe { link.GetIconLocation(&mut icon, &mut icon_index) };
-    let mut arguments = vec![0_u16; 32768];
-    let _ = unsafe { link.GetArguments(&mut arguments) };
-    Ok(ShortcutDetails {
-        target: path_from_buffer(&target),
-        // Installers write icon locations with forward slashes and 8.3 names
-        // (C:/PROGRA~1/...). Normalize separators so cache keys stay consistent.
-        icon_location: path_from_buffer(&icon)
-            .map(|path| PathBuf::from(path.to_string_lossy().replace('/', r"\"))),
-        arguments: string_from_buffer(&arguments),
+    // Reused across shortcuts instead of allocating and zeroing three 64 KB buffers per `.lnk`
+    // — a Start Menu with a few hundred entries otherwise churned ~100 MB per scan. Capacity is
+    // unchanged (the Windows maximum path length), so nothing is truncated that was not before.
+    BUFFERS.with(|buffers| {
+        let buffers = &mut *buffers.borrow_mut();
+        for buffer in [
+            &mut buffers.target,
+            &mut buffers.icon,
+            &mut buffers.arguments,
+        ] {
+            buffer.fill(0);
+        }
+        let _ = unsafe { link.GetPath(&mut buffers.target, std::ptr::null_mut(), 0) };
+        let mut icon_index = 0;
+        let _ = unsafe { link.GetIconLocation(&mut buffers.icon, &mut icon_index) };
+        let _ = unsafe { link.GetArguments(&mut buffers.arguments) };
+        Ok(ShortcutDetails {
+            target: path_from_buffer(&buffers.target),
+            // Installers write icon locations with forward slashes and 8.3 names
+            // (C:/PROGRA~1/...). Normalize separators so cache keys stay consistent.
+            icon_location: path_from_buffer(&buffers.icon)
+                .map(|path| PathBuf::from(path.to_string_lossy().replace('/', r"\"))),
+            arguments: string_from_buffer(&buffers.arguments),
+        })
     })
+}
+
+const BUFFER_LENGTH: usize = 32768;
+
+struct ShortcutBuffers {
+    target: Vec<u16>,
+    icon: Vec<u16>,
+    arguments: Vec<u16>,
+}
+
+thread_local! {
+    static BUFFERS: std::cell::RefCell<ShortcutBuffers> = std::cell::RefCell::new(ShortcutBuffers {
+        target: vec![0_u16; BUFFER_LENGTH],
+        icon: vec![0_u16; BUFFER_LENGTH],
+        arguments: vec![0_u16; BUFFER_LENGTH],
+    });
 }
 
 fn path_from_buffer(buffer: &[u16]) -> Option<PathBuf> {

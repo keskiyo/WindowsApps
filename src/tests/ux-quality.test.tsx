@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
@@ -53,7 +53,6 @@ function renderApp(
 			publisher: 'Microsoft',
 			source: 'registry',
 			mechanism: 'registered_command',
-			command: 'C:\\Code\\uninstall.exe /quiet',
 		}),
 		uninstallApp: vi.fn().mockResolvedValue(undefined),
 		onAppsUpdated: vi.fn().mockResolvedValue(() => undefined),
@@ -307,9 +306,16 @@ describe('UX quality — keyboard & native (round 3)', () => {
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Open navigation' }),
 		)
-		const allApps = screen.getByRole('button', { name: 'All Apps' })
+		const navigation = screen.getByRole('dialog', {
+			name: 'App navigation',
+		})
+		const allApps = within(navigation).getByRole('button', {
+			name: 'All Apps',
+		})
 		expect(allApps).toHaveAttribute('aria-current', 'page')
-		const favorites = screen.getByRole('button', { name: /Favorites/ })
+		const favorites = within(navigation).getByRole('button', {
+			name: /Favorites/,
+		})
 		expect(favorites).not.toHaveAttribute('aria-current')
 	})
 

@@ -10,17 +10,20 @@ export function deduplicateVisibleApps(apps: AppInfo[]): AppInfo[] {
 	const byId = new Map<string, number>()
 	const byPath = new Map<string, number>()
 
-	const register = (entry: AppInfo, position: number) => {
+	const register = (entry: AppInfo, position: number, path: string) => {
 		if (entry.id) byId.set(entry.id, position)
-		byPath.set(normalizeVisiblePath(entry.path), position)
+		byPath.set(path, position)
 	}
 
 	for (const app of apps) {
-		const index = byId.get(app.id) ?? byPath.get(normalizeVisiblePath(app.path))
+		// Normalizing lowercases the path locale-aware; compute it once per app rather
+		// than for both the lookup and the registration.
+		const path = normalizeVisiblePath(app.path)
+		const index = byId.get(app.id) ?? byPath.get(path)
 		if (index === undefined) {
 			const position = unique.length
 			unique.push(app)
-			register(app, position)
+			register(app, position, path)
 			continue
 		}
 
@@ -28,7 +31,7 @@ export function deduplicateVisibleApps(apps: AppInfo[]): AppInfo[] {
 			visibleCandidateScore(app) > visibleCandidateScore(unique[index])
 				? mergeVisibleApp(app, unique[index])
 				: mergeVisibleApp(unique[index], app)
-		register(unique[index], index)
+		register(unique[index], index, normalizeVisiblePath(unique[index].path))
 	}
 
 	return unique

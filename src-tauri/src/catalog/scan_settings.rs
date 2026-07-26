@@ -6,7 +6,7 @@ const SETTINGS_FILE: &str = "scan-settings.json";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ScanSettings {
+pub(crate) struct ScanSettings {
     pub auto_scan_fixed_drives: bool,
     #[serde(default)]
     pub included_paths: Vec<String>,
@@ -24,14 +24,14 @@ impl Default for ScanSettings {
     }
 }
 
-pub fn read(app_data_dir: &Path) -> ScanSettings {
+pub(crate) fn read(app_data_dir: &Path) -> ScanSettings {
     fs::read(app_data_dir.join(SETTINGS_FILE))
         .ok()
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or_default()
 }
 
-pub fn write(app_data_dir: &Path, settings: &ScanSettings) -> io::Result<()> {
+pub(crate) fn write(app_data_dir: &Path, settings: &ScanSettings) -> io::Result<()> {
     fs::create_dir_all(app_data_dir)?;
     let bytes = serde_json::to_vec_pretty(settings).map_err(io::Error::other)?;
     let temporary = app_data_dir.join("scan-settings.json.tmp");

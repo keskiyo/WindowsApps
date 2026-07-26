@@ -3,16 +3,35 @@ use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 use windows::core::PCWSTR;
+use windows::Win32::Foundation::{CloseHandle, HANDLE};
+use windows::Win32::System::Threading::WaitForInputIdle;
 use windows::Win32::UI::Shell::{
     ShellExecuteExW, ShellExecuteW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW,
 };
 use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
 /// Launches an app and, when the shell hands back a process handle (regular exe/shortcut
-/// launches), returns its raw value so the caller can wait for the window to be ready.
+/// launches), returns an owned handle so the caller can wait for the window to be ready.
 /// Store/UWP and shell hand-offs return `Ok(None)` — there is no handle to wait on.
-pub fn launch(kind: LaunchKind, target: &str) -> Result<Option<isize>, String> {
-    if kind != LaunchKind::AppUserModelId && !Path::new(target).exists() {
+pub(crate) struct OwnedProcessHandle(isize);
+
+impl Drop for OwnedProcessHandle {
+    fn drop(&mut self) {
+        let _ = unsafe { CloseHandle(HANDLE(self.0 as *mut core::ffi::c_void)) };
+    }
+}
+
+pub(crate) fn wait_for_input_idle(handle: &OwnedProcessHandle, timeout_ms: u32) {
+    let handle = HANDLE(handle.0 as *mut core::ffi::c_void);
+    unsafe { WaitForInputIdle(handle, timeout_ms) };
+}
+
+pub(crate) fn launch(kind: LaunchKind, target: &str) -> Result<Option<OwnedProcessHandle>, String> {
+    // A protocol target has no file to check; requiring one rejected every Steam game, whose
+    // catalog entry is `steam://rungameid/<id>`. Handing the URI to the shell is also what
+    // should happen: Steam starts the game itself, so DRM, cloud saves, the overlay and
+    // playtime tracking all work — launching the bare executable bypasses them.
+    if kind != LaunchKind::AppUserModelId && !is_launch_uri(target) && !Path::new(target).exists() {
         return Err(format!("File not found: {target}"));
     }
     let shell_target = match kind {
@@ -22,7 +41,7 @@ pub fn launch(kind: LaunchKind, target: &str) -> Result<Option<isize>, String> {
     shell_execute_with_handle(&shell_target)
 }
 
-fn shell_execute_with_handle(target: &str) -> Result<Option<isize>, String> {
+fn shell_execute_with_handle(target: &str) -> Result<Option<OwnedProcessHandle>, String> {
     let operation: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
     let file: Vec<u16> = OsStr::new(target).encode_wide().chain(Some(0)).collect();
     let mut info = SHELLEXECUTEINFOW {
@@ -42,11 +61,11 @@ fn shell_execute_with_handle(target: &str) -> Result<Option<isize>, String> {
     if info.hProcess.is_invalid() {
         Ok(None)
     } else {
-        Ok(Some(info.hProcess.0 as isize))
+        Ok(Some(OwnedProcessHandle(info.hProcess.0 as isize)))
     }
 }
 
-pub fn shell_execute(target: &str) -> Result<(), String> {
+pub(crate) fn shell_execute(target: &str) -> Result<(), String> {
     let operation: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
     let file: Vec<u16> = OsStr::new(target).encode_wide().chain(Some(0)).collect();
     let result = unsafe {
@@ -64,6 +83,18 @@ pub fn shell_execute(target: &str) -> Result<(), String> {
 
 fn apps_folder_target(app_id: &str) -> String {
     format!(r"shell:AppsFolder\{app_id}")
+}
+
+/// Launch targets that address a protocol handler instead of a file. Deliberately an allowlist
+/// of the single scheme the catalog produces: targets are resolved server-side from what the
+/// scanner found, and this keeps it that way even if a future source starts emitting URIs.
+const LAUNCH_URI_SCHEMES: &[&str] = &["steam:"];
+
+fn is_launch_uri(target: &str) -> bool {
+    let target = target.trim().to_ascii_lowercase();
+    LAUNCH_URI_SCHEMES
+        .iter()
+        .any(|scheme| target.starts_with(scheme))
 }
 
 fn validate_shell_result(result: isize) -> Result<(), String> {
@@ -88,6 +119,29 @@ mod tests {
     #[test]
     fn rejects_shell_execute_error_values() {
         assert!(validate_shell_result(31).is_err());
+    }
+
+    // Steam entries carry `steam://rungameid/<id>` as their launch target and win the merge
+    // against any shortcut, so treating that as a missing file made every Steam game
+    // unlaunchable.
+    #[test]
+    fn steam_targets_are_recognized_as_protocol_uris() {
+        assert!(is_launch_uri("steam://rungameid/2183900"));
+        assert!(is_launch_uri("  STEAM://rungameid/1  "));
+    }
+
+    #[test]
+    fn ordinary_targets_are_not_treated_as_protocol_uris() {
+        for target in [
+            r"C:\Games\game.exe",
+            r"C:\Menu\Game.lnk",
+            r"\\server\share\game.exe",
+            "Microsoft.WindowsCamera_8wekyb3d8bbwe!App",
+            "https://example.invalid",
+            "",
+        ] {
+            assert!(!is_launch_uri(target), "{target}");
+        }
     }
 
     #[test]

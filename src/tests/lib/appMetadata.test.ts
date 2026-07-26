@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { descriptionLabel, metadataRows } from '../../lib/appMetadata'
+import {
+	descriptionLabel,
+	displayVersion,
+	metadataRows,
+} from '../../lib/appMetadata'
+
+describe('displayVersion', () => {
+	it('strips a redundant "Version"/"v" marker so the UI does not print "vVersion"', () => {
+		expect(displayVersion('Version 12.0.7.68887')).toBe('12.0.7.68887')
+		expect(displayVersion('v2.1')).toBe('2.1')
+		expect(displayVersion('version: 8.6')).toBe('8.6')
+	})
+
+	it('leaves a plain numeric version and a real name untouched', () => {
+		expect(displayVersion('1.18.10.3140')).toBe('1.18.10.3140')
+		// A leading letter that is not a version marker is not stripped.
+		expect(displayVersion('Vista 1.0')).toBe('Vista 1.0')
+	})
+})
 
 describe('application metadata formatting', () => {
 	it('does not invent an unavailable description', () => {

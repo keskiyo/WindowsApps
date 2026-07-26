@@ -5,6 +5,9 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$Tag,
 
+  [Parameter(Mandatory = $true)]
+  [string]$NotesPath,
+
   [string]$Repository = "keskiyo/WindowsApps"
 )
 
@@ -22,10 +25,17 @@ if (-not (Test-Path -LiteralPath $setupPath -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $signaturePath -PathType Leaf)) {
   throw "$setupName.sig is missing from $AssetsDir"
 }
+if (-not (Test-Path -LiteralPath $NotesPath -PathType Leaf)) {
+  throw "Release notes file is missing: $NotesPath"
+}
 
 $signature = (Get-Content -LiteralPath $signaturePath -Raw).Trim()
 if ([string]::IsNullOrWhiteSpace($signature)) {
   throw "$setupName.sig is empty"
+}
+$notes = [IO.File]::ReadAllText($NotesPath, [Text.Encoding]::UTF8).Trim()
+if ([string]::IsNullOrWhiteSpace($notes)) {
+  throw "Release notes file is empty: $NotesPath"
 }
 
 $downloadUrl = "https://github.com/$Repository/releases/download/$Tag/$([Uri]::EscapeDataString($publishedSetupName))"
@@ -39,7 +49,7 @@ $platforms = [ordered]@{
 }
 $manifest = [ordered]@{
   version = $version
-  notes = "See the GitHub release notes."
+  notes = $notes
   pub_date = [DateTime]::UtcNow.ToString("o")
   platforms = $platforms
   packageSize = (Get-Item -LiteralPath $setupPath).Length

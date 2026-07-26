@@ -5,13 +5,13 @@
 
 **A fast, private application catalog and launcher for Windows 10 and Windows 11.**
 
-[![Version](https://img.shields.io/badge/version-0.2.6-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.6)
+[![Version](https://img.shields.io/badge/version-0.2.7-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.7)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
 ![Local first](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
 
-[Download Windows Apps 0.2.6](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.6) ·
+[Download Windows Apps 0.2.7](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.7) ·
 [Documentation](Documentation.md) ·
 [Telegram](https://t.me/keskiyo)
 
@@ -27,36 +27,48 @@ The catalog is stored locally. On startup, cached names appear immediately while
 
 ## Features
 
-- **Unified catalog** — Start Menu shortcuts, registered desktop software, packaged Windows apps, Steam games, and portable executables.
-- **Fast startup** — lightweight versioned cache is rendered before background synchronization finishes.
-- **Incremental scanning** — unchanged directories reuse previous results.
-- **Controlled full scans** — progress reporting, cancellation, depth, entry-count, and time limits.
-- **Smart deduplication** — evidence-based resolution merges the same product found across sources, with useful shortcuts preferred and legitimate apps kept when identity is ambiguous.
-- **Explainable noise filtering** — applications are classified from Windows registration, shortcut targets, executable metadata, location, and role instead of relying only on filenames.
-- **Auxiliary tools** — runtime components and maintenance executables stay out of normal categories and search, remain inspectable, and can be restored by the user.
-- **Stable catalog overrides** — restored auxiliary tools are tracked by normalized application identity, surviving source and launcher changes; they can be moved back at any time.
-- **Full-text search** — matches application name, publisher, description, and install path; each word is matched independently.
-- **Quick launch (Ctrl+K)** — keyboard-first command palette to find and launch any app; `Ctrl+F` or `/` jumps to search.
-- **Launch feedback** — the card shows a launching state (dimmed icon + spinner) and a top activity bar, cleared when the app window is ready or after a short ceiling.
-- **Background icon loading** — visible application cards receive priority without creating duplicate hydration work.
-- **Organization** — automatic and custom categories, category reordering, application moves, Favorites (surfaced first within a category), and reversible Hidden items.
-- **Automatic updates** — signed NSIS-only updates show release date, package size, full notes, byte progress, verification, quiet installation, restart, and retry states.
-- **Catalog diagnostics** — Settings reports the last scan mode, duration, changes, and privacy-safe source totals.
-- **Icon recovery** — repair missing icons or clear only the icon cache without forcing another filesystem scan.
-- **Responsive navigation** — persistent sidebar from `1024px`; overlay drawer on smaller windows.
-- **Keyboard & accessibility** — focus traps in dialogs and menus, `aria-current` navigation, arrow-key menus, and reduced-motion support.
-- **Native launching** — shortcuts, executables, shell targets, Steam entries, and packaged applications use their appropriate Windows launch mechanism.
-- **Registered uninstall** — Windows Apps uses vendor, MSI, or MSIX uninstall information registered with Windows.
-- **Uninstall history** — keeps a local privacy-limited history of the latest 100 attempts.
-- **System tray** — closing the window keeps the launcher available in the notification area.
-- **Global shortcut** — `Win+Shift+Q` restores the window using the physical Q key regardless of keyboard layout.
-- **Windows startup** — optional launch after sign-in for the current Windows account.
-- **Catalog maintenance** — Force full scan and Reset catalog cache are available in Settings.
+Most launchers just re-list what Windows already knows. Windows Apps earns its place by what it does _with_ that list — deciding what deserves to be a launch card, keeping your choices attached to the app rather than to a fragile internal ID, and resolving every native action inside Rust.
+
+### An intelligent catalog
+
+- **Evidence-based deduplication** — the same product found as a Start Menu shortcut, a registry entry, a Store package, and a Steam game collapses into one card. Merging weighs resolved targets, product families, publishers, and install roots; a useful shortcut wins, and a genuine app is kept when the evidence is ambiguous rather than guessed away.
+- **Explainable classification, not filename guessing** — every entry is scored `primary` / `auxiliary` / `rejected` from Windows registration, shortcut target, PE metadata, location, and role, each with a stable reason code. `ServiceDesk` is not mistaken for a service; a renamed `notification_helper.exe` is not mistaken for an app.
+- **Auxiliary tools instead of deletion** — runtime components, language servers, and maintenance executables stay out of your categories and search but remain inspectable, and any of them can be restored in one click.
+- **Choices that survive a rescan** — Favorites, Hidden items, and restored tools are tracked by a normalized application identity, so they follow the app across a source change, a full rescan, or a cache reset instead of vanishing when its internal ID changes.
+
+### Built to feel instant
+
+- **Cache-first startup** — names render from a lightweight versioned cache before any scan runs; icons and metadata stream in behind them.
+- **Incremental by default** — unchanged directories reuse prior results; only what actually changed on disk is re-read.
+- **Bounded, cancellable full scans** — depth, entry-count, and time limits with live progress. Reparse points, network, and removable drives are skipped, so a scan can neither loop nor run away.
+- **Batched icon hydration** — visible cards are prioritized and icons arrive in batches, so streaming metadata never re-renders the whole grid.
+
+### Secure by construction
+
+- **The webview can only pass an ID** — every launch and uninstall is resolved from a Rust-owned catalog map, never from a path supplied by the frontend.
+- **No shell strings** — processes are built from a fixed executable plus an argument vector; UNC/network targets, script interpreters, and unvalidated uninstall commands are refused.
+- **Local and quiet** — the catalog is processed and stored on your machine; no inventory, drive list, or telemetry leaves it, and missing metadata is left unknown rather than invented.
+- **Privacy-limited uninstall history** — the newest 100 attempts, storing only name, publisher, mechanism, and result — never a command, path, argument, or error text.
+
+### Finding and launching
+
+- **Full-text search** — matches name, publisher, description, and install path, each word independently, cached so typing stays smooth over a large catalog.
+- **Quick-launch palette (Ctrl+K)** — keyboard-first find-and-launch; `Ctrl+F` or `/` jumps to search.
+- **Honest launch feedback** — the card dims with a spinner and a top activity bar until the app's window is actually ready, cleared early by the backend or by a short ceiling.
+- **Native launch mechanisms** — shortcuts, executables, shell targets, packaged apps, and Steam entries each launch the way Windows intends; Steam games start through Steam, so overlay, cloud saves, and playtime keep working.
+
+### Organization and desktop fit
+
+- **Flexible organization** — automatic plus custom categories with reordering and drag-to-move, Favorites surfaced first within a category, and reversible Hidden items.
+- **Registered, signed, reversible** — vendor / MSI / MSIX uninstall from Windows' own registration; signed NSIS-only auto-updates with full notes, byte progress, and verification; nothing forced.
+- **Lives in the tray** — closing hides to the notification area; `Win+Shift+Q` (physical key, layout-independent) brings it back; optional launch at sign-in.
+- **Accessible and responsive** — focus-trapped dialogs, arrow-key menus, `aria-current` navigation, reduced-motion support, and a persistent sidebar that becomes an overlay drawer on narrow windows.
+- **Catalog maintenance** — Settings exposes scan diagnostics, icon repair, icon-cache clear, force full scan, and cache reset.
 
 ## Installation
 
-1. Open [Windows Apps 0.2.6](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.6).
-2. Download `Windows Apps_0.2.6_x64-setup.exe`.
+1. Open [Windows Apps 0.2.7](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.7).
+2. Download `Windows Apps_0.2.7_x64-setup.exe`.
 3. Run the installer.
 4. Start **Windows Apps** and select **Scan for apps** when prompted.
 
@@ -106,7 +118,7 @@ PE `ProductName` and `OriginalFilename` metadata are retained separately. They h
 - No telemetry service is configured.
 - Missing descriptions are left unknown; Windows Apps does not invent or download metadata.
 - Launch commands are resolved from Rust-owned catalog IDs, not arbitrary frontend paths.
-- Uninstall commands come from Windows registration data and are previewed before execution.
+- Uninstall targets come from Windows registration data. The preview exposes only application identity and a safe removal-mechanism label; command details remain backend-only.
 - UNC/network uninstall executables are rejected.
 - Program folders are never recursively deleted as an uninstall method.
 - Uninstall history excludes commands, paths, arguments, package IDs, usernames, and detailed error text.
@@ -136,7 +148,8 @@ npm run typecheck
 npm test
 npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
-cargo check --manifest-path src-tauri/Cargo.toml
+cargo fmt --manifest-path src-tauri/Cargo.toml --check
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
 Production build:
@@ -148,7 +161,7 @@ npm run tauri build
 Primary local artifact:
 
 ```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.6_x64-setup.exe
+src-tauri/target/release/bundle/nsis/Windows Apps_0.2.7_x64-setup.exe
 ```
 
 ## Support
