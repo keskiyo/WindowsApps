@@ -21,13 +21,16 @@ export function NavItem({
 			type='button'
 			onClick={onClick}
 			aria-current={active ? 'page' : undefined}
+			aria-label={count === undefined ? label : `${label} ${count}`}
+			title={label}
 			{...spotlight}
 			className={`${itemClass(active)}${className ? ` ${className}` : ''}`}
 		>
 			<SpotlightLayer size={90} />
-			<Icon size={17} /> <span>{label}</span>
+			<Icon className='shrink-0' size={17} />{' '}
+			<span className='min-w-0 truncate'>{label}</span>
 			{count !== undefined && (
-				<span className='ml-auto rounded-full bg-slate-200/85 px-2 py-0.5 text-xs text-slate-600'>
+				<span className='ml-auto shrink-0 rounded-full bg-slate-200/85 px-2 py-0.5 text-xs text-slate-600'>
 					{count}
 				</span>
 			)}

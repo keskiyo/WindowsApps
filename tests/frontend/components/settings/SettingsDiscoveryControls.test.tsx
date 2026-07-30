@@ -5,7 +5,7 @@ import { SettingsDiscoveryControls } from '../../../../src/components/settings/S
 import type { SystemSettings } from '../../../../src/types'
 
 const settings: SystemSettings = {
-	version: '0.2.7',
+	version: '0.2.8',
 	autostartEnabled: false,
 	shortcut: { available: true, label: 'Win+Shift+Q', error: null },
 	scanSettings: {

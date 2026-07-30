@@ -51,6 +51,7 @@ describe('large catalog selector behavior', () => {
 		const before = selectCategorizedApps({
 			apps,
 			categoryOverrides: {},
+			categoryOverrideIdentities: {},
 			promotedAppIds: [],
 			promotedAppIdentities: [],
 		})
@@ -64,6 +65,7 @@ describe('large catalog selector behavior', () => {
 		const after = selectCategorizedApps({
 			apps: patched,
 			categoryOverrides: {},
+			categoryOverrideIdentities: {},
 			promotedAppIds: [],
 			promotedAppIdentities: [],
 		})

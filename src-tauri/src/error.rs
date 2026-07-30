@@ -16,7 +16,7 @@ struct AppErrorPayload {
     message: &'static str,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum AppError {
     /// The per-user application data directory could not be resolved.
     AppDataDir(String),
@@ -27,6 +27,8 @@ pub(crate) enum AppError {
     },
     /// A scan request was coalesced into another in-flight scan and produced no result.
     Coalesced { what: &'static str },
+    /// The user cancelled an application scan.
+    ScanCancelled,
     /// Persisting scan settings failed.
     SaveScanSettings(String),
     /// Resetting the catalog cache failed.
@@ -41,6 +43,8 @@ pub(crate) enum AppError {
     ScanPathNotAbsolute(String),
     /// The release-notes version argument failed validation.
     InvalidReleaseVersion,
+    /// The icon hydration request exceeded its bounded IPC contract.
+    InvalidHydrationRequest,
     /// The launch target map is unavailable (poisoned).
     LaunchDataUnavailable,
     /// No trusted launch target exists for the requested id.
@@ -69,6 +73,7 @@ impl AppError {
             Self::AppDataDir(_) => "APP_DATA_UNAVAILABLE",
             Self::Interrupted { .. } => "OPERATION_INTERRUPTED",
             Self::Coalesced { .. } => "SCAN_COALESCED",
+            Self::ScanCancelled => "SCAN_CANCELLED",
             Self::SaveScanSettings(_) => "SAVE_SCAN_SETTINGS_FAILED",
             Self::ResetCatalogCache(_) => "RESET_CATALOG_CACHE_FAILED",
             Self::ResetIconCache(_) => "RESET_ICON_CACHE_FAILED",
@@ -76,6 +81,7 @@ impl AppError {
             Self::ClearUninstallHistory(_) => "CLEAR_UNINSTALL_HISTORY_FAILED",
             Self::ScanPathNotAbsolute(_) => "SCAN_PATH_NOT_ABSOLUTE",
             Self::InvalidReleaseVersion => "INVALID_RELEASE_VERSION",
+            Self::InvalidHydrationRequest => "INVALID_HYDRATION_REQUEST",
             Self::LaunchDataUnavailable => "LAUNCH_DATA_UNAVAILABLE",
             Self::LaunchUnavailable => "LAUNCH_UNAVAILABLE",
             Self::UninstallDataUnavailable => "UNINSTALL_DATA_UNAVAILABLE",
@@ -94,6 +100,7 @@ impl AppError {
                 source: _source,
             } => "The operation was interrupted. Try again.",
             Self::Coalesced { what: _what } => "The scan could not be completed. Try again.",
+            Self::ScanCancelled => "Application scan cancelled.",
             Self::SaveScanSettings(_source) => "Could not save scan settings. Try again.",
             Self::ResetCatalogCache(_source) => "Could not reset the catalog cache. Try again.",
             Self::ResetIconCache(_source) => "Could not reset the icon cache. Try again.",
@@ -101,6 +108,7 @@ impl AppError {
             Self::ClearUninstallHistory(_source) => "Could not clear uninstall history. Try again.",
             Self::ScanPathNotAbsolute(_path) => "Scan paths must be absolute.",
             Self::InvalidReleaseVersion => "The release version is invalid.",
+            Self::InvalidHydrationRequest => "The icon hydration request is invalid.",
             Self::LaunchDataUnavailable => "Launch data is temporarily unavailable.",
             Self::LaunchUnavailable => "This application is not available for launch.",
             Self::UninstallDataUnavailable => "Uninstall data is temporarily unavailable.",
@@ -171,6 +179,7 @@ mod tests {
                 source: String::new(),
             },
             AppError::Coalesced { what: "x" },
+            AppError::ScanCancelled,
             AppError::SaveScanSettings(String::new()),
             AppError::ResetCatalogCache(String::new()),
             AppError::ResetIconCache(String::new()),
@@ -178,6 +187,7 @@ mod tests {
             AppError::ClearUninstallHistory(String::new()),
             AppError::ScanPathNotAbsolute(String::new()),
             AppError::InvalidReleaseVersion,
+            AppError::InvalidHydrationRequest,
             AppError::LaunchDataUnavailable,
             AppError::LaunchUnavailable,
             AppError::UninstallDataUnavailable,
@@ -207,6 +217,7 @@ mod tests {
                 "APP_DATA_UNAVAILABLE",
                 "CLEAR_ICON_CACHE_FAILED",
                 "CLEAR_UNINSTALL_HISTORY_FAILED",
+                "INVALID_HYDRATION_REQUEST",
                 "INVALID_RELEASE_VERSION",
                 "LAUNCH_DATA_UNAVAILABLE",
                 "LAUNCH_UNAVAILABLE",
@@ -217,6 +228,7 @@ mod tests {
                 "RESET_CATALOG_CACHE_FAILED",
                 "RESET_ICON_CACHE_FAILED",
                 "SAVE_SCAN_SETTINGS_FAILED",
+                "SCAN_CANCELLED",
                 "SCAN_COALESCED",
                 "SCAN_PATH_NOT_ABSOLUTE",
                 "UNINSTALL_DATA_UNAVAILABLE",
@@ -241,6 +253,28 @@ mod tests {
             }
             .to_string(),
             "The scan could not be completed. Try again."
+        );
+    }
+
+    #[test]
+    fn scan_cancellation_has_a_stable_safe_envelope() {
+        assert_eq!(
+            serde_json::to_value(AppError::ScanCancelled).unwrap(),
+            serde_json::json!({
+                "code": "SCAN_CANCELLED",
+                "message": "Application scan cancelled.",
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_hydration_requests_have_a_stable_safe_envelope() {
+        assert_eq!(
+            serde_json::to_value(AppError::InvalidHydrationRequest).unwrap(),
+            serde_json::json!({
+                "code": "INVALID_HYDRATION_REQUEST",
+                "message": "The icon hydration request is invalid.",
+            })
         );
     }
 }

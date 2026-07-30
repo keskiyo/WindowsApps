@@ -121,22 +121,28 @@ export function AppNavigation(props: AppNavigationProps) {
 				</DndContext>
 			</div>
 			<div className='border-t border-slate-300/65 p-4'>
-				<NavItem
-					icon={Wrench}
-					label='Auxiliary tools'
-					active={props.activeView === 'auxiliary'}
-					count={props.auxiliaryCount ?? 0}
-					className='mb-1 py-[calc(0.625rem-1.5px)]!'
-					onClick={() => props.onSelectView('auxiliary')}
-				/>
-				<NavItem
-					icon={EyeOff}
-					label='Hidden'
-					active={props.activeView === 'hidden'}
-					count={props.hiddenCount}
-					className='py-[calc(0.625rem-1.5px)]!'
-					onClick={() => props.onSelectView('hidden')}
-				/>
+				<div
+					role='group'
+					aria-label='Utility views'
+					className='grid grid-cols-[3fr_2fr] gap-2'
+				>
+					<NavItem
+						icon={Wrench}
+						label='Auxiliary tools'
+						active={props.activeView === 'auxiliary'}
+						count={props.auxiliaryCount ?? 0}
+						className='min-w-0 gap-1! px-1.5! py-2! text-xs! [&>span:last-child]:px-1!'
+						onClick={() => props.onSelectView('auxiliary')}
+					/>
+					<NavItem
+						icon={EyeOff}
+						label='Hidden'
+						active={props.activeView === 'hidden'}
+						count={props.hiddenCount}
+						className='min-w-0 gap-1! px-1.5! py-2! text-xs! [&>span:last-child]:px-1!'
+						onClick={() => props.onSelectView('hidden')}
+					/>
+				</div>
 			</div>
 		</nav>
 	)

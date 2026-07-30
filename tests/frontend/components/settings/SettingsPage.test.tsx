@@ -26,6 +26,21 @@ describe('SettingsPage', () => {
 		pickFolder: vi.fn().mockResolvedValue(null),
 		openTelegram: vi.fn().mockResolvedValue(undefined),
 		openGithub: vi.fn().mockResolvedValue(undefined),
+		openAppsSettings: vi.fn().mockResolvedValue(undefined),
+	})
+
+	it('opens the Windows installed apps settings page', async () => {
+		const client = systemClient()
+		render(<SettingsPage client={client} />)
+		await screen.findByText('Version 0.1.0')
+
+		await userEvent.click(
+			screen.getByRole('button', {
+				name: 'Open Windows installed apps',
+			}),
+		)
+
+		expect(client.openAppsSettings).toHaveBeenCalledTimes(1)
 	})
 
 	it('runs the manual update check on the shared updater instance', async () => {
@@ -261,6 +276,7 @@ describe('SettingsPage', () => {
 			pickFolder: vi.fn().mockResolvedValue(String.raw`F:\Stick\Tools`),
 			openTelegram: vi.fn().mockResolvedValue(undefined),
 			openGithub: vi.fn().mockResolvedValue(undefined),
+			openAppsSettings: vi.fn().mockResolvedValue(undefined),
 		}
 		render(<SettingsPage client={client} />)
 		expect(await screen.findByText('Version 0.1.0')).toBeInTheDocument()
@@ -312,6 +328,7 @@ describe('SettingsPage', () => {
 			pickFolder: vi.fn().mockResolvedValue(String.raw`F:\Stick\Tools`),
 			openTelegram: vi.fn().mockResolvedValue(undefined),
 			openGithub: vi.fn().mockResolvedValue(undefined),
+			openAppsSettings: vi.fn().mockResolvedValue(undefined),
 		}
 		render(<SettingsPage client={client} />)
 		await screen.findByText('Version 0.1.0')

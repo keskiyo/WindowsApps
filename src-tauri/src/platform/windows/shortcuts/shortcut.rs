@@ -19,7 +19,7 @@ pub(crate) struct ShortcutDetails {
 
 pub(crate) fn resolve(path: &Path) -> ShortcutDetails {
     // One apartment per worker thread, not one per shortcut — see `platform::windows::com`.
-    super::com::ensure_initialized();
+    crate::platform::windows::com::ensure_initialized();
     unsafe { resolve_inner(path) }.unwrap_or_default()
 }
 

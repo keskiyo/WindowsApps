@@ -5,7 +5,7 @@ use crate::catalog::scan_coordinator::ScanCoordinator;
 use crate::catalog::{self, AppInfo, LaunchKind, SourceKind, UninstallTarget};
 use crate::platform::windows::{uninstall_history, uninstaller};
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -70,6 +70,8 @@ pub(crate) struct UninstallPreview {
 /// directly, so shared state never leaks across test cases.
 #[derive(Default)]
 pub(crate) struct AppState {
+    /// Catalog ids accepted from trusted backend scans/cache reads.
+    pub(crate) catalog_ids: Mutex<HashSet<String>>,
     /// Trusted uninstall records keyed by catalog id (resolved server-side, never from IPC).
     pub(crate) uninstall_targets: Mutex<HashMap<String, UninstallRecord>>,
     /// Trusted launch targets (kind + path) keyed by catalog id.
@@ -90,6 +92,29 @@ pub(crate) struct AppState {
         Mutex<Option<crate::platform::windows::global_shortcut::ShortcutGuard>>,
     /// Last known registration status of the global hotkey, shown on the settings page.
     pub(crate) shortcut_status: Mutex<crate::platform::windows::global_shortcut::Status>,
+}
+
+pub(crate) fn remember_catalog(state: &AppState, apps: &[AppInfo]) {
+    remember_catalog_ids(state, apps);
+    remember_uninstall_targets(state, apps);
+    remember_launch_targets(state, apps);
+}
+
+fn remember_catalog_ids(state: &AppState, apps: &[AppInfo]) {
+    let ids = apps.iter().map(|app| app.id.clone()).collect();
+    if let Ok(mut stored) = state.catalog_ids.lock() {
+        *stored = ids;
+    }
+}
+
+pub(crate) fn known_catalog_ids(state: &AppState, ids: Vec<String>) -> Vec<String> {
+    let Ok(known) = state.catalog_ids.lock() else {
+        return Vec::new();
+    };
+    let mut seen = HashSet::with_capacity(ids.len());
+    ids.into_iter()
+        .filter(|id| known.contains(id) && seen.insert(id.clone()))
+        .collect()
 }
 
 pub(crate) fn remember_uninstall_targets(state: &AppState, apps: &[AppInfo]) {
@@ -190,6 +215,7 @@ pub(crate) fn cached_app(name: &str, path: &str) -> AppInfo {
         shortcut_icon_path: None,
         launch_arguments: None,
         canonical_identity: None,
+        preference_identity: None,
         visibility_class: Default::default(),
         visibility_score: 0,
         visibility_reasons: Vec::new(),

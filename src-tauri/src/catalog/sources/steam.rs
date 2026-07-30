@@ -1,13 +1,13 @@
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct SteamGame {
+pub(in crate::catalog) struct SteamGame {
     pub app_id: String,
     pub name: String,
     pub install_dir: PathBuf,
 }
 
-pub(super) fn parse_library_paths(value: &str) -> Vec<PathBuf> {
+pub(in crate::catalog) fn parse_library_paths(value: &str) -> Vec<PathBuf> {
     let tokens = quoted_values(value);
     let mut paths = tokens
         .windows(2)
@@ -18,7 +18,7 @@ pub(super) fn parse_library_paths(value: &str) -> Vec<PathBuf> {
     paths
 }
 
-pub(super) fn parse_manifest(value: &str, library: &Path) -> Option<SteamGame> {
+pub(in crate::catalog) fn parse_manifest(value: &str, library: &Path) -> Option<SteamGame> {
     let tokens = quoted_values(value);
     let value_for = |key: &str| {
         tokens
@@ -61,7 +61,7 @@ fn safe_install_dir(value: &str) -> Option<&str> {
     (!rejected).then_some(value)
 }
 
-pub(super) fn scan_library(library: &Path) -> Vec<SteamGame> {
+pub(in crate::catalog) fn scan_library(library: &Path) -> Vec<SteamGame> {
     let Ok(entries) = std::fs::read_dir(library.join("steamapps")) else {
         return Vec::new();
     };
@@ -78,7 +78,7 @@ pub(super) fn scan_library(library: &Path) -> Vec<SteamGame> {
         .collect()
 }
 
-pub(super) fn installed_libraries() -> Vec<PathBuf> {
+pub(in crate::catalog) fn installed_libraries() -> Vec<PathBuf> {
     let Some(main) = crate::platform::windows::steam_registry::install_root() else {
         return Vec::new();
     };

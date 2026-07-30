@@ -87,6 +87,7 @@ function renderApp(
 		pickFolder: vi.fn().mockResolvedValue(null),
 		openTelegram: vi.fn().mockResolvedValue(undefined),
 		openGithub: vi.fn().mockResolvedValue(undefined),
+		openAppsSettings: vi.fn().mockResolvedValue(undefined),
 		...systemOverrides,
 	}
 	const store = createAppStore(client, localStorage)
@@ -185,7 +186,7 @@ describe('App', () => {
 		const steam = await screen.findByText('Steam')
 		expect(steam).toHaveAttribute('title', 'Steam')
 		expect(
-			screen.getByRole('button', { name: 'Move Development category' }),
+			screen.getByRole('heading', { name: 'Development' }),
 		).toHaveAttribute('title', 'Development')
 	})
 
@@ -308,7 +309,7 @@ describe('App', () => {
 		expect(screen.getByText('Visual Studio Code')).toBeInTheDocument()
 	})
 
-	it('renders persisted category order with accessible drag handles', async () => {
+	it('renders persisted category order with accessible reorder controls', async () => {
 		localStorage.setItem(
 			PREFERENCES_KEY,
 			JSON.stringify({
@@ -325,19 +326,20 @@ describe('App', () => {
 			headings.slice(0, 2).map(heading => heading.textContent),
 		).toEqual(['Browsers', 'Games'])
 		expect(
-			screen.getByRole('button', { name: 'Move Games category' }),
+			screen.getByRole('button', { name: 'Reorder Games category' }),
 		).toBeInTheDocument()
 	})
 
-	it('uses the category heading as the drag activator and keeps collapse separate', async () => {
+	it('uses the title for collapse while preserving keyboard reordering', async () => {
 		renderApp()
 		await screen.findByText('Steam')
-		const move = screen.getByRole('button', { name: 'Move Games category' })
-		expect(move).toHaveTextContent('Games')
-		expect(move).toHaveTextContent('1 app')
-		expect(screen.getByRole('button', { name: 'Collapse Games' })).not.toBe(
-			move,
-		)
+		const reorder = screen.getByRole('button', {
+			name: 'Reorder Games category',
+		})
+		const toggle = screen.getByRole('button', { name: 'Collapse Games' })
+		expect(toggle).toHaveTextContent('Games')
+		expect(toggle).toHaveTextContent('1 app')
+		expect(reorder).not.toBe(toggle)
 	})
 
 	it('hides the rename pencil while a category name is being edited', async () => {
@@ -488,7 +490,7 @@ describe('App', () => {
 		).toBeInTheDocument()
 	})
 
-	it('keeps auxiliary tools out of command palette from every active view', async () => {
+	it('includes auxiliary tools in command palette but excludes hidden apps', async () => {
 		const helper = app({
 			id: 'helper',
 			name: 'Runtime Helper',
@@ -496,19 +498,58 @@ describe('App', () => {
 			category: 'utilities',
 			visibilityClass: 'auxiliary',
 		})
+		const hidden = app({
+			id: 'hidden-helper',
+			name: 'Hidden Helper',
+			path: String.raw`C:\Tool\runtime\hidden.exe`,
+			category: 'utilities',
+			visibilityClass: 'auxiliary',
+		})
 		const { store } = renderApp({
-			getApps: vi.fn().mockResolvedValue({ apps: [...apps, helper], hasCache: true }),
+			getApps: vi
+				.fn()
+				.mockResolvedValue({
+					apps: [...apps, helper, hidden],
+					hasCache: true,
+				}),
 		})
 		await screen.findByRole('button', { name: 'Launch Steam' })
-		store.getState().setActiveView('auxiliary')
+		store.getState().hideApp(hidden.id)
 		await userEvent.keyboard('{Control>}k{/Control}')
-		await userEvent.type(
-			screen.getByRole('combobox', { name: 'Quick launch search' }),
-			'Runtime Helper',
-		)
+		const input = screen.getByRole('combobox', {
+			name: 'Quick launch search',
+		})
+		await userEvent.type(input, 'Runtime Helper')
+		expect(
+			screen.getByRole('option', { name: 'Runtime Helper' }),
+		).toBeInTheDocument()
 
+		await userEvent.clear(input)
+		await userEvent.type(input, 'Hidden Helper')
 		expect(screen.getByText(/No apps match/)).toBeInTheDocument()
 	})
+
+	it.each(['p', 'з'])(
+		'prevents the print shortcut when KeyP reports %s',
+		async key => {
+			renderApp()
+			await screen.findByText('Steam')
+			const event = new KeyboardEvent('keydown', {
+				key,
+				code: 'KeyP',
+				ctrlKey: true,
+				bubbles: true,
+				cancelable: true,
+			})
+
+			document.dispatchEvent(event)
+
+			expect(event.defaultPrevented).toBe(true)
+			expect(
+				screen.queryByRole('dialog', { name: 'Quick launch' }),
+			).not.toBeInTheDocument()
+		},
+	)
 
 	it('keeps the sticky header above cards and open app menus', async () => {
 		renderApp()

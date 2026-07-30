@@ -3,28 +3,26 @@ use std::env;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-pub(crate) mod cache;
 mod classify;
 mod dedup;
 mod filters;
-pub(crate) mod hydration;
-pub(crate) mod icon_cache;
-pub(crate) mod incremental;
 mod model;
 mod naming;
-mod portable;
-mod registry;
-pub(crate) mod scan_coordinator;
-pub(crate) mod scan_settings;
-pub(crate) mod source;
-mod start_apps;
-mod steam;
+mod scan;
+mod sources;
+mod storage;
 pub(crate) mod sync;
 mod visibility;
 
 pub(crate) use model::{
     AppCategory, AppInfo, LaunchKind, ScanProgress, SourceKind, UninstallTarget,
 };
+pub(crate) use scan::{
+    coordinator as scan_coordinator, hydration, incremental, settings as scan_settings,
+};
+pub(crate) use sources::source;
+use sources::{portable, registry, start_apps, steam};
+pub(crate) use storage::{cache, icon_cache};
 pub(crate) use visibility::{VisibilityClass, VisibilityReason};
 
 fn steam_app(game: steam::SteamGame) -> AppInfo {
@@ -51,6 +49,7 @@ fn steam_app(game: steam::SteamGame) -> AppInfo {
         shortcut_icon_path: None,
         launch_arguments: None,
         canonical_identity: None,
+        preference_identity: None,
         visibility_class: Default::default(),
         visibility_score: 0,
         visibility_reasons: Vec::new(),
@@ -203,7 +202,11 @@ fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
 }
 
 pub(crate) fn sanitize(apps: Vec<AppInfo>) -> Vec<AppInfo> {
-    dedup::deduplicate(filter_maintenance(apps), classify::classify_app)
+    dedup::deduplicate(
+        filter_maintenance(apps),
+        classify::classify_app,
+        crate::platform::windows::os_ui_script(),
+    )
 }
 
 /// Like `sanitize`, but also refreshes the dev-only dedup report. Call this from the full
@@ -215,7 +218,11 @@ pub(crate) fn sanitize_reported(apps: Vec<AppInfo>) -> Vec<AppInfo> {
     if dedup::dev_report_enabled() {
         dedup::write_dev_report(&filtered);
     }
-    dedup::deduplicate(filtered, classify::classify_app)
+    dedup::deduplicate(
+        filtered,
+        classify::classify_app,
+        crate::platform::windows::os_ui_script(),
+    )
 }
 
 fn is_known_standalone_portable(stem: &str) -> bool {
@@ -357,6 +364,7 @@ fn make_app(name: String, path: PathBuf) -> AppInfo {
         shortcut_icon_path: None,
         launch_arguments: None,
         canonical_identity: None,
+        preference_identity: None,
         visibility_class: Default::default(),
         visibility_score: 0,
         visibility_reasons: Vec::new(),
@@ -468,6 +476,22 @@ pub(crate) fn target_is_present(app: &AppInfo) -> bool {
 /// Auxiliary. The PE subsystem is a reliable, launch-free signal that generalizes to any
 /// executable (including ones nobody can test by hand), so it beats name/description heuristics.
 /// Runs on the scan path only (it reads the target file), after classification.
+fn is_plain_windows_powershell(app: &AppInfo, target: &Path) -> bool {
+    if app.source_kind != SourceKind::StartMenu
+        || app.launch_kind != LaunchKind::Shortcut
+        || app
+            .launch_arguments
+            .as_deref()
+            .is_some_and(|arguments| !arguments.trim().is_empty())
+    {
+        return false;
+    }
+    target
+        .file_name()
+        .and_then(|file| file.to_str())
+        .is_some_and(|file| file.eq_ignore_ascii_case("powershell.exe"))
+}
+
 pub(crate) fn demote_console_applications(apps: &mut [AppInfo]) {
     for app in apps.iter_mut() {
         if app.visibility_class != VisibilityClass::Primary
@@ -477,6 +501,9 @@ pub(crate) fn demote_console_applications(apps: &mut [AppInfo]) {
         }
         let target = app.resolved_path.as_deref().unwrap_or(&app.path);
         let path = Path::new(target);
+        if is_plain_windows_powershell(app, path) {
+            continue;
+        }
         if path
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
@@ -496,7 +523,13 @@ pub(crate) fn demote_console_applications(apps: &mut [AppInfo]) {
 
 #[cfg(test)]
 fn deduplicate(apps: Vec<AppInfo>) -> Vec<AppInfo> {
-    dedup::deduplicate(apps, classify::classify_app)
+    // Tests assert the English-user experience by default; the locale-aware name pick keeps a Latin
+    // name over a Cyrillic one. Cases that need the Cyrillic result set the script explicitly.
+    dedup::deduplicate(
+        apps,
+        classify::classify_app,
+        crate::platform::windows::NameScript::Latin,
+    )
 }
 
 #[cfg(test)]
@@ -528,6 +561,7 @@ mod tests {
             shortcut_icon_path: None,
             launch_arguments: None,
             canonical_identity: None,
+            preference_identity: None,
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
@@ -657,6 +691,42 @@ mod tests {
             .visibility_reasons
             .contains(&VisibilityReason::ConsoleApplication));
         assert_eq!(apps[1].visibility_class, VisibilityClass::Primary);
+    }
+
+    #[test]
+    fn command_prompt_is_auxiliary_but_plain_powershell_stays_primary() {
+        let dir = tempfile::tempdir().unwrap();
+        let cmd = dir.path().join("cmd.exe");
+        let powershell = dir.path().join("powershell.exe");
+        std::fs::write(&cmd, minimal_pe(3)).unwrap();
+        std::fs::write(&powershell, minimal_pe(3)).unwrap();
+
+        let mut command_prompt = app("Command Prompt", r"C:\Menu\Command Prompt.lnk");
+        command_prompt.source_kind = SourceKind::StartMenu;
+        command_prompt.launch_kind = LaunchKind::Shortcut;
+        command_prompt.resolved_path = Some(cmd.to_string_lossy().into_owned());
+        let mut windows_powershell = app("Windows PowerShell", r"C:\Menu\Windows PowerShell.lnk");
+        windows_powershell.source_kind = SourceKind::StartMenu;
+        windows_powershell.launch_kind = LaunchKind::Shortcut;
+        windows_powershell.resolved_path = Some(powershell.to_string_lossy().into_owned());
+        let mut developer_prompt = app("Developer Command Prompt", r"C:\Menu\Developer Prompt.lnk");
+        developer_prompt.source_kind = SourceKind::StartMenu;
+        developer_prompt.launch_kind = LaunchKind::Shortcut;
+        developer_prompt.resolved_path = Some(cmd.to_string_lossy().into_owned());
+        developer_prompt.launch_arguments = Some("/k setup.bat".into());
+
+        let mut apps = vec![command_prompt, windows_powershell, developer_prompt];
+        demote_console_applications(&mut apps);
+
+        assert_eq!(apps[0].visibility_class, VisibilityClass::Auxiliary);
+        assert!(apps[0]
+            .visibility_reasons
+            .contains(&VisibilityReason::ConsoleApplication));
+        assert_eq!(apps[1].visibility_class, VisibilityClass::Primary);
+        assert_eq!(apps[2].visibility_class, VisibilityClass::Auxiliary);
+        assert!(apps[2]
+            .visibility_reasons
+            .contains(&VisibilityReason::ConsoleApplication));
     }
 
     #[test]
@@ -1217,12 +1287,111 @@ mod tests {
         );
         assert_eq!(
             classify("7-Zip File Manager", r"C:\7zFM.exe"),
-            AppCategory::Utilities
+            AppCategory::FileCloud
         );
         assert_eq!(
             classify("Character Map", r"C:\charmap.exe"),
             AppCategory::WindowsFeatures
         );
+    }
+
+    #[test]
+    fn classifies_new_general_categories() {
+        // Office & Productivity.
+        for (name, path) in [
+            (
+                "LibreOffice Calc",
+                r"C:\Program Files\LibreOffice\scalc.exe",
+            ),
+            ("Notion", r"C:\Users\Maks\Notion\Notion.exe"),
+            ("Obsidian", r"C:\Users\Maks\Obsidian\Obsidian.exe"),
+            (
+                "Foxit PDF Reader",
+                r"C:\Program Files\Foxit\FoxitReader.exe",
+            ),
+        ] {
+            assert_eq!(classify(name, path), AppCategory::Productivity, "{name}");
+        }
+        // Security & Privacy.
+        for (name, path) in [
+            ("Bitwarden", r"C:\Users\Maks\Bitwarden\Bitwarden.exe"),
+            ("Malwarebytes", r"C:\Program Files\Malwarebytes\mb.exe"),
+            ("WireGuard", r"C:\Program Files\WireGuard\wireguard.exe"),
+        ] {
+            assert_eq!(classify(name, path), AppCategory::Security, "{name}");
+        }
+        // File & Cloud.
+        for (name, path) in [
+            ("WinRAR", r"C:\Program Files\WinRAR\WinRAR.exe"),
+            ("Total Commander", r"C:\totalcmd\TOTALCMD64.EXE"),
+            ("Dropbox", r"C:\Program Files\Dropbox\Dropbox.exe"),
+        ] {
+            assert_eq!(classify(name, path), AppCategory::FileCloud, "{name}");
+        }
+    }
+
+    #[test]
+    fn bare_git_keyword_no_longer_miscategorizes_logitech() {
+        // "Logitech" contains the substring "git"; it must not land in Development.
+        assert_ne!(
+            classify("Logitech G HUB", r"C:\Program Files\LGHUB\lghub.exe"),
+            AppCategory::Development
+        );
+        // A real Git tool still classifies as Development.
+        assert_eq!(
+            classify("Git Bash", r"C:\Program Files\Git\git-bash.exe"),
+            AppCategory::Development
+        );
+    }
+
+    #[test]
+    fn pdf_reader_beats_adobe_publisher_editors_mapping() {
+        let mut acrobat = app(
+            "Adobe Acrobat Reader",
+            r"C:\Program Files\Adobe\Acrobat\Acrobat.exe",
+        );
+        acrobat.publisher = Some("Adobe Inc.".into());
+        acrobat.resolved_path = Some(r"C:\Program Files\Adobe\Acrobat\AcroRd32.exe".into());
+        assert_eq!(classify_app(&acrobat), AppCategory::Productivity);
+    }
+
+    #[test]
+    fn antivirus_publisher_pins_security() {
+        let mut kis = app("Protection", r"C:\Program Files\Kaspersky Lab\avp.exe");
+        kis.publisher = Some("Kaspersky Lab".into());
+        assert_eq!(classify_app(&kis), AppCategory::Security);
+    }
+
+    #[test]
+    fn install_path_pins_productivity_and_browsers_for_cryptic_names() {
+        // Neutral shortcut name, but the resolved target lives in a known product tree.
+        let mut writer = app("Writer", r"C:\Menu\Writer.lnk");
+        writer.resolved_path = Some(r"C:\Program Files\LibreOffice\program\swriter.exe".into());
+        assert_eq!(classify_app(&writer), AppCategory::Productivity);
+
+        // A launcher exe with no browser keyword, identified purely by its install tree.
+        let mut ff = app("Nightly", r"C:\Menu\Nightly.lnk");
+        ff.resolved_path = Some(r"C:\Program Files\Mozilla Firefox\launcher.exe".into());
+        assert_eq!(classify_app(&ff), AppCategory::Browsers);
+    }
+
+    #[test]
+    fn classify_app_reads_product_name_signal() {
+        // A cryptic display name and exe; the PE product name carries the category.
+        let mut note = app("Notes", r"C:\Apps\notes.exe");
+        note.product_name = Some("Obsidian".into());
+        assert_eq!(classify_app(&note), AppCategory::Productivity);
+    }
+
+    #[test]
+    fn communication_and_ai_publishers_pin_category() {
+        let mut tg = app("Nikogram", r"C:\Apps\ng.exe");
+        tg.publisher = Some("Telegram FZ-LLC".into());
+        assert_eq!(classify_app(&tg), AppCategory::Communication);
+
+        let mut ai = app("Assistant", r"C:\Apps\assist.exe");
+        ai.publisher = Some("OpenAI".into());
+        assert_eq!(classify_app(&ai), AppCategory::Ai);
     }
 
     #[test]
@@ -1352,10 +1521,10 @@ mod tests {
         resolve.publisher = Some("Blackmagic Design Pty. Ltd.".into());
         assert_eq!(classify_app(&resolve), AppCategory::Editors);
 
-        // A VPN client falls to Utilities by keyword.
+        // A VPN client falls to Security by keyword.
         assert_eq!(
             classify_app(&app("Hiddify", r"C:\Users\Maks\Hiddify\Hiddify.exe")),
-            AppCategory::Utilities
+            AppCategory::Security
         );
 
         // A hardware vendor is NOT a game publisher (no bare "ea"/"riot" substring hit).
@@ -1371,7 +1540,7 @@ mod tests {
         sota.launch_kind = LaunchKind::Shortcut;
         sota.source_kind = SourceKind::StartMenu;
         sota.resolved_path = Some(r"D:\Apps\SotaConnect\SotaVPN.exe".into());
-        assert_eq!(classify_app(&sota), AppCategory::Utilities);
+        assert_eq!(classify_app(&sota), AppCategory::Security);
 
         // OpenCode → AI, even though its exe path contains "code.exe" (AI is matched before Dev).
         let mut opencode = app("OpenCode", r"C:\Menu\OpenCode.lnk");
@@ -1386,11 +1555,164 @@ mod tests {
             Some(r"C:\Users\Maks\AppData\Local\MongoDBCompass\MongoDBCompass.exe".into());
         assert_eq!(classify_app(&mongo), AppCategory::Development);
 
-        // The Hiddify VPN client stays Utilities.
+        // The Hiddify VPN client → Security.
         assert_eq!(
             classify_app(&app("Hiddify", r"C:\Program Files\Hiddify\Hiddify.exe")),
-            AppCategory::Utilities
+            AppCategory::Security
         );
+    }
+
+    #[test]
+    fn tokenized_matching_ignores_substrings_of_unrelated_words() {
+        // Whole-word matching: a keyword must be a full token, never a substring. These are the
+        // false-positive classes the previous substring cascade had to hand-patch around.
+        assert_eq!(
+            classify("Omega Launcher", r"C:\Omega\omega.exe"),
+            AppCategory::Other,
+            "'mega' inside 'Omega' must not imply File & Cloud"
+        );
+        assert_eq!(
+            classify("Excellent Notes", r"C:\ExcellentNotes.exe"),
+            AppCategory::Other,
+            "'excel' inside 'Excellent' must not imply Productivity"
+        );
+        assert_ne!(
+            classify("Realtek Digital Output", r"C:\Realtek\rtk.exe"),
+            AppCategory::Development,
+            "'git' inside 'Digital' must not imply Development"
+        );
+    }
+
+    #[test]
+    fn file_description_signal_classifies_cryptic_names() {
+        // The PE file description often names the category outright even when the display name and
+        // executable are opaque.
+        let mut browser = app("Nyxbrowse", r"C:\Apps\nyx.exe");
+        browser.description = Some("Internet Browser".into());
+        assert_eq!(classify_app(&browser), AppCategory::Browsers);
+
+        let mut shield = app("Shield", r"C:\Apps\shield.exe");
+        shield.description = Some("Antivirus".into());
+        assert_eq!(classify_app(&shield), AppCategory::Security);
+    }
+
+    #[test]
+    fn original_filename_reveals_a_renamed_launcher() {
+        // A neutral shortcut whose PE original filename is the real browser executable.
+        let mut renamed = app("Fast Start", r"C:\Menu\Fast Start.lnk");
+        renamed.original_filename = Some("chrome.exe".into());
+        assert_eq!(classify_app(&renamed), AppCategory::Browsers);
+    }
+
+    #[test]
+    fn corroborating_signals_accumulate_to_break_a_tie() {
+        // "Cursor Code" hits AI ("cursor") and Development ("code") equally by name; the AI executable
+        // adds weight so AI wins on the total, not on list order.
+        let mut cursor = app("Cursor Code", r"C:\Apps\Cursor.exe");
+        cursor.resolved_path = Some(r"C:\Apps\Cursor.exe".into());
+        assert_eq!(classify_app(&cursor), AppCategory::Ai);
+    }
+
+    #[test]
+    fn game_engine_and_games_folder_classify_unknown_indie_titles() {
+        // Brotato: portable, non-Steam, its title in no keyword list. The Godot engine in the file
+        // description and the dedicated Games folder identify it structurally.
+        let mut brotato = app("Brotato", r"D:\Games\Brotato\Brotato.exe");
+        brotato.source_kind = SourceKind::Portable;
+        brotato.publisher = Some("Blobfish Games".into());
+        brotato.product_name = Some("Brotato".into());
+        brotato.description = Some("Godot Engine".into());
+        assert_eq!(classify_app(&brotato), AppCategory::Games);
+
+        // The engine fingerprint alone suffices, without a games folder.
+        let mut indie = app("Unknowable", r"C:\Apps\Unknowable\game.exe");
+        indie.description = Some("Unreal Engine".into());
+        assert_eq!(classify_app(&indie), AppCategory::Games);
+
+        // A dedicated games folder alone tips an otherwise-unknown title to Games.
+        assert_eq!(
+            classify_app(&app("Zephyr", r"D:\Games\Zephyr\Zephyr.exe")),
+            AppCategory::Games
+        );
+    }
+
+    #[test]
+    fn extended_coverage_classifies_common_apps_not_installed_here() {
+        use AppCategory::*;
+        // Popular apps a typical user has, identified by distinctive name tokens.
+        for (name, path, want) in [
+            ("Epic Games Launcher", r"C:\Menu\Epic.lnk", Games),
+            ("CurseForge", r"C:\Menu\CurseForge.lnk", Games),
+            (
+                "PostgreSQL 16",
+                r"C:\Program Files\PostgreSQL\16\bin\postgres.exe",
+                Development,
+            ),
+            ("PuTTY", r"C:\Program Files\PuTTY\putty.exe", Development),
+            ("Zed", r"C:\Apps\Zed\zed.exe", Development),
+            (
+                "HandBrake",
+                r"C:\Program Files\HandBrake\HandBrake.exe",
+                Editors,
+            ),
+            ("Autodesk AutoCAD 2024", r"C:\Menu\AutoCAD.lnk", Editors),
+            ("Todoist", r"C:\Apps\Todoist\Todoist.exe", Productivity),
+            (
+                "Microsoft PowerPoint",
+                r"C:\Menu\PowerPoint.lnk",
+                Productivity,
+            ),
+            ("Tor Browser", r"C:\Apps\Tor Browser\firefox.exe", Browsers),
+            (
+                "LibreWolf",
+                r"C:\Program Files\LibreWolf\librewolf.exe",
+                Browsers,
+            ),
+            (
+                "OBS Studio",
+                r"C:\Program Files\obs-studio\bin\obs64.exe",
+                Media,
+            ),
+            ("FL Studio", r"C:\Program Files\FL Studio\FL64.exe", Media),
+            ("Microsoft Teams", r"C:\Menu\Teams.lnk", Communication),
+            (
+                "qBittorrent",
+                r"C:\Program Files\qBittorrent\qbittorrent.exe",
+                FileCloud,
+            ),
+            ("WinZip", r"C:\Program Files\WinZip\winzip64.exe", FileCloud),
+            (
+                "Tailscale",
+                r"C:\Program Files\Tailscale\tailscale.exe",
+                Security,
+            ),
+            (
+                "VeraCrypt",
+                r"C:\Program Files\VeraCrypt\VeraCrypt.exe",
+                Security,
+            ),
+            (
+                "TeamViewer",
+                r"C:\Program Files\TeamViewer\TeamViewer.exe",
+                Utilities,
+            ),
+            ("ShareX", r"C:\Program Files\ShareX\ShareX.exe", Utilities),
+            ("NVIDIA App", r"C:\Menu\NVIDIA App.lnk", Utilities),
+        ] {
+            assert_eq!(classify(name, path), want, "{name}");
+        }
+
+        // Publisher rules generalize across every product a vendor ships, even a neutral name.
+        for (publisher, want) in [
+            ("Autodesk Inc.", Editors),
+            ("NVIDIA Corporation", Utilities),
+            ("Sophos Ltd.", Security),
+            ("PostgreSQL Global Development Group", Development),
+        ] {
+            let mut a = app("Neutral Tool", r"C:\Apps\tool.exe");
+            a.publisher = Some(publisher.into());
+            assert_eq!(classify_app(&a), want, "{publisher}");
+        }
     }
 
     #[test]

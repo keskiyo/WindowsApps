@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { toast } from 'sonner'
+import { toAppClientError } from '../lib/clientError'
 import type { AppInfo } from '../types'
 
 interface AppFeedbackOptions {
@@ -37,8 +38,7 @@ export function useAppFeedback({
 			await onRefresh()
 			toast.success('Application list refreshed')
 		} catch (error) {
-			const message = String(error)
-			if (message.toLowerCase().includes('cancelled')) {
+			if (toAppClientError(error).code === 'SCAN_CANCELLED') {
 				toast.info('Application scan cancelled')
 			} else {
 				toast.error('Could not refresh the application list')

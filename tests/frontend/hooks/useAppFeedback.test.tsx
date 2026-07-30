@@ -1,14 +1,17 @@
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppFeedback } from '../../../src/hooks/useAppFeedback'
 import type { AppInfo } from '../../../src/types'
 
-const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }))
+const { toastError, toastInfo } = vi.hoisted(() => ({
+	toastError: vi.fn(),
+	toastInfo: vi.fn(),
+}))
 
 vi.mock('sonner', () => ({
 	toast: {
 		error: toastError,
-		info: vi.fn(),
+		info: toastInfo,
 		success: vi.fn(),
 	},
 }))
@@ -29,6 +32,10 @@ const app: AppInfo = {
 }
 
 describe('useAppFeedback', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
 	it('returns a failure result when uninstalling fails', async () => {
 		const { result } = renderHook(() =>
 			useAppFeedback({
@@ -47,5 +54,42 @@ describe('useAppFeedback', () => {
 		expect(toastError).toHaveBeenCalledWith(
 			'Could not uninstall Visual Studio Code',
 		)
+	})
+
+	it('reports typed scan cancellation as informational feedback', async () => {
+		const { result } = renderHook(() =>
+			useAppFeedback({
+				onLaunch: vi.fn().mockResolvedValue(undefined),
+				onRefresh: vi.fn().mockRejectedValue({
+					code: 'SCAN_CANCELLED',
+					message: 'Application scan cancelled.',
+				}),
+				onUninstall: vi.fn().mockResolvedValue(undefined),
+			}),
+		)
+
+		await act(() => result.current.refresh())
+
+		expect(toastInfo).toHaveBeenCalledWith('Application scan cancelled')
+		expect(toastError).not.toHaveBeenCalled()
+	})
+
+	it('does not infer scan cancellation from an untyped error message', async () => {
+		const { result } = renderHook(() =>
+			useAppFeedback({
+				onLaunch: vi.fn().mockResolvedValue(undefined),
+				onRefresh: vi
+					.fn()
+					.mockRejectedValue(new Error('scan cancelled internally')),
+				onUninstall: vi.fn().mockResolvedValue(undefined),
+			}),
+		)
+
+		await act(() => result.current.refresh())
+
+		expect(toastError).toHaveBeenCalledWith(
+			'Could not refresh the application list',
+		)
+		expect(toastInfo).not.toHaveBeenCalled()
 	})
 })

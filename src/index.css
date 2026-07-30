@@ -63,6 +63,12 @@
 	background: var(--utility-accent-hover);
 }
 
+.category-count {
+	color: var(--text-primary);
+	border-color: color-mix(in oklab, var(--accent) 34%, transparent);
+	background: color-mix(in oklab, var(--accent) 20%, var(--surface-raised));
+}
+
 ::-webkit-scrollbar {
 	width: 10px;
 	height: 10px;
@@ -373,12 +379,16 @@ button {
 }
 
 /*
- * Skip layout/paint for off-screen cards on large catalogs. contain-intrinsic-size keeps a
- * stable placeholder height (min card height) so the scrollbar doesn't jump.
+ * Skip layout/paint for off-screen cards on large catalogs — the cheap, dependency-free form of
+ * virtualization. Containment lives on the card (not the category section): a section with paint
+ * containment would clip a card's open actions menu, the very bug the [data-menu-open] rule below
+ * fixes. contain-intrinsic-size is the placeholder height used only until an element renders once
+ * (the `auto` keyword then remembers the real size); ~10rem matches a typical card with its label,
+ * so the scrollbar barely shifts as cards stream in.
  */
 .cv-card {
 	content-visibility: auto;
-	contain-intrinsic-size: auto 8.5rem;
+	contain-intrinsic-size: auto 10rem;
 }
 
 /*

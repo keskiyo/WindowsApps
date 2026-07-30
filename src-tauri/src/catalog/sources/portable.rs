@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
-pub(super) fn should_visit_directory(path: &Path, excluded: &[PathBuf]) -> bool {
+pub(in crate::catalog) fn should_visit_directory(path: &Path, excluded: &[PathBuf]) -> bool {
     let path = path.to_string_lossy().to_lowercase();
     if excluded
         .iter()
-        .any(|value| super::path_is_within(&path, &value.to_string_lossy().to_lowercase()))
+        .any(|value| crate::catalog::path_is_within(&path, &value.to_string_lossy().to_lowercase()))
     {
         return false;
     }
@@ -54,7 +54,7 @@ pub(super) fn should_visit_directory(path: &Path, excluded: &[PathBuf]) -> bool 
     )
 }
 
-pub(super) fn is_portable_candidate(path: &Path) -> bool {
+pub(in crate::catalog) fn is_portable_candidate(path: &Path) -> bool {
     if !path
         .extension()
         .is_some_and(|value| value.eq_ignore_ascii_case("exe"))
@@ -66,8 +66,8 @@ pub(super) fn is_portable_candidate(path: &Path) -> bool {
         .unwrap_or_default()
         .to_string_lossy()
         .to_lowercase();
-    if super::filters::is_installer_file_name(&stem)
-        || super::filters::is_helper_executable_stem(&stem)
+    if crate::catalog::filters::is_installer_file_name(&stem)
+        || crate::catalog::filters::is_helper_executable_stem(&stem)
     {
         return false;
     }

@@ -1,6 +1,10 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { toAppClientError } from '../lib/clientError'
-import { readPreferences, writePreferences } from '../lib/preferences'
+import {
+	readPreferences,
+	writePreferences,
+	type LegacyCanonicalPreferences,
+} from '../lib/preferences'
 import type {
 	AppCategory,
 	AppHydrationPatch,
@@ -34,11 +38,16 @@ export interface AppState {
 	favoriteAppIdentities: string[]
 	categoryOrder: AppCategory[]
 	collapsedCategories: AppCategory[]
+	// `categoryOverrides` is the runtime id-keyed projection; `categoryOverrideIdentities` is the
+	// durable form (keyed by `canonicalIdentity`) that survives a Force full scan, Reset cache, or
+	// dedup rule change. The selector resolves identity-first so the override follows the app.
 	categoryOverrides: Record<string, AppCategory>
+	categoryOverrideIdentities: Record<string, AppCategory>
 	hiddenAppIds: string[]
 	hiddenAppIdentities: string[]
 	promotedAppIds: string[]
 	promotedAppIdentities: string[]
+	legacyCanonicalPreferences: LegacyCanonicalPreferences
 	/** False once a preferences write was refused (quota, private mode, storage disabled). */
 	preferencesPersisted: boolean
 	categories: CategoryDefinition[]
@@ -86,13 +95,15 @@ export interface AppState {
 // Ceiling for the "launching" visual when the backend can't report real readiness
 // (Store/UWP, shell hand-off). Cleared early by the launch://status event when available.
 const LAUNCH_CEILING_MS = 12000
+const HYDRATION_BATCH_SIZE = 128
 
-function errorMessage(error: unknown): string {
-	return toAppClientError(error).message
+function errorMessage(error: unknown): string | null {
+	const clientError = toAppClientError(error)
+	return clientError.code === 'SCAN_CANCELLED' ? null : clientError.message
 }
 
 function identityOf(app: AppInfo): string {
-	return app.canonicalIdentity ?? app.id
+	return app.preferenceIdentity ?? app.canonicalIdentity ?? app.id
 }
 
 function addUnique(list: string[], value: string): string[] {
@@ -109,17 +120,93 @@ function reconcileSelection(
 	apps: AppInfo[],
 	ids: string[],
 	identities: string[],
-): { ids: string[]; identities: string[] } {
+	legacyCanonicalIdentities: string[],
+): { ids: string[]; identities: string[]; unresolvedLegacy: string[] } {
 	const byId = new Map(apps.map(app => [app.id, app]))
 	const mergedIdentities = new Set(identities)
+	const unresolvedLegacy = new Set(legacyCanonicalIdentities)
 	for (const legacyId of ids) {
 		const app = byId.get(legacyId)
-		if (app) mergedIdentities.add(identityOf(app))
+		if (!app) continue
+		mergedIdentities.add(identityOf(app))
+		if (app.canonicalIdentity)
+			unresolvedLegacy.delete(app.canonicalIdentity)
+	}
+	const byCanonicalIdentity = new Map<string, AppInfo[]>()
+	for (const app of apps) {
+		if (!app.canonicalIdentity) continue
+		const group = byCanonicalIdentity.get(app.canonicalIdentity) ?? []
+		group.push(app)
+		byCanonicalIdentity.set(app.canonicalIdentity, group)
+	}
+	for (const legacyIdentity of unresolvedLegacy) {
+		const matches = byCanonicalIdentity.get(legacyIdentity)
+		if (matches?.length !== 1) continue
+		mergedIdentities.add(identityOf(matches[0]))
+		unresolvedLegacy.delete(legacyIdentity)
 	}
 	const currentIds = apps
 		.filter(app => mergedIdentities.has(identityOf(app)))
 		.map(app => app.id)
-	return { ids: currentIds, identities: [...mergedIdentities] }
+	return {
+		ids: currentIds,
+		identities: [...mergedIdentities],
+		unresolvedLegacy: [...unresolvedLegacy],
+	}
+}
+
+/**
+ * Reconcile the manual category overrides against a freshly loaded catalog, mirroring
+ * `reconcileSelection`. Legacy id-keyed entries (written before identities existed) are folded into
+ * the identity map for apps present in the catalog, then the runtime id map is re-derived from the
+ * identity map — so an override follows its app across a dedup rule change that renamed its id.
+ */
+function reconcileOverrides(
+	apps: AppInfo[],
+	idOverrides: Record<string, AppCategory>,
+	identityOverrides: Record<string, AppCategory>,
+	legacyCanonicalOverrides: Record<string, AppCategory>,
+): {
+	overrides: Record<string, AppCategory>
+	overrideIdentities: Record<string, AppCategory>
+	unresolvedLegacy: Record<string, AppCategory>
+} {
+	const byId = new Map(apps.map(app => [app.id, app]))
+	const mergedIdentities: Record<string, AppCategory> = { ...identityOverrides }
+	const unresolvedLegacy = { ...legacyCanonicalOverrides }
+	for (const [legacyId, category] of Object.entries(idOverrides)) {
+		const app = byId.get(legacyId)
+		if (app && !(identityOf(app) in mergedIdentities))
+			mergedIdentities[identityOf(app)] = category
+		if (app?.canonicalIdentity)
+			delete unresolvedLegacy[app.canonicalIdentity]
+	}
+	const byCanonicalIdentity = new Map<string, AppInfo[]>()
+	for (const app of apps) {
+		if (!app.canonicalIdentity) continue
+		const group = byCanonicalIdentity.get(app.canonicalIdentity) ?? []
+		group.push(app)
+		byCanonicalIdentity.set(app.canonicalIdentity, group)
+	}
+	for (const [legacyIdentity, category] of Object.entries(
+		unresolvedLegacy,
+	)) {
+		const matches = byCanonicalIdentity.get(legacyIdentity)
+		if (matches?.length !== 1) continue
+		if (!(identityOf(matches[0]) in mergedIdentities))
+			mergedIdentities[identityOf(matches[0])] = category
+		delete unresolvedLegacy[legacyIdentity]
+	}
+	const overrides: Record<string, AppCategory> = {}
+	for (const app of apps) {
+		const category = mergedIdentities[identityOf(app)]
+		if (category) overrides[app.id] = category
+	}
+	return {
+		overrides,
+		overrideIdentities: mergedIdentities,
+		unresolvedLegacy,
+	}
 }
 
 // Preserve an already-loaded icon when an incoming app record has none, so background
@@ -141,6 +228,20 @@ export function createAppStore(
 	let initializationDispose: (() => void) | null = null
 	let initializationUsers = 0
 
+	async function hydrateIds(ids: string[]): Promise<void> {
+		if (!client.hydrateVisibleIcons) return
+		for (let start = 0; start < ids.length; start += HYDRATION_BATCH_SIZE) {
+			try {
+				await client.hydrateVisibleIcons(
+					ids.slice(start, start + HYDRATION_BATCH_SIZE),
+				)
+			} catch {
+				// Hydration is best-effort. One failed batch must not starve later
+				// visible cards; background hydration can retry the failed IDs.
+			}
+		}
+	}
+
 	function releaseInitialization() {
 		initializationUsers = Math.max(0, initializationUsers - 1)
 		if (initializationUsers > 0) return
@@ -153,17 +254,20 @@ export function createAppStore(
 		function persist() {
 			const state = get()
 			const persisted = writePreferences(storage, {
-				version: 5,
+				version: 7,
 				categories: state.categories,
 				categoryOrder: state.categoryOrder,
 				favoriteAppIds: state.favoriteAppIds,
 				favoriteAppIdentities: state.favoriteAppIdentities,
 				collapsedCategories: state.collapsedCategories,
 				categoryOverrides: state.categoryOverrides,
+				categoryOverrideIdentities: state.categoryOverrideIdentities,
 				hiddenAppIds: state.hiddenAppIds,
 				hiddenAppIdentities: state.hiddenAppIdentities,
 				promotedAppIds: state.promotedAppIds,
 				promotedAppIdentities: state.promotedAppIdentities,
+				legacyCanonicalPreferences:
+					state.legacyCanonicalPreferences,
 				unknownFields: preferences.unknownFields,
 			})
 			// A refused write leaves the UI showing changes that will not survive a restart,
@@ -190,10 +294,13 @@ export function createAppStore(
 			categoryOrder: preferences.categoryOrder,
 			collapsedCategories: preferences.collapsedCategories,
 			categoryOverrides: preferences.categoryOverrides,
+			categoryOverrideIdentities: preferences.categoryOverrideIdentities,
 			hiddenAppIds: preferences.hiddenAppIds,
 			hiddenAppIdentities: preferences.hiddenAppIdentities,
 			promotedAppIds: preferences.promotedAppIds,
 			promotedAppIdentities: preferences.promotedAppIdentities,
+			legacyCanonicalPreferences:
+				preferences.legacyCanonicalPreferences,
 			preferencesPersisted: true,
 			categories: preferences.categories,
 			launchingIds: [],
@@ -224,39 +331,50 @@ export function createAppStore(
 				set({ isLoading: true, error: null })
 				try {
 					const snapshot = await client.getApps()
-					const promotedAppIdentities = new Set(
-						get().promotedAppIdentities,
-					)
-					for (const legacyId of get().promotedAppIds) {
-						const match = snapshot.apps.find(
-							app => app.id === legacyId,
-						)
-						if (match)
-							promotedAppIdentities.add(
-								match.canonicalIdentity ?? match.id,
-							)
-					}
+					const legacy = get().legacyCanonicalPreferences
 					const favorites = reconcileSelection(
 						snapshot.apps,
 						get().favoriteAppIds,
 						get().favoriteAppIdentities,
+						legacy.favorite,
 					)
 					const hidden = reconcileSelection(
 						snapshot.apps,
 						get().hiddenAppIds,
 						get().hiddenAppIdentities,
+						legacy.hidden,
+					)
+					const promoted = reconcileSelection(
+						snapshot.apps,
+						get().promotedAppIds,
+						get().promotedAppIdentities,
+						legacy.promoted,
+					)
+					const overrides = reconcileOverrides(
+						snapshot.apps,
+						get().categoryOverrides,
+						get().categoryOverrideIdentities,
+						legacy.categoryOverrides,
 					)
 					set({
 						apps: snapshot.apps,
 						hasCache: snapshot.hasCache,
 						catalogGeneration: snapshot.generation ?? 0,
 						catalogDiagnostics: snapshot.diagnostics ?? null,
-						promotedAppIds: [],
-						promotedAppIdentities: [...promotedAppIdentities],
+						promotedAppIds: promoted.ids,
+						promotedAppIdentities: promoted.identities,
 						favoriteAppIds: favorites.ids,
 						favoriteAppIdentities: favorites.identities,
 						hiddenAppIds: hidden.ids,
 						hiddenAppIdentities: hidden.identities,
+						categoryOverrides: overrides.overrides,
+						categoryOverrideIdentities: overrides.overrideIdentities,
+						legacyCanonicalPreferences: {
+							favorite: favorites.unresolvedLegacy,
+							hidden: hidden.unresolvedLegacy,
+							promoted: promoted.unresolvedLegacy,
+							categoryOverrides: overrides.unresolvedLegacy,
+						},
 					})
 					persist()
 				} catch (error) {
@@ -352,22 +470,17 @@ export function createAppStore(
 			},
 			async hydrateVisibleIcons(ids) {
 				if (!ids.length || !client.hydrateVisibleIcons) return
-				try {
-					await client.hydrateVisibleIcons(ids)
-				} catch {
-					// Icon hydration is an optimization path; the normal background
-					// hydrator still runs and app launching must not be affected.
-				}
+				await hydrateIds(ids)
 			},
 			async clearIconCache() {
 				if (!client.clearIconCache) return
 				await client.clearIconCache()
-				await client.hydrateVisibleIcons?.(
+				await get().hydrateVisibleIcons(
 					get().apps.map(app => app.id),
 				)
 			},
 			async repairMissingIcons() {
-				await client.hydrateVisibleIcons?.(
+				await get().hydrateVisibleIcons(
 					get()
 						.apps.filter(app => !app.iconBase64)
 						.map(app => app.id),
@@ -420,12 +533,12 @@ export function createAppStore(
 					const promoted = app
 						? state.promotedAppIds.includes(app.id) ||
 							state.promotedAppIdentities.includes(
-								app.canonicalIdentity ?? app.id,
+								identityOf(app),
 							)
 						: false
 					if (app?.visibilityClass === 'auxiliary' && !promoted)
 						return state
-					const identity = app?.canonicalIdentity ?? id
+					const identity = app ? identityOf(app) : id
 					const wasFavorite = state.favoriteAppIds.includes(id)
 					return {
 						favoriteAppIds: wasFavorite
@@ -444,7 +557,7 @@ export function createAppStore(
 				set(state => {
 					if (state.hiddenAppIds.includes(id)) return state
 					const app = state.apps.find(item => item.id === id)
-					const identity = app?.canonicalIdentity ?? id
+					const identity = app ? identityOf(app) : id
 					return {
 						hiddenAppIds: [...state.hiddenAppIds, id],
 						hiddenAppIdentities: addUnique(
@@ -458,7 +571,7 @@ export function createAppStore(
 			restoreApp(id) {
 				set(state => {
 					const app = state.apps.find(item => item.id === id)
-					const identity = app?.canonicalIdentity ?? id
+					const identity = app ? identityOf(app) : id
 					return {
 						hiddenAppIds: state.hiddenAppIds.filter(
 							appId => appId !== id,
@@ -472,7 +585,7 @@ export function createAppStore(
 			},
 			promoteAuxiliary(id) {
 				const app = get().apps.find(item => item.id === id)
-				const identity = app?.canonicalIdentity ?? id
+				const identity = app ? identityOf(app) : id
 				set(state => ({
 					promotedAppIdentities: state.promotedAppIdentities.includes(
 						identity,
@@ -484,7 +597,7 @@ export function createAppStore(
 			},
 			demoteAuxiliary(id) {
 				const app = get().apps.find(item => item.id === id)
-				const identity = app?.canonicalIdentity ?? id
+				const identity = app ? identityOf(app) : id
 				set(state => ({
 					promotedAppIds: state.promotedAppIds.filter(
 						appId => appId !== id,
@@ -517,12 +630,20 @@ export function createAppStore(
 				persist()
 			},
 			moveApp(id, category) {
-				set(state => ({
-					categoryOverrides: {
-						...state.categoryOverrides,
-						[id]: category,
-					},
-				}))
+				set(state => {
+					const app = state.apps.find(item => item.id === id)
+					const identity = app ? identityOf(app) : id
+					return {
+						categoryOverrides: {
+							...state.categoryOverrides,
+							[id]: category,
+						},
+						categoryOverrideIdentities: {
+							...state.categoryOverrideIdentities,
+							[identity]: category,
+						},
+					}
+				})
 				persist()
 			},
 			createCategory(label) {
@@ -594,6 +715,14 @@ export function createAppStore(
 						Object.entries(state.categoryOverrides).map(
 							([appId, category]) => [
 								appId,
+								category === id ? 'other' : category,
+							],
+						),
+					),
+					categoryOverrideIdentities: Object.fromEntries(
+						Object.entries(state.categoryOverrideIdentities).map(
+							([identity, category]) => [
+								identity,
 								category === id ? 'other' : category,
 							],
 						),

@@ -1,3 +1,19 @@
+//! Catalog synchronization core and Tauri-owned orchestration.
+//!
+//! The pure delta/scanning logic remains callable through this module, while the focused
+//! submodules own cache-document loading, background hydration, coordinated scan execution,
+//! and filesystem-watcher lifecycle.
+
+mod document;
+mod hydration;
+mod scan;
+mod watcher;
+
+pub(crate) use document::{load_sanitized_cache, load_sanitized_document};
+pub(crate) use hydration::enqueue_hydration;
+pub(crate) use scan::run_coordinated_scan;
+pub(crate) use watcher::restart_change_watcher;
+
 use crate::catalog::cache::{CatalogCache, CatalogDiagnostics};
 use crate::catalog::incremental::{scan_root, FilesystemIndex, ScanMode};
 use crate::catalog::scan_settings::ScanSettings;
@@ -311,6 +327,7 @@ mod tests {
             shortcut_icon_path: None,
             launch_arguments: None,
             canonical_identity: None,
+            preference_identity: None,
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),

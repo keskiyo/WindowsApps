@@ -4,7 +4,6 @@
 // see src-tauri/capabilities/default.json.
 mod app_state;
 mod catalog;
-mod catalog_sync;
 mod commands;
 mod error;
 mod lifecycle;
@@ -13,8 +12,8 @@ mod platform;
 use std::sync::Arc;
 use tauri::Manager;
 
-use app_state::{remember_launch_targets, remember_uninstall_targets, AppState};
-use catalog_sync::{load_sanitized_cache, restart_change_watcher};
+use app_state::{remember_catalog, AppState};
+use catalog::sync::{load_sanitized_cache, restart_change_watcher};
 use platform::windows::{autostart, global_shortcut, install_registry};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -66,8 +65,7 @@ pub fn run() {
             if let Ok(app_data_dir) = app.path().app_data_dir() {
                 if let Some(apps) = load_sanitized_cache(&app_data_dir) {
                     let state = app.state::<AppState>();
-                    remember_uninstall_targets(state.inner(), &apps);
-                    remember_launch_targets(state.inner(), &apps);
+                    remember_catalog(state.inner(), &apps);
                 }
                 let settings = catalog::scan_settings::read(&app_data_dir);
                 restart_change_watcher(app.handle().clone(), &settings);
@@ -113,6 +111,7 @@ pub fn run() {
             commands::settings::set_scan_settings,
             commands::links::open_telegram,
             commands::links::open_github,
+            commands::links::open_apps_settings,
             commands::links::open_release,
             commands::links::stale_copy_status,
             commands::links::open_installed_copy

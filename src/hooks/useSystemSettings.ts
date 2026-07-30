@@ -103,7 +103,9 @@ export function useSystemSettings({
 			await onForceFullScan()
 			setConfirmForce(false)
 		} catch (reason) {
-			setError(toAppClientError(reason).message)
+			const clientError = toAppClientError(reason)
+			if (clientError.code !== 'SCAN_CANCELLED')
+				setError(clientError.message)
 		} finally {
 			maintenanceInFlight.current = false
 			setForcing(false)
@@ -119,7 +121,9 @@ export function useSystemSettings({
 			await onResetCatalogCache()
 			setConfirmReset(false)
 		} catch (reason) {
-			setError(toAppClientError(reason).message)
+			const clientError = toAppClientError(reason)
+			if (clientError.code !== 'SCAN_CANCELLED')
+				setError(clientError.message)
 		} finally {
 			maintenanceInFlight.current = false
 			setResetting(false)

@@ -65,5 +65,28 @@
 		"path": "D:\\Tools\\bin\\unknown.exe",
 		"source": "portable",
 		"expected": "uncertain"
+	},
+	{
+		"name": "RTSSSharedMemorySample Application",
+		"path": "D:\\Apps\\RivaTuner Statistics Server\\SDK\\Samples\\SharedMemory\\RTSSSharedMemorySample\\Release\\RTSSSharedMemorySample.exe",
+		"source": "portable",
+		"description": "RTSS shared memory sample",
+		"expected": "auxiliary"
+	},
+	{
+		"name": "MACMSharedMemorySample Application",
+		"path": "D:\\Apps\\MSI Afterburner\\SDK\\Samples\\SharedMemory\\MACMSharedMemorySample\\Release\\MACMSharedMemorySample.exe",
+		"source": "portable",
+		"description": "MACM shared memory sample application",
+		"expected": "auxiliary"
+	},
+	{
+		"name": "Windows Terminal",
+		"path": "D:\\Microsoft VS Code\\resources\\app\\node_modules.asar.unpacked\\node-pty\\build\\Release\\conpty\\OpenConsole.exe",
+		"source": "portable",
+		"description": "Console Window and PTY Host (Open Source)",
+		"publisher": "Microsoft Corporation",
+		"originalFilename": "OpenConsole.exe",
+		"expected": "rejected"
 	}
 ]

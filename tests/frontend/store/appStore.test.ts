@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PREFERENCES_KEY } from '../../../src/lib/preferences'
+import { AppClientError } from '../../../src/lib/clientError'
 import {
 	createAppStore,
 	selectFilteredApps,
@@ -185,6 +186,139 @@ describe('app store', () => {
 		expect(reopened.getState().hiddenAppIds).toEqual(['target:new'])
 	})
 
+	// A manual category override is keyed by canonicalIdentity, so it survives a Force full scan /
+	// Reset cache / dedup change that renames the app id.
+	it('keeps a manual category override when the app id changes but its identity does not', async () => {
+		const storage = localStorage
+		storage.clear()
+		const before = app({
+			id: 'target:old',
+			name: 'Toolbox',
+			path: String.raw`C:\Toolbox.exe`,
+			category: 'other',
+			canonicalIdentity: 'identity:toolbox',
+		})
+		const store = createAppStore(
+			client({ getApps: vi.fn().mockResolvedValue({ apps: [before], hasCache: true }) }),
+			storage,
+		)
+		store.setState({ apps: [before] })
+		store.getState().moveApp('target:old', 'utilities')
+
+		expect(
+			JSON.parse(storage.getItem(PREFERENCES_KEY) ?? '{}')
+				.categoryOverrideIdentities,
+		).toEqual({ 'identity:toolbox': 'utilities' })
+
+		// A rescan loads the same app under a different id; the override must still apply.
+		const after = { ...before, id: 'target:new' }
+		const reopened = createAppStore(
+			client({ getApps: vi.fn().mockResolvedValue({ apps: [after], hasCache: true }) }),
+			storage,
+		)
+		await reopened.getState().load()
+
+		const categorized = selectVisibleApps({
+			...reopened.getState(),
+			activeView: 'all',
+		})
+		expect(
+			categorized.find(item => item.id === 'target:new')?.category,
+		).toBe('utilities')
+	})
+
+	it('migrates a v6 canonical collision only to the card named by its saved id', async () => {
+		localStorage.setItem(
+			PREFERENCES_KEY,
+			JSON.stringify({
+				version: 6,
+				favoriteAppIds: ['cmd-shortcut'],
+				favoriteAppIdentities: ['product:command-prompt'],
+				hiddenAppIds: ['cmd-shortcut'],
+				hiddenAppIdentities: ['product:command-prompt'],
+				categoryOverrides: { 'cmd-shortcut': 'utilities' },
+				categoryOverrideIdentities: {
+					'product:command-prompt': 'utilities',
+				},
+			}),
+		)
+		const shortcut = app({
+			id: 'cmd-shortcut',
+			name: 'Command Prompt',
+			path: String.raw`C:\Menu\Command Prompt.lnk`,
+			category: 'system',
+			canonicalIdentity: 'product:command-prompt',
+			preferenceIdentity: 'preference:cmd-shortcut',
+			launchKind: 'shortcut',
+			sourceKind: 'start_menu',
+		})
+		const executable = app({
+			id: 'cmd-executable',
+			name: 'Command Prompt',
+			path: String.raw`C:\Windows\System32\cmd.exe`,
+			category: 'system',
+			canonicalIdentity: 'product:command-prompt',
+			preferenceIdentity: 'preference:cmd-executable',
+		})
+		const store = createAppStore(
+			client({
+				getApps: vi.fn().mockResolvedValue({
+					apps: [shortcut, executable],
+					hasCache: true,
+				}),
+			}),
+			localStorage,
+		)
+
+		await store.getState().load()
+
+		expect(store.getState().favoriteAppIds).toEqual(['cmd-shortcut'])
+		expect(store.getState().hiddenAppIds).toEqual(['cmd-shortcut'])
+		expect(store.getState().categoryOverrides).toEqual({
+			'cmd-shortcut': 'utilities',
+		})
+		expect(store.getState().favoriteAppIdentities).toEqual([
+			'preference:cmd-shortcut',
+		])
+	})
+
+	it('keeps an ambiguous v6 canonical preference unresolved instead of fanning it out', async () => {
+		localStorage.setItem(
+			PREFERENCES_KEY,
+			JSON.stringify({
+				version: 6,
+				favoriteAppIdentities: ['product:command-prompt'],
+			}),
+		)
+		const collision = ['shortcut', 'executable'].map(role =>
+			app({
+				id: `cmd-${role}`,
+				name: 'Command Prompt',
+				path: `C:\\cmd-${role}.exe`,
+				category: 'system',
+				canonicalIdentity: 'product:command-prompt',
+				preferenceIdentity: `preference:cmd-${role}`,
+			}),
+		)
+		const store = createAppStore(
+			client({
+				getApps: vi.fn().mockResolvedValue({
+					apps: collision,
+					hasCache: true,
+				}),
+			}),
+			localStorage,
+		)
+
+		await store.getState().load()
+
+		expect(store.getState().favoriteAppIds).toEqual([])
+		expect(
+			JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? '{}')
+				.legacyCanonicalPreferences.favorite,
+		).toEqual(['product:command-prompt'])
+	})
+
 	it('persists an auxiliary tool promoted by the user', () => {
 		const storage = localStorage
 		storage.clear()
@@ -272,10 +406,10 @@ describe('app store', () => {
 			'new-shortcut',
 		])
 		expect(JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? '{}')).toMatchObject({
-			promotedAppIds: [],
+			promotedAppIds: ['old-launcher'],
 			promotedAppIdentities: ['identity:example'],
 		})
-		expect(store.getState().promotedAppIds).toEqual([])
+		expect(store.getState().promotedAppIds).toEqual(['old-launcher'])
 	})
 
 	it('moves a promoted tool back to auxiliary and removes its favorite', () => {
@@ -611,6 +745,65 @@ describe('app store', () => {
 		expect(api.hydrateVisibleIcons).toHaveBeenCalledWith(['code', 'chrome'])
 	})
 
+	it('batches clear and repair hydration for catalogs above the IPC limit', async () => {
+		const catalog = Array.from({ length: 129 }, (_, index) =>
+			app({
+				id: `app-${index}`,
+				name: `App ${index}`,
+				path: `C:\\Apps\\app-${index}.exe`,
+				category: 'other',
+			}),
+		)
+		const hydrateVisibleIcons = vi.fn().mockResolvedValue(undefined)
+		const api = client({
+			clearIconCache: vi.fn().mockResolvedValue(undefined),
+			hydrateVisibleIcons,
+		})
+		const store = createAppStore(api)
+		store.setState({ apps: catalog })
+
+		await store.getState().clearIconCache()
+
+		expect(hydrateVisibleIcons).toHaveBeenNthCalledWith(
+			1,
+			catalog.slice(0, 128).map(item => item.id),
+		)
+		expect(hydrateVisibleIcons).toHaveBeenNthCalledWith(2, ['app-128'])
+
+		hydrateVisibleIcons.mockClear()
+		await store.getState().repairMissingIcons()
+
+		expect(hydrateVisibleIcons).toHaveBeenNthCalledWith(
+			1,
+			catalog.slice(0, 128).map(item => item.id),
+		)
+		expect(hydrateVisibleIcons).toHaveBeenNthCalledWith(2, ['app-128'])
+	})
+
+	it('continues best-effort hydration after one batch fails', async () => {
+		const catalog = Array.from({ length: 129 }, (_, index) =>
+			app({
+				id: `app-${index}`,
+				name: `App ${index}`,
+				path: `C:\\Apps\\app-${index}.exe`,
+				category: 'other',
+			}),
+		)
+		const hydrateVisibleIcons = vi
+			.fn()
+			.mockRejectedValueOnce(new Error('first batch failed'))
+			.mockResolvedValue(undefined)
+		const store = createAppStore(
+			client({ hydrateVisibleIcons }),
+		)
+		store.setState({ apps: catalog })
+
+		await store.getState().repairMissingIcons()
+
+		expect(hydrateVisibleIcons).toHaveBeenCalledTimes(2)
+		expect(hydrateVisibleIcons).toHaveBeenLastCalledWith(['app-128'])
+	})
+
 	it('searches publisher and description', () => {
 		const store = createAppStore(client())
 		store.setState({ apps, query: 'openai' })
@@ -628,6 +821,22 @@ describe('app store', () => {
 		await store.getState().refresh()
 		expect(store.getState().apps).toEqual(apps.slice().reverse())
 		expect(store.getState().isRefreshing).toBe(false)
+	})
+
+	it('does not publish scan cancellation through the global error state', async () => {
+		const cancellation = new AppClientError(
+			'SCAN_CANCELLED',
+			'Application scan cancelled.',
+		)
+		const store = createAppStore(
+			client({
+				refreshApps: vi.fn().mockRejectedValue(cancellation),
+			}),
+		)
+
+		await expect(store.getState().refresh()).rejects.toBe(cancellation)
+
+		expect(store.getState().error).toBeNull()
 	})
 
 	it('surfaces launch errors', async () => {

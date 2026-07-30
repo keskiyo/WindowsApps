@@ -9,7 +9,7 @@ export const PREFERENCES_KEY = 'windows-apps.preferences.v1'
 
 /** The schema version this build understands. `version` in the stored document is independent
  * of the key name; see `AGENTS_frontend.md` §3. */
-export const CURRENT_PREFERENCES_VERSION = 5
+export const CURRENT_PREFERENCES_VERSION = 7
 
 /**
  * Previous known-good copy. The backend cache has kept a `.bak` and recovered from it since the
@@ -19,39 +19,58 @@ export const CURRENT_PREFERENCES_VERSION = 5
  */
 export const PREFERENCES_BACKUP_KEY = 'windows-apps.preferences.v1.bak'
 
-export interface AppPreferencesV5 {
-	version: 5
+export interface LegacyCanonicalPreferences {
+	favorite: string[]
+	hidden: string[]
+	promoted: string[]
+	categoryOverrides: Record<string, AppCategory>
+}
+
+export interface AppPreferencesV7 {
+	version: 7
 	categories: CategoryDefinition[]
 	categoryOrder: AppCategory[]
 	// `*AppIds` are catalog ids: durable within a version, but an id is a function of the
 	// deduplication grouping, so it can change between releases. `*AppIdentities` carry the
 	// stable `canonicalIdentity`, which is what actually survives a dedup rule change — the
-	// ids are re-derived from them on load (see the store). The id arrays are kept for the
+	// ids are re-derived from them on load (see the store). The id arrays/maps are kept for the
 	// one-time migration of preferences written before the identities existed, exactly as
 	// `promotedAppIds` is kept beside `promotedAppIdentities`.
 	favoriteAppIds: string[]
 	favoriteAppIdentities: string[]
 	collapsedCategories: AppCategory[]
+	// A manual category override keyed by catalog id (runtime projection) and by the durable
+	// `canonicalIdentity` (`categoryOverrideIdentities`). The identity map is what survives a
+	// Force full scan / Reset cache / dedup rule change; the id map is re-derived from it on load.
 	categoryOverrides: Record<string, AppCategory>
+	categoryOverrideIdentities: Record<string, AppCategory>
 	hiddenAppIds: string[]
 	hiddenAppIdentities: string[]
 	promotedAppIds: string[]
 	promotedAppIdentities: string[]
+	legacyCanonicalPreferences: LegacyCanonicalPreferences
 	unknownFields?: Record<string, unknown>
 }
 
-export const DEFAULT_PREFERENCES: AppPreferencesV5 = {
-	version: 5,
+export const DEFAULT_PREFERENCES: AppPreferencesV7 = {
+	version: 7,
 	categories: DEFAULT_CATEGORIES.map(category => ({ ...category })),
 	categoryOrder: [...CATEGORY_ORDER],
 	favoriteAppIds: [],
 	favoriteAppIdentities: [],
 	collapsedCategories: [],
 	categoryOverrides: {},
+	categoryOverrideIdentities: {},
 	hiddenAppIds: [],
 	hiddenAppIdentities: [],
 	promotedAppIds: [],
 	promotedAppIdentities: [],
+	legacyCanonicalPreferences: {
+		favorite: [],
+		hidden: [],
+		promoted: [],
+		categoryOverrides: {},
+	},
 }
 
 function uniqueStrings(value: unknown): string[] {
@@ -65,6 +84,22 @@ function uniqueStrings(value: unknown): string[] {
 				),
 			]
 		: []
+}
+
+/** A `{ key -> category }` map, keeping only entries with a non-empty key and a known category. */
+function normalizeOverrideMap(
+	value: unknown,
+	known: Set<string>,
+): Record<string, AppCategory> {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+	return Object.fromEntries(
+		Object.entries(value as Record<string, unknown>).filter(
+			([key, category]) =>
+				key.trim() &&
+				typeof category === 'string' &&
+				known.has(category),
+		),
+	) as Record<string, AppCategory>
 }
 
 function normalizeDefinitions(value: unknown): CategoryDefinition[] {
@@ -109,13 +144,15 @@ const KNOWN_PREFERENCE_FIELDS = new Set([
 	'favoriteAppIdentities',
 	'collapsedCategories',
 	'categoryOverrides',
+	'categoryOverrideIdentities',
 	'hiddenAppIds',
 	'hiddenAppIdentities',
 	'promotedAppIds',
 	'promotedAppIdentities',
+	'legacyCanonicalPreferences',
 ])
 
-export function normalizePreferences(value: unknown): AppPreferencesV5 {
+export function normalizePreferences(value: unknown): AppPreferencesV7 {
 	if (!value || typeof value !== 'object')
 		return structuredClone(DEFAULT_PREFERENCES)
 	const raw = value as Record<string, unknown>
@@ -130,43 +167,74 @@ export function normalizePreferences(value: unknown): AppPreferencesV5 {
 			.map(category => category.id)
 			.filter(id => !savedOrder.includes(id)),
 	]
-	const overrides =
-		raw.categoryOverrides &&
-		typeof raw.categoryOverrides === 'object' &&
-		!Array.isArray(raw.categoryOverrides)
-			? Object.fromEntries(
-					Object.entries(raw.categoryOverrides).filter(
-						([id, category]) =>
-							id.trim() &&
-							typeof category === 'string' &&
-							known.has(category),
-					),
-				)
+	const overrides = normalizeOverrideMap(raw.categoryOverrides, known)
+	const overrideIdentities = normalizeOverrideMap(
+		raw.categoryOverrideIdentities,
+		known,
+	)
+	const isCurrentSchema = raw.version === CURRENT_PREFERENCES_VERSION
+	const rawLegacy =
+		isCurrentSchema &&
+		raw.legacyCanonicalPreferences &&
+		typeof raw.legacyCanonicalPreferences === 'object' &&
+		!Array.isArray(raw.legacyCanonicalPreferences)
+			? (raw.legacyCanonicalPreferences as Record<string, unknown>)
 			: {}
+	const legacyCanonicalPreferences: LegacyCanonicalPreferences = {
+		favorite: uniqueStrings(
+			isCurrentSchema
+				? rawLegacy.favorite
+				: raw.favoriteAppIdentities,
+		),
+		hidden: uniqueStrings(
+			isCurrentSchema ? rawLegacy.hidden : raw.hiddenAppIdentities,
+		),
+		promoted: uniqueStrings(
+			isCurrentSchema
+				? rawLegacy.promoted
+				: raw.promotedAppIdentities,
+		),
+		categoryOverrides: normalizeOverrideMap(
+			isCurrentSchema
+				? rawLegacy.categoryOverrides
+				: raw.categoryOverrideIdentities,
+			known,
+		),
+	}
 	const unknownFields = Object.fromEntries(
 		Object.entries(raw).filter(
 			([key]) => !KNOWN_PREFERENCE_FIELDS.has(key),
 		),
 	)
 	return {
-		version: 5,
+		version: 7,
 		categories,
 		categoryOrder,
 		favoriteAppIds: uniqueStrings(raw.favoriteAppIds),
-		favoriteAppIdentities: uniqueStrings(raw.favoriteAppIdentities),
+		favoriteAppIdentities: isCurrentSchema
+			? uniqueStrings(raw.favoriteAppIdentities)
+			: [],
 		collapsedCategories: uniqueStrings(raw.collapsedCategories).filter(id =>
 			known.has(id),
 		),
 		categoryOverrides: overrides,
+		categoryOverrideIdentities: isCurrentSchema
+			? overrideIdentities
+			: {},
 		hiddenAppIds: uniqueStrings(raw.hiddenAppIds),
-		hiddenAppIdentities: uniqueStrings(raw.hiddenAppIdentities),
+		hiddenAppIdentities: isCurrentSchema
+			? uniqueStrings(raw.hiddenAppIdentities)
+			: [],
 		promotedAppIds: uniqueStrings(raw.promotedAppIds),
-		promotedAppIdentities: uniqueStrings(raw.promotedAppIdentities),
+		promotedAppIdentities: isCurrentSchema
+			? uniqueStrings(raw.promotedAppIdentities)
+			: [],
+		legacyCanonicalPreferences,
 		...(Object.keys(unknownFields).length > 0 ? { unknownFields } : {}),
 	}
 }
 
-export function readPreferences(storage: Storage): AppPreferencesV5 {
+export function readPreferences(storage: Storage): AppPreferencesV7 {
 	return (
 		readSlot(storage, PREFERENCES_KEY) ??
 		readSlot(storage, PREFERENCES_BACKUP_KEY) ??
@@ -175,7 +243,7 @@ export function readPreferences(storage: Storage): AppPreferencesV5 {
 }
 
 /** `null` means "nothing usable here", so the caller can fall through to the next source. */
-function readSlot(storage: Storage, key: string): AppPreferencesV5 | null {
+function readSlot(storage: Storage, key: string): AppPreferencesV7 | null {
 	try {
 		const value = storage.getItem(key)
 		return value ? normalizePreferences(JSON.parse(value)) : null
@@ -193,7 +261,7 @@ function readSlot(storage: Storage, key: string): AppPreferencesV5 | null {
  */
 export function writePreferences(
 	storage: Storage,
-	preferences: AppPreferencesV5,
+	preferences: AppPreferencesV7,
 ): boolean {
 	// If the stored document was written by a newer version than this build understands, leave
 	// it untouched: overwriting it with the older v5 shape would strip fields the newer build

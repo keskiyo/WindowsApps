@@ -1,0 +1,440 @@
+[
+	{
+		"name": "Brotato",
+		"path": "D:\\Games\\Brotato\\Brotato.exe",
+		"source": "portable",
+		"publisher": "Blobfish Games",
+		"productName": "Brotato",
+		"description": "Godot Engine",
+		"expected": "games"
+	},
+	{
+		"name": "Hearthstone",
+		"path": "C:\\Program Files\\Hearthstone\\Hearthstone.exe",
+		"publisher": "Blizzard Entertainment",
+		"expected": "games"
+	},
+	{
+		"name": "Battle.net",
+		"path": "C:\\Games\\Battle.net.exe",
+		"expected": "games"
+	},
+	{
+		"name": "World of Warcraft",
+		"path": "C:\\Blizzard\\Wow.lnk",
+		"expected": "games"
+	},
+	{
+		"name": "Counter-Strike 2",
+		"path": "C:\\steam\\steamapps\\common\\cs2\\cs2.exe",
+		"expected": "games"
+	},
+	{
+		"name": "Diablo IV",
+		"path": "C:\\Menu\\Diablo.lnk",
+		"resolvedPath": "D:\\Games\\Battle.net\\Diablo IV\\game.exe",
+		"expected": "games"
+	},
+	{
+		"name": "CurseForge",
+		"path": "C:\\Menu\\CurseForge.lnk",
+		"expected": "games"
+	},
+	{
+		"name": "Xbox",
+		"path": "Microsoft.GamingApp_8wekyb3d8bbwe!App",
+		"source": "msix",
+		"expected": "games"
+	},
+	{
+		"name": "Epic Games Launcher",
+		"path": "C:\\Menu\\Epic.lnk",
+		"expected": "games"
+	},
+	{
+		"name": "Unknowable",
+		"path": "C:\\Apps\\Unknowable\\game.exe",
+		"description": "Unreal Engine",
+		"expected": "games"
+	},
+
+	{ "name": "Claude", "path": "C:\\Claude.exe", "expected": "ai" },
+	{ "name": "ChatGPT", "path": "C:\\ChatGPT.exe", "expected": "ai" },
+	{
+		"name": "OpenCode",
+		"path": "C:\\Menu\\OpenCode.lnk",
+		"resolvedPath": "D:\\Apps\\OpenCode\\OpenCode.exe",
+		"expected": "ai"
+	},
+	{
+		"name": "Assistant",
+		"path": "C:\\assist.exe",
+		"publisher": "OpenAI",
+		"expected": "ai"
+	},
+	{ "name": "Codeium", "path": "C:\\codeium.exe", "expected": "ai" },
+	{ "name": "LM Studio", "path": "C:\\lmstudio.exe", "expected": "ai" },
+
+	{
+		"name": "Visual Studio Code",
+		"path": "C:\\Code.exe",
+		"expected": "development"
+	},
+	{
+		"name": "RustRover",
+		"path": "C:\\RustRover.exe",
+		"expected": "development"
+	},
+	{
+		"name": "MongoDB Compass",
+		"path": "C:\\Menu\\Mongo.lnk",
+		"publisher": "MongoDB Inc",
+		"resolvedPath": "C:\\MongoDBCompass\\MongoDBCompass.exe",
+		"expected": "development"
+	},
+	{
+		"name": "Git Bash",
+		"path": "C:\\Program Files\\Git\\git-bash.exe",
+		"expected": "development"
+	},
+	{
+		"name": "PostgreSQL 16",
+		"path": "C:\\Program Files\\PostgreSQL\\16\\bin\\postgres.exe",
+		"publisher": "PostgreSQL Global Development Group",
+		"expected": "development"
+	},
+	{
+		"name": "PuTTY",
+		"path": "C:\\PuTTY\\putty.exe",
+		"expected": "development"
+	},
+	{
+		"name": "Zed",
+		"path": "C:\\Apps\\Zed\\zed.exe",
+		"expected": "development"
+	},
+	{
+		"name": "Docker Desktop",
+		"path": "C:\\Program Files\\Docker\\Docker Desktop.exe",
+		"expected": "development"
+	},
+	{
+		"name": "DBeaver",
+		"path": "C:\\dbeaver\\dbeaver.exe",
+		"expected": "development"
+	},
+
+	{
+		"name": "Adobe Photoshop",
+		"path": "C:\\Photoshop.exe",
+		"expected": "editors"
+	},
+	{ "name": "Figma", "path": "C:\\Figma.exe", "expected": "editors" },
+	{
+		"name": "Untitled Project",
+		"path": "C:\\Resolve.exe",
+		"publisher": "Blackmagic Design Pty. Ltd.",
+		"expected": "editors"
+	},
+	{
+		"name": "HandBrake",
+		"path": "C:\\HandBrake\\HandBrake.exe",
+		"expected": "editors"
+	},
+	{
+		"name": "Autodesk AutoCAD 2024",
+		"path": "C:\\Menu\\AutoCAD.lnk",
+		"publisher": "Autodesk",
+		"expected": "editors"
+	},
+	{ "name": "Krita", "path": "C:\\krita\\krita.exe", "expected": "editors" },
+
+	{
+		"name": "Adobe Acrobat Reader",
+		"path": "C:\\Acrobat.exe",
+		"publisher": "Adobe Inc.",
+		"resolvedPath": "C:\\Adobe\\Acrobat\\AcroRd32.exe",
+		"expected": "productivity"
+	},
+	{
+		"name": "LibreOffice Calc",
+		"path": "C:\\Program Files\\LibreOffice\\scalc.exe",
+		"expected": "productivity"
+	},
+	{
+		"name": "Notion",
+		"path": "C:\\Users\\Maks\\Notion\\Notion.exe",
+		"expected": "productivity"
+	},
+	{
+		"name": "Notes",
+		"path": "C:\\Apps\\notes.exe",
+		"productName": "Obsidian",
+		"expected": "productivity"
+	},
+	{
+		"name": "Writer",
+		"path": "C:\\Menu\\Writer.lnk",
+		"resolvedPath": "C:\\Program Files\\LibreOffice\\program\\swriter.exe",
+		"expected": "productivity"
+	},
+	{
+		"name": "Foxit PDF Reader",
+		"path": "C:\\Program Files\\Foxit\\FoxitReader.exe",
+		"expected": "productivity"
+	},
+	{
+		"name": "Todoist",
+		"path": "C:\\Apps\\Todoist\\Todoist.exe",
+		"expected": "productivity"
+	},
+
+	{
+		"name": "Google Chrome",
+		"path": "C:\\Chrome.exe",
+		"expected": "browsers"
+	},
+	{
+		"name": "Microsoft Edge",
+		"path": "C:\\Program Files\\Microsoft\\Edge\\msedge.exe",
+		"expected": "browsers"
+	},
+	{
+		"name": "Nightly",
+		"path": "C:\\Menu\\Nightly.lnk",
+		"resolvedPath": "C:\\Program Files\\Mozilla Firefox\\launcher.exe",
+		"expected": "browsers"
+	},
+	{
+		"name": "Tor Browser",
+		"path": "C:\\Tor Browser\\Browser\\firefox.exe",
+		"expected": "browsers"
+	},
+	{
+		"name": "Fast Start",
+		"path": "C:\\Menu\\Fast Start.lnk",
+		"originalFilename": "chrome.exe",
+		"expected": "browsers"
+	},
+	{
+		"name": "Nyxbrowse",
+		"path": "C:\\Apps\\nyx.exe",
+		"description": "Internet Browser",
+		"expected": "browsers"
+	},
+
+	{ "name": "VLC media player", "path": "C:\\vlc.exe", "expected": "media" },
+	{
+		"name": "OBS Studio",
+		"path": "C:\\Program Files\\obs-studio\\bin\\obs64.exe",
+		"expected": "media"
+	},
+	{
+		"name": "FL Studio",
+		"path": "C:\\Program Files\\FL Studio\\FL64.exe",
+		"expected": "media"
+	},
+	{
+		"name": "Spotify",
+		"path": "C:\\Users\\Maks\\Spotify\\Spotify.exe",
+		"expected": "media"
+	},
+
+	{
+		"name": "Discord",
+		"path": "C:\\Discord.exe",
+		"expected": "communication"
+	},
+	{
+		"name": "Microsoft Teams",
+		"path": "C:\\Menu\\Teams.lnk",
+		"expected": "communication"
+	},
+	{
+		"name": "Nikogram",
+		"path": "C:\\Apps\\ng.exe",
+		"publisher": "Telegram FZ-LLC",
+		"expected": "communication"
+	},
+	{
+		"name": "TeamSpeak",
+		"path": "C:\\TeamSpeak\\ts3client.exe",
+		"expected": "communication"
+	},
+
+	{
+		"name": "7-Zip File Manager",
+		"path": "C:\\7zFM.exe",
+		"expected": "file_cloud"
+	},
+	{
+		"name": "WinRAR",
+		"path": "C:\\Program Files\\WinRAR\\WinRAR.exe",
+		"expected": "file_cloud"
+	},
+	{
+		"name": "Dropbox",
+		"path": "C:\\Program Files\\Dropbox\\Dropbox.exe",
+		"expected": "file_cloud"
+	},
+	{
+		"name": "qBittorrent",
+		"path": "C:\\Program Files\\qBittorrent\\qbittorrent.exe",
+		"expected": "file_cloud"
+	},
+	{
+		"name": "Total Commander",
+		"path": "C:\\totalcmd\\TOTALCMD64.EXE",
+		"expected": "file_cloud"
+	},
+
+	{
+		"name": "Bitwarden",
+		"path": "C:\\Users\\Maks\\Bitwarden\\Bitwarden.exe",
+		"expected": "security"
+	},
+	{
+		"name": "WireGuard",
+		"path": "C:\\Program Files\\WireGuard\\wireguard.exe",
+		"expected": "security"
+	},
+	{
+		"name": "Protection",
+		"path": "C:\\Program Files\\Kaspersky Lab\\avp.exe",
+		"publisher": "Kaspersky Lab",
+		"expected": "security"
+	},
+	{
+		"name": "Sota Connect",
+		"path": "C:\\Menu\\Sota Connect.lnk",
+		"source": "start_menu",
+		"resolvedPath": "D:\\Apps\\SotaConnect\\SotaVPN.exe",
+		"expected": "security"
+	},
+	{
+		"name": "Hiddify",
+		"path": "C:\\Program Files\\Hiddify\\Hiddify.exe",
+		"expected": "security"
+	},
+	{
+		"name": "Tailscale",
+		"path": "C:\\Program Files\\Tailscale\\tailscale.exe",
+		"expected": "security"
+	},
+	{
+		"name": "VeraCrypt",
+		"path": "C:\\Program Files\\VeraCrypt\\VeraCrypt.exe",
+		"expected": "security"
+	},
+	{
+		"name": "Happ",
+		"path": "C:\\Program Files\\Happ\\Happ.exe",
+		"description": "Happ Proxy Client",
+		"publisher": "FlyFrog LLC",
+		"productName": "Happ",
+		"expected": "security"
+	},
+	{
+		"name": "Secure Connection",
+		"path": "C:\\Program Files\\Example\\client.exe",
+		"productName": "Example VPN Client",
+		"expected": "security"
+	},
+	{
+		"name": "Network Client",
+		"path": "C:\\Program Files\\Example\\client.exe",
+		"description": "Desktop Proxy Client",
+		"expected": "security"
+	},
+	{
+		"name": "Protection Agent",
+		"path": "C:\\Program Files\\Example\\agent.exe",
+		"productName": "Example Antivirus",
+		"expected": "security"
+	},
+	{
+		"name": "Endpoint Agent",
+		"path": "C:\\Program Files\\Example\\agent.exe",
+		"description": "Endpoint Security Client",
+		"expected": "security"
+	},
+
+	{
+		"name": "TeamViewer",
+		"path": "C:\\Program Files\\TeamViewer\\TeamViewer.exe",
+		"expected": "utilities"
+	},
+	{
+		"name": "ShareX",
+		"path": "C:\\Program Files\\ShareX\\ShareX.exe",
+		"expected": "utilities"
+	},
+	{
+		"name": "NVIDIA App",
+		"path": "C:\\Menu\\NVIDIA App.lnk",
+		"expected": "utilities"
+	},
+	{
+		"name": "Logitech G HUB",
+		"path": "C:\\Menu\\Logitech G HUB.lnk",
+		"resolvedPath": "C:\\LGHUB\\lghub.exe",
+		"publisher": "Logitech, Inc.",
+		"expected": "utilities"
+	},
+	{
+		"name": "CPU-Z",
+		"path": "C:\\CPUID\\CPU-Z\\cpuz.exe",
+		"expected": "utilities"
+	},
+	{
+		"name": "Realtek Audio Console",
+		"path": "RealtekSemiconductorCorp.RealtekAudioControl!App",
+		"source": "msix",
+		"publisher": "Realtek Semiconductor Corp.",
+		"expected": "utilities"
+	},
+
+	{
+		"name": "Character Map",
+		"path": "C:\\Windows\\System32\\charmap.exe",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Computer Management",
+		"path": "C:\\Windows\\System32\\compmgmt.msc",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Управление печатью",
+		"path": "C:\\Menu\\Управление печатью.lnk",
+		"source": "start_menu",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Task Scheduler",
+		"path": "C:\\Windows\\System32\\taskschd.msc",
+		"expected": "windows_features"
+	},
+	{
+		"name": "File Explorer",
+		"path": "C:\\Windows\\explorer.exe",
+		"expected": "windows_features"
+	},
+
+	{ "name": "Acme Workspace", "path": "C:\\Acme.exe", "expected": "other" },
+	{
+		"name": "Omega Launcher",
+		"path": "C:\\Omega\\omega.exe",
+		"expected": "other"
+	},
+	{
+		"name": "Excellent Notes",
+		"path": "C:\\ExcellentNotes.exe",
+		"expected": "other"
+	},
+	{
+		"name": "Realtek Digital Output",
+		"path": "C:\\Realtek\\rtk.exe",
+		"expected": "other"
+	}
+]

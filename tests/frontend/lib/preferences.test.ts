@@ -12,11 +12,12 @@ import { CATEGORY_ORDER } from '../../../src/types'
 describe('preferences', () => {
 	it('uses complete defaults', () => {
 		expect(DEFAULT_PREFERENCES).toMatchObject({
-			version: 5,
+			version: 7,
 			categoryOrder: CATEGORY_ORDER,
 			favoriteAppIds: [],
 			collapsedCategories: [],
 			categoryOverrides: {},
+			categoryOverrideIdentities: {},
 			hiddenAppIds: [],
 			promotedAppIds: [],
 			promotedAppIdentities: [],
@@ -35,7 +36,7 @@ describe('preferences', () => {
 				collapsedCategories: ['other'],
 			}),
 		).toMatchObject({
-			version: 5,
+			version: 7,
 			favoriteAppIds: ['codex'],
 			collapsedCategories: ['other'],
 			categoryOverrides: {},
@@ -53,7 +54,7 @@ describe('preferences', () => {
 		})
 
 		expect(normalized).toMatchObject({
-			version: 5,
+			version: 7,
 			favoriteAppIds: ['code'],
 			unknownFields: {
 				experimentalLayout: { density: 'compact' },
@@ -86,7 +87,7 @@ describe('preferences', () => {
 		).toBe(true)
 
 		expect(JSON.parse(values.get(PREFERENCES_KEY) ?? '{}')).toMatchObject({
-			version: 5,
+			version: 7,
 			favoriteAppIds: ['code', 'editor'],
 			experimentalLayout: { density: 'compact' },
 		})
@@ -109,6 +110,85 @@ describe('preferences', () => {
 		).toEqual({ codex: 'ai', wow: 'games' })
 	})
 
+	it('migrates a v5 document by defaulting the durable override identity map', () => {
+		const normalized = normalizePreferences({
+			version: 5,
+			categoryOverrides: { codex: 'ai' },
+		})
+		// The id-keyed map is preserved (the store folds it into identities on the next catalog
+		// load); the new identity map defaults to empty so nothing is lost on upgrade.
+		expect(normalized.version).toBe(7)
+		expect(normalized.categoryOverrides).toEqual({ codex: 'ai' })
+		expect(normalized.categoryOverrideIdentities).toEqual({})
+	})
+
+	it('quarantines v6 canonical identities for collision-safe catalog reconciliation', () => {
+		const normalized = normalizePreferences({
+			version: 6,
+			favoriteAppIds: ['cmd-shortcut'],
+			favoriteAppIdentities: ['product:command-prompt'],
+			hiddenAppIds: ['cmd-shortcut'],
+			hiddenAppIdentities: ['product:command-prompt'],
+			promotedAppIds: ['cmd-shortcut'],
+			promotedAppIdentities: ['product:command-prompt'],
+			categoryOverrides: { 'cmd-shortcut': 'utilities' },
+			categoryOverrideIdentities: {
+				'product:command-prompt': 'utilities',
+			},
+		})
+
+		expect(normalized).toMatchObject({
+			version: 7,
+			favoriteAppIds: ['cmd-shortcut'],
+			favoriteAppIdentities: [],
+			hiddenAppIds: ['cmd-shortcut'],
+			hiddenAppIdentities: [],
+			promotedAppIds: ['cmd-shortcut'],
+			promotedAppIdentities: [],
+			categoryOverrides: { 'cmd-shortcut': 'utilities' },
+			categoryOverrideIdentities: {},
+			legacyCanonicalPreferences: {
+				favorite: ['product:command-prompt'],
+				hidden: ['product:command-prompt'],
+				promoted: ['product:command-prompt'],
+				categoryOverrides: {
+					'product:command-prompt': 'utilities',
+				},
+			},
+		})
+	})
+
+	it('keeps v7 card preference identities out of the legacy quarantine', () => {
+		const normalized = normalizePreferences({
+			version: 7,
+			favoriteAppIdentities: ['preference:cmd-shortcut'],
+			legacyCanonicalPreferences: {
+				favorite: ['product:unresolved'],
+			},
+		})
+
+		expect(normalized.favoriteAppIdentities).toEqual([
+			'preference:cmd-shortcut',
+		])
+		expect(normalized.legacyCanonicalPreferences.favorite).toEqual([
+			'product:unresolved',
+		])
+	})
+
+	it('keeps only valid durable override identities', () => {
+		expect(
+			normalizePreferences({
+				version: 7,
+				categoryOverrideIdentities: {
+					'ci:codex': 'ai',
+					'ci:wow': 'games',
+					'ci:broken': 'missing',
+					'': 'games',
+				},
+			}).categoryOverrideIdentities,
+		).toEqual({ 'ci:codex': 'ai', 'ci:wow': 'games' })
+	})
+
 	it('normalizes duplicates and appends missing categories', () => {
 		expect(
 			normalizePreferences({
@@ -118,7 +198,7 @@ describe('preferences', () => {
 				collapsedCategories: ['games', 'invalid'],
 			}),
 		).toEqual({
-			version: 5,
+			version: 7,
 			categories: DEFAULT_PREFERENCES.categories,
 			categoryOrder: [
 				'browsers',
@@ -131,10 +211,17 @@ describe('preferences', () => {
 			favoriteAppIdentities: [],
 			collapsedCategories: ['games'],
 			categoryOverrides: {},
+			categoryOverrideIdentities: {},
 			hiddenAppIds: [],
 			hiddenAppIdentities: [],
 			promotedAppIds: [],
 			promotedAppIdentities: [],
+			legacyCanonicalPreferences: {
+				favorite: [],
+				hidden: [],
+				promoted: [],
+				categoryOverrides: {},
+			},
 		})
 	})
 
@@ -187,11 +274,11 @@ describe('preferences', () => {
 		).toEqual(['a'])
 	})
 
-	// A newer build may have written a version 6 document; this build (v5) must not overwrite it
+	// A newer build may have written a version 8 document; this build (v7) must not overwrite it
 	// with the older shape and strip the fields it does not know about.
 	it('does not overwrite a document written by a newer version', () => {
 		const future = JSON.stringify({
-			version: 6,
+			version: 8,
 			favoriteAppIds: ['keep'],
 			futureField: 'preserved',
 		})

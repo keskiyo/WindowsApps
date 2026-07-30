@@ -38,6 +38,8 @@ export interface SystemClient {
 	pickFolder(): Promise<string | null>
 	openTelegram(): Promise<void>
 	openGithub(): Promise<void>
+	/** Opens the Windows "Installed apps" settings page. */
+	openAppsSettings(): Promise<void>
 	openRelease?(version: string): Promise<void>
 	/** Non-null when this process is an outdated leftover copy of the app. */
 	staleCopyStatus?(): Promise<StaleCopyInfo | null>

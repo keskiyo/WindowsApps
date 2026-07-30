@@ -1,7 +1,7 @@
 use super::run_blocking;
 use crate::app_state::AppState;
 use crate::catalog;
-use crate::catalog_sync::restart_change_watcher;
+use crate::catalog::sync::restart_change_watcher;
 use crate::error::AppError;
 use crate::platform::windows::{autostart, drives, global_shortcut};
 use serde::Serialize;

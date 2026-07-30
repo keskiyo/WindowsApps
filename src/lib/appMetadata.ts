@@ -28,9 +28,13 @@ const VISIBILITY_REASON_LABELS = {
 	documentation_shortcut: 'Documentation shortcut',
 	installer: 'Installer',
 	maintenance_executable: 'Maintenance executable',
+	framework_package: 'Framework package',
+	shell_location_shortcut: 'Shell location shortcut',
+	sdk_sample: 'SDK sample',
 	command_environment: 'Command environment',
 	console_application: 'Console application',
 	insufficient_launch_evidence: 'Insufficient launch evidence',
+	unknown: 'Unknown',
 } as const
 
 /**

@@ -72,12 +72,14 @@ export function App({ store, systemClient }: AppProps) {
 			selectCategorizedApps({
 				apps: state.apps,
 				categoryOverrides: state.categoryOverrides,
+				categoryOverrideIdentities: state.categoryOverrideIdentities,
 				promotedAppIds: state.promotedAppIds,
 				promotedAppIdentities: state.promotedAppIdentities,
 			}),
 		[
 			state.apps,
 			state.categoryOverrides,
+			state.categoryOverrideIdentities,
 			state.promotedAppIds,
 			state.promotedAppIdentities,
 		],
@@ -97,6 +99,10 @@ export function App({ store, systemClient }: AppProps) {
 			state.favoriteAppIds,
 		],
 	)
+	const paletteApps = useMemo(() => {
+		const hidden = new Set(state.hiddenAppIds)
+		return categorizedApps.filter(app => !hidden.has(app.id))
+	}, [categorizedApps, state.hiddenAppIds])
 	// Defer the query so fast typing never blocks the input. React will render
 	// the grid with the deferred value while keeping the input state current.
 	const deferredQuery = useDeferredValue(state.query)
@@ -222,6 +228,14 @@ export function App({ store, systemClient }: AppProps) {
 			const isSearchShortcut =
 				commandOrControl &&
 				(event.code === 'KeyF' || event.key.toLowerCase() === 'f')
+			const isPrintShortcut =
+				commandOrControl &&
+				(event.code === 'KeyP' || event.key.toLowerCase() === 'p')
+			if (isPrintShortcut) {
+				event.preventDefault()
+				event.stopPropagation()
+				return
+			}
 			if (isQuickLaunchShortcut) {
 				event.preventDefault()
 				event.stopPropagation()
@@ -505,7 +519,7 @@ export function App({ store, systemClient }: AppProps) {
 				)}
 				{paletteOpen && (
 					<CommandPalette
-						apps={visibleCategorizedApps}
+						apps={paletteApps}
 						onLaunch={feedback.launch}
 						onClose={() => setPaletteOpen(false)}
 					/>

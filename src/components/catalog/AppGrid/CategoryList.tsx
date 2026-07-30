@@ -59,7 +59,7 @@ export function CategoryList(props: AppGridProps) {
 			>
 				<div
 					aria-label='Applications by category'
-					className='space-y-9'
+					className='space-y-5'
 				>
 					{visibleCategories.map(category => {
 						const definition = props.categories.find(

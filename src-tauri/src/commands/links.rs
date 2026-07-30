@@ -20,6 +20,20 @@ pub(crate) async fn open_telegram() -> Result<(), AppError> {
         .map_err(AppError::from)
 }
 
+/// Opens the Windows "Installed apps" settings page (`Apps > Installed apps`). A fixed
+/// `ms-settings:` URI, resolved here rather than supplied by the webview, exactly like the other
+/// `open_*` links.
+#[tauri::command]
+pub(crate) async fn open_apps_settings() -> Result<(), AppError> {
+    tauri::async_runtime::spawn_blocking(|| launcher::shell_execute("ms-settings:appsfeatures"))
+        .await
+        .map_err(|error| AppError::Interrupted {
+            context: "Apps settings launch",
+            source: error.to_string(),
+        })?
+        .map_err(AppError::from)
+}
+
 #[tauri::command]
 pub(crate) async fn open_github() -> Result<(), AppError> {
     tauri::async_runtime::spawn_blocking(|| {

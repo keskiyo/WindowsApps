@@ -1,8 +1,8 @@
 use super::run_blocking;
-use crate::app_state::{remember_launch_targets, remember_uninstall_targets, AppState};
+use crate::app_state::{known_catalog_ids, remember_catalog, AppState};
 use crate::catalog::sync::SyncRequest;
+use crate::catalog::sync::{enqueue_hydration, load_sanitized_document, run_coordinated_scan};
 use crate::catalog::{self, cache, AppInfo};
-use crate::catalog_sync::{enqueue_hydration, load_sanitized_document, run_coordinated_scan};
 use crate::error::AppError;
 use serde::Serialize;
 use tauri::Manager;
@@ -15,6 +15,9 @@ pub(crate) struct CatalogSnapshot {
     generation: u64,
     diagnostics: Option<cache::CatalogDiagnostics>,
 }
+
+const MAX_HYDRATION_IDS: usize = 128;
+const MAX_HYDRATION_ID_LENGTH: usize = 512;
 
 #[tauri::command]
 pub(crate) async fn get_apps(app: tauri::AppHandle) -> Result<CatalogSnapshot, AppError> {
@@ -34,8 +37,7 @@ pub(crate) async fn get_apps(app: tauri::AppHandle) -> Result<CatalogSnapshot, A
     let apps = document.apps;
     {
         let state = app.state::<AppState>();
-        remember_uninstall_targets(state.inner(), &apps);
-        remember_launch_targets(state.inner(), &apps);
+        remember_catalog(state.inner(), &apps);
     }
     enqueue_hydration(
         app.clone(),
@@ -130,6 +132,10 @@ pub(crate) async fn hydrate_visible_icons(
     app: tauri::AppHandle,
     ids: Vec<String>,
 ) -> Result<(), AppError> {
+    let ids = {
+        let state = app.state::<AppState>();
+        validate_hydration_ids(state.inner(), ids)?
+    };
     if ids.is_empty() {
         return Ok(());
     }
@@ -149,6 +155,17 @@ pub(crate) async fn hydrate_visible_icons(
     Ok(())
 }
 
+fn validate_hydration_ids(state: &AppState, ids: Vec<String>) -> Result<Vec<String>, AppError> {
+    if ids.len() > MAX_HYDRATION_IDS
+        || ids
+            .iter()
+            .any(|id| id.chars().count() > MAX_HYDRATION_ID_LENGTH)
+    {
+        return Err(AppError::InvalidHydrationRequest);
+    }
+    Ok(known_catalog_ids(state, ids))
+}
+
 #[tauri::command]
 pub(crate) fn start_background_sync(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
@@ -158,4 +175,73 @@ pub(crate) fn start_background_sync(app: tauri::AppHandle) {
         })
         .await;
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app_state::{cached_app, remember_catalog};
+
+    #[test]
+    fn hydration_ids_are_deduplicated_and_limited_to_the_trusted_catalog() {
+        let state = AppState::default();
+        let mut known = cached_app("Known", r"C:\Known.exe");
+        known.id = "known".into();
+        remember_catalog(&state, &[known]);
+
+        assert_eq!(
+            validate_hydration_ids(
+                &state,
+                vec![
+                    "known".into(),
+                    String::new(),
+                    "unknown".into(),
+                    "known".into(),
+                ]
+            )
+            .unwrap(),
+            vec!["known"]
+        );
+    }
+
+    #[test]
+    fn hydration_rejects_oversized_id_lists() {
+        let state = AppState::default();
+        let ids = (0..=MAX_HYDRATION_IDS)
+            .map(|index| format!("app-{index}"))
+            .collect();
+
+        assert!(matches!(
+            validate_hydration_ids(&state, ids),
+            Err(AppError::InvalidHydrationRequest)
+        ));
+    }
+
+    #[test]
+    fn hydration_rejects_oversized_ids() {
+        let state = AppState::default();
+
+        assert!(matches!(
+            validate_hydration_ids(&state, vec!["x".repeat(MAX_HYDRATION_ID_LENGTH + 1)]),
+            Err(AppError::InvalidHydrationRequest)
+        ));
+    }
+
+    #[test]
+    fn hydration_length_limit_counts_unicode_characters() {
+        let state = AppState::default();
+        let accepted_id = "я".repeat(MAX_HYDRATION_ID_LENGTH);
+        let mut known = cached_app("Known", r"C:\Known.exe");
+        known.id = accepted_id.clone();
+        remember_catalog(&state, &[known]);
+
+        assert_eq!(
+            validate_hydration_ids(&state, vec![accepted_id.clone()]).unwrap(),
+            vec![accepted_id]
+        );
+        assert!(matches!(
+            validate_hydration_ids(&state, vec!["я".repeat(MAX_HYDRATION_ID_LENGTH + 1)]),
+            Err(AppError::InvalidHydrationRequest)
+        ));
+    }
 }

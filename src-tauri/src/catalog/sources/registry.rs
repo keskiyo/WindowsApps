@@ -1,12 +1,12 @@
-use super::{
+use crate::catalog::{
     classify::classify, filters::clean_display_icon, find_executable_named, stable_id, AppInfo,
     LaunchKind, SourceKind, UninstallTarget,
 };
 use crate::platform::windows::uninstall_registry;
-pub(super) use crate::platform::windows::uninstall_registry::RegistryEntry as RegistryValues;
+pub(in crate::catalog) use crate::platform::windows::uninstall_registry::RegistryEntry as RegistryValues;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct RegistryMetadata {
+pub(in crate::catalog) struct RegistryMetadata {
     pub name: String,
     pub description: Option<String>,
     pub version: Option<String>,
@@ -16,12 +16,12 @@ pub(super) struct RegistryMetadata {
 }
 
 #[derive(Default)]
-pub(super) struct RegistryScan {
+pub(in crate::catalog) struct RegistryScan {
     pub apps: Vec<AppInfo>,
     pub metadata: Vec<RegistryMetadata>,
 }
 
-pub(super) fn scan() -> RegistryScan {
+pub(in crate::catalog) fn scan() -> RegistryScan {
     let mut result = RegistryScan::default();
     for values in uninstall_registry::entries()
         .into_iter()
@@ -37,7 +37,7 @@ pub(super) fn scan() -> RegistryScan {
     result
 }
 
-pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
+pub(in crate::catalog) fn from_values(values: RegistryValues) -> Option<AppInfo> {
     if values.system_component {
         return None;
     }
@@ -46,8 +46,8 @@ pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
         .as_deref()
         .and_then(clean_display_icon)
         .filter(|path| {
-            super::is_launchable(path)
-                && !super::filters::is_noise(&values.display_name, &path.to_string_lossy())
+            crate::catalog::is_launchable(path)
+                && !crate::catalog::filters::is_noise(&values.display_name, &path.to_string_lossy())
         })
         .or_else(|| {
             values
@@ -57,7 +57,7 @@ pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
         })?;
     let path_text = path.to_string_lossy().trim().to_string();
     if values.display_name.trim().is_empty()
-        || super::filters::is_noise(&values.display_name, &path_text)
+        || crate::catalog::filters::is_noise(&values.display_name, &path_text)
     {
         return None;
     }
@@ -92,6 +92,7 @@ pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
         shortcut_icon_path: None,
         launch_arguments: None,
         canonical_identity: None,
+        preference_identity: None,
         visibility_class: Default::default(),
         visibility_score: 0,
         visibility_reasons: Vec::new(),
@@ -100,7 +101,7 @@ pub(super) fn from_values(values: RegistryValues) -> Option<AppInfo> {
 
 fn metadata_from_values(values: &RegistryValues) -> Option<RegistryMetadata> {
     let name = values.display_name.trim().to_string();
-    if name.is_empty() || super::filters::is_invalid_display_name(&name) {
+    if name.is_empty() || crate::catalog::filters::is_invalid_display_name(&name) {
         return None;
     }
     Some(RegistryMetadata {
@@ -146,7 +147,7 @@ fn clean(value: Option<String>) -> Option<String> {
         .filter(|text| !text.is_empty())
 }
 
-pub(super) fn split_command(value: &str) -> Option<(String, String)> {
+pub(in crate::catalog) fn split_command(value: &str) -> Option<(String, String)> {
     let value = value.trim();
     if let Some(rest) = value.strip_prefix('"') {
         let end = rest.find('"')?;

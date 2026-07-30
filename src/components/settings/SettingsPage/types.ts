@@ -26,6 +26,7 @@ export interface GeneralSettingsProps {
 	onToggleAutostart(): Promise<void>
 	onOpenGithub: SystemClient['openGithub']
 	onOpenTelegram: SystemClient['openTelegram']
+	onOpenAppsSettings: SystemClient['openAppsSettings']
 }
 
 export interface CatalogMaintenanceProps {

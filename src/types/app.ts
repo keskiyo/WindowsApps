@@ -23,9 +23,13 @@ export type AppVisibilityReason =
 	| 'documentation_shortcut'
 	| 'installer'
 	| 'maintenance_executable'
+	| 'framework_package'
+	| 'shell_location_shortcut'
+	| 'sdk_sample'
 	| 'command_environment'
 	| 'console_application'
 	| 'insufficient_launch_evidence'
+	| 'unknown'
 
 export interface AppInfo {
 	id: string
@@ -44,6 +48,7 @@ export interface AppInfo {
 	canUninstall: boolean
 	launchArguments?: string | null
 	canonicalIdentity?: string | null
+	preferenceIdentity?: string | null
 	userPromoted?: boolean
 	visibilityClass?: AppVisibilityClass
 	visibilityScore?: number

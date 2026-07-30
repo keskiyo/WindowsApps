@@ -1,5 +1,5 @@
-use super::exec_target::{self, RejectedTarget};
 use crate::catalog::UninstallTarget;
+use crate::platform::windows::exec_target::{self, RejectedTarget};
 use serde::{Deserialize, Serialize};
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;

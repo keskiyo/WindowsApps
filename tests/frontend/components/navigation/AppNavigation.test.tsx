@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AppNavigation } from '../../../../src/components/navigation/AppNavigation/AppNavigation'
@@ -37,7 +37,7 @@ describe('AppNavigation', () => {
 		expect(games).toHaveAttribute('aria-roledescription', 'sortable')
 		expect(games).toHaveClass('cursor-grab')
 		expect(
-			screen.queryByRole('button', { name: 'Move Games category' }),
+			screen.queryByRole('button', { name: 'Reorder Games category' }),
 		).not.toBeInTheDocument()
 		expect(screen.queryByTestId('category-drag-icon')).not.toBeInTheDocument()
 		expect(
@@ -45,5 +45,35 @@ describe('AppNavigation', () => {
 		).not.toBeInTheDocument()
 		await userEvent.click(games)
 		expect(onSelectCategory).toHaveBeenCalledWith('games')
+	})
+
+	it('groups utility views into one compact navigation row', () => {
+		render(
+			<AppNavigation
+				categoryOrder={[]}
+				categories={categories}
+				counts={new Map()}
+				activeView='all'
+				favoriteCount={0}
+				auxiliaryCount={65}
+				hiddenCount={0}
+				onSelectView={vi.fn()}
+				onSelectCategory={vi.fn()}
+				onCreateCategory={() => ({ ok: true, id: 'custom' })}
+				onReorderCategory={vi.fn()}
+			/>,
+		)
+
+		const utilityViews = screen.getByRole('group', {
+			name: 'Utility views',
+		})
+		expect(
+			within(utilityViews).getByRole('button', {
+				name: 'Auxiliary tools 65',
+			}),
+		).toHaveAttribute('title', 'Auxiliary tools')
+		expect(
+			within(utilityViews).getByRole('button', { name: 'Hidden 0' }),
+		).toHaveAttribute('title', 'Hidden')
 	})
 })

@@ -3,17 +3,18 @@
 
 use super::document::load_sanitized_document;
 use super::hydration::enqueue_hydration;
-use crate::app_state::{remember_launch_targets, remember_uninstall_targets, AppState};
+use crate::app_state::{remember_catalog, AppState};
 use crate::catalog::cache;
 use crate::catalog::scan_coordinator::{ScanJob, Submission};
 use crate::catalog::sync::{compute_delta, SyncRequest};
 use crate::catalog::{self, AppInfo};
+use crate::error::AppError;
 use tauri::{Emitter, Manager};
 
 fn synchronize_catalog_once(
     app: &tauri::AppHandle,
     job: &ScanJob<Vec<AppInfo>>,
-) -> Result<Vec<AppInfo>, String> {
+) -> Result<Vec<AppInfo>, AppError> {
     let state = app.state::<AppState>();
     let _guard = state
         .sync_lock
@@ -35,11 +36,10 @@ fn synchronize_catalog_once(
         || job.cancelled.load(std::sync::atomic::Ordering::Relaxed),
     );
     if job.cancelled.load(std::sync::atomic::Ordering::Relaxed) {
-        return Err("Application scan cancelled".into());
+        return Err(AppError::ScanCancelled);
     }
     let delta = compute_delta(document.generation, &previous.apps, &document.apps);
-    remember_uninstall_targets(state.inner(), &document.apps);
-    remember_launch_targets(state.inner(), &document.apps);
+    remember_catalog(state.inner(), &document.apps);
     cache::write_document(&app_data_dir, &document)
         .map_err(|error| format!("Could not save the application cache: {error}"))?;
     // Once per scan: applications that left the catalog would otherwise keep their cached icon
@@ -82,7 +82,7 @@ pub(crate) fn run_coordinated_scan(
     app: &tauri::AppHandle,
     request: SyncRequest,
     wants_result: bool,
-) -> Result<Option<Vec<AppInfo>>, String> {
+) -> Result<Option<Vec<AppInfo>>, AppError> {
     let state = app.state::<AppState>();
     let coordinator = &state.scan_coordinator;
     match coordinator.submit(request, wants_result) {

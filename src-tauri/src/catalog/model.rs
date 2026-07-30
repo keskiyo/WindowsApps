@@ -12,13 +12,19 @@ pub(crate) enum AppCategory {
     Ai,
     Editors,
     Development,
+    Productivity,
     Browsers,
     Media,
     Communication,
+    FileCloud,
+    Security,
     Utilities,
     System,
     WindowsFeatures,
+    // `serde(other)` makes an unrecognized category from a newer cache degrade to Other instead of
+    // failing the whole document — an older build must not discard a cache a newer build wrote.
     #[default]
+    #[serde(other)]
     Other,
 }
 
@@ -92,6 +98,8 @@ pub(crate) struct AppInfo {
     pub launch_arguments: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canonical_identity: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preference_identity: Option<String>,
     #[serde(default)]
     pub visibility_class: VisibilityClass,
     #[serde(default)]
@@ -107,4 +115,33 @@ pub(crate) struct ScanProgress {
     pub location: Option<String>,
     pub completed_roots: usize,
     pub total_roots: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A cache written by a newer build may carry category/reason values this build does not know.
+    // They must degrade (category -> Other, reason -> Unknown) rather than fail the whole document,
+    // otherwise an older build discards a valid newer cache and rescans on every cold start.
+    #[test]
+    fn unknown_persisted_enum_values_degrade_instead_of_failing() {
+        let json = serde_json::json!({
+            "id": "x",
+            "name": "X",
+            "path": "C:\\x.exe",
+            "iconBase64": null,
+            "category": "quantum_future",
+            "visibilityReasons": ["teleportation", "product_component"]
+        });
+
+        let app: AppInfo =
+            serde_json::from_value(json).expect("unknown enum values degrade, not fail");
+
+        assert_eq!(app.category, AppCategory::Other);
+        assert!(app.visibility_reasons.contains(&VisibilityReason::Unknown));
+        assert!(app
+            .visibility_reasons
+            .contains(&VisibilityReason::ProductComponent));
+    }
 }

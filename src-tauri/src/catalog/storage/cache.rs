@@ -79,14 +79,14 @@ fn parse_document(bytes: &[u8]) -> Option<CatalogCache> {
             // Visibility classification arrived in 4; older documents need it recomputed.
             if document.schema_version < 4 {
                 for app in &mut document.apps {
-                    super::visibility::apply_visibility(app);
+                    crate::catalog::visibility::apply_visibility(app);
                 }
             }
             // 5 replaced the combined Windows snapshot with one per scanner. The apps stay —
             // only the stale snapshot goes, and the next scan repopulates the new keys.
-            document
-                .sources
-                .retain(|snapshot| snapshot.key.0 != super::source::LEGACY_COMBINED_SOURCE);
+            document.sources.retain(|snapshot| {
+                snapshot.key.0 != crate::catalog::source::LEGACY_COMBINED_SOURCE
+            });
             document.schema_version = CACHE_SCHEMA_VERSION;
             return Some(document);
         }
@@ -95,7 +95,7 @@ fn parse_document(bytes: &[u8]) -> Option<CatalogCache> {
     let mut apps = serde_json::from_slice::<Vec<AppInfo>>(bytes).ok()?;
     for app in &mut apps {
         app.icon_base64 = None;
-        super::visibility::apply_visibility(app);
+        crate::catalog::visibility::apply_visibility(app);
     }
     Some(CatalogCache {
         apps,
@@ -218,6 +218,7 @@ mod tests {
             shortcut_icon_path: None,
             launch_arguments: Some("--profile-directory=Work".into()),
             canonical_identity: Some("identity:editor".into()),
+            preference_identity: None,
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
@@ -235,7 +236,7 @@ mod tests {
         assert_eq!(document.apps.len(), 1);
         assert_eq!(document.apps[0].icon_base64, None);
         legacy.icon_base64 = None;
-        super::super::visibility::apply_visibility(&mut legacy);
+        crate::catalog::visibility::apply_visibility(&mut legacy);
         assert_eq!(document.apps[0], legacy);
     }
 
@@ -262,6 +263,7 @@ mod tests {
             shortcut_icon_path: None,
             launch_arguments: None,
             canonical_identity: None,
+            preference_identity: None,
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
@@ -303,6 +305,7 @@ mod tests {
             shortcut_icon_path: Some(r"C:\Program Files\Mozilla Firefox\firefox.exe".into()),
             launch_arguments: None,
             canonical_identity: None,
+            preference_identity: None,
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),

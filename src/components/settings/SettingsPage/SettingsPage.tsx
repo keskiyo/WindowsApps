@@ -69,6 +69,7 @@ export function SettingsPage({
 				onToggleAutostart={toggleAutostart}
 				onOpenGithub={client.openGithub}
 				onOpenTelegram={client.openTelegram}
+				onOpenAppsSettings={client.openAppsSettings}
 			/>
 			{onForceFullScan && (
 				<CatalogMaintenance

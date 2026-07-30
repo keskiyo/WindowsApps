@@ -1,4 +1,5 @@
 use crate::catalog::{AppCategory, AppInfo, LaunchKind, SourceKind};
+use crate::platform::windows::NameScript;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Component, Path};
@@ -104,6 +105,7 @@ fn canonical_order_key(app: &AppInfo) -> (u8, String) {
 pub(super) fn deduplicate(
     mut apps: Vec<AppInfo>,
     classify: impl Fn(&AppInfo) -> AppCategory,
+    os_script: NameScript,
 ) -> Vec<AppInfo> {
     // Canonicalize the input order so deduplication is deterministic and idempotent. The resolver
     // is order-sensitive ("first matching group wins") and merge relations are not transitive, so
@@ -126,8 +128,24 @@ pub(super) fn deduplicate(
         apps = resolve_apps(apps, &mut report)
             .into_iter()
             .map(|mut resolved| {
+                // Pick the card's display name by the user's OS language. `resolved.app` already
+                // holds the highest-scored source (its launch target and icon), but its name may be
+                // in the wrong script for the user — a Russian shortcut on an English machine. The
+                // name is chosen independently so a non-Russian user reads a Latin name when one
+                // exists, without changing which source actually launches.
+                resolved.app.name = choose_display_name(
+                    &resolved.app.name,
+                    resolved
+                        .candidates
+                        .iter()
+                        .map(|candidate| candidate.app.name.as_str()),
+                    os_script,
+                );
                 resolved.app.id = resolved_canonical_id(&resolved);
-                resolved.app.canonical_identity = Some(preference_identity(&resolved.app));
+                let product_identity = preference_identity(&resolved.app);
+                resolved.app.preference_identity =
+                    Some(card_preference_identity(&resolved.app, &product_identity));
+                resolved.app.canonical_identity = Some(product_identity);
                 resolved.app
             })
             .collect::<Vec<_>>();
@@ -354,6 +372,18 @@ impl CandidateIdentity {
 fn should_merge(existing: &ResolvedApp, candidate: &AppCandidate) -> bool {
     if existing.candidates.iter().any(|left| {
         both_unversioned_portable_copies(left, candidate) && !same_portable_root(left, candidate)
+    }) {
+        return false;
+    }
+    if existing.candidates.iter().any(|left| {
+        left.family == candidate.family
+            && matches!(
+                (
+                    left.identity.launch_mode.as_ref(),
+                    candidate.identity.launch_mode.as_ref()
+                ),
+                (Some(left), Some(right)) if left != right
+            )
     }) {
         return false;
     }
@@ -700,7 +730,17 @@ fn meaningful_launch_arguments(value: Option<&str>) -> Option<String> {
         let token = tokens[index].trim_matches('"').to_lowercase();
         let takes_value = matches!(
             token.as_str(),
-            "--profile-directory" | "--user-data-dir" | "--app" | "--app-id" | "--class" | "-p"
+            "--profile-directory"
+                | "--user-data-dir"
+                | "--app"
+                | "--app-id"
+                | "--class"
+                | "-p"
+                | "/k"
+                | "/c"
+                | "-c"
+                | "-command"
+                | "-file"
         );
         let inline = [
             "--profile-directory=",
@@ -711,7 +751,13 @@ fn meaningful_launch_arguments(value: Option<&str>) -> Option<String> {
         ]
         .iter()
         .any(|prefix| token.starts_with(prefix));
-        if inline {
+        let standalone = matches!(
+            token.as_str(),
+            "--safe-mode" | "--incognito" | "--private-window" | "--guest" | "--kiosk"
+        );
+        if standalone {
+            meaningful.push(token);
+        } else if inline {
             let (key, value) = token.split_once('=').expect("inline argument has equals");
             meaningful.push(format!("{key}={}", normalize_argument_value(key, value)));
         } else if takes_value {
@@ -874,7 +920,7 @@ pub(super) fn canonical_id(app: &AppInfo) -> String {
         return format!("aumid:{aumid}");
     }
     if let Some(target) = identity.launch_target {
-        return format!("target:{target}");
+        return canonical_target_id(&target, app.launch_arguments.as_deref());
     }
     if let Some(registry_product) = identity.registry_product {
         if !registry_product.trim_matches('|').is_empty() {
@@ -911,7 +957,7 @@ fn resolved_canonical_id(resolved: &ResolvedApp) -> String {
         .iter()
         .find_map(|identity| identity.launch_target.as_ref())
     {
-        return format!("target:{target}");
+        return canonical_target_id(target, resolved.app.launch_arguments.as_deref());
     }
     if let Some(registry_product) = identities
         .iter()
@@ -928,6 +974,13 @@ fn resolved_canonical_id(resolved: &ResolvedApp) -> String {
         return format!("portable:{portable_product}");
     }
     canonical_id(&resolved.app)
+}
+
+fn canonical_target_id(target: &str, arguments: Option<&str>) -> String {
+    match meaningful_launch_arguments(arguments) {
+        Some(mode) => format!("target:{target}|mode:{:x}", Sha256::digest(mode.as_bytes())),
+        None => format!("target:{target}"),
+    }
 }
 
 pub(super) fn normalize_path(value: &str) -> String {
@@ -1006,6 +1059,26 @@ pub(super) fn preference_identity(app: &AppInfo) -> String {
         }
     };
     format!("identity:{:x}", Sha256::digest(raw.as_bytes()))
+}
+
+fn card_preference_identity(app: &AppInfo, product_identity: &str) -> String {
+    let launch_role = match (app.source_kind, app.launch_kind) {
+        (SourceKind::Steam, _) => "steam".to_owned(),
+        (_, LaunchKind::AppUserModelId) => "app_user_model_id".to_owned(),
+        _ => {
+            let target = app.resolved_path.as_deref().unwrap_or(&app.path);
+            Path::new(target.trim().trim_matches('"'))
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .map(str::to_lowercase)
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| normalized_product_family(&app.name))
+        }
+    };
+    let launch_mode =
+        meaningful_launch_arguments(app.launch_arguments.as_deref()).unwrap_or_default();
+    let raw = format!("{product_identity}|role:{launch_role}|mode:{launch_mode}");
+    format!("preference:{:x}", Sha256::digest(raw.as_bytes()))
 }
 
 fn preference_target(app: &AppInfo) -> Option<String> {
@@ -1234,6 +1307,54 @@ fn version_family(name: &str) -> &str {
     }
 }
 
+/// Writing system of a display name — only the distinction the locale rule acts on. Any Cyrillic
+/// letter marks a localized name; otherwise a Latin letter marks an English/Latin name.
+fn name_script(name: &str) -> NameScript {
+    let mut has_latin = false;
+    for character in name.chars() {
+        if ('\u{0400}'..='\u{052F}').contains(&character) {
+            return NameScript::Cyrillic;
+        }
+        if character.is_ascii_alphabetic() {
+            has_latin = true;
+        }
+    }
+    if has_latin {
+        NameScript::Latin
+    } else {
+        NameScript::Other
+    }
+}
+
+/// Chooses the display name for a merged card from all of its candidate names, given the OS UI
+/// script. `primary` is the highest-scored source's name (kept when it already matches). Otherwise
+/// a candidate in the OS script wins; failing that, any Latin (English) name — so a non-Cyrillic
+/// user never ends up reading a Cyrillic card when a Latin alternative exists. Purely a naming
+/// choice: the launching source, icon, and target are unchanged.
+fn choose_display_name<'a>(
+    primary: &str,
+    candidates: impl Iterator<Item = &'a str>,
+    os_script: NameScript,
+) -> String {
+    if name_script(primary) == os_script {
+        return primary.to_string();
+    }
+    let names = candidates.collect::<Vec<_>>();
+    if let Some(matched) = names.iter().find(|name| name_script(name) == os_script) {
+        return (*matched).to_string();
+    }
+    if name_script(primary) == NameScript::Latin {
+        return primary.to_string();
+    }
+    if let Some(latin) = names
+        .iter()
+        .find(|name| name_script(name) == NameScript::Latin)
+    {
+        return (*latin).to_string();
+    }
+    primary.to_string()
+}
+
 fn candidate_score(app: &AppInfo) -> u8 {
     if is_helper_candidate(app) {
         return 1;
@@ -1277,6 +1398,7 @@ fn system_tool_alias(app: &AppInfo) -> Option<&'static str> {
             "microsoft.windows.administrativetools" => return Some("windows:admintools"),
             "microsoft.windows.controlpanel" => return Some("windows:controlpanel"),
             "microsoft.windows.remotedesktop" => return Some("windows:remotedesktop"),
+            "microsoft.windows.shell.rundialog" => return Some("windows:run"),
             _ => {}
         }
     }
@@ -1298,6 +1420,11 @@ fn system_tool_alias(app: &AppInfo) -> Option<&'static str> {
     // is English on every locale, so it is a safe key for this fixed shell item.
     if target.is_empty() && normalize_name(&app.name) == "file explorer" {
         return Some("windows:explorer");
+    }
+    // The Run dialog also ships as a PIDL-only "Run" shortcut with no readable target, matching the
+    // localized `Microsoft.Windows.Shell.RunDialog` Start-App above.
+    if target.is_empty() && normalize_name(&app.name) == "run" {
+        return Some("windows:run");
     }
     None
 }
@@ -1323,13 +1450,16 @@ fn category_rank(category: AppCategory) -> u8 {
         AppCategory::Ai => 1,
         AppCategory::Editors => 2,
         AppCategory::Development => 3,
-        AppCategory::Browsers => 4,
-        AppCategory::Media => 5,
-        AppCategory::Communication => 6,
-        AppCategory::Utilities => 7,
-        AppCategory::System => 8,
-        AppCategory::WindowsFeatures => 9,
-        AppCategory::Other => 10,
+        AppCategory::Productivity => 4,
+        AppCategory::Browsers => 5,
+        AppCategory::Media => 6,
+        AppCategory::Communication => 7,
+        AppCategory::FileCloud => 8,
+        AppCategory::Security => 9,
+        AppCategory::Utilities => 10,
+        AppCategory::System => 11,
+        AppCategory::WindowsFeatures => 12,
+        AppCategory::Other => 13,
     }
 }
 
@@ -1358,6 +1488,7 @@ mod tests {
             shortcut_icon_path: None,
             launch_arguments: None,
             canonical_identity: None,
+            preference_identity: None,
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
@@ -1365,7 +1496,71 @@ mod tests {
     }
 
     fn resolve(apps: Vec<AppInfo>) -> Vec<AppInfo> {
-        deduplicate(apps, |_app| AppCategory::Other)
+        deduplicate(apps, |_app| AppCategory::Other, NameScript::Latin)
+    }
+
+    #[test]
+    fn name_script_detects_writing_system() {
+        assert_eq!(name_script("Kaspersky"), NameScript::Latin);
+        assert_eq!(name_script("7-Zip"), NameScript::Latin);
+        assert_eq!(name_script("Касперский"), NameScript::Cyrillic);
+        assert_eq!(name_script("Проводник"), NameScript::Cyrillic);
+        assert_eq!(name_script("日本語"), NameScript::Other);
+    }
+
+    #[test]
+    fn choose_display_name_prefers_os_script_then_latin_fallback() {
+        // English machine: a Latin name wins over a Cyrillic primary.
+        assert_eq!(
+            choose_display_name(
+                "Касперский",
+                ["Касперский", "Kaspersky"].into_iter(),
+                NameScript::Latin,
+            ),
+            "Kaspersky"
+        );
+        // Russian machine: the localized name is kept.
+        assert_eq!(
+            choose_display_name(
+                "Kaspersky",
+                ["Kaspersky", "Касперский"].into_iter(),
+                NameScript::Cyrillic,
+            ),
+            "Касперский"
+        );
+        // English machine but only a Cyrillic name exists: nothing better, keep it.
+        assert_eq!(
+            choose_display_name("Проводник", ["Проводник"].into_iter(), NameScript::Latin),
+            "Проводник"
+        );
+    }
+
+    // The merged card launches via the higher-scored source but reads in the user's OS language:
+    // a Russian shortcut plus an English registry entry for one product show "Kaspersky" on an
+    // English machine and "Касперский" on a Russian one.
+    #[test]
+    fn merged_display_name_follows_the_os_language() {
+        let candidates = || {
+            let mut shortcut = app("Касперский", r"C:\Menu\Касперский.lnk");
+            shortcut.launch_kind = LaunchKind::Shortcut;
+            shortcut.source_kind = SourceKind::StartMenu;
+            shortcut.resolved_path = Some(r"C:\Program Files\Kaspersky\avp.exe".into());
+            let mut registry = app("Kaspersky", r"C:\Program Files\Kaspersky\avp.exe");
+            registry.can_uninstall = true;
+            vec![shortcut, registry]
+        };
+
+        let english = deduplicate(candidates(), |_app| AppCategory::Other, NameScript::Latin);
+        assert_eq!(english.len(), 1, "the two entries must merge into one card");
+        assert_eq!(english[0].name, "Kaspersky");
+
+        let russian = deduplicate(
+            candidates(),
+            |_app| AppCategory::Other,
+            NameScript::Cyrillic,
+        );
+        assert_eq!(russian.len(), 1);
+        assert_eq!(russian[0].name, "Касперский");
     }
 
     // Legal-form suffixes are stripped as whole tokens. The old substring `.replace` mangled real
@@ -1488,6 +1683,148 @@ mod tests {
 
         assert_ne!(preference_identity(&node), preference_identity(&vs));
         assert_eq!(resolve(vec![node, vs]).len(), 2);
+    }
+
+    fn launch_card(name: &str, target: &str, arguments: Option<&str>) -> AppInfo {
+        let mut candidate = app(name, &format!(r"C:\Menu\{name}.lnk"));
+        candidate.launch_kind = LaunchKind::Shortcut;
+        candidate.source_kind = SourceKind::StartMenu;
+        candidate.resolved_path = Some(target.into());
+        candidate.launch_arguments = arguments.map(str::to_owned);
+        candidate
+    }
+
+    #[test]
+    fn separate_launch_cards_in_one_product_get_distinct_preference_identities() {
+        let cases = [
+            (
+                launch_card("Python 3.14", r"C:\Python\python.exe", None),
+                launch_card(
+                    "IDLE",
+                    r"C:\Python\pythonw.exe",
+                    Some(r#""C:\Python\Lib\idlelib\idle.pyw""#),
+                ),
+            ),
+            (
+                launch_card("7-Zip", r"D:\Tools\7-Zip\7z.exe", None),
+                launch_card("7-Zip File Manager", r"D:\Tools\7-Zip\7zFM.exe", None),
+            ),
+            (
+                launch_card("chrome", r"C:\Chromium\chrome.exe", None),
+                launch_card(
+                    "chrome pwa launcher",
+                    r"C:\Chromium\chrome_pwa_launcher.exe",
+                    None,
+                ),
+            ),
+            (
+                launch_card(
+                    "LibreOffice Safe Mode",
+                    r"C:\Program Files\LibreOffice\program\soffice.exe",
+                    Some("--safe-mode"),
+                ),
+                launch_card(
+                    "LibreOffice Help Pack",
+                    r"C:\Program Files\LibreOffice\program\gengal.exe",
+                    None,
+                ),
+            ),
+        ];
+
+        for (left, right) in cases {
+            assert_ne!(
+                card_preference_identity(&left, "identity:shared-product"),
+                card_preference_identity(&right, "identity:shared-product"),
+                "{} and {} must not share durable user preferences",
+                left.name,
+                right.name,
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_launch_modes_still_get_distinct_preference_identities() {
+        let ordinary = launch_card(
+            "LibreOffice",
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            None,
+        );
+        let safe_mode = launch_card(
+            "LibreOffice Safe Mode",
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            Some("--safe-mode"),
+        );
+
+        assert_ne!(
+            card_preference_identity(&ordinary, "identity:libreoffice"),
+            card_preference_identity(&safe_mode, "identity:libreoffice"),
+        );
+        let resolved = resolve(vec![ordinary, safe_mode]);
+        assert_eq!(resolved.len(), 2);
+        assert_ne!(resolved[0].id, resolved[1].id);
+    }
+
+    #[test]
+    fn the_same_launch_role_keeps_its_preference_identity_across_sources() {
+        let mut registry = app("Editor", r"C:\Editor\editor.exe");
+        registry.product_name = Some("Editor".into());
+        let shortcut = launch_card("Editor", r"C:\Editor\editor.exe", None);
+
+        assert_eq!(
+            card_preference_identity(&registry, "identity:editor-product"),
+            card_preference_identity(&shortcut, "identity:editor-product"),
+        );
+    }
+
+    #[test]
+    fn visual_studio_command_profiles_keep_distinct_batch_environments() {
+        let profiles = vec![
+            cmd_shortcut(
+                "x64 Native Tools Command Prompt for VS 2019",
+                r"C:\Menu\VS\x64 Native Tools.lnk",
+                r"C:\BuildTools\VC\Auxiliary\Build\vcvars64.bat",
+            ),
+            cmd_shortcut(
+                "x86 Native Tools Command Prompt for VS 2019",
+                r"C:\Menu\VS\x86 Native Tools.lnk",
+                r"C:\BuildTools\VC\Auxiliary\Build\vcvars32.bat",
+            ),
+            cmd_shortcut(
+                "x64_x86 Cross Tools Command Prompt for VS 2019",
+                r"C:\Menu\VS\x64_x86 Cross Tools.lnk",
+                r"C:\BuildTools\VC\Auxiliary\Build\vcvarsamd64_x86.bat",
+            ),
+            cmd_shortcut(
+                "x86_x64 Cross Tools Command Prompt for VS 2019",
+                r"C:\Menu\VS\x86_x64 Cross Tools.lnk",
+                r"C:\BuildTools\VC\Auxiliary\Build\vcvarsx86_amd64.bat",
+            ),
+        ];
+
+        assert_eq!(resolve(profiles).len(), 4);
+    }
+
+    #[test]
+    fn duplicate_sources_for_one_command_profile_still_merge() {
+        let shortcut = cmd_shortcut(
+            "x64 Native Tools Command Prompt for VS 2019",
+            r"C:\Menu\VS\x64 Native Tools.lnk",
+            r"C:\BuildTools\VC\Auxiliary\Build\vcvars64.bat",
+        );
+        let mut start_app = app(
+            "x64 Native Tools Command Prompt for VS 2019",
+            "Microsoft.AutoGenerated.{FF70D809-A022-5972-850F-19E0AA8C07C2}",
+        );
+        start_app.launch_kind = LaunchKind::AppUserModelId;
+        start_app.source_kind = SourceKind::StartApps;
+
+        let resolved = resolve(vec![start_app, shortcut]);
+
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(
+            resolved[0].launch_arguments.as_deref(),
+            Some(r#"/k "C:\BuildTools\VC\Auxiliary\Build\vcvars64.bat""#)
+        );
     }
 
     // Real corpus: a Start-Menu shortcut and its Start-App (AUMID) that resolve to the same
@@ -1710,6 +2047,9 @@ mod tests {
         let mut aumid = app("IDLE (Python 3.14 64-bit)", "Microsoft.AutoGenerated.{ABC}");
         aumid.launch_kind = LaunchKind::AppUserModelId;
         aumid.source_kind = SourceKind::StartApps;
+        // A resolvable target keeps this a genuine Primary sibling (an empty one would now be
+        // demoted as a dead AutoGenerated folder entry, which is a separate case).
+        aumid.resolved_path = Some(r"C:\Python314\pythonw.exe".into());
         apply_visibility(&mut aumid);
 
         assert_eq!(shortcut.visibility_class, VisibilityClass::Auxiliary);
@@ -2031,15 +2371,24 @@ mod tests {
         start_app.source_kind = SourceKind::StartApps;
         start_app.resolved_path = Some(r"C:\Windows\system32\eventvwr.msc".into());
 
-        let merged = resolve(vec![shortcut, start_app]);
-
+        // English machine: the card reads in English but still launches via the localized
+        // Start-App — its working shell icon and target are kept, only the name follows the locale.
+        let merged = resolve(vec![shortcut.clone(), start_app.clone()]);
         assert_eq!(merged.len(), 1, "same target → one card");
-        assert_eq!(merged[0].name, "Просмотр событий", "keep localized name");
+        assert_eq!(merged[0].name, "Event Viewer");
         assert_eq!(
             merged[0].launch_kind,
             LaunchKind::AppUserModelId,
             "keep the localized Start-App as the launch/icon source",
         );
+
+        // Russian machine: the localized name is kept.
+        let localized = deduplicate(
+            vec![shortcut, start_app],
+            |_app| AppCategory::Other,
+            NameScript::Cyrillic,
+        );
+        assert_eq!(localized[0].name, "Просмотр событий");
     }
 
     #[test]
@@ -2054,10 +2403,11 @@ mod tests {
         start_app.source_kind = SourceKind::StartApps;
         start_app.resolved_path = Some("::{52205FD8-5DFB-447D-801A-D0B52F2E83E1}".into());
 
+        // English machine: English name; the Cyrillic case is covered by the Event Viewer test.
         let merged = resolve(vec![shortcut, start_app]);
 
         assert_eq!(merged.len(), 1);
-        assert_eq!(merged[0].name, "Проводник");
+        assert_eq!(merged[0].name, "File Explorer");
     }
 
     #[test]
@@ -2075,10 +2425,33 @@ mod tests {
         start_app.source_kind = SourceKind::StartApps;
         start_app.resolved_path = Some(r"C:\Windows\system32\control.exe".into());
 
+        // English machine: the English shortcut name wins over the localized Start-App name.
         let merged = resolve(vec![shortcut, start_app]);
 
         assert_eq!(merged.len(), 1);
-        assert_eq!(merged[0].name, "Инструменты Windows");
+        assert_eq!(merged[0].name, "Administrative Tools");
+    }
+
+    #[test]
+    fn run_dialog_shortcut_and_localized_start_app_merge() {
+        // English "Run" is a PIDL-only shortcut (no readable target).
+        let mut shortcut = app("Run", r"C:\Menu\System Tools\Run.lnk");
+        shortcut.launch_kind = LaunchKind::Shortcut;
+        shortcut.source_kind = SourceKind::StartMenu;
+        // Localized "Выполнить" (Microsoft.Windows.Shell.RunDialog) → Run dialog shell CLSID.
+        let mut start_app = app("Выполнить", "Microsoft.Windows.Shell.RunDialog");
+        start_app.launch_kind = LaunchKind::AppUserModelId;
+        start_app.source_kind = SourceKind::StartApps;
+        start_app.resolved_path = Some("::{2559A1F3-21D7-11D4-BDAF-00C04F60B9F0}".into());
+
+        let merged = resolve(vec![shortcut, start_app]);
+
+        assert_eq!(merged.len(), 1, "the Run dialog is a single card");
+        assert_eq!(
+            merged[0].name, "Run",
+            "English machine shows the Latin name"
+        );
+        assert_eq!(merged[0].launch_kind, LaunchKind::AppUserModelId);
     }
 
     #[test]

@@ -1,9 +1,9 @@
 # Windows Apps Technical Documentation
 
-Technical reference for Windows Apps `0.2.7`.
+Technical reference for Windows Apps `0.2.8`.
 
 [README](README.md) ·
-[Release 0.2.7](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.7) ·
+[Release 0.2.8](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.8) ·
 [Telegram](https://t.me/keskiyo)
 
 ---
@@ -38,6 +38,8 @@ auto-updates the third-party applications it catalogs.
 | Package target   | NSIS setup executable                        |
 
 The main window uses custom decorations, supports resizing, and has a minimum size of `560 × 520`. At minimum width, application grids retain two columns and the header keeps navigation, search, and Refresh on one row while hiding the application identity. The catalog summary cards navigate directly to All applications, Favorites, Hidden, and Auxiliary tools.
+
+The header search remains scoped to the currently open view or category. Both it and the `Ctrl+K` quick-launch palette correct queries typed with the Russian/English keyboard layout reversed and allow one insertion, deletion, substitution, or adjacent transposition in name and product-name words of at least four characters. Literal matches rank above corrected and fuzzy matches. The exact one-token queries `cmd` and `сьв` are reserved aliases for the genuine `Microsoft.WindowsTerminal` package and exclude Command Prompt, Git CMD, and internal `OpenConsole.exe` candidates; full queries such as `command prompt` retain normal matching. `Ctrl+P` is reserved and consumed by the application, including when the same physical key reports `Ctrl+З`, so WebView2 never opens its print dialog.
 
 ## 3. Architecture
 
@@ -77,6 +79,19 @@ The Rust backend owns:
 The frontend sends application IDs for native actions. Rust resolves those IDs through trusted maps built from the catalog, so the webview cannot supply an arbitrary executable path.
 Raw registry access and Windows handles are owned by `src-tauri/src/platform/windows/`; catalog and command modules consume typed platform results.
 
+Rust catalog ownership is grouped by responsibility:
+
+- `catalog/scan/` owns scan coordination, settings, incremental traversal, and hydration work;
+- `catalog/sources/` owns Start Apps, Start Menu/portable, registry, and Steam source adapters;
+- `catalog/storage/` owns the versioned catalog cache and generated icon cache;
+- `catalog/sync/` owns source synchronization plus AppState-facing document, scan, watcher, and hydration orchestration;
+- `catalog/classify/`, `catalog/dedup/`, and `catalog/visibility/` remain separate decision layers.
+
+Windows-native adapters are grouped under `platform/windows/execution/`, `registry/`,
+`shortcuts/`, and `uninstall/`. `platform/windows/mod.rs` re-exports the established
+crate-visible module names so callers depend on one stable platform seam rather than the
+physical folder layout.
+
 ## 4. Tauri command surface
 
 | Command                   | Responsibility                                                               |
@@ -86,9 +101,9 @@ Raw registry access and Windows handles are owned by `src-tauri/src/platform/win
 | `force_full_scan`         | Rebuild configured sources without relying on the previous filesystem index. |
 | `reset_catalog_cache`     | Remove generated catalog and icon caches, then run a clean full scan.        |
 | `clear_icon_cache`        | Remove only generated icons; keep the catalog and filesystem index.          |
-| `hydrate_visible_icons`   | Promote visible application IDs in the hydration queue.                      |
+| `hydrate_visible_icons`   | Promote bounded, trusted catalog IDs in the hydration queue.                  |
 | `start_background_sync`   | Start background validation after the cached catalog is displayed.           |
-| `cancel_scan`             | Cancel active and queued scanning work.                                      |
+| `cancel_scan`             | Cancel active and queued work; refresh reports `SCAN_CANCELLED`.              |
 | `launch_app`              | Launch a trusted catalog entry by ID.                                        |
 | `get_uninstall_preview`   | Return application identity, publisher, source, and safe removal mechanism.  |
 | `uninstall_app`           | Execute the trusted uninstall target and record its result.                  |
@@ -99,6 +114,7 @@ Raw registry access and Windows handles are owned by `src-tauri/src/platform/win
 | `set_scan_settings`       | Save automatic fixed-drive, included-path, and excluded-path settings.       |
 | `open_telegram`           | Open the fixed project contact URL.                                          |
 | `open_github`             | Open the fixed project repository URL.                                       |
+| `open_apps_settings`      | Open the Windows "Installed apps" settings page (`ms-settings:appsfeatures`). |
 | `open_release`            | Open the GitHub release-notes page for a validated version string.           |
 | `stale_copy_status`       | Report when this process is an outdated leftover copy of a newer install.    |
 | `open_installed_copy`     | Launch the newer registered installed copy and exit this outdated one.       |
@@ -167,7 +183,7 @@ The watcher monitors Start Menu paths, uninstall registry keys, and user-configu
 
 ## 7. Cache and asynchronous hydration
 
-The catalog cache contains lightweight application records and a monotonically increasing generation. Large icon payloads are stored separately.
+The catalog cache contains lightweight application records and a monotonically increasing generation. Large icon payloads are stored separately. Persisted enums degrade rather than fail on unknown values — a category or visibility reason written by a newer build deserializes to `Other` / `Unknown` instead of discarding the whole cache, so an older build never rescans just because a newer one wrote the file.
 
 Icon hydration:
 
@@ -188,9 +204,9 @@ Every successful synchronization stores privacy-safe diagnostics with the catalo
 
 Discovery and visibility are separate stages. Every retained candidate receives a `primary`, `auxiliary`, or `rejected` classification with a numeric score and stable reason codes. AUMID, Start Menu, Steam, registered uninstall products, coherent PE metadata, runtime paths, and component-role markers contribute independent evidence.
 
-Normal categories, search, Favorites, and command surfaces exclude `auxiliary` entries. The **Auxiliary tools** view keeps uncertain runtime and maintenance components inspectable. A user can restore an entry to the main catalog; its canonical identity is persisted in local preferences and survives incremental refresh, full scan, and cache reset.
+Normal categories, view-scoped search, and Favorites exclude `auxiliary` entries. The `Ctrl+K` quick-launch palette searches both primary and auxiliary entries but still excludes apps explicitly hidden by the user. The **Auxiliary tools** view keeps uncertain runtime and maintenance components inspectable. A user can restore an entry to the main catalog; its canonical identity is persisted in local preferences and survives incremental refresh, full scan, and cache reset.
 
-Beyond product components, two further classes are auxiliary. **Command environments** open a configured interpreter shell rather than an application: a shortcut whose target is a generic host (`cmd`, `powershell`, `pwsh`, `rundll32`, `python`/`pythonw`, `mysql`, `node`, `wsl`, `wscript`/`cscript`) carrying arguments, or a named developer prompt (Visual Studio Developer/Native Tools/Cross Tools command prompt, Python IDLE, a database command-line client, a Node.js tools installer). A plain interpreter with no arguments (`Windows PowerShell`, `Command Prompt`) stays primary. **Diagnostic launchers** — a "safe mode" / "reset preferences and cache" variant — are auxiliary or rejected. Oracle Java runtime entries are auxiliary. A command-environment or product-component classification is sticky: it survives a merge, so an AUMID sibling that is primary only by the launch-kind fast-path cannot promote the merged card back into the main catalog.
+Beyond product components, two further classes are auxiliary. **Command environments** open a configured interpreter shell rather than an application: a shortcut whose target is a generic host (`cmd`, `powershell`, `pwsh`, `rundll32`, `python`/`pythonw`, `mysql`, `node`, `wsl`, `wscript`/`cscript`) carrying arguments, or a named developer prompt (Visual Studio Developer/Native Tools/Cross Tools command prompt, Python IDLE, a database command-line client, a Node.js tools installer). Plain Command Prompt is auxiliary because it is a console interpreter; argument-free Windows PowerShell remains primary. Command scripts and PowerShell command/file arguments are launch identity: distinct Native/Cross Tools environments remain separate, while the Start Apps and Start Menu records for one profile still merge. **Diagnostic launchers** — a "safe mode" / "reset preferences and cache" variant — are auxiliary or rejected. Oracle Java runtime entries are auxiliary. A command-environment or product-component classification is sticky: it survives a merge, so an AUMID sibling that is primary only by the launch-kind fast-path cannot promote the merged card back into the main catalog.
 
 User visibility overrides now prefer a separate hashed canonical identity. AUMID and Steam identities are strongest; normalized ProductName, publisher, and install root provide cross-source stability; resolved target and normalized path are conservative fallbacks. Legacy promoted IDs remain as fallback and are migrated when a current catalog entry can be matched. Portable roots remain part of identity, so copies at a different (or unknown) version do not collapse; copies at the same exact version are merged.
 
@@ -198,7 +214,7 @@ The model retains PE `ProductName` and `OriginalFilename`, plus shortcut argumen
 
 Debug builds write `%LOCALAPPDATA%\WindowsApps\visibility-report.json` for rejected candidates. User-profile prefixes are replaced with `<USERPROFILE>` and the report is not emitted as a normal production log. A small synthetic fixture corpus lives under `src-tauri/tests/fixtures`; it validates the runner and regression examples but is not evidence of real-world accuracy.
 
-Definite installers, uninstallers, documentation shortcuts, broken resource names, and maintenance executables are rejected. Ambiguous executable names are not rejected solely by name. Registry records marked `SystemComponent=1` remain metadata-only and cannot create a launch card.
+Definite installers, uninstallers, self-extractor stubs, documentation shortcuts, broken resource names, maintenance executables (updaters, crash/telemetry/watchdog helpers, Squirrel), bundled `OpenConsole.exe` PTY hosts, and MSIX framework packages (`Microsoft.VCLibs`, `Microsoft.UI.Xaml`, `Microsoft.NET.Native`, the WebView2 runtime, DirectX) are rejected. Shell-location shortcuts — a `.lnk` that opens a folder through `explorer.exe` with a path argument, such as the "Windows Software Development Kit" Start-Menu entry — are rejected too; the real File Explorer, a bare `explorer.exe` with no argument, is kept. A portable executable with no version, publisher, or product name is nudged toward Auxiliary. Ambiguous executable names are not rejected solely by name. Registry records marked `SystemComponent=1` remain metadata-only and cannot create a launch card.
 
 Deduplication is **order-independent and idempotent**: the input is canonicalized (by candidate quality, then path) before resolution, so the same catalog produces the same groups regardless of the order the scanners emitted entries, and re-running changes nothing. This is what keeps the frontend delta path from accumulating a less-merged variant across background syncs.
 
@@ -221,7 +237,9 @@ Candidate priority is:
 3. `.exe` executable;
 4. packaged application identity.
 
-On a merge the entry surfaced is the higher-priority one, preferring the 64-bit build when two differ only by architecture. Metadata and uninstall data from the secondary record are merged into the preferred record when safe. Conflicting publishers and products that merely share a prefix remain separate. Deduplication intentionally prefers a possible duplicate over hiding a legitimate application when identity evidence is weak.
+On a merge the entry surfaced is the higher-priority one, preferring the 64-bit build when two differ only by architecture. Different command-environment scripts override that architecture-family equivalence because they configure different toolchains. Metadata and uninstall data from the secondary record are merged into the preferred record when safe. Conflicting publishers and products that merely share a prefix remain separate. Deduplication intentionally prefers a possible duplicate over hiding a legitimate application when identity evidence is weak.
+
+The **display name is chosen separately from the launch source**, by the user's Windows UI language. When a merged card carries names in more than one script — a localized Start-Menu shortcut plus an English registry entry, for example — the card shows the name whose script matches the OS UI language (`GetUserDefaultLocaleName`), falling back to a Latin/English name so a non-Cyrillic-locale user is never shown a Cyrillic name when a Latin one exists. Only the name follows the locale; the launching source, icon, and target are still the higher-priority record. A Cyrillic name is kept only when no Latin alternative was found.
 
 ## 9. Categories and navigation
 
@@ -231,23 +249,27 @@ Built-in categories:
 - AI & Agents;
 - Editors & Design;
 - Development;
+- Office & Productivity;
 - Browsers;
 - Media;
 - Communication;
+- File & Cloud;
+- Security & Privacy;
 - Utilities;
 - System;
 - Windows Features;
 - Other.
 
-Category assignment runs after deduplication on the merged record and weighs several signals, not the name alone: the Steam source and a game-store install path (`\steamapps\`, `\Battle.net\`, `\Epic Games\`, …) or an unambiguous game publisher (Blizzard, Valve, Riot, …) map to Games; a few distinctive publishers pin a category (Adobe/Blackmagic → Editors, JetBrains → Development); everything else falls back to curated keyword lists over the name **and the resolved target executable** (so a neutrally named shortcut to `SotaVPN.exe` still reads as a VPN → Utilities), including VPN/proxy clients and database tools. A user override always wins.
+Category assignment runs after deduplication on the merged record and weighs several signals, not the name alone: the Steam source and a game-store install path (`\steamapps\`, `\Battle.net\`, `\Epic Games\`, …) or an unambiguous game publisher (Blizzard, Valve, Riot, …) map to Games; a few distinctive publishers pin a category (Adobe/Blackmagic → Editors, JetBrains → Development, anti-virus vendors → Security, VideoLAN/Spotify → Media, Mozilla → Browsers); a known product install tree pins a category even when the shortcut name is cryptic (`\Microsoft Office\`, `\LibreOffice\` → Office & Productivity; `\Mozilla Firefox\`, `\Google\Chrome\` → Browsers); everything else falls back to curated keyword lists matched over the name, resolved target executable, PE product name, file description, and install directory (so `Happ Proxy Client`, a neutrally named shortcut to `SotaVPN.exe`, or an antivirus identified by product metadata still reads correctly). Office suites, note-takers, and PDF readers map to Office & Productivity; anti-virus, antimalware, endpoint-security, password-manager, VPN, and proxy clients to Security & Privacy; archivers, cloud sync, and file managers to File & Cloud. Keyword matching is anchored to avoid false hits (for example "Logitech" is not read as Git). A user override always wins.
 
 Windows Features is based on known names, targets, and package identities. A generic Microsoft publisher/name is not enough to classify an application as a Windows component.
 
 Users can:
 
 - create, rename, delete, and reorder categories;
-- drag a category by its name;
-- click the same category row to navigate to it;
+- drag a category by holding and moving its header;
+- click anywhere on a category header to collapse or expand it (the chevron is a state indicator);
+- click a category in the sidebar to navigate to it;
 - move applications between categories;
 - mark applications as Favorites;
 - hide and later restore applications.
@@ -256,7 +278,14 @@ Deleting a custom category moves its applications to Other. Hidden is a separate
 
 At widths of `1024px` and above, navigation uses a persistent sidebar. Below `1024px`, the same navigation is presented as an overlay drawer.
 
-Frontend preferences use schema version 4. Reads tolerate any earlier shape — missing or unfamiliar fields are defaulted rather than migrated per version — preserve unknown root fields, recover from the previous valid backup when the primary document is malformed, and refuse to overwrite a document written by a newer version.
+Frontend preferences use schema version 7. Each launch card has a `preferenceIdentity`
+derived from its product identity, launch role, and meaningful arguments. Favorites, hidden
+state, auxiliary promotion, and category overrides use this card identity, so distinct launch
+modes of one product do not inherit each other's settings. Version 6 canonical identities are
+retained separately during migration: an exact saved catalog ID or a single catalog match
+resolves them, while ambiguous matches remain preserved and unapplied instead of fanning out.
+Reads preserve unknown root fields, recover from the previous valid backup when the primary
+document is malformed, and refuse to overwrite a document written by a newer version.
 
 ## 10. Launching
 
@@ -370,6 +399,8 @@ client-side ceiling clears it. A top activity bar reflects any in-flight launch 
 - No online application-description lookup is performed.
 - The Content Security Policy allows application resources and Tauri IPC endpoints.
 - Native launch and uninstall operations resolve trusted Rust-owned catalog records.
+- Icon hydration accepts at most 128 IDs of at most 512 characters each, deduplicates them, and
+  drops IDs absent from the trusted Rust-owned catalog before cache I/O.
 - Uninstall actions require explicit confirmation.
 - Scan recursion is bounded and does not follow reparse points.
 - Debug logging is enabled only in debug builds.
@@ -390,11 +421,18 @@ src/lib/                         Tauri clients, preferences, catalog utilities
 src/store/                       Zustand application state
 src/types/                       Shared TypeScript contracts
 src-tauri/src/app_state.rs       Process-wide trusted catalog target state
-src-tauri/src/catalog_sync.rs    Scan, cache, watcher, and hydration orchestration
-src-tauri/src/commands.rs        Tauri IPC transport handlers
-src-tauri/src/catalog/           Discovery, cache, scanning, hydration, deduplication
+src-tauri/src/catalog/           Catalog model, classify, deduplication, and visibility rules
+src-tauri/src/catalog/scan/      Scan coordination, settings, traversal, and hydration
+src-tauri/src/catalog/sources/   Registry, Start Apps, portable, and Steam source adapters
+src-tauri/src/catalog/storage/   Versioned catalog and generated icon caches
+src-tauri/src/catalog/sync/      Source and AppState-facing synchronization orchestration
+src-tauri/src/commands/          Tauri IPC transport handlers
 src-tauri/src/lifecycle/         Tray and window lifecycle
-src-tauri/src/platform/windows/  Windows-specific native integrations
+src-tauri/src/platform/windows/  Windows-native boundary and compatibility facade
+  execution/                    Launch targets, metadata, and process execution
+  registry/                     Install, uninstall, and Steam registry access
+  shortcuts/                    Shell-link and global-shortcut integrations
+  uninstall/                    Validated uninstall execution and local history
 tests/frontend/                  Frontend tests, mirroring src/ layout by layer
 .github/workflows/release.yml    Tag-driven Windows release pipeline
 scripts/                         Release version/source/asset checks, manifest prep, boundary verifiers
@@ -470,5 +508,5 @@ Run the complete verification commands in [README.md](README.md#development), th
 ---
 
 [README](README.md) ·
-[Release 0.2.7](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.7) ·
+[Release 0.2.8](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.8) ·
 [Telegram: @keskiyo](https://t.me/keskiyo)

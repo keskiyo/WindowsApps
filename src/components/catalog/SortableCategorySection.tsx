@@ -1,7 +1,9 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { ArrowUpDown } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
-import { CategorySection } from './CategorySection'
+import { CategorySection } from './CategorySection/CategorySection'
 
 interface Props {
 	category: AppCategory
@@ -37,31 +39,41 @@ export function SortableCategorySection(props: Props) {
 		transform: CSS.Transform.toString(sortable.transform),
 		transition: sortable.transition,
 	}
-	const dragActivator = (
-		<button
-			type='button'
-			ref={sortable.setActivatorNodeRef}
-			{...sortable.attributes}
-			{...sortable.listeners}
-			aria-label={`Move ${label} category`}
-			title={label}
-			className='group flex min-w-0 flex-1 cursor-grab items-center gap-3 rounded-xl px-1 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 active:cursor-grabbing'
-		>
-			<h2
-				id={`category-${props.category}`}
-				className='truncate text-base font-semibold tracking-tight text-slate-800'
-				title={label}
-			>
-				{label}
-			</h2>
-			<span
-				aria-hidden='true'
-				className='rounded-full bg-slate-200/80 px-2.5 py-1 text-[0.7rem] font-medium text-slate-500'
-			>
-				{props.apps.length} {props.apps.length === 1 ? 'app' : 'apps'}
-			</span>
-		</button>
-	)
+	const suppressToggle = useRef(false)
+	const suppressionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+	useEffect(() => {
+		if (sortable.isDragging) {
+			suppressToggle.current = true
+			if (suppressionTimer.current) {
+				clearTimeout(suppressionTimer.current)
+				suppressionTimer.current = null
+			}
+			return
+		}
+		if (suppressToggle.current) {
+			suppressionTimer.current = setTimeout(() => {
+				suppressToggle.current = false
+				suppressionTimer.current = null
+			}, 250)
+		}
+		return () => {
+			if (suppressionTimer.current) {
+				clearTimeout(suppressionTimer.current)
+				suppressionTimer.current = null
+			}
+		}
+	}, [sortable.isDragging])
+	function toggleUnlessDragged() {
+		if (suppressToggle.current) {
+			suppressToggle.current = false
+			if (suppressionTimer.current) {
+				clearTimeout(suppressionTimer.current)
+				suppressionTimer.current = null
+			}
+			return
+		}
+		props.onToggle()
+	}
 	return (
 		<div
 			ref={sortable.setNodeRef}
@@ -70,7 +82,24 @@ export function SortableCategorySection(props: Props) {
 				sortable.isDragging ? 'z-10 opacity-70 drop-shadow-2xl' : ''
 			}`}
 		>
-			<CategorySection {...props} dragActivator={dragActivator} />
+			<button
+				type='button'
+				ref={sortable.setActivatorNodeRef}
+				{...sortable.attributes}
+				onKeyDown={event => sortable.listeners?.onKeyDown?.(event)}
+				aria-label={`Reorder ${label} category`}
+				title={`Reorder ${label}`}
+				className='sr-only focus:not-sr-only focus:absolute focus:left-0 focus:top-0 focus:z-20 focus:grid focus:size-8 focus:place-items-center focus:rounded-lg focus:bg-slate-200 focus:text-violet-700 focus:outline-2 focus:outline-violet-500'
+			>
+				<ArrowUpDown size={15} aria-hidden='true' />
+			</button>
+			<CategorySection
+				{...props}
+				titlePointerDown={event =>
+					sortable.listeners?.onPointerDown?.(event)
+				}
+				onToggle={toggleUnlessDragged}
+			/>
 		</div>
 	)
 }

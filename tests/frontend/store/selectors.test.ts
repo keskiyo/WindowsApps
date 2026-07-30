@@ -28,10 +28,12 @@ function state(
 	apps: AppInfo[],
 	categoryOverrides: Record<string, AppCategory> = {},
 	promotedAppIds: string[] = [],
+	categoryOverrideIdentities: Record<string, AppCategory> = {},
 ) {
 	return {
 		apps,
 		categoryOverrides,
+		categoryOverrideIdentities,
 		promotedAppIds,
 		promotedAppIdentities: [] as string[],
 	}
@@ -60,6 +62,23 @@ describe('categorized app identity', () => {
 		expect(result[2]).toBe(catalog[2])
 		expect(result[1]).not.toBe(catalog[1])
 		expect(result[1].category).toBe('utilities')
+	})
+
+	it('applies a durable override by canonical identity even when the app id changed', () => {
+		// Simulates a Force full scan / dedup change: a new id, the same canonical identity, and only
+		// the identity-keyed map carries the override. The manual category must still follow the app.
+		const rescanned = [
+			app({
+				id: 'code-v2',
+				name: 'Visual Studio Code',
+				category: 'development',
+				canonicalIdentity: 'ci:vscode',
+			}),
+		]
+		const result = selectCategorizedApps(
+			state(rescanned, {}, [], { 'ci:vscode': 'utilities' }),
+		)
+		expect(result[0].category).toBe('utilities')
 	})
 
 	it('keeps identity when an override resolves to the current category', () => {

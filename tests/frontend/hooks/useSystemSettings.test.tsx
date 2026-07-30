@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { useSystemSettings } from '../../../src/hooks/useSystemSettings'
+import { AppClientError } from '../../../src/lib/clientError'
 import type { SystemClient } from '../../../src/types'
 
 const client: SystemClient = {
@@ -22,6 +23,7 @@ const client: SystemClient = {
 	pickFolder: vi.fn(),
 	openTelegram: vi.fn(),
 	openGithub: vi.fn(),
+	openAppsSettings: vi.fn(),
 }
 
 describe('useSystemSettings', () => {
@@ -72,4 +74,31 @@ describe('useSystemSettings', () => {
 		finishForce?.()
 		await act(async () => Promise.all([forcing, resetting]))
 	})
+
+	it.each(['force', 'reset'] as const)(
+		'does not expose %s scan cancellation as a settings error',
+		async operation => {
+			const cancellation = new AppClientError(
+				'SCAN_CANCELLED',
+				'Application scan cancelled.',
+			)
+			const { result } = renderHook(() =>
+				useSystemSettings({
+					client,
+					onForceFullScan: vi.fn().mockRejectedValue(cancellation),
+					onResetCatalogCache: vi
+						.fn()
+						.mockRejectedValue(cancellation),
+				}),
+			)
+
+			await act(() =>
+				operation === 'force'
+					? result.current.forceFullScan()
+					: result.current.resetCatalogCache(),
+			)
+
+			expect(result.current.error).toBeNull()
+		},
+	)
 })

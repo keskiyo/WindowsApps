@@ -85,6 +85,7 @@ mod tests {
             shortcut_icon_path: None,
             launch_arguments: None,
             canonical_identity: None,
+            preference_identity: None,
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),

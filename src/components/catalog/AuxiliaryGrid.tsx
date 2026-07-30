@@ -1,7 +1,7 @@
 import { Wrench } from 'lucide-react'
 import { sortFavoritesFirst } from '../../lib/catalog'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
-import { AppCard } from '../apps/AppCard/AppCard'
+import { AuxiliaryToolRow } from './AuxiliaryToolRow/AuxiliaryToolRow'
 
 interface Props {
 	apps: AppInfo[]
@@ -9,7 +9,6 @@ interface Props {
 	favoriteAppIds: string[]
 	categories: CategoryDefinition[]
 	categoryOrder: AppCategory[]
-	onToggleFavorite(id: string): void
 	onLaunch(app: AppInfo): Promise<void>
 	onMoveApp(id: string, category: AppCategory): void
 	onInfo(app: AppInfo): void
@@ -41,26 +40,22 @@ export function AuxiliaryGrid(props: Props) {
 				</div>
 			</section>
 		)
+	const apps = sortFavoritesFirst(props.apps, props.favoriteAppIds)
 	return (
 		<section
 			aria-label='Auxiliary tools'
-			className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+			className='grid min-w-0 grid-cols-1 gap-2.5 min-[769px]:grid-cols-2'
 		>
-			{sortFavoritesFirst(props.apps, props.favoriteAppIds).map(app => (
-				<AppCard
+			{apps.map(app => (
+				<AuxiliaryToolRow
 					key={app.id}
 					app={app}
-					isHidden
-					isAuxiliary
-					isFavorite={props.favoriteAppIds.includes(app.id)}
 					categories={props.categories}
 					categoryOrder={props.categoryOrder}
-					onToggleFavorite={props.onToggleFavorite}
 					onLaunch={props.onLaunch}
 					onMove={props.onMoveApp}
 					onInfo={props.onInfo}
 					onUninstall={props.onUninstall}
-					onHide={() => undefined}
 					onRestore={props.onPromote}
 					onDemote={props.onDemote}
 				/>

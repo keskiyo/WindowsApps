@@ -1,8 +1,9 @@
-use super::sync::SyncRequest;
+use crate::catalog::sync::SyncRequest;
+use crate::error::AppError;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 
-pub(crate) type ScanResult<T> = Result<T, String>;
+pub(crate) type ScanResult<T> = Result<T, AppError>;
 
 pub(crate) struct ScanJob<T> {
     pub request: SyncRequest,
@@ -141,7 +142,7 @@ impl<T: Clone> ScanCoordinator<T> {
         }
         if let Some(pending) = state.pending.take() {
             for waiter in pending.waiters {
-                let _ = waiter.send(Err("Application scan cancelled".into()));
+                let _ = waiter.send(Err(AppError::ScanCancelled));
             }
         }
     }
@@ -182,7 +183,7 @@ mod tests {
         assert!(background.cancelled.load(Ordering::Relaxed));
 
         let next = coordinator
-            .complete(background, Err("background superseded".into()))
+            .complete(background, Err("background superseded".to_string().into()))
             .expect("refresh should be pending");
         assert_eq!(next.request, SyncRequest::Refresh);
         assert!(refresh.try_recv().is_err());
@@ -220,11 +221,29 @@ mod tests {
             panic!("force should wait");
         };
         let next = coordinator
-            .complete(active, Err("superseded".into()))
+            .complete(active, Err("superseded".to_string().into()))
             .unwrap();
         assert_eq!(next.request, SyncRequest::Force);
         coordinator.complete(next, Ok(9));
         assert_eq!(refresh.recv().unwrap(), Ok(9));
         assert_eq!(force.recv().unwrap(), Ok(9));
+    }
+
+    #[test]
+    fn cancelling_a_pending_scan_returns_the_typed_cancellation_error() {
+        let coordinator = ScanCoordinator::<u32>::default();
+        let Submission::Start { .. } = coordinator.submit(SyncRequest::Startup, false) else {
+            panic!("startup scan should start");
+        };
+        let Submission::Wait(refresh) = coordinator.submit(SyncRequest::Refresh, true) else {
+            panic!("refresh should wait");
+        };
+
+        coordinator.cancel_all();
+
+        assert!(matches!(
+            refresh.recv().unwrap(),
+            Err(AppError::ScanCancelled)
+        ));
     }
 }

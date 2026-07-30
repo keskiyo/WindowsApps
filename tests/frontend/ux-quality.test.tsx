@@ -78,6 +78,7 @@ function renderApp(
 		pickFolder: vi.fn().mockResolvedValue(null),
 		openTelegram: vi.fn().mockResolvedValue(undefined),
 		openGithub: vi.fn().mockResolvedValue(undefined),
+		openAppsSettings: vi.fn().mockResolvedValue(undefined),
 		...systemOverrides,
 	}
 	const store = createAppStore(client, localStorage)

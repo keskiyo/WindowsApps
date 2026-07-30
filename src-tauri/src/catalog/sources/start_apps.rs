@@ -1,4 +1,4 @@
-use super::{
+use crate::catalog::{
     classify::classify, filters::is_invalid_display_name, filters::is_maintenance_entry, stable_id,
     AppInfo, LaunchKind, SourceKind, UninstallTarget,
 };
@@ -45,7 +45,7 @@ struct PackageRow {
 /// "this machine has no Start apps". The caller must not replace the stored snapshot on
 /// failure: doing so reports every Store application as removed and wipes them from the
 /// catalog until the next successful scan.
-pub(super) fn scan() -> Option<Vec<AppInfo>> {
+pub(in crate::catalog) fn scan() -> Option<Vec<AppInfo>> {
     let primary = run_powershell(START_APPS_SCRIPT);
     let mut powershell_ran = primary.is_some();
     let mut apps = primary
@@ -184,7 +184,7 @@ fn decode_output(bytes: Vec<u8>) -> Option<String> {
         .map(|value| value.trim().to_string())
 }
 
-pub(super) fn parse_start_apps(json: &str) -> Result<Vec<AppInfo>, serde_json::Error> {
+pub(in crate::catalog) fn parse_start_apps(json: &str) -> Result<Vec<AppInfo>, serde_json::Error> {
     let rows: Vec<StartAppRow> = parse_rows(json)?;
     Ok(rows
         .into_iter()
@@ -230,6 +230,7 @@ pub(super) fn parse_start_apps(json: &str) -> Result<Vec<AppInfo>, serde_json::E
                 shortcut_icon_path: None,
                 launch_arguments: None,
                 canonical_identity: None,
+                preference_identity: None,
                 visibility_class: Default::default(),
                 visibility_score: 0,
                 visibility_reasons: Vec::new(),

@@ -1,35 +1,11 @@
 import { useDroppable } from '@dnd-kit/core'
-import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
-import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
-import { AppCard } from '../apps/AppCard/AppCard'
-import { DeleteCategoryDialog } from '../dialogs/DeleteCategoryDialog'
-import { CategoryNameEditor } from '../shared/CategoryNameEditor'
-
-interface Props {
-	category: AppCategory
-	definition: CategoryDefinition
-	categories: CategoryDefinition[]
-	categoryOrder: AppCategory[]
-	apps: AppInfo[]
-	collapsed: boolean
-	favoriteAppIds: string[]
-	dragActivator: ReactNode
-	onToggle(): void
-	onToggleFavorite(id: string): void
-	onLaunch(app: AppInfo): Promise<void>
-	onMoveApp(id: string, category: AppCategory): void
-	onInfo(app: AppInfo): void
-	onUninstall(app: AppInfo): void
-	onHide(id: string): void
-	onRestore(id: string): void
-	onDemote(id: string): void
-	onRenameCategory(
-		id: string,
-		label: string,
-	): { ok: true } | { ok: false; error: string }
-	onDeleteCategory(id: string): { ok: true } | { ok: false; error: string }
-}
+import { Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { AppCard } from '../../apps/AppCard/AppCard'
+import { DeleteCategoryDialog } from '../../dialogs/DeleteCategoryDialog'
+import { CategoryNameEditor } from '../../shared/CategoryNameEditor'
+import { CategoryHeader } from './CategoryHeader'
+import type { CategorySectionProps } from './types'
 
 export function CategorySection({
 	category,
@@ -39,7 +15,7 @@ export function CategorySection({
 	apps,
 	collapsed,
 	favoriteAppIds,
-	dragActivator,
+	titlePointerDown,
 	onToggle,
 	onToggleFavorite,
 	onLaunch,
@@ -51,7 +27,7 @@ export function CategorySection({
 	onDemote,
 	onRenameCategory,
 	onDeleteCategory,
-}: Props) {
+}: CategorySectionProps) {
 	const label = definition.label
 	const [editing, setEditing] = useState(false)
 	const [deleting, setDeleting] = useState(false)
@@ -67,20 +43,6 @@ export function CategorySection({
 			className={`relative scroll-mt-40 rounded-2xl transition-colors duration-200 focus-within:z-90 lg:scroll-mt-24 ${drop.isOver ? 'bg-violet-100/55 ring-1 ring-violet-400/35' : ''}`}
 		>
 			<div className='mb-3 flex items-center gap-2'>
-				<button
-					type='button'
-					aria-expanded={!collapsed}
-					aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
-					onClick={onToggle}
-					disabled={apps.length === 0}
-					className='grid size-8 shrink-0 place-items-center rounded-lg bg-slate-200/75 text-slate-500 transition-colors hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500 disabled:pointer-events-none disabled:opacity-40'
-				>
-					{collapsed ? (
-						<ChevronRight size={15} aria-hidden='true' />
-					) : (
-						<ChevronDown size={15} aria-hidden='true' />
-					)}
-				</button>
 				{editing ? (
 					<CategoryNameEditor
 						initialValue={label}
@@ -93,17 +55,15 @@ export function CategorySection({
 						}}
 					/>
 				) : (
-					dragActivator
-				)}
-				{!editing && (
-					<button
-						type='button'
-						aria-label={`Rename ${label} category`}
-						onClick={() => setEditing(true)}
-						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-violet-100/75 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-violet-500'
-					>
-						<Pencil size={15} />
-					</button>
+					<CategoryHeader
+						category={category}
+						label={label}
+						appCount={apps.length}
+						collapsed={collapsed}
+						titlePointerDown={titlePointerDown}
+						onToggle={onToggle}
+						onEdit={() => setEditing(true)}
+					/>
 				)}
 				{!definition.builtIn && (
 					<button

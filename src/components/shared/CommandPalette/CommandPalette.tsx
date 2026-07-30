@@ -33,17 +33,14 @@ export function CommandPalette({
 
 	useEffect(() => {
 		inputRef.current?.focus()
-		// Restore focus to whatever was focused before the palette opened.
 		const previous = document.activeElement as HTMLElement | null
 		return () => previous?.focus?.()
 	}, [])
 
-	// Clamp selection whenever the result set shrinks.
 	useEffect(() => {
 		setSelected(value => (value >= results.length ? 0 : value))
 	}, [results.length])
 
-	// Keep the active option scrolled into view.
 	useEffect(() => {
 		const node = listRef.current?.children[selected] as
 			| HTMLElement

@@ -62,7 +62,6 @@ export function AppGrid(props: AppGridProps) {
 				favoriteAppIds={props.favoriteAppIds}
 				categories={props.categories}
 				categoryOrder={props.categoryOrder}
-				onToggleFavorite={props.onToggleFavorite}
 				onLaunch={props.onLaunch}
 				onMoveApp={props.onMoveApp}
 				onInfo={props.onInfo}
