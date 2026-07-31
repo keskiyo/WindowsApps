@@ -7,12 +7,13 @@ import {
 	readPreferences,
 	writePreferences,
 } from '../../../src/lib/preferences'
+import { stableCustomCategoryAccent } from '../../../src/lib/categoryAccents'
 import { CATEGORY_ORDER } from '../../../src/types'
 
 describe('preferences', () => {
 	it('uses complete defaults', () => {
 		expect(DEFAULT_PREFERENCES).toMatchObject({
-			version: 7,
+			version: 8,
 			categoryOrder: CATEGORY_ORDER,
 			favoriteAppIds: [],
 			collapsedCategories: [],
@@ -27,6 +28,36 @@ describe('preferences', () => {
 		)
 	})
 
+	it('migrates v7 custom categories with stable accents and durable identities', () => {
+		const migrated = normalizePreferences({
+			version: 7,
+			categories: [
+				{ id: 'custom:work', label: 'Work', builtIn: false },
+				{
+					id: 'custom:personal',
+					label: 'Personal',
+					builtIn: false,
+					accent: 'red',
+				},
+			],
+			favoriteAppIdentities: ['identity:codex'],
+		})
+
+		expect(migrated).toMatchObject({
+			version: 8,
+			favoriteAppIdentities: ['identity:codex'],
+		})
+		expect(migrated.categories).toContainEqual(
+			expect.objectContaining({
+				id: 'custom:work',
+				accent: stableCustomCategoryAccent('custom:work'),
+			}),
+		)
+		expect(migrated.categories).toContainEqual(
+			expect.objectContaining({ id: 'custom:personal', accent: 'red' }),
+		)
+	})
+
 	it('migrates v1 preferences to v2', () => {
 		expect(
 			normalizePreferences({
@@ -36,7 +67,7 @@ describe('preferences', () => {
 				collapsedCategories: ['other'],
 			}),
 		).toMatchObject({
-			version: 7,
+			version: 8,
 			favoriteAppIds: ['codex'],
 			collapsedCategories: ['other'],
 			categoryOverrides: {},
@@ -54,7 +85,7 @@ describe('preferences', () => {
 		})
 
 		expect(normalized).toMatchObject({
-			version: 7,
+			version: 8,
 			favoriteAppIds: ['code'],
 			unknownFields: {
 				experimentalLayout: { density: 'compact' },
@@ -87,7 +118,7 @@ describe('preferences', () => {
 		).toBe(true)
 
 		expect(JSON.parse(values.get(PREFERENCES_KEY) ?? '{}')).toMatchObject({
-			version: 7,
+			version: 8,
 			favoriteAppIds: ['code', 'editor'],
 			experimentalLayout: { density: 'compact' },
 		})
@@ -117,7 +148,7 @@ describe('preferences', () => {
 		})
 		// The id-keyed map is preserved (the store folds it into identities on the next catalog
 		// load); the new identity map defaults to empty so nothing is lost on upgrade.
-		expect(normalized.version).toBe(7)
+		expect(normalized.version).toBe(8)
 		expect(normalized.categoryOverrides).toEqual({ codex: 'ai' })
 		expect(normalized.categoryOverrideIdentities).toEqual({})
 	})
@@ -138,7 +169,7 @@ describe('preferences', () => {
 		})
 
 		expect(normalized).toMatchObject({
-			version: 7,
+			version: 8,
 			favoriteAppIds: ['cmd-shortcut'],
 			favoriteAppIdentities: [],
 			hiddenAppIds: ['cmd-shortcut'],
@@ -160,7 +191,7 @@ describe('preferences', () => {
 
 	it('keeps v7 card preference identities out of the legacy quarantine', () => {
 		const normalized = normalizePreferences({
-			version: 7,
+			version: 8,
 			favoriteAppIdentities: ['preference:cmd-shortcut'],
 			legacyCanonicalPreferences: {
 				favorite: ['product:unresolved'],
@@ -198,7 +229,7 @@ describe('preferences', () => {
 				collapsedCategories: ['games', 'invalid'],
 			}),
 		).toEqual({
-			version: 7,
+			version: 8,
 			categories: DEFAULT_PREFERENCES.categories,
 			categoryOrder: [
 				'browsers',
@@ -274,11 +305,11 @@ describe('preferences', () => {
 		).toEqual(['a'])
 	})
 
-	// A newer build may have written a version 8 document; this build (v7) must not overwrite it
+	// A newer build may have written a version 9 document; this build (v8) must not overwrite it
 	// with the older shape and strip the fields it does not know about.
 	it('does not overwrite a document written by a newer version', () => {
 		const future = JSON.stringify({
-			version: 8,
+			version: 9,
 			favoriteAppIds: ['keep'],
 			futureField: 'preserved',
 		})

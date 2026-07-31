@@ -6,7 +6,10 @@ authors = ["keskiyo"]
 license = ""
 repository = "https://github.com/keskiyo/WindowsApps"
 edition = "2021"
-rust-version = "1.77.2"
+# Floor imposed by the locked dependency tree, not a preference: `image 0.25.10` (direct) and
+# `time`/`plist`/`darling`/`serde_with` (transitive) all declare rust-version 1.88.0. Verified with
+# `cargo +1.88.0 check --all-targets` and enforced by the msrv job in .github/workflows/verify.yml.
+rust-version = "1.88.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -39,6 +42,8 @@ windows = { version = "0.61", features = [
   "Win32_Graphics_Gdi",
   "Win32_Storage_FileSystem",
   "Win32_Security",
+  "Win32_Security_Cryptography",
+  "Win32_Security_WinTrust",
   "Win32_System_Com",
   "Win32_System_IO",
   "Win32_System_Registry",

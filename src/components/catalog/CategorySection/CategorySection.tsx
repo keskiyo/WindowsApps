@@ -6,6 +6,7 @@ import { DeleteCategoryDialog } from '../../dialogs/DeleteCategoryDialog'
 import { CategoryNameEditor } from '../../shared/CategoryNameEditor'
 import { CategoryHeader } from './CategoryHeader'
 import type { CategorySectionProps } from './types'
+import { useProgressiveCards } from './useProgressiveCards'
 
 export function CategorySection({
 	category,
@@ -31,6 +32,9 @@ export function CategorySection({
 	const label = definition.label
 	const [editing, setEditing] = useState(false)
 	const [deleting, setDeleting] = useState(false)
+	// The heading still reports `apps.length`: the count is the size of the category, not of the
+	// batch currently mounted.
+	const cards = useProgressiveCards(apps)
 	const drop = useDroppable({
 		id: `category-drop:${category}`,
 		data: { type: 'category', category },
@@ -77,25 +81,34 @@ export function CategorySection({
 				)}
 			</div>
 			{!collapsed && (
-				<div className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'>
-					{apps.map(app => (
-						<AppCard
-							key={app.id}
-							app={app}
-							isFavorite={favoriteAppIds.includes(app.id)}
-							categories={categories}
-							categoryOrder={categoryOrder}
-							onToggleFavorite={onToggleFavorite}
-							onLaunch={onLaunch}
-							onMove={onMoveApp}
-							onInfo={onInfo}
-							onUninstall={onUninstall}
-							onHide={onHide}
-							onRestore={onRestore}
-							onDemote={onDemote}
+				<>
+					<div className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'>
+						{cards.visible.map(app => (
+							<AppCard
+								key={app.id}
+								app={app}
+								isFavorite={favoriteAppIds.includes(app.id)}
+								categories={categories}
+								categoryOrder={categoryOrder}
+								onToggleFavorite={onToggleFavorite}
+								onLaunch={onLaunch}
+								onMove={onMoveApp}
+								onInfo={onInfo}
+								onUninstall={onUninstall}
+								onHide={onHide}
+								onRestore={onRestore}
+								onDemote={onDemote}
+							/>
+						))}
+					</div>
+					{cards.hasMore && (
+						<div
+							ref={cards.sentinelRef}
+							aria-hidden='true'
+							className='h-1'
 						/>
-					))}
-				</div>
+					)}
+				</>
 			)}
 			{deleting && (
 				<DeleteCategoryDialog

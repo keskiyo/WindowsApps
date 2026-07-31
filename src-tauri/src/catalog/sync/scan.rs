@@ -3,7 +3,7 @@
 
 use super::document::load_sanitized_document;
 use super::hydration::enqueue_hydration;
-use crate::app_state::{remember_catalog, AppState};
+use crate::app_state::{cached_details_for_catalog, remember_catalog, AppState};
 use crate::catalog::cache;
 use crate::catalog::scan_coordinator::{ScanJob, Submission};
 use crate::catalog::sync::{compute_delta, SyncRequest};
@@ -26,7 +26,7 @@ fn synchronize_catalog_once(
         .map_err(|error| format!("Could not open the application data folder: {error}"))?;
     let previous = load_sanitized_document(&app_data_dir).unwrap_or_default();
     let settings = catalog::scan_settings::read(&app_data_dir);
-    let document = catalog::sync::synchronize(
+    let mut document = catalog::sync::synchronize(
         &previous,
         &settings,
         job.request,
@@ -38,6 +38,8 @@ fn synchronize_catalog_once(
     if job.cancelled.load(std::sync::atomic::Ordering::Relaxed) {
         return Err(AppError::ScanCancelled);
     }
+    document.app_details =
+        cached_details_for_catalog(state.inner(), &document.apps, document.app_details);
     let delta = compute_delta(document.generation, &previous.apps, &document.apps);
     remember_catalog(state.inner(), &document.apps);
     cache::write_document(&app_data_dir, &document)

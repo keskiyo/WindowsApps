@@ -128,17 +128,68 @@ export function filterAppsByQuery(apps: AppInfo[], query: string): AppInfo[] {
 	)
 }
 
+interface ScoredApp {
+	app: AppInfo
+	score: number
+}
+
+/**
+ * Ranking order: score, then the shorter name, then alphabetical. Shared by the full sort and the
+ * bounded selection so the two can never drift apart.
+ */
+function compareRanked(left: ScoredApp, right: ScoredApp): number {
+	return (
+		right.score - left.score ||
+		left.app.name.length - right.app.name.length ||
+		left.app.name.localeCompare(right.app.name)
+	)
+}
+
 export function rankAppsByQuery(apps: AppInfo[], query: string): AppInfo[] {
 	const tokens = queryTokens(query)
 	if (tokens.length === 0) return apps
 	return queryCandidates(apps, tokens)
 		.map(app => ({ app, score: scoreApp(fieldsFor(app), tokens) }))
 		.filter(entry => entry.score > 0)
-		.sort(
-			(a, b) =>
-				b.score - a.score ||
-				a.app.name.length - b.app.name.length ||
-				a.app.name.localeCompare(b.app.name),
-		)
+		.sort(compareRanked)
 		.map(entry => entry.app)
+}
+
+/**
+ * The first `limit` results of {@link rankAppsByQuery}, without ranking the rest.
+ *
+ * The quick-launch palette shows at most 50 rows, but a broad query on a large catalog matches
+ * nearly everything, so scoring was followed by an `O(N log N)` sort of every match on each
+ * keystroke. This keeps a sorted window of at most `limit` entries instead: an entry that cannot
+ * beat the current worst is discarded without being placed.
+ *
+ * Insertion is after equal entries, which reproduces the stability of `Array.prototype.sort`, so
+ * ties resolve to input order exactly as the full sort does.
+ */
+export function rankAppsByQueryTop(
+	apps: AppInfo[],
+	query: string,
+	limit: number,
+): AppInfo[] {
+	if (limit <= 0) return []
+	const tokens = queryTokens(query)
+	if (tokens.length === 0) return apps.slice(0, limit)
+	const top: ScoredApp[] = []
+	for (const app of queryCandidates(apps, tokens)) {
+		const score = scoreApp(fieldsFor(app), tokens)
+		if (score === 0) continue
+		const entry = { app, score }
+		if (top.length === limit && compareRanked(entry, top[limit - 1]) >= 0)
+			continue
+		let low = 0
+		let high = top.length
+		while (low < high) {
+			const middle = (low + high) >>> 1
+			if (compareRanked(entry, top[middle]) < 0) high = middle
+			else low = middle + 1
+		}
+		top.splice(low, 0, entry)
+		if (top.length > limit) top.pop()
+	}
+	return top.map(entry => entry.app)
 }

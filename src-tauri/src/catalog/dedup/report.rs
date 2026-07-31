@@ -5,10 +5,10 @@
 //! A child module of `dedup`, so it reaches the resolver's private items (`resolve_apps`,
 //! `ResolvedApp` fields, вЂ¦) directly without widening their visibility.
 
-use super::{
-    launcher_product_family, normalized_product_family, resolve_apps, resolved_canonical_id,
-    ResolverReport,
-};
+use super::family::{launcher_product_family, normalized_product_family};
+use super::identity::resolved_canonical_id;
+use super::merge::ResolverReport;
+use super::resolve_apps;
 use crate::catalog::AppInfo;
 use serde::Serialize;
 use std::collections::HashMap;

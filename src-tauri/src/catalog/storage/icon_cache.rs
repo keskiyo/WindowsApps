@@ -1,4 +1,5 @@
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -33,8 +34,19 @@ fn icon_path(app_data_dir: &Path, app_id: &str, fingerprint: &str) -> PathBuf {
     icons_dir(app_data_dir).join(format!("{}-{fingerprint}.png", cache_key(app_id)))
 }
 
+/// Ceiling for one cached icon. These are small PNGs — a 256×256 RGBA icon is well under 256 KiB.
+/// The cache lives in a user-writable directory, so a corrupted or planted file is untrusted input:
+/// it is checked before it is read, not after it has been allocated. An icon above the cap is
+/// skipped and re-extracted, and the stale file is removed by the next sweep.
+const MAX_ICON_BYTES: u64 = 4 * 1024 * 1024;
+
 pub(crate) fn read_icon(app_data_dir: &Path, app_id: &str, fingerprint: &str) -> Option<Vec<u8>> {
-    fs::read(icon_path(app_data_dir, app_id, fingerprint)).ok()
+    let path = icon_path(app_data_dir, app_id, fingerprint);
+    let metadata = fs::metadata(&path).ok()?;
+    if !metadata.is_file() || metadata.len() > MAX_ICON_BYTES {
+        return None;
+    }
+    fs::read(path).ok()
 }
 
 pub(crate) fn write_icon(
@@ -49,16 +61,37 @@ pub(crate) fn write_icon(
     let temporary = destination.with_extension("png.tmp");
     fs::write(&temporary, bytes)?;
     fs::rename(temporary, &destination)?;
-    // Superseded files for this application: earlier fingerprints, plus the one it may still
-    // have under the pre-hash naming scheme. This enumerates the icons directory once per
-    // written icon, which is quadratic across a full hydration — see the note on E-02 in the
-    // audit. Left as is deliberately: the alternative that avoids the scan (a constant file
-    // name plus a fingerprint sidecar) is a cache-format change, and dropping the sweep without
-    // that redesign would leak one orphaned file per icon refresh.
-    let prefix = format!("{}-", cache_key(app_id));
-    let legacy = legacy_cache_key(app_id);
-    let legacy_prefix = (!legacy.is_empty()).then(|| format!("{legacy}-"));
-    for entry in fs::read_dir(directory)?.filter_map(Result::ok) {
+    Ok(())
+}
+
+/// Remove the files superseded by a batch of freshly written icons: earlier fingerprints for the
+/// same application, plus anything it still has under the pre-hash naming scheme.
+///
+/// This used to run inside `write_icon`, enumerating the whole icons directory once per written
+/// icon — quadratic across a full hydration. It reads the directory once per hydration batch
+/// instead. Dropping the sweep entirely was never an option: without it every icon refresh leaks
+/// one orphaned file, and `retain_only` cannot collect them because their application is still live.
+pub(crate) fn sweep_superseded(app_data_dir: &Path, written: &[(String, String)]) {
+    if written.is_empty() {
+        return;
+    }
+    let directory = icons_dir(app_data_dir);
+    let Ok(entries) = fs::read_dir(&directory) else {
+        return;
+    };
+    let mut current = std::collections::HashMap::<String, HashSet<String>>::new();
+    let mut legacy_prefixes = Vec::new();
+    for (app_id, fingerprint) in written {
+        current
+            .entry(cache_key(app_id))
+            .or_default()
+            .insert(format!("{fingerprint}.png"));
+        let legacy = legacy_cache_key(app_id);
+        if !legacy.is_empty() {
+            legacy_prefixes.push(format!("{legacy}-"));
+        }
+    }
+    for entry in entries.filter_map(Result::ok) {
         let path = entry.path();
         let Some(name) = path
             .file_name()
@@ -66,15 +99,22 @@ pub(crate) fn write_icon(
         else {
             continue;
         };
-        let superseded = name.starts_with(&prefix)
-            || legacy_prefix
-                .as_deref()
-                .is_some_and(|legacy| name.starts_with(legacy));
-        if path != destination && superseded {
+        let Some((key, rest)) = name.split_once('-') else {
+            continue;
+        };
+        let superseded = match current.get(key) {
+            // Same application, an earlier fingerprint.
+            Some(live) => !live.contains(rest),
+            // Only a pre-hash name can collide with a hashed key here, and only for an
+            // application in this batch.
+            None => legacy_prefixes
+                .iter()
+                .any(|prefix| name.starts_with(prefix.as_str())),
+        };
+        if superseded {
             let _ = fs::remove_file(path);
         }
     }
-    Ok(())
 }
 
 pub(crate) fn source_fingerprint(source: &str) -> String {
@@ -187,12 +227,82 @@ mod tests {
         std::fs::write(&stale, b"legacy").unwrap();
 
         write_icon(dir.path(), app_id, "fp", b"current").unwrap();
+        sweep_superseded(dir.path(), &[(app_id.to_string(), "fp".to_string())]);
 
         assert!(!stale.exists());
         assert_eq!(
             read_icon(dir.path(), app_id, "fp"),
             Some(b"current".to_vec())
         );
+    }
+
+    // The sweep moved out of `write_icon`, which used to re-read the whole icons directory for
+    // every written icon. It must still collect an application's earlier fingerprints, or each
+    // refresh leaks a file that `retain_only` cannot claim because the application is still live.
+    #[test]
+    fn one_batch_sweep_drops_every_superseded_fingerprint() {
+        let dir = tempfile::tempdir().unwrap();
+        let app_id = r"C:\Editor.exe";
+        write_icon(dir.path(), app_id, "old", b"old").unwrap();
+        write_icon(dir.path(), app_id, "new", b"new").unwrap();
+
+        sweep_superseded(dir.path(), &[(app_id.to_string(), "new".to_string())]);
+
+        assert_eq!(read_icon(dir.path(), app_id, "old"), None);
+        assert_eq!(read_icon(dir.path(), app_id, "new"), Some(b"new".to_vec()));
+    }
+
+    #[test]
+    fn a_batch_sweep_leaves_applications_outside_the_batch_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let swept = r"C:\Swept.exe";
+        let untouched = r"C:\Untouched.exe";
+        write_icon(dir.path(), swept, "old", b"old").unwrap();
+        write_icon(dir.path(), swept, "new", b"new").unwrap();
+        write_icon(dir.path(), untouched, "fp", b"kept").unwrap();
+
+        sweep_superseded(dir.path(), &[(swept.to_string(), "new".to_string())]);
+
+        assert_eq!(read_icon(dir.path(), swept, "old"), None);
+        assert_eq!(
+            read_icon(dir.path(), untouched, "fp"),
+            Some(b"kept".to_vec())
+        );
+    }
+
+    // The icon directory is user-writable, so its contents are untrusted: a corrupted or planted
+    // file must be rejected on its metadata, before it is allocated.
+    #[test]
+    fn an_oversized_cache_file_is_skipped_instead_of_being_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let app_id = r"C:\Editor.exe";
+        let icons = icons_dir(dir.path());
+        std::fs::create_dir_all(&icons).unwrap();
+        let path = icon_path(dir.path(), app_id, "fp");
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_len(MAX_ICON_BYTES + 1).unwrap();
+        drop(file);
+
+        assert_eq!(read_icon(dir.path(), app_id, "fp"), None);
+        assert_eq!(std::fs::metadata(&path).unwrap().len(), MAX_ICON_BYTES + 1);
+    }
+
+    #[test]
+    fn a_cache_entry_that_is_a_directory_is_not_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let app_id = r"C:\Editor.exe";
+        std::fs::create_dir_all(icon_path(dir.path(), app_id, "fp")).unwrap();
+
+        assert_eq!(read_icon(dir.path(), app_id, "fp"), None);
+    }
+
+    #[test]
+    fn an_icon_at_the_size_limit_is_still_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let app_id = r"C:\Editor.exe";
+        write_icon(dir.path(), app_id, "fp", b"small").unwrap();
+
+        assert_eq!(read_icon(dir.path(), app_id, "fp"), Some(b"small".to_vec()));
     }
 
     #[test]

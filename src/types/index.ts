@@ -1,9 +1,12 @@
 export type {
 	AppHydrationPatch,
+	AppArchitecture,
+	AppDetails,
 	AppInfo,
 	AppLaunchKind,
 	AppsClient,
 	AppSourceKind,
+	AppSignatureStatus,
 	AppView,
 	CatalogChangeSummary,
 	CatalogDelta,
@@ -24,6 +27,7 @@ export type {
 	AppCategory,
 	BuiltInCategory,
 	CategoryDefinition,
+	CustomCategoryAccent,
 } from './category'
 export type {
 	GlobalShortcutStatus,

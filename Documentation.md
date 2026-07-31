@@ -105,6 +105,8 @@ physical folder layout.
 | `start_background_sync`   | Start background validation after the cached catalog is displayed.           |
 | `cancel_scan`             | Cancel active and queued work; refresh reports `SCAN_CANCELLED`.              |
 | `launch_app`              | Launch a trusted catalog entry by ID.                                        |
+| `get_app_details`         | Return bounded file metadata, or explicit unavailable fields, by trusted ID. |
+| `open_app_folder`         | Open the trusted local installation folder for a catalog entry by ID.        |
 | `get_uninstall_preview`   | Return application identity, publisher, source, and safe removal mechanism.  |
 | `uninstall_app`           | Execute the trusted uninstall target and record its result.                  |
 | `get_uninstall_history`   | Return the local uninstall history newest-first.                             |
@@ -133,6 +135,18 @@ The catalog combines:
 - user-configured included folders.
 
 Drive letters and user folder names are not hardcoded.
+
+For packaged applications, discovery matches the package-family part of the AUMID and then the
+exact application id after `!` against `AppxManifest.xml`. A manifest executable becomes detail
+evidence only when it is a relative `.exe` contained by the trusted package install location;
+absolute paths, traversal components, mismatched application ids and non-executable targets are
+discarded. Launching still uses the AUMID, and packaged folders are not exposed as action targets.
+
+Windows Start Apps with an AUMID may instead resolve to a Windows-owned file such as an MMC
+`.msc` document. The backend accepts that file for details and Open folder only when it is a local
+regular file which canonicalizes beneath the configured Windows directory. It reports file size,
+dates, presence, and signature; non-PE targets report architecture as `notApplicable`. MSIX,
+shell/CLSID, unresolved, and outside-Windows AUMID targets do not gain folder access.
 
 ### Exclusions
 
@@ -183,7 +197,7 @@ The watcher monitors Start Menu paths, uninstall registry keys, and user-configu
 
 ## 7. Cache and asynchronous hydration
 
-The catalog cache contains lightweight application records and a monotonically increasing generation. Large icon payloads are stored separately. Persisted enums degrade rather than fail on unknown values — a category or visibility reason written by a newer build deserializes to `Other` / `Unknown` instead of discarding the whole cache, so an older build never rescans just because a newer one wrote the file.
+The catalog cache contains lightweight application records and a monotonically increasing generation. Large icon payloads are stored separately. Schema 8 also caches local application-detail results by catalog ID and detail-file fingerprint; a changed detail file invalidates only its own record. The Schema 8 migration safely clears derived detail records once so folder availability is recomputed from the current canonical local-folder rule. A freshly read detail is cached in memory immediately and merged into the next synchronized cache document, so opening a dialog never competes with a scan for the cache write lock. The persisted detail payload contains size, dates, PE or not-applicable architecture, file-presence checks, folder availability, and signature status — never launch arguments, registry keys, command lines, or paths beyond the already-catalogued application record. A matched MSIX package already has trusted package metadata from discovery. When its exact manifest application also declares a safe contained executable, that backend-owned path supplies the same fingerprinted file details as a desktop executable; packages without such a mapping remain explicitly unavailable. Persisted enums degrade rather than fail on unknown values — a category or visibility reason written by a newer build deserializes to `Other` / `Unknown` instead of discarding the whole cache, so an older build never rescans just because a newer one wrote the file.
 
 Icon hydration:
 
@@ -204,7 +218,13 @@ Every successful synchronization stores privacy-safe diagnostics with the catalo
 
 Discovery and visibility are separate stages. Every retained candidate receives a `primary`, `auxiliary`, or `rejected` classification with a numeric score and stable reason codes. AUMID, Start Menu, Steam, registered uninstall products, coherent PE metadata, runtime paths, and component-role markers contribute independent evidence.
 
+The quick-launch palette shows at most 50 rows and selects them with a bounded top-N pass: an entry that cannot beat the current worst of the window is discarded without being placed, so a broad query on a large catalog no longer sorts every match on each keystroke. The result is identical to the first 50 entries of the full ranking, ties included, which `tests/frontend/performance/catalogSearchTopN.test.ts` asserts against a 10 000-application fixture.
+
+Category cards mount in batches rather than all at once, extended by an `IntersectionObserver` sentinel after the last mounted card. `content-visibility` already skips layout and paint for off-screen cards, but not the cost of the mount itself — a DOM subtree and a drag registration per card — which is what an auto-scan of fixed drives can multiply into thousands. Category headings keep reporting the full category size, not the mounted batch.
+
 Normal categories, view-scoped search, and Favorites exclude `auxiliary` entries. The `Ctrl+K` quick-launch palette searches both primary and auxiliary entries but still excludes apps explicitly hidden by the user. The **Auxiliary tools** view keeps uncertain runtime and maintenance components inspectable. A user can restore an entry to the main catalog; its canonical identity is persisted in local preferences and survives incremental refresh, full scan, and cache reset.
+
+Every navigation badge reports the length of the view it opens, derived once per catalog change by a single selector shared by the sidebar and the drawer, so the number cannot contradict the list or differ between window widths. The settings page instead reports what the scanner classified as primary and auxiliary, hidden entries included; those two totals are named separately for that reason.
 
 Beyond product components, two further classes are auxiliary. **Command environments** open a configured interpreter shell rather than an application: a shortcut whose target is a generic host (`cmd`, `powershell`, `pwsh`, `rundll32`, `python`/`pythonw`, `mysql`, `node`, `wsl`, `wscript`/`cscript`) carrying arguments, or a named developer prompt (Visual Studio Developer/Native Tools/Cross Tools command prompt, Python IDLE, a database command-line client, a Node.js tools installer). Plain Command Prompt is auxiliary because it is a console interpreter; argument-free Windows PowerShell remains primary. Command scripts and PowerShell command/file arguments are launch identity: distinct Native/Cross Tools environments remain separate, while the Start Apps and Start Menu records for one profile still merge. **Diagnostic launchers** — a "safe mode" / "reset preferences and cache" variant — are auxiliary or rejected. Oracle Java runtime entries are auxiliary. A command-environment or product-component classification is sticky: it survives a merge, so an AUMID sibling that is primary only by the launch-kind fast-path cannot promote the merged card back into the main catalog.
 
@@ -215,6 +235,10 @@ The model retains PE `ProductName` and `OriginalFilename`, plus shortcut argumen
 Debug builds write `%LOCALAPPDATA%\WindowsApps\visibility-report.json` for rejected candidates. User-profile prefixes are replaced with `<USERPROFILE>` and the report is not emitted as a normal production log. A small synthetic fixture corpus lives under `src-tauri/tests/fixtures`; it validates the runner and regression examples but is not evidence of real-world accuracy.
 
 Definite installers, uninstallers, self-extractor stubs, documentation shortcuts, broken resource names, maintenance executables (updaters, crash/telemetry/watchdog helpers, Squirrel), bundled `OpenConsole.exe` PTY hosts, and MSIX framework packages (`Microsoft.VCLibs`, `Microsoft.UI.Xaml`, `Microsoft.NET.Native`, the WebView2 runtime, DirectX) are rejected. Shell-location shortcuts — a `.lnk` that opens a folder through `explorer.exe` with a path argument, such as the "Windows Software Development Kit" Start-Menu entry — are rejected too; the real File Explorer, a bare `explorer.exe` with no argument, is kept. A portable executable with no version, publisher, or product name is nudged toward Auxiliary. Ambiguous executable names are not rejected solely by name. Registry records marked `SystemComponent=1` remain metadata-only and cannot create a launch card.
+
+Rejection is unrecoverable — rejected entries are dropped before deduplication and no view exposes them — so the installer and documentation markers, which match a plain substring of the combined name/path/metadata text, do not apply to a record Windows registered as a launchable product: a Steam entry, a Start Apps/MSIX package, or a registry product with an uninstall entry. This is what keeps applications whose names read like installers ("Inno Setup", "Advanced Installer") in the catalog. Shared runtimes are matched separately (`redist`, `vcredist`, `dxsetup`, `ndp48`, the WebView2 runtime, bootstrappers) and stay rejected however they were registered, because a Visual C++ Redistributable is itself a registered product. Maintenance executables, framework packages, and shell-location shortcuts are precisely scoped and also keep rejecting unconditionally.
+
+Some reasons pin an entry to Auxiliary whatever the score, the AppUserModelId fast-path, or a later merge says: product components, command environments, SDK samples, and console applications. One predicate defines that set for both classification and deduplication, so a merge with a Primary sibling cannot promote such a card back into the main catalog. Console demotion reads the PE subsystem and therefore only runs on the scan path; the reason is persisted with the entry and carried through later reclassification, so a command-line tool stays in Auxiliary tools across a restart.
 
 Deduplication is **order-independent and idempotent**: the input is canonicalized (by candidate quality, then path) before resolution, so the same catalog produces the same groups regardless of the order the scanners emitted entries, and re-running changes nothing. This is what keeps the frontend delta path from accumulating a less-merged variant across background syncs.
 
@@ -227,8 +251,8 @@ Duplicate matching considers:
 - version suffixes;
 - exact version: two copies of the same product at the same version merge across install roots (a portable copy beside its installed shortcut, or the same portable in two folders) — a **different** version is treated as a different program and stays separate;
 - shortcut/executable pairs in the same product folder;
-- package and desktop identity;
-- publishers when both are available.
+- **package identity** — the package-family part of an AppUserModelId, the text before `!`. Two AUMIDs that share it are two entry points of one installed package and merge. Two that differ are different packages regardless of how alike their display names are: a matching display name alone is weak evidence and stays subject to the publisher and install-root checks below, so two unrelated packaged applications that happen to share a name keep their separate launch and uninstall identities;
+- publishers when both are available. An X.500 certificate subject (`CN=…`) is not a publisher for this purpose: a packaged entry reports its signing certificate while the desktop entry of the same product reports the marketing name, so comparing them as strings would invent a conflict between two records of one vendor.
 
 Candidate priority is:
 
@@ -278,7 +302,7 @@ Deleting a custom category moves its applications to Other. Hidden is a separate
 
 At widths of `1024px` and above, navigation uses a persistent sidebar. Below `1024px`, the same navigation is presented as an overlay drawer.
 
-Frontend preferences use schema version 7. Each launch card has a `preferenceIdentity`
+Frontend preferences use schema version 8. Each launch card has a `preferenceIdentity`
 derived from its product identity, launch role, and meaningful arguments. Favorites, hidden
 state, auxiliary promotion, and category overrides use this card identity, so distinct launch
 modes of one product do not inherit each other's settings. Version 6 canonical identities are
@@ -286,6 +310,10 @@ retained separately during migration: an exact saved catalog ID or a single cata
 resolves them, while ambiguous matches remain preserved and unapplied instead of fanning out.
 Reads preserve unknown root fields, recover from the previous valid backup when the primary
 document is malformed, and refuse to overwrite a document written by a newer version.
+Every custom category stores one palette accent when it is created. New categories use a random
+accent not currently used by another custom category when one remains; existing version-7 custom
+categories receive a deterministic accent from their ID during migration. The accent then remains
+unchanged through rename, reorder, restart, and later preference writes.
 
 ## 10. Launching
 
@@ -296,8 +324,10 @@ Launch kinds:
 - AppUserModelID / packaged application;
 - Steam-managed application identity.
 
-The backend stores each trusted launch kind and target against its stable application ID. `launch_app` accepts only that ID and resolves the actual target inside Rust.
+The backend stores each trusted launch kind and target against its stable application ID. `launch_app`, `get_app_details`, and `open_app_folder` accept only that ID and resolve the actual target inside Rust. Every command that resolves a catalog id validates it first — non-blank and at most 512 characters, the same bound the icon-hydration contract enforces — so an unbounded string from the webview is never used as a key into trusted state. A rejected id returns a dedicated static unavailable error; paths and Windows failures never cross IPC.
 Input-idle wait capacity belongs to `AppState`, so each application runtime owns and releases its bounded process-handle permits independently.
+
+**One failure produces one message.** A store action — launch, refresh, force scan, cache reset, uninstall — reports failure by rejecting, and its caller owns the user-facing message: `useAppFeedback` for launch, refresh, and uninstall, `useSystemSettings` for the catalog-maintenance scans. The store's `error` field is the separate channel for background work nobody is awaiting, which only the initial catalog load produces; `App` renders that one as a toast. An action that wrote both reported the same failure twice, the second time without the Retry affordance.
 
 ## 11. Uninstalling
 
@@ -399,8 +429,22 @@ client-side ceiling clears it. A top activity bar reflects any in-flight launch 
 - No online application-description lookup is performed.
 - The Content Security Policy allows application resources and Tauri IPC endpoints.
 - Native launch and uninstall operations resolve trusted Rust-owned catalog records.
+- Application-detail and folder-open operations resolve the same trusted catalog IDs. Folder
+  opening accepts only existing local folders derived from an executable or registered install
+  location; UNC, device, relative, and packaged-app targets are refused.
+- Signature verification uses local `WinVerifyTrust` checks with user interaction and network
+  retrieval disabled, so inspecting an entry neither opens Windows UI nor contacts a server.
+- Every inbound catalog id is validated — non-blank, at most 512 characters — before it is used as
+  a key into trusted state.
+- Tauri capabilities grant only the plugin operations the frontend actually calls: `dialog:allow-open`,
+  `updater:allow-check`, `updater:allow-download`, `updater:allow-install`, and `process:allow-restart`.
+  No `*:default` plugin bundle is granted, so `process:allow-exit` and the combined
+  `updater:allow-download-and-install` are not reachable from the webview.
+- Every `unsafe` block under `platform/windows` carries an adjacent `// SAFETY:` rationale naming
+  the pointer, buffer-length, handle-ownership, COM-apartment or thread-affinity invariant it relies on.
 - Icon hydration accepts at most 128 IDs of at most 512 characters each, deduplicates them, and
   drops IDs absent from the trusted Rust-owned catalog before cache I/O.
+- Cached icon files and PE version resources are size-capped before they are read into memory.
 - Uninstall actions require explicit confirmation.
 - Scan recursion is bounded and does not follow reparse points.
 - Debug logging is enabled only in debug builds.
@@ -416,12 +460,13 @@ src/components/dialogs/          App information and destructive confirmations
 src/components/navigation/       Sidebar, drawer, and category navigation
 src/components/settings/         Settings and uninstall history
 src/components/shared/           Header, title bar, scan prompt, shared UI
-src/hooks/                       Navigation, spotlight, and scroll-lock hooks
+src/hooks/                       Catalog derivation, shortcuts, dialog flows, and updater hooks
 src/lib/                         Tauri clients, preferences, catalog utilities
-src/store/                       Zustand application state
+src/store/                       Zustand application state and catalog selectors
 src/types/                       Shared TypeScript contracts
 src-tauri/src/app_state.rs       Process-wide trusted catalog target state
 src-tauri/src/catalog/           Catalog model, classify, deduplication, and visibility rules
+src-tauri/src/catalog/details/   Trusted per-app detail targets, local reads, and their cache
 src-tauri/src/catalog/scan/      Scan coordination, settings, traversal, and hydration
 src-tauri/src/catalog/sources/   Registry, Start Apps, portable, and Steam source adapters
 src-tauri/src/catalog/storage/   Versioned catalog and generated icon caches
@@ -434,8 +479,9 @@ src-tauri/src/platform/windows/  Windows-native boundary and compatibility facad
   shortcuts/                    Shell-link and global-shortcut integrations
   uninstall/                    Validated uninstall execution and local history
 tests/frontend/                  Frontend tests, mirroring src/ layout by layer
+.github/workflows/verify.yml     Pre-merge gates for pull requests and master
 .github/workflows/release.yml    Tag-driven Windows release pipeline
-scripts/                         Release version/source/asset checks, manifest prep, boundary verifiers
+scripts/                         Release version/source/workflow/asset checks, manifest prep, boundary verifiers
 ```
 
 A component that holds a private subcomponent or local static data lives in its own folder
@@ -448,13 +494,37 @@ components stay flat. Reference: `components/shared/WorkspaceSummary/`.
 
 The supported toolchain, local development commands, verification commands, and bundle path are maintained in [README.md](README.md#development).
 
-## 16. Release automation
+## 16. Continuous verification and release automation
+
+### Pre-merge verification
+
+`.github/workflows/verify.yml` runs on every pull request and on every push to `master`, with all actions SHA-pinned. Four independent jobs:
+
+- **Frontend** — `npm ci`, lint, type-check, tests with coverage, production build. Coverage is reported into the job log, not enforced: a percentage is not evidence that the critical paths are covered, and a threshold rewards tests written to move the number. The rule that actually protects behaviour is that every fixed bug gets a regression test.
+- **Backend** — `cargo fmt --check`, Clippy with warnings denied, Rust tests.
+- **MSRV** — pins the toolchain to the `rust-version` declared in `src-tauri/Cargo.toml`, asserts that the pin and the manifest agree, and compiles at that version. The declared MSRV is a compatibility promise, so it is compiled rather than asserted.
+- **Boundaries and release contract** — both dependency-boundary verifiers, all release-script tests, the runtime dependency audit, and the development dependency triage gate.
+
+The release workflow re-runs the same critical gates on the tag as an independent second check. A green pre-merge run is a prerequisite for a release, never a substitute.
+
+### Dependency advisories
+
+Two separate gates, because the two trees carry different risk:
+
+- **Runtime** (`npm audit --omit=dev --audit-level=high`) must be clean. It admits no exceptions.
+- **Full tree** (`scripts/verify-npm-audit.ps1`) is triaged against `.github/npm-audit-exceptions.json`. A bare `npm audit` can only be green or red, and a permanently red job is not triage — a genuinely new advisory hides behind the known one. The gate therefore fails on any undocumented high or critical advisory, on an exception whose `reviewBy` date has passed, on an exception missing any required field, and on a stale exception whose advisory is no longer reported. `scripts/test-verify-npm-audit.ps1` proves each of those cases against fixture audit output. The exception list is currently empty: both trees are clean.
+
+Both gates run in `verify.yml` and in the weekly `security-audit.yml`.
+
+`cargo audit` runs in `security-audit.yml` from `src-tauri/`, so it reads `src-tauri/.cargo/audit.toml`. Accepting a Rust advisory follows the same discipline as the npm exceptions: the file records the dependency chain, why it carries no runtime impact, an owner, a review date and the remediation. Two entries are currently accepted — `RUSTSEC-2026-0194` and `RUSTSEC-2026-0195`, both denial-of-service issues in `quick-xml`, reached only through `plist`, which parses Apple property lists and is never invoked in a Windows-only application. `plist 1.9.0` requires `quick-xml ^0.39`, so the fixed 0.41 is semver-unreachable until upstream releases; a targeted `cargo update -p quick-xml` changes nothing. The gtk-rs `unmaintained`/`unsound` warnings belong to Tauri's Linux backend, are not compiled for the shipped Windows target, and are left visible rather than ignored.
+
+### Release automation
 
 `.github/workflows/release.yml` runs when a `v*` tag is pushed.
 
 The workflow:
 
-1. checks out the tag with full history and rejects its commit unless it is reachable from `origin/master`;
+1. checks out the tag with full history and rejects its commit unless it resolves to exactly the same SHA as `origin/master`;
 2. configures Node.js 22 and stable Rust;
 3. runs `npm ci`;
 4. validates the tag against npm and Cargo manifests, both lockfiles, and `src-tauri/tauri.conf.json`;
@@ -464,6 +534,11 @@ The workflow:
 8. asks GitHub to generate release notes from commit history and applies them to the draft;
 9. creates `latest.json` from the signed local NSIS bundle and adds the package size and release URL;
 10. verifies the manifest, installer, signature, date, size, URL, and target agreement, then publishes the release.
+
+Two contract rules constrain the workflow:
+
+- **Exact source.** A release is permitted only when the tag commit and `origin/master` resolve to the same SHA. Reachability is not sufficient: a tag left on a superseded master commit would otherwise be signed and published after master had moved on. `scripts/verify-release-source.ps1` enforces it; `scripts/test-verify-release-source.ps1` proves that a superseded ancestor, a feature-branch commit, and a missing ref are all rejected.
+- **Tag as data, not code.** GitHub expands `${{ }}` expressions into the script text before the shell parses it, so no `github.*` value appears inside a `run:` body. Tag, repository, and commit SHA are passed through step-level `env:` and read as `$env:RELEASE_TAG`, `$env:REPOSITORY`, and `$env:COMMIT_SHA`. Expressions remain only in declarative `with:`/`env:` fields. `scripts/test-release-workflow.ps1` fails the build if an expression reappears in a shell step, if a tag-dependent step stops reading the environment variable, or if a crafted tag containing a quote and a statement separator could start a second PowerShell statement.
 
 Release automation depends only on tracked workflow, configuration, and verification scripts. Local planning and release instruction files are not used by CI or stored in the repository.
 
@@ -503,7 +578,7 @@ The installer is not Authenticode-signed. Download it only from the official pro
 
 ## 18. Release verification
 
-Run the complete verification commands in [README.md](README.md#development), then run the tracked release scripts for version consistency, source ancestry, manifest preparation, and asset validation. Publication still requires the Windows updater smoke test and the exact asset checks described by the release workflow.
+Run the complete verification commands in [README.md](README.md#development), then run the tracked release scripts for version consistency, exact release source, workflow tag transport, manifest preparation, and asset validation. Publication still requires the Windows updater smoke test and the exact asset checks described by the release workflow.
 
 ---
 

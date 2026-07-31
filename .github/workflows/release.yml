@@ -19,9 +19,15 @@ jobs:
               with:
                   fetch-depth: 0
 
+            # `github.*` context values never reach a `run:` body directly: GitHub expands
+            # expressions into the script text before the shell parses it, so a crafted ref name
+            # would become PowerShell source. They are passed as environment variables instead,
+            # which the shell reads as data. Enforced by scripts/test-release-workflow.ps1.
             - name: Verify release source
               shell: pwsh
-              run: powershell -NoProfile -File scripts/verify-release-source.ps1 -Commit "${{ github.sha }}" -MasterRef "origin/master"
+              env:
+                  COMMIT_SHA: ${{ github.sha }}
+              run: powershell -NoProfile -File scripts/verify-release-source.ps1 -Commit $env:COMMIT_SHA -MasterRef "origin/master"
 
             - name: Setup Node.js
               uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
@@ -40,7 +46,17 @@ jobs:
 
             - name: Verify release version
               shell: pwsh
-              run: powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag "${{ github.ref_name }}"
+              env:
+                  RELEASE_TAG: ${{ github.ref_name }}
+              run: powershell -NoProfile -File scripts/verify-release-version.ps1 -Tag $env:RELEASE_TAG
+
+            - name: Test release source verification
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-verify-release-source.ps1
+
+            - name: Test release workflow tag transport
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-release-workflow.ps1
 
             - name: Test release manifest preparation
               shell: pwsh
@@ -77,15 +93,18 @@ jobs:
             - name: Remove stale draft release
               shell: pwsh
               run: |
-                  $releases = gh api "repos/${{ github.repository }}/releases" | ConvertFrom-Json
+                  $releases = gh api "repos/$env:REPOSITORY/releases" | ConvertFrom-Json
+                  $staleName = "Windows Apps $env:RELEASE_TAG"
                   $stale = $releases | Where-Object {
-                    $_.draft -and $_.name -eq "Windows Apps ${{ github.ref_name }}"
+                    $_.draft -and $_.name -eq $staleName
                   }
                   foreach ($release in $stale) {
-                    gh api --method DELETE "repos/${{ github.repository }}/releases/$($release.id)"
+                    gh api --method DELETE "repos/$env:REPOSITORY/releases/$($release.id)"
                   }
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  REPOSITORY: ${{ github.repository }}
+                  RELEASE_TAG: ${{ github.ref_name }}
 
             # Keep the release in draft until latest.json is normalized and verified.
             - name: Build, sign & create draft release
@@ -105,43 +124,53 @@ jobs:
               run: |
                   $generatedPath = Join-Path $env:RUNNER_TEMP "generated-release-notes.md"
                   $notesPath = Join-Path $env:RUNNER_TEMP "release-notes.md"
-                  gh api --method POST "repos/${{ github.repository }}/releases/generate-notes" `
-                    -f "tag_name=${{ github.ref_name }}" `
-                    -f "target_commitish=${{ github.sha }}" `
+                  gh api --method POST "repos/$env:REPOSITORY/releases/generate-notes" `
+                    -f "tag_name=$env:RELEASE_TAG" `
+                    -f "target_commitish=$env:COMMIT_SHA" `
                     --jq ".body" | Set-Content -LiteralPath $generatedPath -Encoding utf8NoBOM
                   powershell -NoProfile -File scripts/compose-release-notes.ps1 `
                     -CuratedPath ".github/release-notes.md" `
                     -GeneratedPath $generatedPath `
                     -OutputPath $notesPath
-                  gh release edit "${{ github.ref_name }}" --notes-file $notesPath
+                  gh release edit $env:RELEASE_TAG --notes-file $notesPath
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  REPOSITORY: ${{ github.repository }}
+                  RELEASE_TAG: ${{ github.ref_name }}
+                  COMMIT_SHA: ${{ github.sha }}
 
             - name: Collect signed bundle assets
               shell: pwsh
+              env:
+                  RELEASE_TAG: ${{ github.ref_name }}
               run: |
-                  $version = "${{ github.ref_name }}".TrimStart('v')
+                  $version = $env:RELEASE_TAG.TrimStart('v')
                   New-Item -ItemType Directory -Force -Path release-assets | Out-Null
                   Copy-Item -LiteralPath "src-tauri/target/release/bundle/nsis/Windows Apps_${version}_x64-setup.exe" -Destination release-assets
                   Copy-Item -LiteralPath "src-tauri/target/release/bundle/nsis/Windows Apps_${version}_x64-setup.exe.sig" -Destination release-assets
 
             - name: Prepare updater manifest
               shell: pwsh
+              env:
+                  RELEASE_TAG: ${{ github.ref_name }}
               run: |
                   $notesPath = Join-Path $env:RUNNER_TEMP "release-notes.md"
                   powershell -NoProfile -File scripts/prepare-release-manifest.ps1 `
                     -AssetsDir release-assets `
-                    -Tag "${{ github.ref_name }}" `
+                    -Tag $env:RELEASE_TAG `
                     -NotesPath $notesPath
 
             - name: Verify release assets
               shell: pwsh
-              run: powershell -NoProfile -File scripts/verify-release-assets.ps1 -AssetsDir release-assets -Tag "${{ github.ref_name }}"
+              env:
+                  RELEASE_TAG: ${{ github.ref_name }}
+              run: powershell -NoProfile -File scripts/verify-release-assets.ps1 -AssetsDir release-assets -Tag $env:RELEASE_TAG
 
             - name: Replace manifest and publish release
               shell: pwsh
               run: |
-                  gh release upload "${{ github.ref_name }}" release-assets/latest.json --clobber
-                  gh release edit "${{ github.ref_name }}" --draft=false
+                  gh release upload $env:RELEASE_TAG release-assets/latest.json --clobber
+                  gh release edit $env:RELEASE_TAG --draft=false
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RELEASE_TAG: ${{ github.ref_name }}

@@ -1,4 +1,5 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
+import { chooseCustomCategoryAccent } from '../lib/categoryAccents'
 import { toAppClientError } from '../lib/clientError'
 import {
 	readPreferences,
@@ -254,7 +255,7 @@ export function createAppStore(
 		function persist() {
 			const state = get()
 			const persisted = writePreferences(storage, {
-				version: 7,
+				version: 8,
 				categories: state.categories,
 				categoryOrder: state.categoryOrder,
 				favoriteAppIds: state.favoriteAppIds,
@@ -399,25 +400,48 @@ export function createAppStore(
 							if (registration)
 								disposers.push(await registration(handler))
 						}
-						await subscribe(client.onCatalogDelta, get().applyDelta)
-						await subscribe(
-							client.onCatalogPatches,
-							get().applyPatches,
-						)
-						await subscribe(client.onCatalogChanged, summary =>
-							set({ catalogChange: summary }),
-						)
-						disposers.push(
-							await client.onAppsUpdated(get().replaceApps),
-						)
-						disposers.push(
-							await client.onScanProgress(scanProgress =>
-								set({ scanProgress }),
-							),
-						)
-						await subscribe(client.onLaunchStatus, status =>
-							get().clearLaunching(status.id),
-						)
+						// Registration is all-or-nothing. Each listener was awaited in turn, so a
+						// rejection partway through left the earlier ones attached with no owner
+						// to detach them, and the rejected promise was cached — every later
+						// initialize() returned that same failure without ever retrying. On
+						// failure the accumulated disposers run and the cached state is cleared,
+						// so a transient bridge error is recoverable.
+						try {
+							await subscribe(client.onCatalogDelta, get().applyDelta)
+							await subscribe(
+								client.onCatalogPatches,
+								get().applyPatches,
+							)
+							await subscribe(client.onCatalogChanged, summary =>
+								set({ catalogChange: summary }),
+							)
+							disposers.push(
+								await client.onAppsUpdated(get().replaceApps),
+							)
+							disposers.push(
+								await client.onScanProgress(scanProgress =>
+									set({ scanProgress }),
+								),
+							)
+							await subscribe(client.onLaunchStatus, status =>
+								get().clearLaunching(status.id),
+							)
+						} catch (error) {
+							disposers.splice(0).forEach(dispose => {
+								try {
+									dispose()
+								} catch {
+									// One listener that refuses to detach must not strand the rest.
+								}
+							})
+							initializationUsers = Math.max(
+								0,
+								initializationUsers - 1,
+							)
+							initializationDispose = null
+							initializationPromise = null
+							throw error
+						}
 						await get().load()
 						if (get().hasCache) await client.startBackgroundSync?.()
 						initializationDispose = () =>
@@ -431,9 +455,6 @@ export function createAppStore(
 				set({ isRefreshing: true, error: null })
 				try {
 					set({ apps: await client.refreshApps(), hasCache: true })
-				} catch (error) {
-					set({ error: errorMessage(error) })
-					throw error
 				} finally {
 					set({ isRefreshing: false, scanProgress: null })
 				}
@@ -445,9 +466,6 @@ export function createAppStore(
 						? await client.forceFullScan()
 						: await client.refreshApps()
 					set({ apps, hasCache: true })
-				} catch (error) {
-					set({ error: errorMessage(error) })
-					throw error
 				} finally {
 					set({ isRefreshing: false, scanProgress: null })
 				}
@@ -461,9 +479,6 @@ export function createAppStore(
 								.forceFullScan()
 								.then(() => get().apps)
 					set({ apps, hasCache: true })
-				} catch (error) {
-					set({ error: errorMessage(error) })
-					throw error
 				} finally {
 					set({ isRefreshing: false, scanProgress: null })
 				}
@@ -489,6 +504,11 @@ export function createAppStore(
 			async cancelScan() {
 				await client.cancelScan()
 			},
+			// Actions reject; they do not also write `error`. `error` is the *background*
+			// failure channel — work nobody is waiting on, which only `load()` produces — and
+			// App toasts it. An action already has an owner for its message (`useAppFeedback`
+			// for launch/refresh/uninstall, `useSystemSettings` for the maintenance scans), so
+			// writing it here too reported one failure twice, the second time with no Retry.
 			async launch(app) {
 				set({ error: null })
 				get().markLaunching(app.id)
@@ -505,7 +525,6 @@ export function createAppStore(
 					await client.launchApp({ id: app.id })
 				} catch (error) {
 					get().clearLaunching(app.id)
-					set({ error: errorMessage(error) })
 					throw error
 				}
 			},
@@ -514,12 +533,7 @@ export function createAppStore(
 			},
 			async uninstall(id) {
 				set({ error: null })
-				try {
-					return await client.uninstallApp(id)
-				} catch (error) {
-					set({ error: errorMessage(error) })
-					throw error
-				}
+				return client.uninstallApp(id)
 			},
 			setQuery(query) {
 				set({ query })
@@ -658,12 +672,19 @@ export function createAppStore(
 				)
 					return { ok: false, error: 'Category name already exists' }
 				const id = idFactory()
+				const accent = chooseCustomCategoryAccent(
+					get().categories.flatMap(category =>
+						category.builtIn || !category.accent
+							? []
+							: [category.accent],
+					),
+				)
 				set(state => ({
 					categories: [
 						...state.categories,
-						{ id, label: value, builtIn: false },
+						{ id, label: value, builtIn: false, accent },
 					],
-					categoryOrder: [...state.categoryOrder, id],
+					categoryOrder: [id, ...state.categoryOrder],
 				}))
 				persist()
 				return { ok: true, id }
@@ -807,6 +828,8 @@ export {
 	filterAppsByQuery,
 	filterVisibleApps,
 	rankAppsByQuery,
+	rankAppsByQueryTop,
+	selectCatalogCounts,
 	selectCategorizedApps,
 	selectFilteredApps,
 	selectVisibleApps,

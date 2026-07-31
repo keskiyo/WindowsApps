@@ -67,6 +67,19 @@ function renderApp(
 		onAppsUpdated: vi.fn().mockResolvedValue(() => undefined),
 		onScanProgress: vi.fn().mockResolvedValue(() => undefined),
 		...overrides,
+		getAppDetails:
+			overrides.getAppDetails ??
+			vi.fn().mockResolvedValue({
+				fileSizeBytes: null,
+				fileCreatedAt: null,
+				fileModifiedAt: null,
+				architecture: 'unknown',
+				signature: 'unavailable',
+				executableExists: null,
+				installLocationExists: null,
+			}),
+		openAppFolder:
+			overrides.openAppFolder ?? vi.fn().mockResolvedValue(undefined),
 	}
 	const systemClient: SystemClient = {
 		getSettings: vi.fn().mockResolvedValue({
@@ -91,7 +104,9 @@ function renderApp(
 		...systemOverrides,
 	}
 	const store = createAppStore(client, localStorage)
-	render(<App store={store} systemClient={systemClient} />)
+	render(
+		<App store={store} systemClient={systemClient} appsClient={client} />,
+	)
 	return { client, store, systemClient }
 }
 
@@ -566,10 +581,11 @@ describe('App', () => {
 
 	it('shows application information from the grip menu', async () => {
 		renderApp()
+		const manage = await screen.findByRole('button', {
+			name: 'Manage Visual Studio Code',
+		})
 		await userEvent.click(
-			await screen.findByRole('button', {
-				name: 'Manage Visual Studio Code',
-			}),
+			manage,
 		)
 		await userEvent.click(
 			screen.getByRole('menuitem', { name: 'App info' }),
@@ -586,6 +602,7 @@ describe('App', () => {
 			screen.getByRole('button', { name: 'Close app information' }),
 		)
 		expect(document.body.style.overflow).toBe('')
+		expect(manage).toHaveFocus()
 	})
 
 	it('closes the grip menu when the grip is pressed again', async () => {
@@ -732,6 +749,38 @@ describe('App', () => {
 			screen.queryByRole('heading', { name: 'Games' }),
 		).not.toBeInTheDocument()
 	})
+
+	// Regression: the drawer computed this count over the whole categorized catalog while the
+	// sidebar computed it over the visible one, so the same nav item reported a different number
+	// depending on window width. `filterVisibleApps` is authoritative — the Favorites view drops
+	// hidden and auxiliary apps — so both surfaces must report what that view actually renders.
+	it.each([
+		['drawer', false],
+		['sidebar', true],
+	])(
+		'counts Favorites in the %s exactly as the Favorites view filters',
+		async (_surface, desktop) => {
+			setDesktopNavigation(desktop)
+			const { store } = renderApp()
+			await screen.findByText('Steam')
+			store.getState().toggleFavorite('steam')
+			store.getState().hideApp('steam')
+			if (!desktop)
+				await userEvent.click(
+					screen.getByRole('button', { name: 'Open navigation' }),
+				)
+
+			const navigation = screen.getByRole('navigation', {
+				name: 'App navigation',
+			})
+			expect(
+				within(navigation).getByRole('button', { name: 'Favorites 0' }),
+			).toBeInTheDocument()
+
+			store.getState().setActiveView('favorites')
+			expect(await screen.findByText('No favorites yet')).toBeInTheDocument()
+		},
+	)
 
 	it('creates an empty custom category in the drawer and deletes it from the catalog', async () => {
 		renderApp()

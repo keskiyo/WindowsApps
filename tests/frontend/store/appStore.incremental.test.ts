@@ -27,6 +27,16 @@ function client(): AppsClient {
 		refreshApps: vi.fn().mockResolvedValue([code]),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
+		getAppDetails: vi.fn().mockResolvedValue({
+			fileSizeBytes: null,
+			fileCreatedAt: null,
+			fileModifiedAt: null,
+			architecture: 'unknown',
+			signature: 'unavailable',
+			executableExists: null,
+			installLocationExists: null,
+		}),
+		openAppFolder: vi.fn().mockResolvedValue(undefined),
 		getUninstallPreview: vi.fn().mockResolvedValue({
 			appName: 'Visual Studio Code',
 			publisher: 'Microsoft',

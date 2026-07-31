@@ -317,6 +317,33 @@
 		"expected": "security"
 	},
 	{
+		"_comment": "Observed on a real Windows 11 machine, 2026-07-31: the Start-Menu display name carries a localized version suffix. Paths anonymized; category, source, and publisher are as scanned.",
+		"name": "Hiddify, версия 4.1.1+40101",
+		"path": "C:\\Menu\\Hiddify.lnk",
+		"source": "start_menu",
+		"resolvedPath": "C:\\Program Files\\Hiddify\\Hiddify.exe",
+		"publisher": "Hiddify",
+		"expected": "security"
+	},
+	{
+		"_comment": "Observed on a real Windows 11 machine, 2026-07-31.",
+		"name": "AmneziaVPN",
+		"path": "C:\\Menu\\AmneziaVPN.lnk",
+		"source": "start_menu",
+		"resolvedPath": "C:\\Program Files\\AmneziaVPN\\AmneziaVPN.exe",
+		"publisher": "AmneziaVPN",
+		"expected": "security"
+	},
+	{
+		"_comment": "Observed on a real Windows 11 machine, 2026-07-31. Neither the name nor the publisher contains a proxy/VPN keyword; the classification has to come from the rest of the signals.",
+		"name": "TgWsProxy_windows",
+		"path": "C:\\Menu\\TgWsProxy_windows.lnk",
+		"source": "start_menu",
+		"resolvedPath": "C:\\Apps\\TgWsProxy\\TgWsProxy_windows.exe",
+		"publisher": "Flowseal",
+		"expected": "security"
+	},
+	{
 		"name": "Tailscale",
 		"path": "C:\\Program Files\\Tailscale\\tailscale.exe",
 		"expected": "security"

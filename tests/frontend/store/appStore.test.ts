@@ -70,6 +70,19 @@ function client(overrides: Partial<AppsClient> = {}): AppsClient {
 		onAppsUpdated: vi.fn().mockResolvedValue(() => undefined),
 		onScanProgress: vi.fn().mockResolvedValue(() => undefined),
 		...overrides,
+		getAppDetails:
+			overrides.getAppDetails ??
+			vi.fn().mockResolvedValue({
+				fileSizeBytes: null,
+				fileCreatedAt: null,
+				fileModifiedAt: null,
+				architecture: 'unknown',
+				signature: 'unavailable',
+				executableExists: null,
+				installLocationExists: null,
+			}),
+		openAppFolder:
+			overrides.openAppFolder ?? vi.fn().mockResolvedValue(undefined),
 	}
 }
 
@@ -510,6 +523,74 @@ describe('app store', () => {
 		secondDispose()
 	})
 
+	// Registration used to be a bare sequence of awaits: a rejection partway through left every
+	// earlier listener attached with nothing owning its teardown, and the rejected promise was
+	// cached, so the app could never recover from a transient bridge failure.
+	it('detaches earlier listeners when a later subscription fails', async () => {
+		const disposeDelta = vi.fn()
+		const disposePatches = vi.fn()
+		const api = client({
+			onCatalogDelta: vi.fn().mockResolvedValue(disposeDelta),
+			onCatalogPatches: vi.fn().mockResolvedValue(disposePatches),
+			onCatalogChanged: vi
+				.fn()
+				.mockRejectedValue(new Error('bridge unavailable')),
+		})
+		const store = createAppStore(api)
+
+		await expect(store.getState().initialize()).rejects.toThrow(
+			'bridge unavailable',
+		)
+
+		expect(disposeDelta).toHaveBeenCalledOnce()
+		expect(disposePatches).toHaveBeenCalledOnce()
+		expect(api.onAppsUpdated).not.toHaveBeenCalled()
+	})
+
+	it('detaches every earlier listener when the last subscription fails', async () => {
+		const disposers = [vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn()]
+		const api = client({
+			onCatalogDelta: vi.fn().mockResolvedValue(disposers[0]),
+			onCatalogPatches: vi.fn().mockResolvedValue(disposers[1]),
+			onCatalogChanged: vi.fn().mockResolvedValue(disposers[2]),
+			onAppsUpdated: vi.fn().mockResolvedValue(disposers[3]),
+			onScanProgress: vi.fn().mockResolvedValue(disposers[4]),
+			onLaunchStatus: vi.fn().mockRejectedValue(new Error('late failure')),
+		})
+		const store = createAppStore(api)
+
+		await expect(store.getState().initialize()).rejects.toThrow(
+			'late failure',
+		)
+
+		for (const dispose of disposers) expect(dispose).toHaveBeenCalledOnce()
+		// No catalog load ran, so the failure cannot be mistaken for an empty catalog.
+		expect(api.getApps).not.toHaveBeenCalled()
+	})
+
+	it('retries initialization after a failed subscription instead of caching the rejection', async () => {
+		const onCatalogChanged = vi
+			.fn()
+			.mockRejectedValueOnce(new Error('bridge unavailable'))
+			.mockResolvedValue(() => undefined)
+		const api = client({
+			onCatalogDelta: vi.fn().mockResolvedValue(() => undefined),
+			onCatalogPatches: vi.fn().mockResolvedValue(() => undefined),
+			onCatalogChanged,
+		})
+		const store = createAppStore(api)
+
+		await expect(store.getState().initialize()).rejects.toThrow(
+			'bridge unavailable',
+		)
+		const dispose = await store.getState().initialize()
+
+		expect(onCatalogChanged).toHaveBeenCalledTimes(2)
+		expect(api.getApps).toHaveBeenCalledOnce()
+		expect(store.getState().apps).toHaveLength(apps.length)
+		dispose()
+	})
+
 	it('keeps one app per id when cached and updated data repeats entries', async () => {
 		const duplicate = { ...apps[0] }
 		const store = createAppStore(
@@ -839,7 +920,9 @@ describe('app store', () => {
 		expect(store.getState().error).toBeNull()
 	})
 
-	it('surfaces launch errors', async () => {
+	// An action reports its failure by rejecting, and its caller owns the message. `error` is the
+	// background channel for work nobody awaits; writing both produced two toasts for one failure.
+	it('rejects a failed launch without also writing the background error state', async () => {
 		const store = createAppStore(
 			client({
 				launchApp: vi
@@ -850,9 +933,47 @@ describe('app store', () => {
 		await expect(store.getState().launch(apps[0])).rejects.toThrow(
 			'Access denied',
 		)
+		expect(store.getState().error).toBeNull()
+		expect(store.getState().launchingIds).toEqual([])
+	})
+
+	it('rejects a failed refresh without also writing the background error state', async () => {
+		const store = createAppStore(
+			client({
+				refreshApps: vi.fn().mockRejectedValue(new Error('scan failed')),
+			}),
+		)
+		await expect(store.getState().refresh()).rejects.toThrow('scan failed')
+		expect(store.getState().error).toBeNull()
+		expect(store.getState().isRefreshing).toBe(false)
+	})
+
+	it('rejects a failed uninstall without also writing the background error state', async () => {
+		const store = createAppStore(
+			client({
+				uninstallApp: vi.fn().mockRejectedValue(new Error('denied')),
+			}),
+		)
+		await expect(store.getState().uninstall(apps[0].id)).rejects.toThrow(
+			'denied',
+		)
+		expect(store.getState().error).toBeNull()
+	})
+
+	// A failed catalog load has no caller waiting on it, so it must still reach the user.
+	it('still surfaces a background load failure through the error state', async () => {
+		const store = createAppStore(
+			client({
+				getApps: vi.fn().mockRejectedValue(new Error('cache unreadable')),
+			}),
+		)
+
+		await store.getState().load()
+
 		expect(store.getState().error).toBe(
 			'The operation could not be completed. Try again.',
 		)
+		expect(store.getState().isLoading).toBe(false)
 	})
 
 	it('subscribes to background updates', async () => {
@@ -964,9 +1085,19 @@ describe('app store', () => {
 			ok: true,
 			id: 'custom:work',
 		})
+		expect(store.getState().categoryOrder[0]).toBe('custom:work')
 		expect(
 			store.getState().categories[store.getState().categories.length - 1],
-		).toMatchObject({ id: 'custom:work', label: 'Work', builtIn: false })
+		).toMatchObject({
+			id: 'custom:work',
+			label: 'Work',
+			builtIn: false,
+			accent: expect.any(String),
+		})
+		expect(storage.setItem).toHaveBeenLastCalledWith(
+			PREFERENCES_KEY,
+			expect.stringContaining('"accent"'),
+		)
 		store.getState().moveApp('code', 'custom:work')
 		expect(
 			store.getState().renameCategory('custom:work', 'Projects'),

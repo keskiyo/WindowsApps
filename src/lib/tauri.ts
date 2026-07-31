@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import type {
 	AppHydrationPatch,
+	AppDetails,
 	AppInfo,
 	AppsClient,
 	CatalogChangeSummary,
@@ -84,6 +85,8 @@ export const tauriAppsClient: AppsClient = {
 	cancelScan: () =>
 		isTauriRuntime() ? invokeTauri<void>('cancel_scan') : Promise.resolve(),
 	launchApp: app => invokeIfTauri<void>('launch_app', { id: app.id }),
+	getAppDetails: id => invokeIfTauri<AppDetails>('get_app_details', { id }),
+	openAppFolder: id => invokeIfTauri<void>('open_app_folder', { id }),
 	getUninstallPreview: id =>
 		invokeIfTauri<UninstallPreview>('get_uninstall_preview', { id }),
 	uninstallApp: id => invokeIfTauri<void>('uninstall_app', { id }),

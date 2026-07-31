@@ -3,7 +3,9 @@
 
 # Windows Apps
 
-**A fast, private application catalog and launcher for Windows 10 and Windows 11.**
+**Every application on your PC, in one searchable place.**
+
+Start Menu shortcuts, installed programs, Store apps, Steam games and portable executables — collected into a single catalog that opens instantly and stays on your machine.
 
 [![Version](https://img.shields.io/badge/version-0.2.8-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.8)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
@@ -11,136 +13,129 @@
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
 ![Local first](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
 
-[Download Windows Apps 0.2.8](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.8) ·
-[Documentation](Documentation.md) ·
-[Telegram](https://t.me/keskiyo)
+### [⬇ Download for Windows](https://github.com/keskiyo/WindowsApps/releases/latest)
+
+[Documentation](Documentation.md) · [Release notes](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.8) · [Telegram](https://t.me/keskiyo)
+
+<img src=".github/images/catalog.png" alt="Windows Apps catalog" width="880">
 
 </div>
 
 ---
 
-## Overview
+## Contents
 
-Windows Apps collects applications scattered across Start Menu shortcuts, Windows registrations, Store packages, Steam libraries, and fixed local drives into one searchable catalog.
+[Why](#why) · [Screenshots](#screenshots) · [Install](#install) · [Features](#features) · [Scanning](#scanning) · [Privacy](#privacy) · [Development](#development)
 
-The catalog is stored locally. On startup, cached names appear immediately while icons and metadata are loaded in the background. Incremental scanning checks changed locations instead of repeatedly scanning every file.
+## Why
+
+Windows spreads your software across four places that never agree with each other: the Start Menu, Installed apps, the Microsoft Store, and whatever you unzipped to a folder. Windows Apps reads all of them and produces one list.
+
+The interesting part is what happens next. The same program found as a shortcut, a registry entry, a Store package and a Steam game becomes **one card**. Runtime components, updaters and language servers step aside into **Auxiliary tools** instead of cluttering your categories. And your favorites and custom categories follow the application itself, so a rescan or a version bump does not scatter them.
+
+Everything runs locally. Nothing about your machine is uploaded.
+
+## Screenshots
+
+<div align="center">
+  <img src=".github/images/auxiliary-tools.png" alt="Auxiliary tools view" width="880">
+</div>
+
+**Auxiliary tools** is where the catalog puts what it is not sure about — CLI executables, browser
+components, bundled helpers. They stay out of your categories and out of search, but nothing is
+deleted and any of them is one click from returning to the main catalog. The tiles across the top
+count each view, and every count matches the list it opens.
+
+## Install
+
+1. Download **`Windows.Apps_0.2.8_x64-setup.exe`** from the [latest release](https://github.com/keskiyo/WindowsApps/releases/latest).
+2. Run it.
+3. Start **Windows Apps** and choose **Scan for apps**.
+
+> The installer is not Authenticode-signed, so SmartScreen may show _"Windows protected your PC"_. Choose **More info → Run anyway**. Download only from this repository's Releases. Automatic updates are cryptographically signed and verified by the app before installing.
+
+| Requirement  | Value                      |
+| ------------ | -------------------------- |
+| OS           | Windows 10 or 11           |
+| Architecture | x64                        |
+| Runtime      | Microsoft Edge WebView2    |
+| Internet     | Not required after install |
 
 ## Features
 
-Most launchers just re-list what Windows already knows. Windows Apps earns its place by what it does _with_ that list — deciding what deserves to be a launch card, keeping your choices attached to the app rather than to a fragile internal ID, and resolving every native action inside Rust.
-
-### An intelligent catalog
-
-- **Evidence-based deduplication** — the same product found as a Start Menu shortcut, a registry entry, a Store package, and a Steam game collapses into one card. Merging weighs resolved targets, product families, publishers, and install roots; a useful shortcut wins, and a genuine app is kept when the evidence is ambiguous rather than guessed away.
-- **Explainable classification, not filename guessing** — every entry is scored `primary` / `auxiliary` / `rejected` from Windows registration, shortcut target, PE metadata, location, and role, each with a stable reason code. `ServiceDesk` is not mistaken for a service; a renamed `notification_helper.exe` is not mistaken for an app.
-- **Auxiliary tools instead of deletion** — runtime components, language servers, and maintenance executables stay out of your categories and search but remain inspectable, and any of them can be restored in one click.
-- **Choices that survive a rescan** — Favorites, Hidden items, and restored tools are tracked by a normalized application identity, so they follow the app across a source change, a full rescan, or a cache reset instead of vanishing when its internal ID changes.
-
-### Built to feel instant
-
-- **Cache-first startup** — names render from a lightweight versioned cache before any scan runs; icons and metadata stream in behind them.
-- **Incremental by default** — unchanged directories reuse prior results; only what actually changed on disk is re-read.
-- **Bounded, cancellable full scans** — depth, entry-count, and time limits with live progress. Reparse points, network, and removable drives are skipped, so a scan can neither loop nor run away.
-- **Batched icon hydration** — visible cards are prioritized and icons arrive in batches, so streaming metadata never re-renders the whole grid.
-
-### Secure by construction
-
-- **The webview can only pass an ID** — every launch and uninstall is resolved from a Rust-owned catalog map, never from a path supplied by the frontend.
-- **No shell strings** — processes are built from a fixed executable plus an argument vector; UNC/network targets, script interpreters, and unvalidated uninstall commands are refused.
-- **Local and quiet** — the catalog is processed and stored on your machine; no inventory, drive list, or telemetry leaves it, and missing metadata is left unknown rather than invented.
-- **Privacy-limited uninstall history** — the newest 100 attempts, storing only name, publisher, mechanism, and result — never a command, path, argument, or error text.
-
 ### Finding and launching
 
-- **Full-text search** — matches name, publisher, description, and install path, each word independently, cached so typing stays smooth over a large catalog.
-- **Quick-launch palette (Ctrl+K)** — keyboard-first find-and-launch; `Ctrl+F` or `/` jumps to search.
-- **Honest launch feedback** — the card dims with a spinner and a top activity bar until the app's window is actually ready, cleared early by the backend or by a short ceiling.
-- **Native launch mechanisms** — shortcuts, executables, shell targets, packaged apps, and Steam entries each launch the way Windows intends; Steam games start through Steam, so overlay, cloud saves, and playtime keep working.
+- **Search that forgives** — matches name, publisher, description and path; tolerates typos and finds apps even when you type in the wrong keyboard layout.
+- **Quick-launch palette** — `Ctrl+K` from anywhere, `Ctrl+F` or `/` to jump to search.
+- **Launches the way Windows intends** — shortcuts, executables, packaged apps and Steam entries each use their native mechanism, so Steam overlay, cloud saves and playtime keep working.
+- **Honest feedback** — the card stays busy until the app's window is actually ready, not just until the process spawned.
 
-### Organization and desktop fit
+### A catalog that thinks
 
-- **Flexible organization** — automatic plus custom categories with reordering and drag-to-move, Favorites surfaced first within a category, and reversible Hidden items.
-- **Registered, signed, reversible** — vendor / MSI / MSIX uninstall from Windows' own registration; signed NSIS-only auto-updates with full notes, byte progress, and verification; nothing forced.
-- **Lives in the tray** — closing hides to the notification area; `Win+Shift+Q` (physical key, layout-independent) brings it back; optional launch at sign-in.
-- **Accessible and responsive** — focus-trapped dialogs, arrow-key menus, `aria-current` navigation, reduced-motion support, and a persistent sidebar that becomes an overlay drawer on narrow windows.
-- **Catalog maintenance** — Settings exposes scan diagnostics, force full scan, and cache reset.
+- **One card per application** — merging weighs resolved targets, product families, publishers and install roots. Ambiguous cases are kept, not guessed away.
+- **Auxiliary instead of deletion** — runtime components and maintenance executables leave your categories but stay inspectable, and any of them is one click from coming back.
+- **Explainable decisions** — every entry carries a visibility score and stable reason codes; `ServiceDesk` is not mistaken for a service.
+- **Choices that survive** — Favorites, Hidden items and category assignments are tracked by application identity, so they follow the app through a rescan, a version change or a cache reset.
 
-## Installation
+### App information
 
-1. Open [Windows Apps 0.2.8](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.8).
-2. Download `Windows.Apps_0.2.8_x64-setup.exe`.
-3. Run the installer.
-4. Start **Windows Apps** and select **Scan for apps** when prompted.
+Open any card's details for file size and dates, CPU architecture, Authenticode signature status, and whether the install location still exists — with copy-path, copy-report and **Open folder** actions. Read locally, resolved from a catalog ID.
 
-The installer is not Authenticode-signed, so Microsoft Defender SmartScreen may show an unrecognized-app warning. Download builds only from this repository's official Releases. Automatic updates are cryptographically signed and verified by the app before installation.
+### Fast by design
 
-### System requirements
+- Cache-first startup: names render before any scan runs, icons stream in behind them.
+- Incremental scanning re-reads only what changed on disk.
+- Full scans are bounded and cancellable, with live progress.
+- Cards mount in batches while you scroll, so a large catalog stays smooth.
 
-| Requirement      | Value                                                |
-| ---------------- | ---------------------------------------------------- |
-| Operating system | Windows 10 or Windows 11                             |
-| Architecture     | x64                                                  |
-| Runtime          | Microsoft Edge WebView2                              |
-| Internet         | Not required after installation for catalog features |
+### Fits the desktop
 
-The NSIS installer can download the WebView2 bootstrapper when the runtime is missing.
+- Lives in the tray; `Win+Shift+Q` brings it back, on any keyboard layout.
+- Custom categories, drag-to-move, Favorites first, reversible Hidden items.
+- Uninstall through Windows' own registration — vendor, MSI or MSIX.
+- Signed automatic updates with full notes and byte progress. Nothing is forced.
+- Focus-trapped dialogs, arrow-key menus, reduced-motion support, and a sidebar that becomes a drawer on narrow windows.
 
-## How scanning works
+## Scanning
 
-Windows Apps scans permanent local drives reported by Windows as fixed drives. Removable USB, optical, and network drives are excluded from automatic scanning.
+Windows Apps scans permanent local drives. Removable, optical and network drives are excluded.
 
-Each fixed-drive scan is limited to:
+Each scan root is limited to **16 directory levels**, **500,000 entries** and **three minutes**. Symbolic links and junctions are skipped, so a scan can neither loop nor run away.
 
-- 16 directory levels;
-- 500,000 filesystem entries;
-- three minutes per scan root.
+| Action                   | What it does                                   |
+| ------------------------ | ---------------------------------------------- |
+| **Refresh**              | Normal incremental update                      |
+| **Force full scan**      | Rebuild the filesystem index                   |
+| **Repair missing icons** | Retry extraction only where an icon is missing |
+| **Clear icon cache**     | Rebuild icons without rescanning drives        |
+| **Reset catalog cache**  | Remove generated caches and scan clean         |
 
-Symbolic links, junctions, and other reparse-point directories are skipped. These limits prevent loops and excessive disk activity while retaining already discovered applications.
+Favorites, Hidden items, promoted tools, custom categories and assignments survive all of these.
 
-Use:
+Visibility is conservative. Dropping an entry entirely cannot be undone from the interface, so it takes more than a suggestive name: an application Windows registered as a real product is kept even when its name reads like an installer. Shared runtimes and redistributables are matched separately and always dropped. Anything merely uncertain lands in **Auxiliary tools**, where **Restore to catalog** makes a permanent override.
 
-- **Refresh** for a normal incremental update;
-- **Force full scan** to rebuild the filesystem index;
-- **Repair missing icons** to retry extraction only for applications without an icon;
-- **Clear icon cache** to rebuild icons from the existing catalog without rescanning drives;
-- **Reset catalog cache** to remove generated catalog/icon caches and perform a clean scan.
+## Privacy
 
-Favorites, Hidden items, promoted auxiliary tools, custom categories, and category assignments are preserved when the catalog cache is reset.
-
-Catalog visibility is conservative. Start Menu/AUMID applications, Steam games, registered products, and portable executables with coherent product metadata receive strong launcher evidence. Runtime paths and helper/service/language-server metadata reduce visibility. Ambiguous entries are placed in **Auxiliary tools** rather than deleted, and **Restore to catalog** creates a persistent user override.
-
-PE `ProductName` and `OriginalFilename` metadata are retained separately. They help identify renamed installers and helpers without replacing the user-facing name. Shortcut arguments affect identity only for a small set of user-facing modes such as browser profiles and PWA app launches; ordinary service flags do not create duplicate cards.
-
-## Privacy and safety
-
-- The application catalog is processed and stored locally.
-- No software inventory or drive list is uploaded.
-- No telemetry service is configured.
-- Missing descriptions are left unknown; Windows Apps does not invent or download metadata.
-- Launch commands are resolved from Rust-owned catalog IDs, not arbitrary frontend paths.
-- Uninstall targets come from Windows registration data. The preview exposes only application identity and a safe removal-mechanism label; command details remain backend-only.
-- UNC/network uninstall executables are rejected.
+- The catalog is built and stored **on your machine**.
+- No inventory, drive list or telemetry is uploaded. No telemetry service exists.
+- Missing metadata is left unknown — nothing is invented or fetched.
+- The interface can only pass an **ID**; every launch and uninstall target is resolved inside Rust, never from a path the window supplied.
+- Processes are built from a fixed executable plus an argument vector — never a shell string. Network targets and unvalidated uninstall commands are refused.
 - Program folders are never recursively deleted as an uninstall method.
-- Uninstall history excludes commands, paths, arguments, package IDs, usernames, and detailed error text.
+- Uninstall history keeps the newest 100 attempts with only name, publisher, mechanism and result — no command, path, argument or error text.
+
+See [Documentation.md](Documentation.md#13-privacy-and-security) for the full security model.
 
 ## Development
 
-Prerequisites:
-
-- Node.js 22 and npm;
-- stable Rust with the MSVC toolchain;
-- Microsoft C++ Build Tools and Windows SDK;
-- WebView2 Runtime;
-- [Tauri prerequisites for Windows](https://v2.tauri.app/start/prerequisites/).
-
-Install and run:
+Prerequisites: Node.js 22, Rust 1.88+ with the MSVC toolchain, Microsoft C++ Build Tools and Windows SDK, WebView2 Runtime, and the [Tauri Windows prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```powershell
 npm install
 npm run tauri dev
 ```
 
-Verification:
+Verification — all of these must pass:
 
 ```powershell
 npm run lint
@@ -152,24 +147,20 @@ cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
+Coverage is reported, not gated (`npm run test:coverage`). The MSRV declared in `src-tauri/Cargo.toml` is a compatibility promise and is compiled by the MSRV job in `.github/workflows/verify.yml`.
+
 Production build:
 
 ```powershell
 npm run tauri build
 ```
 
-Primary local artifact:
-
-```text
-src-tauri/target/release/bundle/nsis/Windows Apps_0.2.8_x64-setup.exe
-```
+Local artifact: `src-tauri/target/release/bundle/nsis/Windows Apps_0.2.8_x64-setup.exe`
 
 ## Support
 
-- [Technical documentation](Documentation.md)
-- [GitHub Releases](https://github.com/keskiyo/WindowsApps/releases)
-- [Telegram: @keskiyo](https://t.me/keskiyo)
+[Technical documentation](Documentation.md) · [Releases](https://github.com/keskiyo/WindowsApps/releases) · [Telegram: @keskiyo](https://t.me/keskiyo)
 
 <div align="center">
-  <sub>Built with Tauri, Rust, React, TypeScript, Vite, and native Windows APIs.</sub>
+  <sub>Built with Tauri, Rust, React, TypeScript, Vite and native Windows APIs.</sub>
 </div>

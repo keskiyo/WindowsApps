@@ -3,6 +3,7 @@
 //! `crate::catalog::AppInfo` paths stay unchanged.
 
 use super::visibility::{VisibilityClass, VisibilityReason};
+use crate::platform::windows::{AppArchitecture, AppSignatureStatus};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
@@ -106,6 +107,20 @@ pub(crate) struct AppInfo {
     pub visibility_score: i16,
     #[serde(default)]
     pub visibility_reasons: Vec<VisibilityReason>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AppDetails {
+    pub file_size_bytes: Option<u64>,
+    pub file_created_at: Option<u64>,
+    pub file_modified_at: Option<u64>,
+    pub architecture: AppArchitecture,
+    pub signature: AppSignatureStatus,
+    pub executable_exists: Option<bool>,
+    pub install_location_exists: Option<bool>,
+    #[serde(default)]
+    pub can_open_folder: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]

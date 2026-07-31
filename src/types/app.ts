@@ -10,6 +10,13 @@ export type AppSourceKind =
 	| 'portable'
 export type UninstallMechanism = 'registered_command' | 'msi' | 'msix'
 export type AppVisibilityClass = 'primary' | 'auxiliary' | 'rejected'
+export type AppArchitecture =
+	| 'x86'
+	| 'x64'
+	| 'arm64'
+	| 'notApplicable'
+	| 'unknown'
+export type AppSignatureStatus = 'verified' | 'unsigned' | 'unavailable'
 export type AppVisibilityReason =
 	| 'start_menu_registration'
 	| 'windows_app_registration'
@@ -45,6 +52,7 @@ export interface AppInfo {
 	productName?: string | null
 	originalFilename?: string | null
 	installLocation: string | null
+	resolvedPath?: string | null
 	canUninstall: boolean
 	launchArguments?: string | null
 	canonicalIdentity?: string | null
@@ -53,6 +61,17 @@ export interface AppInfo {
 	visibilityClass?: AppVisibilityClass
 	visibilityScore?: number
 	visibilityReasons?: AppVisibilityReason[]
+}
+
+export interface AppDetails {
+	fileSizeBytes: number | null
+	fileCreatedAt: number | null
+	fileModifiedAt: number | null
+	architecture: AppArchitecture
+	signature: AppSignatureStatus
+	executableExists: boolean | null
+	installLocationExists: boolean | null
+	canOpenFolder?: boolean
 }
 
 export type AppView = 'all' | 'favorites' | 'settings' | 'hidden' | 'auxiliary'
@@ -135,6 +154,8 @@ export interface AppsClient {
 	startBackgroundSync?(): Promise<void>
 	cancelScan(): Promise<void>
 	launchApp(app: Pick<AppInfo, 'id'>): Promise<void>
+	getAppDetails(id: string): Promise<AppDetails>
+	openAppFolder(id: string): Promise<void>
 	getUninstallPreview(id: string): Promise<UninstallPreview>
 	uninstallApp(id: string): Promise<void>
 	onAppsUpdated(handler: (apps: AppInfo[]) => void): Promise<() => void>

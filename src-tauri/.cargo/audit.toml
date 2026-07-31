@@ -1,0 +1,36 @@
+# cargo-audit configuration.
+#
+# Ignoring an advisory here is accepting a known vulnerability, so every entry carries the same
+# fields the npm triage gate requires: the dependency chain, why it carries no runtime impact for
+# this application, an owner, a review date, and the remediation that will remove it. Runtime
+# advisories with a reachable code path are never eligible.
+
+[advisories]
+ignore = [
+  # RUSTSEC-2026-0194 — quick-xml: quadratic run time when checking a start tag for duplicate
+  # attribute names. Severity 7.5 (high). Fixed in quick-xml >= 0.41.0.
+  #
+  #   chain:       quick-xml 0.39.4 <- plist 1.9.0 <- tauri-utils 2.9.3 <- tauri 2.11.3
+  #   reason:      `plist` parses Apple property lists. Windows Apps is Windows-only by design and
+  #                never parses one: the crate is compiled into the Windows build but no code path
+  #                reaches it at runtime. Both advisories are denial of service through hostile XML
+  #                input, and this application feeds plist no input at all.
+  #   blocked by:  plist 1.9.0 requires quick-xml ^0.39, so 0.41 is semver-unreachable.
+  #                `cargo update -p quick-xml` locks 0 packages. Removing it needs a plist release
+  #                that accepts quick-xml 0.41 and a tauri-utils release that accepts that plist.
+  #   owner:       keskiyo
+  #   reviewBy:    2026-10-31
+  #   remediation: re-run `cargo audit` after each Tauri upgrade and drop these entries as soon as
+  #                the chain resolves quick-xml >= 0.41.0.
+  "RUSTSEC-2026-0194",
+  # RUSTSEC-2026-0195 — quick-xml: unbounded namespace-declaration allocation in `NsReader` enables
+  # memory-exhaustion denial of service. Severity 7.5 (high). Same crate, chain, reasoning and
+  # remediation as RUSTSEC-2026-0194 above.
+  "RUSTSEC-2026-0195",
+]
+
+# The remaining findings are `unmaintained`/`unsound` warnings for the gtk-rs GTK3 bindings and
+# their transitive crates, which belong to Tauri's Linux backend and are not compiled for the
+# Windows target this application ships. They are warnings, not vulnerabilities, and are left
+# visible in the report rather than ignored.
+informational_warnings = ["unmaintained", "unsound"]

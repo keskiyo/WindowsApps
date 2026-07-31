@@ -12,7 +12,9 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
     "dialog:allow-open",
-    "updater:default",
-    "process:default"
+    "updater:allow-check",
+    "updater:allow-download",
+    "updater:allow-install",
+    "process:allow-restart"
   ]
 }

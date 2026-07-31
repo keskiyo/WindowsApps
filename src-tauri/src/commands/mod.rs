@@ -8,10 +8,27 @@
 use crate::error::AppError;
 
 pub(crate) mod catalog;
+pub(crate) mod details;
 pub(crate) mod launch;
 pub(crate) mod links;
 pub(crate) mod settings;
 pub(crate) mod uninstall;
+
+/// Upper bound on an inbound catalog id, shared by every command that resolves one.
+///
+/// Real ids are a SHA-256 hex digest or an AppUserModelId, far below this. The bound exists so an
+/// unbounded `String` from the webview is never used as a lookup key or copied into an error path
+/// first and judged second. It matches the per-id limit the icon-hydration contract already
+/// enforces, so the whole IPC surface has one answer for "how long may an id be".
+pub(super) const MAX_CATALOG_ID_LENGTH: usize = 512;
+
+/// Whether a value can name a catalog entry at all. Checked before the id reaches trusted state;
+/// an id that fails here cannot match anything the backend stored, so callers report the same
+/// "unavailable" error they already return for an unknown id and the IPC error contract is
+/// unchanged.
+pub(super) fn is_valid_catalog_id(id: &str) -> bool {
+    !id.trim().is_empty() && id.chars().count() <= MAX_CATALOG_ID_LENGTH
+}
 
 /// Runs blocking work off the async runtime, mapping join failures to `Interrupted`.
 /// Private to `commands`; its domain submodules reach it as `super::run_blocking`.

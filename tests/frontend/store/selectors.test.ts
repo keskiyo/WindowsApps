@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
 	filterAppsByQuery,
+	filterVisibleApps,
 	rankAppsByQuery,
+	selectCatalogCounts,
 	selectCategorizedApps,
 } from '../../../src/store/selectors'
 import type { AppCategory, AppInfo } from '../../../src/types'
@@ -114,6 +116,83 @@ describe('categorized app identity', () => {
 		expect(result[0]).not.toBe(auxiliary[0])
 		expect(result[0].visibilityClass).toBe('primary')
 		expect(result[0].userPromoted).toBe(true)
+	})
+})
+
+describe('selectCatalogCounts', () => {
+	// steam: favorite + visible. code: favorite but hidden. notepad: plain visible.
+	// helper: auxiliary. legacy: auxiliary and hidden.
+	const mixed = [
+		app({ id: 'steam', name: 'Steam', category: 'games' }),
+		app({ id: 'code', name: 'Code', category: 'development' }),
+		app({ id: 'notepad', name: 'Notepad', category: 'utilities' }),
+		app({
+			id: 'helper',
+			name: 'Helper',
+			category: 'system',
+			visibilityClass: 'auxiliary',
+		}),
+		app({
+			id: 'legacy',
+			name: 'Legacy',
+			category: 'system',
+			visibilityClass: 'auxiliary',
+		}),
+	]
+	const hiddenAppIds = ['code', 'legacy']
+	const favoriteAppIds = ['steam', 'code']
+
+	// The contract that keeps a badge from contradicting the list it opens. Each count is the
+	// length of `filterVisibleApps` for the matching view — checked against that function rather
+	// than a hand-written number, so the two cannot drift apart.
+	it.each(['favorites', 'hidden', 'auxiliary'] as const)(
+		'reports the %s badge as the length of that view',
+		view => {
+			const counts = selectCatalogCounts(
+				mixed,
+				hiddenAppIds,
+				favoriteAppIds,
+			)
+			const badge = {
+				favorites: counts.favoriteCount,
+				hidden: counts.hiddenCount,
+				auxiliary: counts.auxiliaryCount,
+			}[view]
+
+			expect(badge).toBe(
+				filterVisibleApps(mixed, view, hiddenAppIds, favoriteAppIds)
+					.length,
+			)
+		},
+	)
+
+	it('excludes auxiliary and hidden apps from the visible set and its category counts', () => {
+		const counts = selectCatalogCounts(mixed, hiddenAppIds, favoriteAppIds)
+
+		expect(counts.visibleCategorizedApps.map(entry => entry.id)).toEqual([
+			'steam',
+			'notepad',
+		])
+		expect(counts.navigationCounts.get('games')).toBe(1)
+		expect(counts.navigationCounts.get('development')).toBeUndefined()
+		expect(counts.navigationCounts.get('system')).toBeUndefined()
+	})
+
+	// The settings page reports what the scanner classified, so hiding an app must not change it.
+	it('keeps classification totals independent of what the user hid', () => {
+		const counts = selectCatalogCounts(mixed, hiddenAppIds, favoriteAppIds)
+
+		expect(counts.classifiedAuxiliaryCount).toBe(2)
+		expect(counts.classifiedPrimaryCount).toBe(3)
+		expect(
+			counts.classifiedPrimaryCount + counts.classifiedAuxiliaryCount,
+		).toBe(mixed.length)
+	})
+
+	it('preserves record identity in the visible set', () => {
+		const counts = selectCatalogCounts(mixed, [], [])
+
+		expect(counts.visibleCategorizedApps[0]).toBe(mixed[0])
 	})
 })
 

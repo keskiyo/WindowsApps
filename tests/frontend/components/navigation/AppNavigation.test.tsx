@@ -76,4 +76,79 @@ describe('AppNavigation', () => {
 			within(utilityViews).getByRole('button', { name: 'Hidden 0' }),
 		).toHaveAttribute('title', 'Hidden')
 	})
+
+	it('keeps the neutral fallback for a legacy category without an accent', () => {
+		const custom: CategoryDefinition = {
+			id: 'custom-tools',
+			label: 'Custom tools',
+			builtIn: false,
+		}
+		render(
+			<AppNavigation
+				categoryOrder={['custom-tools']}
+				categories={[...categories, custom]}
+				counts={new Map([['custom-tools', 1]])}
+				activeView='all'
+				favoriteCount={0}
+				hiddenCount={0}
+				onSelectView={vi.fn()}
+				onSelectCategory={vi.fn()}
+				onCreateCategory={() => ({ ok: true, id: 'custom-tools' })}
+				onReorderCategory={vi.fn()}
+			/>,
+		)
+
+		expect(
+			screen.getByRole('button', { name: 'Custom tools' }),
+		).toHaveAttribute('data-category-accent', 'neutral')
+	})
+
+	it('uses the persisted accent for a custom category', () => {
+		const custom: CategoryDefinition = {
+			id: 'custom-tools',
+			label: 'Custom tools',
+			builtIn: false,
+			accent: 'orange',
+		}
+		render(
+			<AppNavigation
+				categoryOrder={['custom-tools']}
+				categories={[...categories, custom]}
+				counts={new Map([['custom-tools', 1]])}
+				activeView='all'
+				favoriteCount={0}
+				hiddenCount={0}
+				onSelectView={vi.fn()}
+				onSelectCategory={vi.fn()}
+				onCreateCategory={() => ({ ok: true, id: 'custom-tools' })}
+				onReorderCategory={vi.fn()}
+			/>,
+		)
+
+		expect(
+			screen.getByRole('button', { name: 'Custom tools' }),
+		).toHaveAttribute('data-category-accent', 'orange')
+	})
+
+	it('assigns the games category its stable yellow accent', () => {
+		render(
+			<AppNavigation
+				categoryOrder={['games']}
+				categories={categories}
+				counts={new Map([['games', 2]])}
+				activeView='all'
+				favoriteCount={0}
+				hiddenCount={0}
+				onSelectView={vi.fn()}
+				onSelectCategory={vi.fn()}
+				onCreateCategory={() => ({ ok: true, id: 'custom' })}
+				onReorderCategory={vi.fn()}
+			/>,
+		)
+
+		expect(screen.getByRole('button', { name: 'Games' })).toHaveAttribute(
+			'data-category-accent',
+			'yellow',
+		)
+	})
 })

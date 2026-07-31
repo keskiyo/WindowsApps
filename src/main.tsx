@@ -10,6 +10,10 @@ const appStore = createAppStore(tauriAppsClient)
 
 createRoot(document.getElementById('root')!).render(
 	<StrictMode>
-		<App store={appStore} systemClient={tauriSystemClient} />
+		<App
+			store={appStore}
+			systemClient={tauriSystemClient}
+			appsClient={tauriAppsClient}
+		/>
 	</StrictMode>,
 )

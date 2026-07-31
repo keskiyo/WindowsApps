@@ -5,6 +5,7 @@ use walkdir::WalkDir;
 
 mod classify;
 mod dedup;
+mod details;
 mod filters;
 mod model;
 mod naming;
@@ -14,8 +15,12 @@ mod storage;
 pub(crate) mod sync;
 mod visibility;
 
+pub(crate) use details::{
+    can_open_folder, details_fingerprint, folder_target, read_cached_details, read_details,
+    AppDetailsTarget,
+};
 pub(crate) use model::{
-    AppCategory, AppInfo, LaunchKind, ScanProgress, SourceKind, UninstallTarget,
+    AppCategory, AppDetails, AppInfo, LaunchKind, ScanProgress, SourceKind, UninstallTarget,
 };
 pub(crate) use scan::{
     coordinator as scan_coordinator, hydration, incremental, settings as scan_settings,
@@ -23,6 +28,10 @@ pub(crate) use scan::{
 pub(crate) use sources::source;
 use sources::{portable, registry, start_apps, steam};
 pub(crate) use storage::{cache, icon_cache};
+use sync::scan_control::{
+    ScanControl, StageBudget, StageStop, DEFAULT_STAGE_TIMEOUT, START_MENU_MAX_DEPTH,
+    START_MENU_MAX_ENTRIES,
+};
 pub(crate) use visibility::{VisibilityClass, VisibilityReason};
 
 fn steam_app(game: steam::SteamGame) -> AppInfo {
@@ -135,9 +144,8 @@ pub(crate) fn watcher_paths(settings: &scan_settings::ScanSettings) -> Vec<PathB
     paths
 }
 
-fn scan_registry() -> (Vec<AppInfo>, Vec<registry::RegistryMetadata>) {
-    let scan = registry::scan();
-    (scan.apps, scan.metadata)
+fn scan_registry(control: &ScanControl) -> registry::RegistryScan {
+    registry::scan(&control.stage(DEFAULT_STAGE_TIMEOUT))
 }
 
 fn attach_registry_metadata(apps: &mut [AppInfo], metadata: &[registry::RegistryMetadata]) {
@@ -275,17 +283,56 @@ pub(super) fn icon_source(app: &AppInfo) -> Option<String> {
     icon_source_candidates(app).into_iter().next()
 }
 
-fn scan_start_menu() -> Vec<AppInfo> {
+pub(crate) struct StartMenuScan {
+    pub apps: Vec<AppInfo>,
+    /// `None` when the traversal finished. An incomplete traversal must not replace the stored
+    /// Start Menu snapshot: its partial list would report every unvisited shortcut as removed.
+    pub stop: Option<StageStop>,
+}
+
+fn scan_start_menu(control: &ScanControl) -> StartMenuScan {
     let mut roots = vec![PathBuf::from(
         r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
     )];
     if let Some(appdata) = env::var_os("APPDATA") {
         roots.push(PathBuf::from(appdata).join(r"Microsoft\Windows\Start Menu\Programs"));
     }
+    let budget = control.stage_with(
+        DEFAULT_STAGE_TIMEOUT,
+        START_MENU_MAX_ENTRIES,
+        START_MENU_MAX_DEPTH,
+    );
+    // Recorded before the walk starts, so an already-cancelled scan yields an *incomplete* result
+    // rather than an empty complete one that would replace the stored snapshot with nothing.
+    if budget.should_stop() {
+        return StartMenuScan {
+            apps: Vec::new(),
+            stop: budget.stop(),
+        };
+    }
+    let apps = walk_start_menu_shortcuts(roots, &budget);
 
+    StartMenuScan {
+        apps,
+        stop: budget.stop(),
+    }
+}
+
+/// Roots are a parameter so the bounds can be exercised against a fixture tree; `scan_start_menu`
+/// supplies the real Start Menu locations.
+fn walk_start_menu_shortcuts(roots: Vec<PathBuf>, budget: &StageBudget) -> Vec<AppInfo> {
+    // `take_while` rather than `filter`: the traversal must end at the limit, not keep walking a
+    // pathological tree while discarding its entries. Every visited entry is charged, including
+    // directories, because directory enumeration is what an unbounded tree makes expensive.
     roots
         .into_iter()
-        .flat_map(|root| WalkDir::new(root).follow_links(false).into_iter())
+        .flat_map(|root| {
+            WalkDir::new(root)
+                .follow_links(false)
+                .max_depth(budget.max_depth())
+                .into_iter()
+        })
+        .take_while(|_| budget.charge_entry())
         .filter_map(Result::ok)
         .filter(|entry| entry.file_type().is_file())
         .filter(|entry| {
@@ -507,7 +554,7 @@ pub(crate) fn demote_console_applications(apps: &mut [AppInfo]) {
         if path
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
-            && crate::platform::windows::executable_metadata::is_console_subsystem(path)
+            && crate::platform::windows::is_console_subsystem(path)
         {
             app.visibility_class = VisibilityClass::Auxiliary;
             if !app
@@ -539,6 +586,97 @@ mod tests {
     use super::naming::*;
     use super::*;
     use std::path::PathBuf;
+    use std::time::Duration;
+
+    /// Builds a Start Menu fixture: `folders` nested directories, each holding one `.lnk`.
+    fn nested_shortcuts(root: &Path, folders: usize) {
+        let mut current = root.to_path_buf();
+        for index in 0..folders {
+            current = current.join(format!("Level {index}"));
+            std::fs::create_dir_all(&current).unwrap();
+            std::fs::write(current.join(format!("Tool {index}.lnk")), []).unwrap();
+        }
+    }
+
+    // A Start Menu tree used to be walked with no depth, count or time limit at all, so a junction
+    // loop or a corrupted profile could hold the scan indefinitely. Each bound is asserted through
+    // the real traversal rather than through the budget in isolation.
+    #[test]
+    fn the_start_menu_traversal_stops_at_its_depth_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        nested_shortcuts(dir.path(), 6);
+        let never = || false;
+        let control = ScanControl::new(&never);
+        let budget = control.stage_with(DEFAULT_STAGE_TIMEOUT, usize::MAX, 2);
+
+        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
+
+        // Depth 1 is "Level 0", depth 2 its shortcut; nothing deeper is visited.
+        assert_eq!(apps.len(), 1);
+        assert_eq!(apps[0].name, "Tool 0");
+        assert_eq!(budget.stop(), None);
+    }
+
+    #[test]
+    fn the_start_menu_traversal_stops_at_its_entry_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        nested_shortcuts(dir.path(), 6);
+        let never = || false;
+        let control = ScanControl::new(&never);
+        let budget = control.stage_with(DEFAULT_STAGE_TIMEOUT, 3, START_MENU_MAX_DEPTH);
+
+        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
+
+        assert!(apps.len() < 6);
+        assert_eq!(budget.stop(), Some(StageStop::EntryLimit));
+    }
+
+    #[test]
+    fn the_start_menu_traversal_stops_at_its_deadline() {
+        let dir = tempfile::tempdir().unwrap();
+        nested_shortcuts(dir.path(), 6);
+        let never = || false;
+        let control = ScanControl::new(&never);
+        let budget = control.stage_with(Duration::ZERO, usize::MAX, START_MENU_MAX_DEPTH);
+
+        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
+
+        assert!(apps.is_empty());
+        assert_eq!(budget.stop(), Some(StageStop::TimedOut));
+    }
+
+    #[test]
+    fn the_start_menu_traversal_stops_when_the_scan_is_cancelled() {
+        let dir = tempfile::tempdir().unwrap();
+        nested_shortcuts(dir.path(), 6);
+        let cancelled = || true;
+        let control = ScanControl::new(&cancelled);
+        let budget = control.stage_with(DEFAULT_STAGE_TIMEOUT, usize::MAX, START_MENU_MAX_DEPTH);
+
+        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
+
+        assert!(apps.is_empty());
+        assert_eq!(budget.stop(), Some(StageStop::Cancelled));
+    }
+
+    // The bounds must not change the result for a normal Start Menu.
+    #[test]
+    fn an_ordinary_start_menu_tree_is_walked_completely() {
+        let dir = tempfile::tempdir().unwrap();
+        nested_shortcuts(dir.path(), 4);
+        let never = || false;
+        let control = ScanControl::new(&never);
+        let budget = control.stage_with(
+            DEFAULT_STAGE_TIMEOUT,
+            START_MENU_MAX_ENTRIES,
+            START_MENU_MAX_DEPTH,
+        );
+
+        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
+
+        assert_eq!(apps.len(), 4);
+        assert_eq!(budget.stop(), None);
+    }
 
     fn app(name: &str, path: &str) -> AppInfo {
         AppInfo {

@@ -17,12 +17,21 @@ pub(crate) struct OwnedProcessHandle(isize);
 
 impl Drop for OwnedProcessHandle {
     fn drop(&mut self) {
+        // SAFETY: `CloseHandle` requires a handle this process owns and has not already closed.
+        // The only constructor is `shell_execute_with_handle`, which stores the process handle
+        // `ShellExecuteExW` returned under `SEE_MASK_NOCLOSEPROCESS` — ownership transferred to
+        // us — and only after `is_invalid()` ruled out the null case. The field is private and
+        // never copied out, so this is the single close, and `Drop` runs once.
         let _ = unsafe { CloseHandle(HANDLE(self.0 as *mut core::ffi::c_void)) };
     }
 }
 
 pub(crate) fn wait_for_input_idle(handle: &OwnedProcessHandle, timeout_ms: u32) {
     let handle = HANDLE(handle.0 as *mut core::ffi::c_void);
+    // SAFETY: the handle is borrowed from a live `OwnedProcessHandle`, so it is still open for
+    // the whole call — `Drop` cannot run while the borrow is held. `WaitForInputIdle` only reads
+    // the handle; a process without a message queue or an elapsed timeout is reported through the
+    // return value, which the caller deliberately ignores in favour of its own ceiling timer.
     unsafe { WaitForInputIdle(handle, timeout_ms) };
 }
 
@@ -52,6 +61,11 @@ fn shell_execute_with_handle(target: &str) -> Result<Option<OwnedProcessHandle>,
         nShow: SW_SHOWNORMAL.0,
         ..Default::default()
     };
+    // SAFETY: `info` is fully initialized (`cbSize` set to its own size, remaining fields
+    // defaulted), and its `lpVerb`/`lpFile` point at `operation` and `file`, which are
+    // NUL-terminated UTF-16 buffers owned by this frame that outlive the call. `ShellExecuteExW`
+    // writes back into `info` through the exclusive `&mut`, and `SEE_MASK_NOCLOSEPROCESS` makes
+    // any returned `hProcess` ours to close — which `OwnedProcessHandle` then does exactly once.
     unsafe { ShellExecuteExW(&mut info) }.map_err(|_| {
         format!(
             "Windows Shell could not launch the application (code {})",
@@ -68,6 +82,11 @@ fn shell_execute_with_handle(target: &str) -> Result<Option<OwnedProcessHandle>,
 pub(crate) fn shell_execute(target: &str) -> Result<(), String> {
     let operation: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
     let file: Vec<u16> = OsStr::new(target).encode_wide().chain(Some(0)).collect();
+    // SAFETY: both `PCWSTR`s point at NUL-terminated UTF-16 buffers owned by this frame that
+    // outlive the call; the remaining pointer arguments are explicitly null, which
+    // `ShellExecuteW` documents as "no parameters" and "no working directory". No handle is
+    // returned to own — this variant does not set `SEE_MASK_NOCLOSEPROCESS` — so the result is
+    // only an error code, checked by `validate_shell_result`.
     let result = unsafe {
         ShellExecuteW(
             None,
@@ -78,7 +97,8 @@ pub(crate) fn shell_execute(target: &str) -> Result<(), String> {
             SW_SHOWNORMAL,
         )
     };
-    validate_shell_result(result.0 as isize)
+    let code = result.0 as isize;
+    validate_shell_result(code)
 }
 
 fn apps_folder_target(app_id: &str) -> String {

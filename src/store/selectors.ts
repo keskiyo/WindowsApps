@@ -2,11 +2,12 @@ import { deduplicateVisibleApps } from '../lib/appDeduplication'
 import {
 	filterAppsByQuery,
 	rankAppsByQuery,
+	rankAppsByQueryTop,
 } from '../lib/catalogSearch'
 import type { AppInfo, AppView } from '../types'
 import type { AppState } from './appStore'
 
-export { filterAppsByQuery, rankAppsByQuery }
+export { filterAppsByQuery, rankAppsByQuery, rankAppsByQueryTop }
 
 export function filterVisibleApps(
 	categorized: AppInfo[],
@@ -30,6 +31,73 @@ export function filterVisibleApps(
 	if (activeView !== 'favorites') return visible
 	const favorites = new Set(favoriteAppIds)
 	return visible.filter(app => favorites.has(app.id))
+}
+
+export interface CatalogCounts {
+	/** Non-auxiliary, non-hidden apps: the set the grid, the header and the drawer list show. */
+	visibleCategorizedApps: AppInfo[]
+	/** Per-category counts over `visibleCategorizedApps`. */
+	navigationCounts: Map<string, number>
+	/** Each badge is the length of the view it opens, so the number never contradicts the list. */
+	favoriteCount: number
+	hiddenCount: number
+	auxiliaryCount: number
+	/** Scanner classification totals for the settings page; hidden apps still count as scanned. */
+	classifiedPrimaryCount: number
+	classifiedAuxiliaryCount: number
+}
+
+/**
+ * Every count the navigation and settings surfaces show, derived in one `Set`-based pass.
+ *
+ * It exists as a selector for two reasons. It is the single definition the sidebar and the
+ * drawer share — they used to disagree, one counting favorites over the whole categorized
+ * catalog and the other over the visible subset, so the same nav item showed different numbers
+ * at different window widths. And `App` subscribes to the entire store, so the nested
+ * `Array.includes`/`Array.some` scans this replaces re-ran over the catalog on every keystroke.
+ *
+ * The badges deliberately mirror `filterVisibleApps`: a count that disagrees with the list it
+ * opens is a bug, not a different metric. The two `classified*` totals are the exception, and
+ * are named for it — the settings page reports what the scanner classified, hidden or not.
+ */
+export function selectCatalogCounts(
+	categorized: AppInfo[],
+	hiddenAppIds: string[],
+	favoriteAppIds: string[],
+): CatalogCounts {
+	const hidden = new Set(hiddenAppIds)
+	const favorites = new Set(favoriteAppIds)
+	const visibleCategorizedApps: AppInfo[] = []
+	const navigationCounts = new Map<string, number>()
+	let favoriteCount = 0
+	let hiddenCount = 0
+	let auxiliaryCount = 0
+	let classifiedAuxiliaryCount = 0
+	for (const app of categorized) {
+		const isHidden = hidden.has(app.id)
+		if (isHidden) hiddenCount += 1
+		if (app.visibilityClass === 'auxiliary') {
+			classifiedAuxiliaryCount += 1
+			if (!isHidden) auxiliaryCount += 1
+			continue
+		}
+		if (isHidden) continue
+		visibleCategorizedApps.push(app)
+		navigationCounts.set(
+			app.category,
+			(navigationCounts.get(app.category) ?? 0) + 1,
+		)
+		if (favorites.has(app.id)) favoriteCount += 1
+	}
+	return {
+		visibleCategorizedApps,
+		navigationCounts,
+		favoriteCount,
+		hiddenCount,
+		auxiliaryCount,
+		classifiedPrimaryCount: categorized.length - classifiedAuxiliaryCount,
+		classifiedAuxiliaryCount,
+	}
 }
 
 type CategorizedAppsState = Pick<

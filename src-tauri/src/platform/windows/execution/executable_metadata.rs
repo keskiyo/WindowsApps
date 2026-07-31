@@ -1,5 +1,4 @@
 use std::ffi::{c_void, OsStr};
-use std::io::{Read, Seek, SeekFrom};
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 use windows::core::PCWSTR;
@@ -20,35 +19,25 @@ pub(crate) struct ExecutableMetadata {
 /// `git.exe` — rather than the GUI subsystem. Read straight from the PE optional header: no
 /// metadata guessing, no launching, so it generalizes to any executable (including ones nobody
 /// can test by hand). Any read/parse problem answers `false`.
-pub(crate) fn is_console_subsystem(path: &Path) -> bool {
-    const IMAGE_SUBSYSTEM_WINDOWS_CUI: u16 = 3;
-    let Ok(mut file) = std::fs::File::open(path) else {
-        return false;
-    };
-    let mut dos = [0_u8; 64];
-    if file.read_exact(&mut dos).is_err() || &dos[0..2] != b"MZ" {
-        return false;
-    }
-    let e_lfanew = u32::from_le_bytes([dos[60], dos[61], dos[62], dos[63]]) as u64;
-    if file.seek(SeekFrom::Start(e_lfanew)).is_err() {
-        return false;
-    }
-    // PE signature (4) + IMAGE_FILE_HEADER (20) + optional-header offset to Subsystem (68) = 92.
-    // Subsystem sits at optional-header offset 68 in both PE32 and PE32+.
-    let mut header = [0_u8; 94];
-    if file.read_exact(&mut header).is_err() || &header[0..4] != b"PE\0\0" {
-        return false;
-    }
-    u16::from_le_bytes([header[92], header[93]]) == IMAGE_SUBSYSTEM_WINDOWS_CUI
-}
+/// Ceiling for a PE version resource. A real VS_VERSIONINFO block with every translation is a few
+/// kilobytes. The size comes from the file itself, which is untrusted input for this purpose, and
+/// it drives the allocation directly — so it is bounded before the buffer exists rather than after.
+/// A file above the cap simply reports no metadata.
+const MAX_VERSION_RESOURCE_BYTES: u32 = 4 * 1024 * 1024;
 
 pub(crate) fn read(path: &Path) -> ExecutableMetadata {
     let path_wide = wide(path.as_os_str());
+    // SAFETY: `path_wide` is a NUL-terminated UTF-16 buffer owned by this frame and alive for
+    // both calls below. The reserved handle argument is `None`. A file with no version resource
+    // answers 0, which is checked before anything is allocated.
     let size = unsafe { GetFileVersionInfoSizeW(PCWSTR(path_wide.as_ptr()), None) };
-    if size == 0 {
+    if size == 0 || size > MAX_VERSION_RESOURCE_BYTES {
         return ExecutableMetadata::default();
     }
     let mut data = vec![0_u8; size as usize];
+    // SAFETY: `data` was allocated with exactly `size` bytes — the length the same API just
+    // reported and the length passed here — so the callee cannot write past its end. The pointer
+    // comes from a live, uniquely borrowed `Vec` that is not moved for the rest of this function.
     if unsafe {
         GetFileVersionInfoW(
             PCWSTR(path_wide.as_ptr()),
@@ -97,6 +86,11 @@ fn translations(data: &[u8]) -> Vec<(u16, u16)> {
     let query = wide(OsStr::new(r"\VarFileInfo\Translation"));
     let mut buffer: *mut c_void = std::ptr::null_mut();
     let mut length = 0;
+    // SAFETY: `data` holds a version-info block `GetFileVersionInfoW` filled in, which is what
+    // `VerQueryValueW` requires; `query` is a NUL-terminated UTF-16 buffer alive for the call.
+    // `buffer` and `length` are live locals the callee writes through. It borrows `data` — it
+    // returns an interior pointer rather than an allocation — so nothing here is freed, and
+    // `data` outlives every use of `buffer` below.
     let found = unsafe {
         VerQueryValueW(
             data.as_ptr().cast(),
@@ -112,6 +106,11 @@ fn translations(data: &[u8]) -> Vec<(u16, u16)> {
     // Same alignment concern as `string_value_for`: the block lives in a `Vec<u8>`. Read each
     // `u16` from its bytes rather than reinterpreting a `u8` pointer as `*const u16`.
     let pair_count = length as usize / 4;
+    // SAFETY: `buffer` is non-null (checked above) and points into `data`, which is still alive
+    // and not mutated while the slice exists. The length is rounded *down* to whole 4-byte pairs,
+    // so it never exceeds the `length` bytes the callee reported. A `u8` slice has no alignment
+    // requirement, which is precisely why the pairs are decoded from bytes below instead of
+    // reinterpreting this as `*const u16`.
     let bytes = unsafe { std::slice::from_raw_parts(buffer.cast::<u8>(), pair_count * 4) };
     bytes
         .chunks_exact(4)
@@ -135,6 +134,9 @@ fn string_value_for(data: &[u8], language: u16, code_page: u16, key: &str) -> Op
     let query_wide = wide(OsStr::new(&query));
     let mut buffer: *mut c_void = std::ptr::null_mut();
     let mut length = 0;
+    // SAFETY: as in `translations` — a version-info block filled by `GetFileVersionInfoW`, a
+    // NUL-terminated query alive for the call, and live out-parameters. The returned pointer
+    // borrows `data`, which outlives every read below.
     let found = unsafe {
         VerQueryValueW(
             data.as_ptr().cast(),
@@ -151,6 +153,11 @@ fn string_value_for(data: &[u8], language: u16, code_page: u16, key: &str) -> Op
     // read has no alignment requirement) into a properly aligned `u16` buffer instead. `length`
     // is a character count for string values.
     let mut wide = vec![0_u16; length as usize];
+    // SAFETY: source and destination are both valid for `wide.len() * 2` bytes — the destination
+    // by construction, the source because `length` is the character count the callee reported for
+    // a UTF-16 value inside `data`, which is still alive. The two allocations are distinct, so
+    // they cannot overlap. Both pointers are cast to `*const u8`/`*mut u8`, which have no
+    // alignment requirement; that is the whole point of copying rather than reinterpreting.
     unsafe {
         std::ptr::copy_nonoverlapping(
             buffer.cast::<u8>(),
@@ -173,36 +180,6 @@ fn wide(value: &OsStr) -> Vec<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // Minimal PE with a chosen Subsystem: 64-byte DOS header (MZ + e_lfanew), then PE signature,
-    // an empty file header, and an optional header whose Subsystem field carries `subsystem`.
-    fn minimal_pe(subsystem: u16) -> Vec<u8> {
-        let mut buffer = vec![0_u8; 64];
-        buffer[0] = b'M';
-        buffer[1] = b'Z';
-        buffer[60..64].copy_from_slice(&64_u32.to_le_bytes()); // e_lfanew -> 64
-        buffer.extend_from_slice(b"PE\0\0"); // signature (header offset 0..4)
-        buffer.extend_from_slice(&[0_u8; 20]); // IMAGE_FILE_HEADER (4..24)
-        buffer.extend_from_slice(&[0_u8; 68]); // optional header up to Subsystem (24..92)
-        buffer.extend_from_slice(&subsystem.to_le_bytes()); // Subsystem (92..94)
-        buffer
-    }
-
-    #[test]
-    fn recognizes_the_console_subsystem_and_rejects_gui_and_bad_files() {
-        let dir = tempfile::tempdir().unwrap();
-        let console = dir.path().join("cli.exe");
-        std::fs::write(&console, minimal_pe(3)).unwrap(); // IMAGE_SUBSYSTEM_WINDOWS_CUI
-        let gui = dir.path().join("app.exe");
-        std::fs::write(&gui, minimal_pe(2)).unwrap(); // IMAGE_SUBSYSTEM_WINDOWS_GUI
-        let junk = dir.path().join("junk.exe");
-        std::fs::write(&junk, b"not a pe file").unwrap();
-
-        assert!(is_console_subsystem(&console));
-        assert!(!is_console_subsystem(&gui));
-        assert!(!is_console_subsystem(&junk));
-        assert!(!is_console_subsystem(&dir.path().join("missing.exe")));
-    }
 
     #[test]
     fn a_files_own_translations_are_tried_before_the_english_fallback() {

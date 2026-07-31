@@ -1,80 +1,41 @@
-use crate::catalog::{AppCategory, AppInfo, LaunchKind, SourceKind};
-use crate::platform::windows::NameScript;
-use sha2::{Digest, Sha256};
-use std::collections::HashMap;
-use std::path::{Component, Path};
+//! Deduplication: turning a scanned catalog into one card per real application.
+//!
+//! `deduplicate` is the entry point and the only order-dependent part; the submodules own the
+//! decisions it composes. Splitting them apart is what lets each be reviewed on its own terms:
+//!
+//! - [`candidate`] builds a comparable candidate and narrows the search space;
+//! - [`evidence`] decides whether two candidates are the same application;
+//! - [`identity`] produces the ids a card keeps across scans;
+//! - [`family`] normalizes display names and publishers;
+//! - [`merge`] combines two records that resolved together.
 
+use crate::catalog::{AppCategory, AppInfo};
+use crate::platform::windows::NameScript;
+
+mod arguments;
+mod blocking;
+mod candidate;
+mod display_name;
+mod evidence;
+mod family;
+mod identity;
+mod merge;
 mod report;
+mod signals;
+mod target;
+
+use blocking::{equality_keys, BlockingIndex};
+use candidate::{candidate_score, AppCandidate};
+use display_name::choose_display_name;
+use evidence::should_merge;
+use identity::{card_preference_identity, resolved_canonical_id};
+use merge::{merge_resolved, ResolvedApp, ResolverReport};
 
 pub(crate) use report::{dev_report_enabled, write_dev_report};
-
-#[derive(Clone, Debug)]
-pub(super) struct AppCandidate {
-    app: AppInfo,
-    family: String,
-    identity: CandidateIdentity,
-    /// Derived once per candidate. Each of these used to be recomputed inside the pairwise
-    /// predicates — that is, O(n) times per candidate — and every one of them allocates.
-    launcher_family: String,
-    helper_family: String,
-    publisher_key: String,
-    parent: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct CandidateIdentity {
-    steam_app_id: Option<String>,
-    aumid: Option<String>,
-    launch_target: Option<String>,
-    launch_mode: Option<String>,
-    install_root: Option<String>,
-    registry_product: Option<String>,
-    portable_product: Option<String>,
-    path: String,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct Evidence {
-    reason: EvidenceReason,
-    score: u16,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum EvidenceReason {
-    SamePath,
-    SameLaunchTarget,
-    SameSystemToolAlias,
-    ShortcutTargetsExecutable,
-    SameSteamAppId,
-    SameAumid,
-    SameFolderAndFamily,
-    SameInstallRootAndFamily,
-    NestedInstallRootAndFamily,
-    RegistryInstallContainsExecutable,
-    SamePublisherAndFamily,
-    SamePackagedFamily,
-    ShortcutSameFamily,
-    VersionedPortableCopy,
-    SameVersionPortableCopy,
-    SameFolderHelperVariant,
-    SameFamily,
-    NamePrefixOnly,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(super) struct ResolverReport {
-    pub candidates: usize,
-    pub merged: usize,
-    pub evidence: Vec<Evidence>,
-    pub possible_duplicates: usize,
-}
-
-#[derive(Clone, Debug)]
-pub(super) struct ResolvedApp {
-    app: AppInfo,
-    candidates: Vec<AppCandidate>,
-    evidence: Vec<Evidence>,
-}
+// The surface `catalog` itself consumes. Everything else stays inside this module tree.
+pub(super) use family::{normalize_name, normalized_product_family};
+pub(super) use identity::preference_identity;
+pub(super) use target::normalize_path;
 
 /// Total ordering key that canonicalizes the resolver's input (see `deduplicate`). Strongest
 /// candidate first (so it anchors its group), then every field that can decide whether two entries
@@ -199,1251 +160,6 @@ fn resolve_apps(apps: Vec<AppInfo>, report: &mut ResolverReport) -> Vec<Resolved
     resolved
 }
 
-/// Narrows the resolver's search. Every relation in `collect_evidence` that can reach the merge
-/// threshold is either an equality on one of the keys below, or directory containment between a
-/// registry install root and an executable — which, now that containment stops at a component
-/// boundary, is exactly "one path is an ancestor of the other". Two candidates that share no
-/// key therefore cannot merge, and skipping them changes nothing.
-///
-/// The differential test in this module pins that claim: it compares this against an
-/// unnarrowed reference resolver on generated catalogs.
-#[derive(Default)]
-struct BlockingIndex {
-    equality: HashMap<String, Vec<usize>>,
-    /// Registry install roots, looked up by an executable's ancestor directories.
-    install_roots: HashMap<String, Vec<usize>>,
-    /// Executable ancestor directories, looked up by a registry install root.
-    executable_ancestors: HashMap<String, Vec<usize>>,
-}
-
-impl BlockingIndex {
-    fn candidate_groups(&self, candidate: &AppCandidate, keys: &[String]) -> Vec<usize> {
-        let mut groups = Vec::new();
-        for key in keys {
-            if let Some(found) = self.equality.get(key) {
-                groups.extend_from_slice(found);
-            }
-        }
-        if is_executable_path(&candidate.app.path) {
-            for ancestor in path_ancestors(&candidate.identity.path) {
-                if let Some(found) = self.install_roots.get(ancestor) {
-                    groups.extend_from_slice(found);
-                }
-            }
-        }
-        if let Some(root) = registry_install_root(candidate) {
-            if let Some(found) = self.executable_ancestors.get(root) {
-                groups.extend_from_slice(found);
-            }
-        }
-        groups.sort_unstable();
-        groups.dedup();
-        groups
-    }
-
-    fn insert(&mut self, candidate: &AppCandidate, keys: &[String], group: usize) {
-        for key in keys {
-            self.equality.entry(key.clone()).or_default().push(group);
-        }
-        if is_executable_path(&candidate.app.path) {
-            for ancestor in path_ancestors(&candidate.identity.path) {
-                self.executable_ancestors
-                    .entry(ancestor.to_string())
-                    .or_default()
-                    .push(group);
-            }
-        }
-        if let Some(root) = registry_install_root(candidate) {
-            self.install_roots
-                .entry(root.to_string())
-                .or_default()
-                .push(group);
-        }
-    }
-}
-
-/// Prefixed so unrelated fields cannot collide on the same string.
-fn equality_keys(candidate: &AppCandidate) -> Vec<String> {
-    let identity = &candidate.identity;
-    let mut keys = vec![
-        format!("path:{}", identity.path),
-        // `launcher_family` is a truncation of `family`, so equal families always share it;
-        // every family-based relation is covered by this single key.
-        format!("lfam:{}", candidate.launcher_family),
-    ];
-    // A shortcut merges with the executable it resolves to, so it is indexed under that path
-    // as well as its own.
-    if let Some(target) = candidate.app.resolved_path.as_deref() {
-        keys.push(format!("path:{}", normalize_path(target)));
-    }
-    if let Some(target) = identity.launch_target.as_deref() {
-        keys.push(format!("target:{target}"));
-    }
-    if let Some(value) = identity.steam_app_id.as_deref() {
-        keys.push(format!("steam:{value}"));
-    }
-    if let Some(value) = identity.aumid.as_deref() {
-        keys.push(format!("aumid:{value}"));
-    }
-    if let Some(value) = system_tool_alias(&candidate.app) {
-        keys.push(format!("alias:{value}"));
-    }
-    if let Some(parent) = candidate.parent.as_deref() {
-        keys.push(format!("parent:{parent}"));
-    }
-    keys
-}
-
-fn registry_install_root(candidate: &AppCandidate) -> Option<&str> {
-    (candidate.app.source_kind == SourceKind::Registry)
-        .then(|| {
-            candidate
-                .identity
-                .install_root
-                .as_deref()
-                .map(|root| root.trim_end_matches('\\'))
-                .filter(|root| !root.is_empty())
-        })
-        .flatten()
-}
-
-fn is_executable_path(path: &str) -> bool {
-    path.to_lowercase().ends_with(".exe")
-}
-
-/// The path itself and every directory above it, without trailing separators — the same
-/// notion of containment `path_is_within` implements.
-fn path_ancestors(path: &str) -> Vec<&str> {
-    let mut ancestors = vec![path];
-    let mut rest = path;
-    while let Some(separator) = rest.rfind('\\') {
-        rest = &rest[..separator];
-        if rest.is_empty() {
-            break;
-        }
-        ancestors.push(rest);
-    }
-    ancestors
-}
-
-impl From<AppInfo> for AppCandidate {
-    fn from(app: AppInfo) -> Self {
-        let family = normalized_product_family(&app.name);
-        let identity = CandidateIdentity::from_app(&app);
-        Self {
-            launcher_family: launcher_product_family(&family).to_string(),
-            helper_family: helper_variant_family(&family),
-            publisher_key: normalized_publisher(app.publisher.as_deref()),
-            parent: parent_path(&identity.path),
-            family,
-            identity,
-            app,
-        }
-    }
-}
-
-impl CandidateIdentity {
-    fn from_app(app: &AppInfo) -> Self {
-        let family = normalized_product_family(&app.name);
-        let publisher = normalized_publisher(app.publisher.as_deref());
-        let install_root = app.install_location.as_deref().map(normalize_path);
-        Self {
-            steam_app_id: steam_app_id(app).map(str::to_string),
-            aumid: (app.launch_kind == LaunchKind::AppUserModelId)
-                .then(|| app.path.trim().to_lowercase()),
-            launch_target: launch_target(app).map(normalize_path),
-            launch_mode: meaningful_launch_arguments(app.launch_arguments.as_deref()),
-            registry_product: (app.source_kind == SourceKind::Registry).then(|| {
-                format!(
-                    "{}|{}|{}",
-                    publisher,
-                    family,
-                    install_root.clone().unwrap_or_default()
-                )
-            }),
-            portable_product: (app.source_kind == SourceKind::Portable)
-                .then(|| format!("{}|{}", install_root.clone().unwrap_or_default(), family)),
-            install_root,
-            path: normalize_path(&app.path),
-        }
-    }
-}
-
-fn should_merge(existing: &ResolvedApp, candidate: &AppCandidate) -> bool {
-    if existing.candidates.iter().any(|left| {
-        both_unversioned_portable_copies(left, candidate) && !same_portable_root(left, candidate)
-    }) {
-        return false;
-    }
-    if existing.candidates.iter().any(|left| {
-        left.family == candidate.family
-            && matches!(
-                (
-                    left.identity.launch_mode.as_ref(),
-                    candidate.identity.launch_mode.as_ref()
-                ),
-                (Some(left), Some(right)) if left != right
-            )
-    }) {
-        return false;
-    }
-    let best = existing
-        .candidates
-        .iter()
-        .map(|left| summarize_evidence(left, candidate))
-        .max_by_key(|summary| summary.score);
-    let Some(summary) = best else {
-        return false;
-    };
-    // Weak, name-only evidence (score < 75) must not merge across a conflicting install root or a
-    // conflicting version: those are two different installs, or two different releases the user
-    // treats as different applications (7-Zip 22 vs 24, an old and new portable copy). Strong
-    // structural evidence (>= 75: same or nested install root, same product folder, identity)
-    // overrides — a launcher and its game exe in one install tree carry different versions but are
-    // one application, so they still merge.
-    if summary.score < 75
-        && existing.candidates.iter().any(|left| {
-            conflicting_install_roots(left, candidate) || conflicting_versions(left, candidate)
-        })
-    {
-        return false;
-    }
-    if summary.score >= 80 {
-        return true;
-    }
-    if summary.score >= 50 && !publishers_conflict(&existing.app, &candidate.app) {
-        return true;
-    }
-    summary.has_identity_match
-}
-
-/// Both entries carry a version and the two differ — they are distinct releases of the product,
-/// which the user treats as distinct applications, so a name-level merge must not collapse them.
-fn conflicting_versions(left: &AppCandidate, right: &AppCandidate) -> bool {
-    matches!(
-        (
-            normalized_version_string(&left.app),
-            normalized_version_string(&right.app)
-        ),
-        (Some(left), Some(right)) if left != right
-    )
-}
-
-fn conflicting_install_roots(left: &AppCandidate, right: &AppCandidate) -> bool {
-    matches!(
-        (
-            left.identity.install_root.as_ref(),
-            right.identity.install_root.as_ref()
-        ),
-        (Some(left), Some(right))
-            if left != right
-                && !left.starts_with(&format!("{right}\\"))
-                && !right.starts_with(&format!("{left}\\"))
-    )
-}
-
-fn merge_resolved(
-    existing: &mut ResolvedApp,
-    candidate: AppCandidate,
-    report: &mut ResolverReport,
-) {
-    // Only the winning pair needs itemized evidence, so this is the one place that builds it.
-    let (evidence, _score) = existing
-        .candidates
-        .iter()
-        .map(|left| score_evidence(left, &candidate))
-        .max_by_key(|(_, score)| *score)
-        .unwrap_or_default();
-    report.merged += 1;
-    report.evidence.extend(evidence.iter().cloned());
-    existing.evidence.extend(evidence);
-    existing.app = merge_app(existing.app.clone(), candidate.app.clone());
-    existing.candidates.push(candidate);
-}
-
-/// Score without building an evidence list. `should_merge` runs this for every candidate pair,
-/// so allocating a `Vec` per comparison cost one allocation per pair across the whole catalog;
-/// only the pair that actually wins a merge needs the itemized evidence.
-fn summarize_evidence(left: &AppCandidate, right: &AppCandidate) -> EvidenceSummary {
-    let mut summary = EvidenceSummary::default();
-    collect_evidence(left, right, |reason, score| {
-        summary.score = summary.score.max(score);
-        summary.has_identity_match |= matches!(
-            reason,
-            EvidenceReason::SamePath
-                | EvidenceReason::SameLaunchTarget
-                | EvidenceReason::ShortcutTargetsExecutable
-                | EvidenceReason::SameSteamAppId
-                | EvidenceReason::SameAumid
-        );
-    });
-    summary
-}
-
-/// The strongest signals, which merge a pair even when the numeric score alone would not.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-struct EvidenceSummary {
-    score: u16,
-    has_identity_match: bool,
-}
-
-fn score_evidence(left: &AppCandidate, right: &AppCandidate) -> (Vec<Evidence>, u16) {
-    let mut evidence = Vec::new();
-    collect_evidence(left, right, |reason, score| {
-        evidence.push(Evidence { reason, score })
-    });
-    let score = evidence.iter().map(|item| item.score).max().unwrap_or(0);
-    (evidence, score)
-}
-
-/// Single source of truth for what counts as evidence. Both the allocating and the
-/// non-allocating consumers above feed off this, so the two can never drift apart.
-fn collect_evidence(
-    left: &AppCandidate,
-    right: &AppCandidate,
-    mut add: impl FnMut(EvidenceReason, u16),
-) {
-    if left.identity.path == right.identity.path {
-        add(EvidenceReason::SamePath, 100);
-    }
-    if shared(
-        left.identity.launch_target.as_ref(),
-        right.identity.launch_target.as_ref(),
-    ) && left.identity.launch_mode == right.identity.launch_mode
-    {
-        add(EvidenceReason::SameLaunchTarget, 100);
-    }
-    if shortcut_targets_executable(&left.app, &right.app) {
-        add(EvidenceReason::ShortcutTargetsExecutable, 100);
-    }
-    if let (Some(left_alias), Some(right_alias)) =
-        (system_tool_alias(&left.app), system_tool_alias(&right.app))
-    {
-        if left_alias == right_alias {
-            add(EvidenceReason::SameSystemToolAlias, 90);
-        }
-    }
-    if shared(
-        left.identity.steam_app_id.as_ref(),
-        right.identity.steam_app_id.as_ref(),
-    ) {
-        add(EvidenceReason::SameSteamAppId, 100);
-    }
-    if shared(left.identity.aumid.as_ref(), right.identity.aumid.as_ref()) {
-        add(EvidenceReason::SameAumid, 100);
-    }
-    if left.family == right.family
-        && shared(
-            left.identity.install_root.as_ref(),
-            right.identity.install_root.as_ref(),
-        )
-    {
-        add(EvidenceReason::SameInstallRootAndFamily, 80);
-    }
-    if nested_install_root_and_family(left, right) {
-        add(EvidenceReason::NestedInstallRootAndFamily, 75);
-    }
-    if same_folder_and_family(left, right) {
-        add(EvidenceReason::SameFolderAndFamily, 80);
-    }
-    if registry_install_contains_exe(left, right) {
-        add(EvidenceReason::RegistryInstallContainsExecutable, 75);
-    }
-    if left.family == right.family
-        && !left.publisher_key.is_empty()
-        && left.publisher_key == right.publisher_key
-    {
-        add(EvidenceReason::SamePublisherAndFamily, 60);
-    }
-    if one_is_aumid(left, right) && left.family == right.family {
-        add(EvidenceReason::SamePackagedFamily, 80);
-    }
-    if shortcut_same_family(left, right) {
-        add(EvidenceReason::ShortcutSameFamily, 60);
-    }
-    if versioned_portable_copy(left, right) {
-        add(EvidenceReason::VersionedPortableCopy, 60);
-    }
-    // Same product, same exact version, with a portable copy involved: one program in two places.
-    // Score 80 so it merges outright — past the install-root veto (roots differ by definition) and
-    // past a vendor-name variant. Different versions are different programs and never reach here.
-    if same_version_portable_copy(left, right) {
-        add(EvidenceReason::SameVersionPortableCopy, 80);
-    }
-    if same_folder_helper_variant(left, right) {
-        add(EvidenceReason::SameFolderHelperVariant, 80);
-    }
-    if left.family == right.family {
-        add(EvidenceReason::SameFamily, 60);
-    } else if left.launcher_family == right.launcher_family {
-        add(EvidenceReason::NamePrefixOnly, 10);
-    }
-}
-
-fn same_folder_and_family(left: &AppCandidate, right: &AppCandidate) -> bool {
-    left.parent.is_some()
-        && left.parent == right.parent
-        && left.launcher_family == right.launcher_family
-}
-
-fn nested_install_root_and_family(left: &AppCandidate, right: &AppCandidate) -> bool {
-    let left_root = left.identity.install_root.as_ref();
-    let right_root = right.identity.install_root.as_ref();
-    let same_family = left.launcher_family == right.launcher_family;
-    same_family
-        && matches!(
-            (left_root, right_root),
-            (Some(left), Some(right))
-                if left.starts_with(&format!("{right}\\"))
-                    || right.starts_with(&format!("{left}\\"))
-        )
-}
-
-fn same_folder_helper_variant(left: &AppCandidate, right: &AppCandidate) -> bool {
-    left.parent.is_some()
-        && left.parent == right.parent
-        && left.helper_family == right.helper_family
-        && (is_helper_candidate(&left.app) || is_helper_candidate(&right.app))
-}
-
-fn shortcut_same_family(left: &AppCandidate, right: &AppCandidate) -> bool {
-    (left.app.launch_kind == LaunchKind::Shortcut || right.app.launch_kind == LaunchKind::Shortcut)
-        && left.launcher_family == right.launcher_family
-}
-
-fn versioned_portable_copy(left: &AppCandidate, right: &AppCandidate) -> bool {
-    left.app.source_kind == SourceKind::Portable
-        && right.app.source_kind == SourceKind::Portable
-        && left.family == right.family
-        && (left.app.version.is_some() || right.app.version.is_some())
-}
-
-/// The same product at the same exact version where at least one side is a loose portable copy:
-/// a program placed in two locations (a Desktop copy beside its installed shortcut, or the same
-/// portable in two folders). One version is one program, so merge across install roots and even
-/// a vendor-name variant ("Mozilla Corporation" vs "Mozilla Foundation"). Requires a portable
-/// side so two distinct installed products that merely share a version are never merged this way.
-fn same_version_portable_copy(left: &AppCandidate, right: &AppCandidate) -> bool {
-    (left.app.source_kind == SourceKind::Portable || right.app.source_kind == SourceKind::Portable)
-        && left.family == right.family
-        && matches!(
-            (
-                normalized_version_string(&left.app),
-                normalized_version_string(&right.app)
-            ),
-            (Some(left), Some(right)) if left == right
-        )
-}
-
-/// Version compared as its exact normalized string, not numerically: "5.3.7.0 Beta" and
-/// "5.3.7.0" are treated as different releases even though their digits match.
-fn normalized_version_string(app: &AppInfo) -> Option<String> {
-    app.version
-        .as_deref()
-        .map(|value| {
-            value
-                .split_whitespace()
-                .collect::<Vec<_>>()
-                .join(" ")
-                .to_lowercase()
-        })
-        .filter(|value| !value.is_empty())
-}
-
-fn both_unversioned_portable_copies(left: &AppCandidate, right: &AppCandidate) -> bool {
-    left.app.source_kind == SourceKind::Portable
-        && right.app.source_kind == SourceKind::Portable
-        && left.family == right.family
-        && left.app.version.is_none()
-        && right.app.version.is_none()
-}
-
-fn same_portable_root(left: &AppCandidate, right: &AppCandidate) -> bool {
-    shared(
-        left.identity.install_root.as_ref(),
-        right.identity.install_root.as_ref(),
-    )
-}
-
-fn parent_path(path: &str) -> Option<String> {
-    path.rsplit_once('\\').map(|(parent, _)| parent.to_string())
-}
-
-fn helper_variant_family(value: &str) -> String {
-    let mut family = launcher_product_family(value).to_string();
-    for suffix in [
-        " helper",
-        " updater",
-        " update",
-        " crash reporter",
-        " crashhandler",
-        " service",
-    ] {
-        if family.ends_with(suffix) {
-            family.truncate(family.len() - suffix.len());
-            break;
-        }
-    }
-    family.trim().to_string()
-}
-
-fn is_helper_candidate(app: &AppInfo) -> bool {
-    let value = format!("{} {}", normalize_name(&app.name), app.path.to_lowercase());
-    [
-        " helper",
-        " updater",
-        " update.exe",
-        " crash reporter",
-        " crashhandler",
-        " service.exe",
-    ]
-    .iter()
-    .any(|marker| value.contains(marker))
-}
-
-fn shared(left: Option<&String>, right: Option<&String>) -> bool {
-    matches!((left, right), (Some(left), Some(right)) if !left.is_empty() && left == right)
-}
-
-fn shortcut_targets_executable(left: &AppInfo, right: &AppInfo) -> bool {
-    let (shortcut, executable) = if left.launch_kind == LaunchKind::Shortcut {
-        (left, right)
-    } else if right.launch_kind == LaunchKind::Shortcut {
-        (right, left)
-    } else {
-        return false;
-    };
-    let Some(target) = shortcut.resolved_path.as_deref() else {
-        return false;
-    };
-    if meaningful_launch_arguments(shortcut.launch_arguments.as_deref()).is_some() {
-        return false;
-    }
-    normalize_path(target) == normalize_path(&executable.path)
-}
-
-fn meaningful_launch_arguments(value: Option<&str>) -> Option<String> {
-    let tokens = tokenize_quoted_arguments(value?);
-    let mut meaningful = Vec::new();
-    let mut index = 0;
-    while index < tokens.len() {
-        let token = tokens[index].trim_matches('"').to_lowercase();
-        let takes_value = matches!(
-            token.as_str(),
-            "--profile-directory"
-                | "--user-data-dir"
-                | "--app"
-                | "--app-id"
-                | "--class"
-                | "-p"
-                | "/k"
-                | "/c"
-                | "-c"
-                | "-command"
-                | "-file"
-        );
-        let inline = [
-            "--profile-directory=",
-            "--user-data-dir=",
-            "--app=",
-            "--app-id=",
-            "--class=",
-        ]
-        .iter()
-        .any(|prefix| token.starts_with(prefix));
-        let standalone = matches!(
-            token.as_str(),
-            "--safe-mode" | "--incognito" | "--private-window" | "--guest" | "--kiosk"
-        );
-        if standalone {
-            meaningful.push(token);
-        } else if inline {
-            let (key, value) = token.split_once('=').expect("inline argument has equals");
-            meaningful.push(format!("{key}={}", normalize_argument_value(key, value)));
-        } else if takes_value {
-            meaningful.push(token);
-            if let Some(next) = tokens.get(index + 1) {
-                meaningful.push(normalize_argument_value(
-                    meaningful.last().expect("argument key was added"),
-                    next,
-                ));
-                index += 1;
-            }
-        }
-        index += 1;
-    }
-    (!meaningful.is_empty()).then(|| meaningful.join(" "))
-}
-
-fn normalize_argument_value(key: &str, value: &str) -> String {
-    let value = value.trim_matches('"');
-    if key == "--user-data-dir" {
-        normalize_path(value)
-    } else {
-        value.to_lowercase()
-    }
-}
-
-fn tokenize_quoted_arguments(value: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let mut token = String::new();
-    let mut quoted = false;
-    for character in value.chars() {
-        match character {
-            '"' => quoted = !quoted,
-            character if character.is_whitespace() && !quoted => {
-                if !token.is_empty() {
-                    tokens.push(std::mem::take(&mut token));
-                }
-            }
-            character => token.push(character),
-        }
-    }
-    if !token.is_empty() {
-        tokens.push(token);
-    }
-    tokens
-}
-
-fn registry_install_contains_exe(left: &AppCandidate, right: &AppCandidate) -> bool {
-    let pairs = [(left, right), (right, left)];
-    pairs.iter().any(|(registry, executable)| {
-        registry.app.source_kind == SourceKind::Registry
-            && executable.app.path.to_lowercase().ends_with(".exe")
-            && registry
-                .identity
-                .install_root
-                .as_ref()
-                // Containment must stop at a component boundary: with a raw `starts_with` an
-                // install root of `C:\Prog` "contained" `C:\Program Files\other.exe`, and this
-                // evidence requires neither a matching name nor a matching publisher, so
-                // nothing else in the scoring would have vetoed the merge.
-                .is_some_and(|root| super::path_is_within(&executable.identity.path, root))
-    })
-}
-
-fn one_is_aumid(left: &AppCandidate, right: &AppCandidate) -> bool {
-    left.app.launch_kind == LaunchKind::AppUserModelId
-        || right.app.launch_kind == LaunchKind::AppUserModelId
-}
-
-fn publishers_conflict(left: &AppInfo, right: &AppInfo) -> bool {
-    let left = normalized_publisher(left.publisher.as_deref());
-    let right = normalized_publisher(right.publisher.as_deref());
-    !left.is_empty() && !right.is_empty() && left != right
-}
-
-/// Legal-form suffixes stripped so "Foo" and "Foo Inc." compare equal. Matched as whole tokens,
-/// never as substrings: the old `.replace("inc", "")` mangled real publisher names — "Vincent
-/// Labs" became "vt labs", "Incredible" became "redible", and a publisher of literally "Inc."
-/// collapsed to the empty string, which silently disabled `publishers_conflict` (the empty
-/// publisher matches everything). Token matching keeps the intended stripping while leaving any
-/// name that merely contains these letters intact.
-const PUBLISHER_LEGAL_SUFFIXES: &[&str] = &[
-    "corporation",
-    "incorporated",
-    "limited",
-    "company",
-    "corp",
-    "inc",
-    "llc",
-];
-
-fn normalized_publisher(value: Option<&str>) -> String {
-    value
-        .unwrap_or_default()
-        .to_lowercase()
-        .split(|character: char| !character.is_alphanumeric())
-        .filter(|token| !token.is_empty() && !PUBLISHER_LEGAL_SUFFIXES.contains(token))
-        .collect()
-}
-
-fn launch_target(app: &AppInfo) -> Option<&str> {
-    let target = app.resolved_path.as_deref()?;
-    // A generic interpreter host (cmd.exe, powershell.exe, python.exe, …) is not an identifying
-    // target. Distinct tools that merely share an interpreter — a Node.js prompt and a VS
-    // Developer Command Prompt, both `cmd.exe /k <different>.bat` — would otherwise resolve to
-    // the same target, collide on one canonical identity, and over-merge into a single card.
-    // Fall back to the shortcut's own path for those. Self-contained targets (`.msc`, `.cpl`,
-    // real application exes) are unaffected.
-    (!is_generic_interpreter_host(target)).then_some(target)
-}
-
-/// Interpreter/host executables whose behaviour is defined by their arguments, so the host path
-/// alone does not identify the tool. Mirrors `start_apps::is_generic_host_target` (see FRAG-1 in
-/// the audit: these lists should eventually share one source).
-fn is_generic_interpreter_host(path: &str) -> bool {
-    const HOSTS: &[&str] = &[
-        "cmd.exe",
-        "powershell.exe",
-        "pwsh.exe",
-        "wscript.exe",
-        "cscript.exe",
-        "rundll32.exe",
-        "mshta.exe",
-        "conhost.exe",
-        "control.exe",
-        "explorer.exe",
-        "mmc.exe",
-        "python.exe",
-        "pythonw.exe",
-        "py.exe",
-        "node.exe",
-        "java.exe",
-        "javaw.exe",
-        "mysql.exe",
-        "wsl.exe",
-        "bash.exe",
-        "sh.exe",
-    ];
-    let file = Path::new(path.trim().trim_matches('"'))
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or(path)
-        .to_ascii_lowercase();
-    HOSTS.contains(&file.as_str())
-}
-
-fn steam_app_id(app: &AppInfo) -> Option<&str> {
-    if app.source_kind != SourceKind::Steam {
-        return None;
-    }
-    app.path.strip_prefix("steam://rungameid/")
-}
-
-pub(super) fn canonical_id(app: &AppInfo) -> String {
-    let identity = CandidateIdentity::from_app(app);
-    if let Some(app_id) = identity.steam_app_id {
-        return format!("steam:{}", app_id.to_lowercase());
-    }
-    if let Some(aumid) = identity.aumid {
-        return format!("aumid:{aumid}");
-    }
-    if let Some(target) = identity.launch_target {
-        return canonical_target_id(&target, app.launch_arguments.as_deref());
-    }
-    if let Some(registry_product) = identity.registry_product {
-        if !registry_product.trim_matches('|').is_empty() {
-            return format!("registry:{registry_product}");
-        }
-    }
-    if let Some(portable_product) = identity.portable_product {
-        if !portable_product.trim_matches('|').is_empty() {
-            return format!("portable:{portable_product}");
-        }
-    }
-    format!("path:{}", identity.path)
-}
-
-fn resolved_canonical_id(resolved: &ResolvedApp) -> String {
-    let identities = resolved
-        .candidates
-        .iter()
-        .map(|candidate| &candidate.identity)
-        .collect::<Vec<_>>();
-    if let Some(app_id) = identities
-        .iter()
-        .find_map(|identity| identity.steam_app_id.as_ref())
-    {
-        return format!("steam:{}", app_id.to_lowercase());
-    }
-    if let Some(aumid) = identities
-        .iter()
-        .find_map(|identity| identity.aumid.as_ref())
-    {
-        return format!("aumid:{aumid}");
-    }
-    if let Some(target) = identities
-        .iter()
-        .find_map(|identity| identity.launch_target.as_ref())
-    {
-        return canonical_target_id(target, resolved.app.launch_arguments.as_deref());
-    }
-    if let Some(registry_product) = identities
-        .iter()
-        .find_map(|identity| identity.registry_product.as_ref())
-        .filter(|value| !value.trim_matches('|').is_empty())
-    {
-        return format!("registry:{registry_product}");
-    }
-    if let Some(portable_product) = identities
-        .iter()
-        .find_map(|identity| identity.portable_product.as_ref())
-        .filter(|value| !value.trim_matches('|').is_empty())
-    {
-        return format!("portable:{portable_product}");
-    }
-    canonical_id(&resolved.app)
-}
-
-fn canonical_target_id(target: &str, arguments: Option<&str>) -> String {
-    match meaningful_launch_arguments(arguments) {
-        Some(mode) => format!("target:{target}|mode:{:x}", Sha256::digest(mode.as_bytes())),
-        None => format!("target:{target}"),
-    }
-}
-
-pub(super) fn normalize_path(value: &str) -> String {
-    let expanded = expand_windows_env(value.trim().trim_matches('"'));
-    let separated = expanded.replace('/', "\\");
-    let mut normalized = std::path::PathBuf::new();
-    for component in Path::new(&separated).components() {
-        match component {
-            Component::CurDir => {}
-            Component::ParentDir => {
-                if !normalized.pop() {
-                    normalized.push(component.as_os_str());
-                }
-            }
-            _ => normalized.push(component.as_os_str()),
-        }
-    }
-    normalized
-        .to_string_lossy()
-        .trim_end_matches('\\')
-        .to_lowercase()
-}
-
-fn expand_windows_env(value: &str) -> String {
-    let mut result = String::with_capacity(value.len());
-    let mut rest = value;
-    while let Some(start) = rest.find('%') {
-        result.push_str(&rest[..start]);
-        let after = &rest[start + 1..];
-        let Some(end) = after.find('%') else {
-            result.push_str(&rest[start..]);
-            return result;
-        };
-        let name = &after[..end];
-        if let Ok(replacement) = std::env::var(name) {
-            result.push_str(&replacement);
-        } else {
-            result.push('%');
-            result.push_str(name);
-            result.push('%');
-        }
-        rest = &after[end + 1..];
-    }
-    result.push_str(rest);
-    result
-}
-
-pub(super) fn preference_identity(app: &AppInfo) -> String {
-    let raw = if let Some(app_id) = steam_app_id(app) {
-        format!("steam:{}", app_id.to_lowercase())
-    } else if app.launch_kind == LaunchKind::AppUserModelId {
-        format!("aumid:{}", app.path.trim().to_lowercase())
-    } else {
-        let product = app
-            .product_name
-            .as_deref()
-            .map(normalized_product_family)
-            .filter(|value| !value.is_empty());
-        let publisher = normalized_publisher(app.publisher.as_deref());
-        let install_root = app.install_location.as_deref().map(normalize_path);
-        if let (Some(product), Some(root)) = (product, install_root.filter(|root| !root.is_empty()))
-        {
-            if !publisher.is_empty() {
-                format!("product:{publisher}|{product}|{root}")
-            } else if app.source_kind == SourceKind::Portable {
-                format!("portable:{product}|{root}")
-            } else if let Some(target) = preference_target(app) {
-                format!("target:{target}")
-            } else {
-                format!("path:{}", normalize_path(&app.path))
-            }
-        } else if let Some(target) = preference_target(app) {
-            format!("target:{target}")
-        } else {
-            format!("path:{}", normalize_path(&app.path))
-        }
-    };
-    format!("identity:{:x}", Sha256::digest(raw.as_bytes()))
-}
-
-fn card_preference_identity(app: &AppInfo, product_identity: &str) -> String {
-    let launch_role = match (app.source_kind, app.launch_kind) {
-        (SourceKind::Steam, _) => "steam".to_owned(),
-        (_, LaunchKind::AppUserModelId) => "app_user_model_id".to_owned(),
-        _ => {
-            let target = app.resolved_path.as_deref().unwrap_or(&app.path);
-            Path::new(target.trim().trim_matches('"'))
-                .file_stem()
-                .and_then(|value| value.to_str())
-                .map(str::to_lowercase)
-                .filter(|value| !value.is_empty())
-                .unwrap_or_else(|| normalized_product_family(&app.name))
-        }
-    };
-    let launch_mode =
-        meaningful_launch_arguments(app.launch_arguments.as_deref()).unwrap_or_default();
-    let raw = format!("{product_identity}|role:{launch_role}|mode:{launch_mode}");
-    format!("preference:{:x}", Sha256::digest(raw.as_bytes()))
-}
-
-fn preference_target(app: &AppInfo) -> Option<String> {
-    let target = normalize_path(launch_target(app)?);
-    Some(
-        match meaningful_launch_arguments(app.launch_arguments.as_deref()) {
-            Some(mode) => format!("{target}|mode:{mode}"),
-            None => target,
-        },
-    )
-}
-
-fn launcher_product_family(name: &str) -> &str {
-    name.strip_suffix(" launcher").unwrap_or(name).trim()
-}
-
-/// A 32-bit build of a tool, recognized so a merged x86/x64 pair can surface the 64-bit one.
-fn is_32bit_variant(app: &AppInfo) -> bool {
-    let name = app.name.to_lowercase();
-    let arch_token = name
-        .split(|character: char| !character.is_alphanumeric())
-        .any(|token| matches!(token, "x86" | "wow" | "wow64"));
-    let paths_are_32bit = [
-        app.path.as_str(),
-        app.resolved_path.as_deref().unwrap_or(""),
-    ]
-    .iter()
-    .any(|value| {
-        let lower = value.to_lowercase();
-        lower.contains(r"\syswow64\") || lower.contains(r"\program files (x86)\")
-    });
-    arch_token || name.contains("32-bit") || paths_are_32bit
-}
-
-fn merge_app(left: AppInfo, right: AppInfo) -> AppInfo {
-    let scores_tie = candidate_score(&right) == candidate_score(&left);
-    let prefer_right = candidate_score(&right) > candidate_score(&left)
-        || (scores_tie
-            && left.source_kind == SourceKind::Portable
-            && right.source_kind == SourceKind::Portable
-            && version_key(right.version.as_deref()) > version_key(left.version.as_deref()))
-        // On a tie, keep the 64-bit build when the two differ only by architecture.
-        || (scores_tie && is_32bit_variant(&left) && !is_32bit_variant(&right));
-    let (mut primary, secondary) = if prefer_right {
-        (right, left)
-    } else {
-        (left, right)
-    };
-    if primary.description.is_none() {
-        primary.description = secondary.description;
-    }
-    if primary.version.is_none() {
-        primary.version = secondary.version;
-    }
-    if (primary.publisher.is_none()
-        || primary
-            .publisher
-            .as_deref()
-            .is_some_and(|value| value.starts_with("CN=")))
-        && secondary
-            .publisher
-            .as_deref()
-            .is_some_and(|value| !value.starts_with("CN="))
-    {
-        primary.publisher = secondary.publisher;
-    }
-    if primary.product_name.is_none() {
-        primary.product_name = secondary.product_name;
-    }
-    if primary.original_filename.is_none() {
-        primary.original_filename = secondary.original_filename;
-    }
-    if primary.install_location.is_none() {
-        primary.install_location = secondary.install_location;
-    }
-    if primary.icon_base64.is_none() {
-        primary.icon_base64 = secondary.icon_base64;
-    }
-    if primary.uninstall.is_none() {
-        primary.uninstall = secondary.uninstall;
-    }
-    if primary.resolved_path.is_none() {
-        primary.resolved_path = secondary.resolved_path;
-    }
-    if primary.shortcut_icon_path.is_none() {
-        primary.shortcut_icon_path = secondary.shortcut_icon_path;
-    }
-    if primary.launch_arguments.is_none() {
-        primary.launch_arguments = secondary.launch_arguments;
-    }
-    if visibility_rank(secondary.visibility_class) > visibility_rank(primary.visibility_class) {
-        primary.visibility_class = secondary.visibility_class;
-    }
-    primary.visibility_score = primary.visibility_score.max(secondary.visibility_score);
-    for reason in secondary.visibility_reasons {
-        if !primary.visibility_reasons.contains(&reason) {
-            primary.visibility_reasons.push(reason);
-        }
-    }
-    // A command environment or product component stays auxiliary through a merge. Otherwise an
-    // AUMID sibling (Primary by the launch-kind fast-path, since it carries no arguments to reveal
-    // itself) promoted the whole card back to Primary — this is why a merged IDLE / Python prompt
-    // reappeared in the main catalog.
-    use crate::catalog::VisibilityReason::{CommandEnvironment, ProductComponent};
-    if primary.visibility_class == crate::catalog::VisibilityClass::Primary
-        && primary
-            .visibility_reasons
-            .iter()
-            .any(|reason| matches!(reason, CommandEnvironment | ProductComponent))
-    {
-        primary.visibility_class = crate::catalog::VisibilityClass::Auxiliary;
-    }
-    primary.can_uninstall |= secondary.can_uninstall || primary.uninstall.is_some();
-    primary
-}
-
-fn visibility_rank(class: crate::catalog::VisibilityClass) -> u8 {
-    match class {
-        crate::catalog::VisibilityClass::Rejected => 0,
-        crate::catalog::VisibilityClass::Auxiliary => 1,
-        crate::catalog::VisibilityClass::Primary => 2,
-    }
-}
-
-fn version_key(version: Option<&str>) -> Vec<u64> {
-    version
-        .unwrap_or_default()
-        .split(|character: char| !character.is_ascii_digit())
-        .filter_map(|segment| segment.parse().ok())
-        .collect()
-}
-
-pub(super) fn normalize_name(name: &str) -> String {
-    name.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
-}
-
-/// Architecture markers are noise for identity: the 64-bit and 32-bit build of one tool are a
-/// single application to a launcher. Stripped as whole tokens (surrounding parentheses ignored)
-/// from anywhere in the name, so `Windows PowerShell ISE (x86)`, `x64 Native Tools …` and
-/// `Foo x64` all reduce to the same family as their 64-bit sibling.
-fn strip_architecture_markers(name: &str) -> String {
-    const MARKERS: &[&str] = &[
-        "x86", "x64", "x86_x64", "x64_x86", "amd64", "arm64", "ia64", "win32", "win64", "32bit",
-        "64bit", "32-bit", "64-bit", "wow", "wow64",
-    ];
-    name.split_whitespace()
-        .filter(|token| {
-            let cleaned = token.trim_matches(|character| character == '(' || character == ')');
-            !MARKERS.contains(&cleaned)
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-pub(super) fn normalized_product_family(name: &str) -> String {
-    let value = strip_architecture_markers(&normalize_name(name));
-    if let Some((family, suffix)) = value.split_once(" - ") {
-        let generic_suffix = ["proxy utility", "desktop app", "application"]
-            .iter()
-            .any(|marker| suffix.starts_with(marker));
-        let has_version = suffix.chars().any(|character| character.is_ascii_digit());
-        if generic_suffix && has_version {
-            return family.trim().to_string();
-        }
-    }
-    let mut family = version_family(&value).trim().to_string();
-    if family.ends_with(" version") {
-        family.truncate(family.len() - " version".len());
-    }
-    if let Some(rest) = family.strip_prefix("mozilla firefox") {
-        let rest = rest.trim();
-        if rest.is_empty() || rest.starts_with('(') {
-            family = "firefox".into();
-        }
-    }
-    canonical_windows_tool_family(&family)
-}
-
-fn canonical_windows_tool_family(family: &str) -> String {
-    const ALIASES: [(&str, &[&str]); 10] = [
-        ("task manager", &["task manager", "диспетчер задач"]),
-        ("control panel", &["control panel", "панель управления"]),
-        ("registry editor", &["registry editor", "редактор реестра"]),
-        ("device manager", &["device manager", "диспетчер устройств"]),
-        ("services", &["services", "службы"]),
-        ("event viewer", &["event viewer", "просмотр событий"]),
-        (
-            "computer management",
-            &["computer management", "управление компьютером"],
-        ),
-        (
-            "disk management",
-            &["disk management", "управление дисками"],
-        ),
-        (
-            "system information",
-            &["system information", "сведения о системе"],
-        ),
-        ("command prompt", &["command prompt", "командная строка"]),
-    ];
-    ALIASES
-        .iter()
-        .find_map(|(canonical, aliases)| aliases.contains(&family).then_some(*canonical))
-        .unwrap_or(family)
-        .to_string()
-}
-
-fn version_family(name: &str) -> &str {
-    let Some((family, suffix)) = name.rsplit_once(' ') else {
-        return name;
-    };
-    if !suffix.starts_with(|character: char| character.is_ascii_digit()) {
-        return name;
-    }
-    let numeric_segments = suffix
-        .split(|character: char| !character.is_ascii_digit())
-        .filter(|segment| !segment.is_empty())
-        .count();
-    if numeric_segments >= 2 {
-        family
-    } else {
-        name
-    }
-}
-
-/// Writing system of a display name — only the distinction the locale rule acts on. Any Cyrillic
-/// letter marks a localized name; otherwise a Latin letter marks an English/Latin name.
-fn name_script(name: &str) -> NameScript {
-    let mut has_latin = false;
-    for character in name.chars() {
-        if ('\u{0400}'..='\u{052F}').contains(&character) {
-            return NameScript::Cyrillic;
-        }
-        if character.is_ascii_alphabetic() {
-            has_latin = true;
-        }
-    }
-    if has_latin {
-        NameScript::Latin
-    } else {
-        NameScript::Other
-    }
-}
-
-/// Chooses the display name for a merged card from all of its candidate names, given the OS UI
-/// script. `primary` is the highest-scored source's name (kept when it already matches). Otherwise
-/// a candidate in the OS script wins; failing that, any Latin (English) name — so a non-Cyrillic
-/// user never ends up reading a Cyrillic card when a Latin alternative exists. Purely a naming
-/// choice: the launching source, icon, and target are unchanged.
-fn choose_display_name<'a>(
-    primary: &str,
-    candidates: impl Iterator<Item = &'a str>,
-    os_script: NameScript,
-) -> String {
-    if name_script(primary) == os_script {
-        return primary.to_string();
-    }
-    let names = candidates.collect::<Vec<_>>();
-    if let Some(matched) = names.iter().find(|name| name_script(name) == os_script) {
-        return (*matched).to_string();
-    }
-    if name_script(primary) == NameScript::Latin {
-        return primary.to_string();
-    }
-    if let Some(latin) = names
-        .iter()
-        .find(|name| name_script(name) == NameScript::Latin)
-    {
-        return (*latin).to_string();
-    }
-    primary.to_string()
-}
-
-fn candidate_score(app: &AppInfo) -> u8 {
-    if is_helper_candidate(app) {
-        return 1;
-    }
-    if app.source_kind == SourceKind::Steam {
-        return 5;
-    }
-    // A localized Start-App for a built-in Windows tool (Event Viewer / Просмотр событий,
-    // etc.) should win over its English Start-Menu shortcut so the merged card keeps the
-    // OS-language name and the working shell icon. Scoped to system targets only, so normal
-    // app merges (registry/shortcut/portable) are unaffected.
-    if app.launch_kind == LaunchKind::AppUserModelId
-        && app.source_kind == SourceKind::StartApps
-        && (is_system_tool_target(app) || system_tool_alias(app).is_some())
-    {
-        return 6;
-    }
-    match Path::new(&app.path)
-        .extension()
-        .and_then(|value| value.to_str())
-    {
-        Some(extension) if extension.eq_ignore_ascii_case("lnk") => return 4,
-        Some(extension) if extension.eq_ignore_ascii_case("exe") => return 3,
-        _ => {}
-    }
-    if app.launch_kind == LaunchKind::AppUserModelId {
-        2
-    } else {
-        0
-    }
-}
-
-/// Curated equivalence for built-in Windows shell items whose localized Start-App and English
-/// shortcut resolve to different, non-comparable targets (a shell CLSID vs a PIDL-only shortcut,
-/// or control.exe with an applet name). Returns a shared token so the pair collapses into one
-/// card. Language-independent: keyed on stable AUMIDs and applet names, not display text.
-fn system_tool_alias(app: &AppInfo) -> Option<&'static str> {
-    if app.launch_kind == LaunchKind::AppUserModelId {
-        match app.path.trim().to_lowercase().as_str() {
-            "microsoft.windows.explorer" => return Some("windows:explorer"),
-            "microsoft.windows.administrativetools" => return Some("windows:admintools"),
-            "microsoft.windows.controlpanel" => return Some("windows:controlpanel"),
-            "microsoft.windows.remotedesktop" => return Some("windows:remotedesktop"),
-            "microsoft.windows.shell.rundialog" => return Some("windows:run"),
-            _ => {}
-        }
-    }
-    let target = app
-        .resolved_path
-        .as_deref()
-        .unwrap_or_default()
-        .to_lowercase();
-    let args = app
-        .launch_arguments
-        .as_deref()
-        .unwrap_or_default()
-        .to_lowercase();
-    // "Administrative Tools" launches control.exe /name Microsoft.AdministrativeTools.
-    if target.ends_with("control.exe") && args.contains("microsoft.administrativetools") {
-        return Some("windows:admintools");
-    }
-    // "File Explorer" ships as a PIDL-only shortcut (no readable target); its .lnk file name
-    // is English on every locale, so it is a safe key for this fixed shell item.
-    if target.is_empty() && normalize_name(&app.name) == "file explorer" {
-        return Some("windows:explorer");
-    }
-    // The Run dialog also ships as a PIDL-only "Run" shortcut with no readable target, matching the
-    // localized `Microsoft.Windows.Shell.RunDialog` Start-App above.
-    if target.is_empty() && normalize_name(&app.name) == "run" {
-        return Some("windows:run");
-    }
-    None
-}
-
-/// True when the app's resolved launch target is a built-in Windows tool: a `.msc`/`.cpl`
-/// snap-in, a binary under the Windows system directories, or a shell CLSID target
-/// (`::{…}`, e.g. Control Panel). Used to scope localized-name preference to system tools.
-fn is_system_tool_target(app: &AppInfo) -> bool {
-    let Some(target) = app.resolved_path.as_deref() else {
-        return false;
-    };
-    let normalized = normalize_path(target);
-    normalized.starts_with("::{")
-        || normalized.ends_with(".msc")
-        || normalized.ends_with(".cpl")
-        || normalized.contains("\\windows\\system32\\")
-        || normalized.contains("\\windows\\syswow64\\")
-}
-
 fn category_rank(category: AppCategory) -> u8 {
     match category {
         AppCategory::Games => 0,
@@ -1463,9 +179,19 @@ fn category_rank(category: AppCategory) -> u8 {
     }
 }
 
+/// Behaviour tests for the module as a whole: they drive `deduplicate`/`resolve_apps` and assert
+/// which cards come out, which is this module's responsibility. Unit tests for an individual
+/// helper live beside that helper in its own submodule.
 #[cfg(test)]
 mod tests {
+    use super::arguments::meaningful_launch_arguments;
+    use super::display_name::name_script;
+    use super::family::normalized_publisher;
+    use super::identity::{canonical_id, card_preference_identity};
+    use super::signals::publishers_conflict;
+    use super::target::is_generic_interpreter_host;
     use super::*;
+    use crate::catalog::{LaunchKind, SourceKind};
 
     fn app(name: &str, path: &str) -> AppInfo {
         AppInfo {
@@ -1590,6 +316,32 @@ mod tests {
     fn a_bare_legal_suffix_publisher_normalizes_to_empty() {
         assert_eq!(normalized_publisher(Some("Inc.")), "");
         assert_eq!(normalized_publisher(None), "");
+    }
+
+    // A signing-certificate subject and a marketing name are not comparable strings. Treating
+    // "CN=AMD" as a publisher made it conflict with "Advanced Micro Devices, Inc." — the same
+    // vendor — and kept one product in two cards.
+    #[test]
+    fn a_certificate_subject_is_not_treated_as_a_publisher() {
+        assert_eq!(normalized_publisher(Some("CN=AMD")), "");
+        assert_eq!(normalized_publisher(Some("cn=Contoso, O=Contoso Ltd")), "");
+        // A real name that merely begins with those letters is untouched.
+        assert_eq!(normalized_publisher(Some("CNC Software")), "cncsoftware");
+    }
+
+    // Publishers are arbitrary UTF-8 from the registry and from PE metadata. The certificate-
+    // subject check byte-sliced the first three bytes, which lands inside a code point when the
+    // name starts with a multi-byte character — a real scan on a machine with a Cyrillic vendor
+    // name panicked with "byte index 3 is not a char boundary".
+    #[test]
+    fn a_multibyte_publisher_name_does_not_panic() {
+        assert_eq!(
+            normalized_publisher(Some("АО Лаборатория")),
+            "аолаборатория"
+        );
+        assert_eq!(normalized_publisher(Some("Ы")), "ы");
+        assert_eq!(normalized_publisher(Some("日本")), "日本");
+        assert_eq!(normalized_publisher(Some("é")), "é");
     }
 
     // Regression for the substring bug: two distinct real publishers used to collapse to the same
@@ -2058,6 +810,50 @@ mod tests {
         let merged = resolve(vec![aumid, shortcut]);
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].visibility_class, VisibilityClass::Auxiliary);
+    }
+
+    // The same rule for an SDK sample. `classify_visibility` treated `SdkSample` as sticky but the
+    // merge copy of that list did not, so a sample merged with an AUMID sibling was promoted back
+    // into the main catalog. Both now consult `visibility::is_sticky_auxiliary`.
+    #[test]
+    fn merged_sdk_sample_stays_auxiliary() {
+        use crate::catalog::visibility::apply_visibility;
+        use crate::catalog::VisibilityClass;
+
+        use crate::catalog::VisibilityReason;
+
+        // Only the description carries the sample marker. The path deliberately avoids
+        // `\sdk\samples\`, which would also trip `is_bundled_toolchain_path` and add a
+        // `ProductComponent` reason — that one was already sticky, so it would mask the defect.
+        let mut sample = app("SharedMemory Tool", r"D:\Apps\Server\Release\shmtool.exe");
+        sample.source_kind = SourceKind::Portable;
+        sample.description = Some("shared memory sample".into());
+        apply_visibility(&mut sample);
+        assert!(sample
+            .visibility_reasons
+            .contains(&VisibilityReason::SdkSample));
+        assert!(!sample
+            .visibility_reasons
+            .contains(&VisibilityReason::ProductComponent));
+
+        // The sibling must be a genuine Primary, or the merge is never asked to decide anything.
+        let mut aumid = app("SharedMemory Tool", "Contoso.ShmTool_1!App");
+        aumid.launch_kind = LaunchKind::AppUserModelId;
+        aumid.source_kind = SourceKind::StartApps;
+        aumid.resolved_path = Some(r"D:\Apps\Server\Launcher.exe".into());
+        apply_visibility(&mut aumid);
+
+        assert_eq!(sample.visibility_class, VisibilityClass::Auxiliary);
+        assert_eq!(aumid.visibility_class, VisibilityClass::Primary);
+
+        let merged = resolve(vec![aumid, sample]);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(
+            merged[0].visibility_class,
+            VisibilityClass::Auxiliary,
+            "reasons: {:?}",
+            merged[0].visibility_reasons
+        );
     }
 
     // "(WOW)" is WoW64 — the 32-bit build. It merges with the "(X64)" build, keeping x64.
@@ -2660,6 +1456,77 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["Firefox", "Private Browsing Firefox"],
         );
+    }
+
+    // A display name is not an identity. Two unrelated packaged applications can ship the same
+    // one, and the old rule scored *any* pair with an AUMID on either side and a matching display
+    // family at 80 — the threshold that merges outright, before the publisher-conflict check runs.
+    // Everything that distinguishes these two entries (package, publisher, target, install root)
+    // was ignored, and the loser's launch and uninstall identity was lost with it.
+    #[test]
+    fn same_named_packages_from_different_publishers_stay_separate() {
+        let mut first = app("Snap Camera", "Contoso.SnapCamera_9abc!App");
+        first.launch_kind = LaunchKind::AppUserModelId;
+        first.source_kind = SourceKind::StartApps;
+        first.publisher = Some("Contoso".into());
+        first.install_location =
+            Some(r"C:\Program Files\WindowsApps\Contoso.SnapCamera_9abc".into());
+        first.resolved_path =
+            Some(r"C:\Program Files\WindowsApps\Contoso.SnapCamera_9abc\snap.exe".into());
+        let mut second = app("Snap Camera", "Fabrikam.SnapCamera_1def!App");
+        second.launch_kind = LaunchKind::AppUserModelId;
+        second.source_kind = SourceKind::StartApps;
+        second.publisher = Some("Fabrikam".into());
+        second.install_location =
+            Some(r"C:\Program Files\WindowsApps\Fabrikam.SnapCamera_1def".into());
+        second.resolved_path =
+            Some(r"C:\Program Files\WindowsApps\Fabrikam.SnapCamera_1def\camera.exe".into());
+
+        let merged = resolve(vec![first.clone(), second.clone()]);
+
+        assert_eq!(merged.len(), 2, "different packages are different cards");
+        // Order invariance: the rule must not depend on which side is inspected first.
+        assert_eq!(resolve(vec![second, first]).len(), 2);
+    }
+
+    // The narrower rule still has to recognise a genuine package: two entry points of one
+    // installed package share the package-family part of their AUMID.
+    #[test]
+    fn two_entry_points_of_one_package_still_merge() {
+        let mut main = app(
+            "Windows Terminal",
+            "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App",
+        );
+        main.launch_kind = LaunchKind::AppUserModelId;
+        main.source_kind = SourceKind::StartApps;
+        let mut preview = app(
+            "Windows Terminal",
+            "Microsoft.WindowsTerminal_8wekyb3d8bbwe!OpenHere",
+        );
+        preview.launch_kind = LaunchKind::AppUserModelId;
+        preview.source_kind = SourceKind::StartApps;
+
+        assert_eq!(resolve(vec![main, preview]).len(), 1);
+    }
+
+    // Name similarity must not chain through a shared middle entry: A merging with B and B with C
+    // does not make A and C the same application.
+    #[test]
+    fn a_shared_name_does_not_chain_unrelated_packages_together() {
+        let mut left = app("Notes", "Contoso.Notes_9abc!App");
+        left.launch_kind = LaunchKind::AppUserModelId;
+        left.source_kind = SourceKind::StartApps;
+        left.publisher = Some("Contoso".into());
+        let mut right = app("Notes", "Fabrikam.Notes_1def!App");
+        right.launch_kind = LaunchKind::AppUserModelId;
+        right.source_kind = SourceKind::StartApps;
+        right.publisher = Some("Fabrikam".into());
+        let mut third = app("Notes", "Northwind.Notes_5ghi!App");
+        third.launch_kind = LaunchKind::AppUserModelId;
+        third.source_kind = SourceKind::StartApps;
+        third.publisher = Some("Northwind".into());
+
+        assert_eq!(resolve(vec![left, right, third]).len(), 3);
     }
 
     #[test]

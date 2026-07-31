@@ -1,57 +1,42 @@
-import {
-	useCallback,
-	useDeferredValue,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast, Toaster } from 'sonner'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import { AppGrid } from './components/catalog/AppGrid/AppGrid'
-import { AppInfoDialog } from './components/dialogs/AppInfoDialog'
+import { AppInfoDialog } from './components/dialogs/AppInfoDialog/AppInfoDialog'
 import { UninstallDialog } from './components/dialogs/UninstallDialog'
 import { AppDrawer } from './components/navigation/AppDrawer'
 import { AppSidebar } from './components/navigation/AppSidebar'
 import { SettingsPage } from './components/settings/SettingsPage/SettingsPage'
+import { AppShellChrome } from './components/shared/AppShellChrome'
 import { CommandPalette } from './components/shared/CommandPalette/CommandPalette'
-import { GlobalActivityBar } from './components/shared/GlobalActivityBar'
 import { Header } from './components/shared/Header/Header'
-import { PreferencesNotSavedBanner } from './components/shared/PreferencesNotSavedBanner'
 import { ScanPrompt } from './components/shared/ScanPrompt'
-import { StaleCopyBanner } from './components/shared/StaleCopyBanner'
-import { TitleBar } from './components/shared/TitleBar'
-import { UpdateDialog } from './components/shared/UpdateDialog/UpdateDialog'
 import { useAppFeedback } from './hooks/useAppFeedback'
 import { useCatalogNavigation } from './hooks/useCatalogNavigation'
 import { useDesktopNavigation } from './hooks/useDesktopNavigation'
 
 import { WorkspaceSummary } from './components/shared/WorkspaceSummary/WorkspaceSummary'
 import { useIconRecovery } from './hooks/useIconRecovery'
+import { useAppInfoDialog } from './hooks/useAppInfoDialog'
+import { useCatalogView } from './hooks/useCatalogView'
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
+import { useStaleCopy } from './hooks/useStaleCopy'
+import { useUninstallFlow } from './hooks/useUninstallFlow'
 import { useUpdater } from './hooks/useUpdater'
 import { catalogChangeMessage } from './lib/catalogChanges'
 import { toAppClientError } from './lib/clientError'
-import {
-	filterVisibleApps,
-	rankAppsByQuery,
-	selectCategorizedApps,
-	type AppState,
-} from './store/appStore'
+import { type AppState } from './store/appStore'
 import { AppStoreProvider } from './store/storeContext'
-import type {
-	AppInfo,
-	StaleCopyInfo,
-	SystemClient,
-	UninstallPreview,
-} from './types'
+import type { AppsClient, SystemClient } from './types'
 
 interface AppProps {
 	store: StoreApi<AppState>
 	systemClient: SystemClient
+	appsClient: Pick<AppsClient, 'getAppDetails' | 'openAppFolder'>
 }
 
-export function App({ store, systemClient }: AppProps) {
+export function App({ store, systemClient, appsClient }: AppProps) {
 	const state = useStore(store)
 	const {
 		activeView,
@@ -65,66 +50,17 @@ export function App({ store, systemClient }: AppProps) {
 		isRefreshing,
 		preferencesPersisted,
 	} = state
-	// Dedup is O(N) but still recomputed only when the catalog actually changes; query
-	// typing, scan progress, favorites and drawer toggles reuse the memoized result.
-	const categorizedApps = useMemo(
-		() =>
-			selectCategorizedApps({
-				apps: state.apps,
-				categoryOverrides: state.categoryOverrides,
-				categoryOverrideIdentities: state.categoryOverrideIdentities,
-				promotedAppIds: state.promotedAppIds,
-				promotedAppIdentities: state.promotedAppIdentities,
-			}),
-		[
-			state.apps,
-			state.categoryOverrides,
-			state.categoryOverrideIdentities,
-			state.promotedAppIds,
-			state.promotedAppIdentities,
-		],
-	)
-	const visibleApps = useMemo(
-		() =>
-			filterVisibleApps(
-				categorizedApps,
-				state.activeView,
-				state.hiddenAppIds,
-				state.favoriteAppIds,
-			),
-		[
-			categorizedApps,
-			state.activeView,
-			state.hiddenAppIds,
-			state.favoriteAppIds,
-		],
-	)
-	const paletteApps = useMemo(() => {
-		const hidden = new Set(state.hiddenAppIds)
-		return categorizedApps.filter(app => !hidden.has(app.id))
-	}, [categorizedApps, state.hiddenAppIds])
-	// Defer the query so fast typing never blocks the input. React will render
-	// the grid with the deferred value while keeping the input state current.
-	const deferredQuery = useDeferredValue(state.query)
-	const filteredApps = useMemo(
-		() => rankAppsByQuery(visibleApps, deferredQuery),
-		[visibleApps, deferredQuery],
-	)
-	const visibleHydrationIds = filteredApps
-		.slice(0, 48)
-		.map(app => app.id)
-		.join('|')
+	const {
+		counts,
+		deferredQuery,
+		filteredApps,
+		paletteApps,
+		visibleHydrationIds,
+	} = useCatalogView(state)
 	const [drawerOpen, setDrawerOpen] = useState(false)
 	const [drawerMounted, setDrawerMounted] = useState(false)
-	const [infoApp, setInfoApp] = useState<AppInfo | null>(null)
-	const [uninstallApp, setUninstallApp] = useState<AppInfo | null>(null)
-	const [uninstallPreview, setUninstallPreview] =
-		useState<UninstallPreview | null>(null)
-	const [uninstallPreviewLoading, setUninstallPreviewLoading] =
-		useState(false)
-	const [uninstallPreviewError, setUninstallPreviewError] = useState<
-		string | null
-	>(null)
+	const appInfoDialog = useAppInfoDialog()
+	const uninstall = useUninstallFlow(getUninstallPreview)
 	const [scanPromptDismissed, setScanPromptDismissed] = useState(false)
 	const [paletteOpen, setPaletteOpen] = useState(false)
 	const menuButtonRef = useRef<HTMLButtonElement>(null)
@@ -135,12 +71,6 @@ export function App({ store, systemClient }: AppProps) {
 		setDrawerOpen(false)
 		if (!animateDrawer) setDrawerMounted(false)
 	}, [animateDrawer])
-	const closeInfo = useCallback(() => setInfoApp(null), [])
-	const closeUninstall = useCallback(() => {
-		setUninstallApp(null)
-		setUninstallPreview(null)
-		setUninstallPreviewError(null)
-	}, [])
 	const feedback = useAppFeedback({
 		onLaunch: state.launch,
 		onRefresh: state.refresh,
@@ -153,38 +83,16 @@ export function App({ store, systemClient }: AppProps) {
 		closeDrawer,
 	})
 	async function confirmUninstall() {
-		if (!uninstallApp) return
-		const result = await feedback.uninstall(uninstallApp)
+		if (!uninstall.app) return
+		const result = await feedback.uninstall(uninstall.app)
 		if (!result.ok) return
-		setUninstallApp(null)
+		uninstall.select(null)
 		try {
 			await state.refresh()
 		} catch {
 			// The store exposes the refresh error through the existing toast effect.
 		}
 	}
-
-	useEffect(() => {
-		if (!uninstallApp) return
-		let active = true
-		setUninstallPreview(null)
-		setUninstallPreviewError(null)
-		setUninstallPreviewLoading(true)
-		void getUninstallPreview(uninstallApp.id)
-			.then(preview => {
-				if (active) setUninstallPreview(preview)
-			})
-			.catch(error => {
-				if (active)
-					setUninstallPreviewError(toAppClientError(error).message)
-			})
-			.finally(() => {
-				if (active) setUninstallPreviewLoading(false)
-			})
-		return () => {
-			active = false
-		}
-	}, [getUninstallPreview, uninstallApp])
 
 	useEffect(() => {
 		let dispose: (() => void) | undefined
@@ -212,54 +120,17 @@ export function App({ store, systemClient }: AppProps) {
 		}
 	}, [error])
 
-	// Global keyboard shortcuts: Ctrl+K opens the quick-launch palette; Ctrl+F or "/"
-	// jump to the search field (a launcher should be keyboard-first).
-	useEffect(() => {
-		function onKeyDown(event: KeyboardEvent) {
-			const target = event.target as HTMLElement | null
-			const typing =
-				target instanceof HTMLInputElement ||
-				target instanceof HTMLTextAreaElement ||
-				target?.isContentEditable === true
-			const commandOrControl = event.ctrlKey || event.metaKey
-			const isQuickLaunchShortcut =
-				commandOrControl &&
-				(event.code === 'KeyK' || event.key.toLowerCase() === 'k')
-			const isSearchShortcut =
-				commandOrControl &&
-				(event.code === 'KeyF' || event.key.toLowerCase() === 'f')
-			const isPrintShortcut =
-				commandOrControl &&
-				(event.code === 'KeyP' || event.key.toLowerCase() === 'p')
-			if (isPrintShortcut) {
-				event.preventDefault()
-				event.stopPropagation()
-				return
-			}
-			if (isQuickLaunchShortcut) {
-				event.preventDefault()
-				event.stopPropagation()
-				setPaletteOpen(value => !value)
-				return
-			}
-			if (isSearchShortcut) {
-				event.preventDefault()
-				event.stopPropagation()
-				searchInputRef.current?.focus()
-				searchInputRef.current?.select()
-				return
-			}
-			if (event.key === '/' && !typing) {
-				event.preventDefault()
-				searchInputRef.current?.focus()
-			}
-		}
-		document.addEventListener('keydown', onKeyDown, { capture: true })
-		return () =>
-			document.removeEventListener('keydown', onKeyDown, {
-				capture: true,
-			})
-	}, [])
+	useGlobalShortcuts({
+		onToggleQuickLaunch: useCallback(
+			() => setPaletteOpen(value => !value),
+			[],
+		),
+		onSearchFromShortcut: useCallback(() => {
+			searchInputRef.current?.focus()
+			searchInputRef.current?.select()
+		}, []),
+		onFocusSearch: useCallback(() => searchInputRef.current?.focus(), []),
+	})
 
 	useEffect(() => {
 		if (!catalogChange) return
@@ -284,28 +155,14 @@ export function App({ store, systemClient }: AppProps) {
 		if (ids.length) void hydrateVisibleIcons(ids)
 	}, [activeView, hydrateVisibleIcons, isLoading, visibleHydrationIds])
 
-	const auxiliaryCount = categorizedApps.filter(
-		app => app.visibilityClass === 'auxiliary',
-	).length
-	const primaryCount = categorizedApps.length - auxiliaryCount
-	const visibleCategorizedApps = categorizedApps.filter(
-		app =>
-			app.visibilityClass !== 'auxiliary' &&
-			!state.hiddenAppIds.includes(app.id),
-	)
-	const navigationCounts = new Map<string, number>()
-	for (const app of visibleCategorizedApps)
-		navigationCounts.set(
-			app.category,
-			(navigationCounts.get(app.category) ?? 0) + 1,
-		)
+	const {
+		auxiliaryCount,
+		favoriteCount,
+		hiddenCount,
+		navigationCounts,
+		visibleCategorizedApps,
+	} = counts
 	const hasQuery = deferredQuery.trim().length > 0
-	const favoriteCount = visibleCategorizedApps.filter(app =>
-		state.favoriteAppIds.includes(app.id),
-	).length
-	const hiddenCount = state.hiddenAppIds.filter(id =>
-		state.apps.some(app => app.id === id),
-	).length
 	const navigationProps = {
 		categoryOrder: state.categoryOrder,
 		categories: state.categories,
@@ -335,65 +192,19 @@ export function App({ store, systemClient }: AppProps) {
 	const activityActive = state.launchingIds.length > 0 || state.isRefreshing
 	const updater = useUpdater()
 	useIconRecovery(state.repairMissingIcons)
-	const [staleCopy, setStaleCopy] = useState<StaleCopyInfo | null>(null)
-	useEffect(() => {
-		let active = true
-		systemClient
-			.staleCopyStatus?.()
-			.then(value => {
-				if (active) setStaleCopy(value ?? null)
-			})
-			.catch(() => {
-				// Not in Tauri (dev browser / tests) — no stale copy to report.
-			})
-		return () => {
-			active = false
-		}
-	}, [systemClient])
+	const { dismiss: dismissStaleCopy, staleCopy } = useStaleCopy(systemClient)
 
 	return (
 		<AppStoreProvider store={store}>
 			<div className='app-shell theme-graphite-surface flex h-screen flex-col overflow-hidden'>
-				<TitleBar />
-				{staleCopy && (
-					<StaleCopyBanner
-						installedVersion={staleCopy.installedVersion}
-						installLocation={staleCopy.installLocation}
-						onOpenInstalled={() =>
-							systemClient.openInstalledCopy?.() ??
-							Promise.resolve()
-						}
-						onDismiss={() => setStaleCopy(null)}
-					/>
-				)}
-				{!preferencesPersisted && <PreferencesNotSavedBanner />}
-				{updater.update && (
-					<UpdateDialog
-						version={updater.update.version}
-						date={updater.update.date}
-						packageSize={updater.update.packageSize}
-						releaseUrl={updater.update.releaseUrl}
-						notes={updater.update.notes}
-						installing={updater.installing}
-						progress={updater.progress}
-						downloadedBytes={updater.downloadedBytes}
-						totalBytes={updater.totalBytes}
-						phase={updater.phase}
-						error={updater.error}
-						onInstall={() => void updater.install()}
-						onDismiss={updater.dismiss}
-						onOpenRelease={() =>
-							void (
-								systemClient.openRelease?.(
-									updater.update?.version ?? '',
-								) ?? systemClient.openGithub()
-							)
-						}
-					/>
-				)}
-				<GlobalActivityBar
-					active={activityActive}
-					label={activityLabel}
+				<AppShellChrome
+					activityActive={activityActive}
+					activityLabel={activityLabel}
+					preferencesPersisted={preferencesPersisted}
+					staleCopy={staleCopy}
+					systemClient={systemClient}
+					updater={updater}
+					onDismissStaleCopy={dismissStaleCopy}
 				/>
 				<div className='flex min-h-0 flex-1 gap-2 px-2 pb-2'>
 					{desktopNavigation && <AppSidebar {...navigationProps} />}
@@ -402,7 +213,10 @@ export function App({ store, systemClient }: AppProps) {
 						className='app-panel flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto rounded-2xl'
 					>
 						<Header
-							appCount={primaryCount}
+							// The grid shows the visible primary cards, so the header counts the
+							// same set. `primaryCount` includes apps the user hid, which made the
+							// count disagree with what is on screen right after a Hide.
+							appCount={visibleCategorizedApps.length}
 							visibleCount={filteredApps.length}
 							query={state.query}
 							isRefreshing={state.isRefreshing}
@@ -428,8 +242,9 @@ export function App({ store, systemClient }: AppProps) {
 										state.catalogDiagnostics
 									}
 									visibilityCounts={{
-										primary: primaryCount,
-										auxiliary: auxiliaryCount,
+										primary: counts.classifiedPrimaryCount,
+										auxiliary:
+											counts.classifiedAuxiliaryCount,
 									}}
 									updater={updater}
 								/>
@@ -476,8 +291,8 @@ export function App({ store, systemClient }: AppProps) {
 										}
 										onMoveApp={state.moveApp}
 										onLaunch={feedback.launch}
-										onInfo={setInfoApp}
-										onUninstall={setUninstallApp}
+										onInfo={appInfoDialog.open}
+										onUninstall={uninstall.select}
 										onHide={state.hideApp}
 										onRestore={state.restoreApp}
 										onPromoteAuxiliary={
@@ -501,13 +316,9 @@ export function App({ store, systemClient }: AppProps) {
 						categoryOrder={state.categoryOrder}
 						categories={state.categories}
 						activeView={state.activeView}
-						favoriteCount={
-							categorizedApps.filter(app =>
-								state.favoriteAppIds.includes(app.id),
-							).length
-						}
-						hiddenCount={navigationProps.hiddenCount}
-						auxiliaryCount={navigationProps.auxiliaryCount}
+						favoriteCount={favoriteCount}
+						hiddenCount={hiddenCount}
+						auxiliaryCount={auxiliaryCount}
 						triggerRef={menuButtonRef}
 						onSelectView={navigation.selectView}
 						onSelectCategory={navigation.selectCategory}
@@ -524,20 +335,21 @@ export function App({ store, systemClient }: AppProps) {
 						onClose={() => setPaletteOpen(false)}
 					/>
 				)}
-				{infoApp && (
+				{appInfoDialog.app && (
 					<AppInfoDialog
-						app={infoApp}
+						app={appInfoDialog.app}
 						categories={state.categories}
-						onClose={closeInfo}
+						appsClient={appsClient}
+						onClose={appInfoDialog.close}
 					/>
 				)}
-				{uninstallApp && (
+				{uninstall.app && (
 					<UninstallDialog
-						appName={uninstallApp.name}
-						preview={uninstallPreview}
-						isPreviewLoading={uninstallPreviewLoading}
-						previewError={uninstallPreviewError}
-						onClose={closeUninstall}
+						appName={uninstall.app.name}
+						preview={uninstall.preview}
+						isPreviewLoading={uninstall.isPreviewLoading}
+						previewError={uninstall.previewError}
+						onClose={uninstall.close}
 						onConfirm={confirmUninstall}
 					/>
 				)}

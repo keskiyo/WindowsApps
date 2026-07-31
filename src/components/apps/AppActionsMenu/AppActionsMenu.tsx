@@ -75,8 +75,8 @@ export function AppActionsMenu({
 				iconClassName='text-slate-400'
 				label='App info'
 				onClick={() => {
-					onInfo(app)
 					onClose()
+					onInfo(app)
 				}}
 			/>
 			<MenuItem

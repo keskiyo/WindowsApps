@@ -1,6 +1,6 @@
 use crate::catalog::incremental::FilesystemIndex;
 use crate::catalog::source::SourceSnapshot;
-use crate::catalog::AppInfo;
+use crate::catalog::{AppDetails, AppInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
@@ -8,9 +8,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 const CACHE_FILE: &str = "apps-cache.json";
-/// 5 split the single combined Windows source snapshot into one per scanner, so a scanner that
-/// fails keeps its previous snapshot instead of clearing the catalog.
-pub(crate) const CACHE_SCHEMA_VERSION: u32 = 5;
+/// 8 recomputes cached detail records after the canonical local-folder target change.
+pub(crate) const CACHE_SCHEMA_VERSION: u32 = 8;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +28,13 @@ pub(crate) struct CatalogDiagnostics {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct CachedAppDetails {
+    pub fingerprint: String,
+    pub details: AppDetails,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct CatalogCache {
     pub schema_version: u32,
     pub generation: u64,
@@ -41,6 +47,8 @@ pub(crate) struct CatalogCache {
     pub last_successful_sync: Option<u64>,
     #[serde(default)]
     pub diagnostics: Option<CatalogDiagnostics>,
+    #[serde(default)]
+    pub app_details: BTreeMap<String, CachedAppDetails>,
 }
 
 impl Default for CatalogCache {
@@ -53,6 +61,7 @@ impl Default for CatalogCache {
             filesystem_index: FilesystemIndex::default(),
             last_successful_sync: None,
             diagnostics: None,
+            app_details: BTreeMap::new(),
         }
     }
 }
@@ -75,7 +84,7 @@ fn parse_document(bytes: &[u8]) -> Option<CatalogCache> {
         if document.schema_version == CACHE_SCHEMA_VERSION {
             return Some(document);
         }
-        if matches!(document.schema_version, 2..=4) {
+        if matches!(document.schema_version, 2..=7) {
             // Visibility classification arrived in 4; older documents need it recomputed.
             if document.schema_version < 4 {
                 for app in &mut document.apps {
@@ -84,9 +93,16 @@ fn parse_document(bytes: &[u8]) -> Option<CatalogCache> {
             }
             // 5 replaced the combined Windows snapshot with one per scanner. The apps stay —
             // only the stale snapshot goes, and the next scan repopulates the new keys.
-            document.sources.retain(|snapshot| {
-                snapshot.key.0 != crate::catalog::source::LEGACY_COMBINED_SOURCE
-            });
+            if document.schema_version < 5 {
+                document.sources.retain(|snapshot| {
+                    snapshot.key.0 != crate::catalog::source::LEGACY_COMBINED_SOURCE
+                });
+            }
+            // 8 recomputes cached details because the canonical local-folder target format
+            // changed. Metadata is derived from trusted catalog entries and is safe to refill.
+            if document.schema_version < 8 {
+                document.app_details.clear();
+            }
             document.schema_version = CACHE_SCHEMA_VERSION;
             return Some(document);
         }
@@ -401,6 +417,101 @@ mod tests {
             .map(|snapshot| snapshot.key.0.as_str())
             .collect::<Vec<_>>();
         assert_eq!(keys, vec!["steam", "portable"]);
+    }
+
+    #[test]
+    fn migrates_v5_without_details_and_preserves_document_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let document = serde_json::json!({
+            "schemaVersion": 5,
+            "generation": 21,
+            "apps": [],
+            "sources": [{ "key": "portable", "fingerprint": null, "apps": [] }],
+            "filesystemIndex": { "directories": {} },
+            "lastSuccessfulSync": 123,
+            "diagnostics": null
+        });
+        std::fs::write(
+            dir.path().join(CACHE_FILE),
+            serde_json::to_vec(&document).unwrap(),
+        )
+        .unwrap();
+
+        let migrated = read_document(dir.path()).unwrap();
+
+        assert_eq!(migrated.schema_version, CACHE_SCHEMA_VERSION);
+        assert_eq!(migrated.generation, 21);
+        assert_eq!(migrated.sources.len(), 1);
+        assert!(migrated.app_details.is_empty());
+    }
+
+    #[test]
+    fn migrates_v6_by_recomputing_cached_folder_availability() {
+        let dir = tempfile::tempdir().unwrap();
+        let document = serde_json::json!({
+            "schemaVersion": 6,
+            "generation": 22,
+            "apps": [],
+            "appDetails": {
+                "task-scheduler": {
+                    "fingerprint": "system-file",
+                    "details": {
+                        "fileSizeBytes": 145059,
+                        "fileCreatedAt": 1,
+                        "fileModifiedAt": 2,
+                        "architecture": "notApplicable",
+                        "signature": "verified",
+                        "executableExists": true,
+                        "installLocationExists": true
+                    }
+                }
+            }
+        });
+        std::fs::write(
+            dir.path().join(CACHE_FILE),
+            serde_json::to_vec(&document).unwrap(),
+        )
+        .unwrap();
+
+        let migrated = read_document(dir.path()).unwrap();
+
+        assert_eq!(migrated.schema_version, CACHE_SCHEMA_VERSION);
+        assert!(migrated.app_details.is_empty());
+    }
+
+    #[test]
+    fn migrates_v7_by_recomputing_cached_folder_availability() {
+        let dir = tempfile::tempdir().unwrap();
+        let document = serde_json::json!({
+            "schemaVersion": 7,
+            "generation": 23,
+            "apps": [],
+            "appDetails": {
+                "battle-net": {
+                    "fingerprint": "shortcut-target",
+                    "details": {
+                        "fileSizeBytes": 216784,
+                        "fileCreatedAt": 1,
+                        "fileModifiedAt": 2,
+                        "architecture": "x86",
+                        "signature": "verified",
+                        "executableExists": true,
+                        "installLocationExists": true,
+                        "canOpenFolder": false
+                    }
+                }
+            }
+        });
+        std::fs::write(
+            dir.path().join(CACHE_FILE),
+            serde_json::to_vec(&document).unwrap(),
+        )
+        .unwrap();
+
+        let migrated = read_document(dir.path()).unwrap();
+
+        assert_eq!(migrated.schema_version, CACHE_SCHEMA_VERSION);
+        assert!(migrated.app_details.is_empty());
     }
 
     #[test]

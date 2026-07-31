@@ -1,0 +1,148 @@
+name: Verify
+
+# Pre-merge verification. The release workflow re-runs the same critical gates on the tag as an
+# independent second check, so a green run here is a prerequisite for a release, never a substitute.
+on:
+    pull_request:
+    push:
+        branches:
+            - master
+
+permissions:
+    contents: read
+
+jobs:
+    frontend:
+        name: Frontend
+        runs-on: windows-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+            - name: Setup Node.js
+              uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+              with:
+                  node-version: '22'
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Lint
+              run: npm run lint
+
+            - name: Type-check
+              run: npm run typecheck
+
+            # The `text` reporter writes the summary straight into the job log, so coverage is
+            # visible on every run without adding an artifact-upload action to the SHA-pinned set.
+            # No threshold is configured: see the note in vite.config.ts.
+            - name: Test with coverage
+              run: npm run test:coverage
+
+            - name: Build
+              run: npm run build
+
+    backend:
+        name: Backend
+        runs-on: windows-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+              with:
+                  toolchain: stable
+                  targets: x86_64-pc-windows-msvc
+                  components: clippy, rustfmt
+
+            - name: Check formatting
+              run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+
+            - name: Lint
+              run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+            - name: Test
+              run: cargo test --manifest-path src-tauri/Cargo.toml
+
+    msrv:
+        name: MSRV
+        runs-on: windows-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+            # Pinned to the rust-version declared in src-tauri/Cargo.toml. The manifest states a
+            # compatibility promise, so it is compiled rather than asserted.
+            - name: Setup declared MSRV toolchain
+              uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+              with:
+                  toolchain: '1.88.0'
+                  targets: x86_64-pc-windows-msvc
+
+            - name: Check declared MSRV matches the manifest
+              shell: pwsh
+              run: |
+                  $declared = (Select-String -Path src-tauri/Cargo.toml -Pattern '^rust-version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+                  $installed = (& rustc --version).Split(' ')[1]
+                  if ($declared -ne $installed) {
+                    throw "Cargo.toml declares MSRV $declared but this job pins $installed; update both together"
+                  }
+
+            - name: Build at the declared MSRV
+              run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
+
+    contracts:
+        name: Boundaries and release contract
+        runs-on: windows-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+              with:
+                  fetch-depth: 0
+
+            - name: Setup Node.js
+              uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+              with:
+                  node-version: '22'
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Verify frontend dependency boundaries
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/verify-frontend-boundaries.ps1
+
+            - name: Verify Windows API ownership boundary
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/verify-platform-boundaries.ps1
+
+            - name: Test release source verification
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-verify-release-source.ps1
+
+            - name: Test release workflow tag transport
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-release-workflow.ps1
+
+            - name: Test release manifest preparation
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-prepare-release-manifest.ps1
+
+            - name: Test release notes preparation
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-release-notes.ps1
+
+            - name: Test npm audit triage gate
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-verify-npm-audit.ps1
+
+            # Runtime dependencies admit no exceptions.
+            - name: Audit runtime dependencies
+              run: npm audit --omit=dev --audit-level=high
+
+            - name: Triage development dependency advisories
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/verify-npm-audit.ps1

@@ -11,23 +11,23 @@ export function FilterTile({ item, active, onSelect }: FilterTileProps) {
 			aria-current={active ? 'page' : undefined}
 			aria-label={`${item.label} ${item.count}`}
 			onClick={() => onSelect(item.view)}
-			className={`flex min-h-16 min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-left shadow-(--shadow-summary) transition-colors hover:ring-1 hover:ring-violet-400/30 focus-visible:outline-2 focus-visible:outline-violet-500 ${
+			className={`flex min-h-16 min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)] motion-reduce:transition-none ${
 				active
-					? 'border-violet-400/55 bg-violet-100/80 text-violet-800'
-					: 'border-white/80 bg-white/62 text-slate-800 hover:border-violet-300/45 hover:bg-violet-100/45'
+					? 'border-[var(--accent)] bg-[var(--utility-accent)] text-[var(--text-primary)] shadow-[var(--shadow-accent)]'
+					: 'border-[var(--border-neutral)] bg-[var(--surface-panel)] text-[var(--text-primary)] shadow-[var(--shadow-summary)] hover:bg-[var(--surface-raised)]'
 			}`}
 		>
 			<span
-				className={`grid size-9 shrink-0 place-items-center rounded-lg ring-1 ring-inset ${toneClass}`}
+				className={`grid size-9 shrink-0 place-items-center rounded-lg border border-[var(--border-neutral)] bg-[var(--surface-raised)] ${toneClass}`}
 			>
 				<Icon size={18} aria-hidden='true' />
 			</span>
 			<span className='min-w-0'>
-				<span className='block truncate text-xs font-medium text-slate-500'>
+				<span className='block truncate text-xs font-medium text-[var(--text-muted)]'>
 					{item.label}
 				</span>
 				<span
-					className={`block truncate text-base font-semibold ${active ? 'text-white' : ''}`}
+					className='block truncate text-base font-semibold text-[var(--text-primary)]'
 				>
 					{item.count}
 				</span>

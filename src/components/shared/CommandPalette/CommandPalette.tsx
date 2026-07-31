@@ -2,7 +2,7 @@ import { Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock'
 import { useFocusTrap } from '../../../hooks/useFocusTrap'
-import { rankAppsByQuery } from '../../../store/appStore'
+import { rankAppsByQueryTop } from '../../../store/appStore'
 import { ResultItem } from './ResultItem'
 import type { CommandPaletteProps } from './types'
 
@@ -26,15 +26,25 @@ export function CommandPalette({
 	const [selected, setSelected] = useState(0)
 	useFocusTrap(dialogRef)
 
+	// Bounded selection rather than ranking the whole catalog and slicing: on a large catalog a
+	// broad query matches nearly everything, and only these rows are ever shown. The result is
+	// identical to the full sort's first MAX_RESULTS entries, ties included.
 	const results = useMemo(
-		() => rankAppsByQuery(apps, query).slice(0, MAX_RESULTS),
+		() => rankAppsByQueryTop(apps, query, MAX_RESULTS),
 		[apps, query],
 	)
 
+	// The trigger has to be captured *before* the input takes focus: reading `activeElement`
+	// afterwards saved the palette's own input, which is detached by the time cleanup runs, so
+	// focus fell to <body> and a keyboard user lost their place in the grid. Restoring only a
+	// still-connected element keeps that from resurrecting a control the close itself unmounted.
 	useEffect(() => {
+		const trigger = document.activeElement
 		inputRef.current?.focus()
-		const previous = document.activeElement as HTMLElement | null
-		return () => previous?.focus?.()
+		return () => {
+			if (trigger instanceof HTMLElement && trigger.isConnected)
+				trigger.focus()
+		}
 	}, [])
 
 	useEffect(() => {

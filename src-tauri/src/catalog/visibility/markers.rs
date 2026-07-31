@@ -211,7 +211,33 @@ fn contains_any(value: &str, markers: &[&str]) -> bool {
     markers.iter().any(|marker| value.contains(marker))
 }
 
-pub(super) fn is_installer_or_uninstaller(value: &str) -> bool {
+/// A shared runtime shipped so other software can run: never something a user launches, however
+/// it was registered. Kept separate from `is_installer_artifact` precisely because it must not be
+/// vetoed — a Visual C++ Redistributable *is* a registered product with an uninstall entry.
+/// "webview2 runtime" is spelled out so a real app named "WebView2 Sample" is not swept up; the
+/// MSIX WebView2 framework package is handled separately by `is_framework_package`.
+pub(super) fn is_runtime_redistributable(value: &str) -> bool {
+    contains_any(
+        value,
+        &[
+            "vcredist",
+            "vc_redist",
+            "redist",
+            "bootstrapper",
+            "webview2 runtime",
+            "dxsetup",
+            "ndp48",
+        ],
+    )
+}
+
+/// Leftovers of an installation rather than an application: a downloaded installer, an
+/// `unins000.exe`, a self-extractor stub.
+///
+/// These needles match a plain substring of the combined name/path/metadata blob, which is weak
+/// evidence — "Inno Setup" and "Advanced Installer" are real applications whose names simply read
+/// like installers. `has_launch_registration` is therefore consulted before this rejects anything.
+pub(super) fn is_installer_artifact(value: &str) -> bool {
     contains_any(
         value,
         &[
@@ -222,16 +248,6 @@ pub(super) fn is_installer_or_uninstaller(value: &str) -> bool {
             "setup.exe",
             "installer",
             "tsetup",
-            "vcredist",
-            "vc_redist",
-            "redist",
-            "bootstrapper",
-            // Runtime redistributables masquerading as apps. "webview2 runtime" is precise so a
-            // real app named "WebView2 Sample" is not swept up; the MSIX WebView2 framework package
-            // is handled separately by `is_framework_package`.
-            "webview2 runtime",
-            "dxsetup",
-            "ndp48",
             // Self-extracting installer stubs (e.g. "Adobe Self Extractor" = AdbeRdr…exe bundled
             // inside another product's \support\ folder).
             "self extractor",
@@ -239,6 +255,20 @@ pub(super) fn is_installer_or_uninstaller(value: &str) -> bool {
             "adberdr",
         ],
     )
+}
+
+/// Evidence that Windows itself registered this record as a launchable product — which a loose
+/// installer artifact dropped in a Downloads folder never has.
+///
+/// Deliberately narrow. `StartMenu` is excluded because an "Uninstall Foo" shortcut is exactly the
+/// common case the installer markers should keep rejecting, and `Portable` is excluded because a
+/// bare file on disk carries no registration at all.
+pub(super) fn has_launch_registration(app: &AppInfo) -> bool {
+    match app.source_kind {
+        SourceKind::Steam | SourceKind::StartApps | SourceKind::Msix => true,
+        SourceKind::Registry => app.can_uninstall,
+        SourceKind::StartMenu | SourceKind::Portable => false,
+    }
 }
 
 pub(super) fn is_documentation(value: &str) -> bool {
@@ -331,6 +361,10 @@ pub(super) fn is_product_component(value: &str) -> bool {
             "the curl executable",
             "openssl command",
             "credential manager",
+            // Known limitation: these are plain substrings of a blob that includes the PE
+            // description, so a developer tool describing itself as a compiler ("Inno Setup
+            // Compiler") is demoted to Auxiliary. Recoverable by the user, unlike a rejection.
+            // Fixing it properly means matching per field, as `classify::signals` already does.
             "gettext",
             "git-lfs",
             "git large file storage",

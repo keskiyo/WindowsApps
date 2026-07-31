@@ -16,11 +16,21 @@ export const CATEGORY_ORDER = [
 ] as const
 export type BuiltInCategory = (typeof CATEGORY_ORDER)[number]
 export type AppCategory = string
+export type CustomCategoryAccent =
+	| 'yellow'
+	| 'cyan'
+	| 'pink'
+	| 'green'
+	| 'blue'
+	| 'orange'
+	| 'purple'
+	| 'red'
 
 export interface CategoryDefinition {
 	id: AppCategory
 	label: string
 	builtIn: boolean
+	accent?: CustomCategoryAccent
 }
 
 export const CATEGORY_LABELS: Record<string, string> = {

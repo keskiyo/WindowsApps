@@ -185,7 +185,10 @@ fn visit_directory<F: Fn() -> bool>(
         if should_stop(result, context.limits, context.started_at) {
             break;
         }
-        if result.statistics.entries_seen % CANCELLATION_CHECK_INTERVAL == 0
+        if result
+            .statistics
+            .entries_seen
+            .is_multiple_of(CANCELLATION_CHECK_INTERVAL)
             && (context.is_cancelled)()
         {
             break;

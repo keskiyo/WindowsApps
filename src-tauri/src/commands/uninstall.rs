@@ -1,25 +1,36 @@
-use super::run_blocking;
+use super::{is_valid_catalog_id, run_blocking};
 use crate::app_state::{execute_and_record, preview_for, AppState, UninstallPreview};
 use crate::error::AppError;
 use crate::platform::windows::{uninstall_history, uninstaller};
 use tauri::Manager;
+
+/// Resolves the trusted uninstall record for an id coming from the webview.
+///
+/// Validation happens before the lookup: an id that cannot name a catalog entry is rejected
+/// without being used as a map key. The removal command itself is only ever read from `AppState`.
+fn resolve_uninstall_record(
+    state: &AppState,
+    id: &str,
+) -> Result<crate::app_state::UninstallRecord, AppError> {
+    if !is_valid_catalog_id(id) {
+        return Err(AppError::UninstallUnavailable);
+    }
+    let stored = state
+        .uninstall_targets
+        .lock()
+        .map_err(|_| AppError::UninstallDataUnavailable)?;
+    stored
+        .get(id)
+        .cloned()
+        .ok_or(AppError::UninstallUnavailable)
+}
 
 #[tauri::command]
 pub(crate) async fn get_uninstall_preview(
     state: tauri::State<'_, AppState>,
     id: String,
 ) -> Result<UninstallPreview, AppError> {
-    let record = {
-        let stored = state
-            .uninstall_targets
-            .lock()
-            .map_err(|_| AppError::UninstallDataUnavailable)?;
-        stored
-            .get(&id)
-            .cloned()
-            .ok_or(AppError::UninstallUnavailable)?
-    };
-    Ok(preview_for(&record))
+    Ok(preview_for(&resolve_uninstall_record(&state, &id)?))
 }
 
 #[tauri::command]
@@ -51,17 +62,7 @@ pub(crate) async fn clear_uninstall_history(app: tauri::AppHandle) -> Result<(),
 
 #[tauri::command]
 pub(crate) async fn uninstall_app(app: tauri::AppHandle, id: String) -> Result<(), AppError> {
-    let record = {
-        let state = app.state::<AppState>();
-        let stored = state
-            .uninstall_targets
-            .lock()
-            .map_err(|_| AppError::UninstallDataUnavailable)?;
-        stored
-            .get(&id)
-            .cloned()
-            .ok_or(AppError::UninstallUnavailable)?
-    };
+    let record = resolve_uninstall_record(&app.state::<AppState>(), &id)?;
     let app_data_dir = app
         .path()
         .app_data_dir()
@@ -77,4 +78,64 @@ pub(crate) async fn uninstall_app(app: tauri::AppHandle, id: String) -> Result<(
         source: error.to_string(),
     })??;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app_state::{cached_app, remember_catalog};
+    use crate::catalog::UninstallTarget;
+    use crate::commands::MAX_CATALOG_ID_LENGTH;
+
+    fn removable(id: &str) -> crate::catalog::AppInfo {
+        let mut app = cached_app("Editor", r"C:\Editor.exe");
+        app.id = id.into();
+        app.can_uninstall = true;
+        app.uninstall = Some(UninstallTarget::Msix {
+            package_full_name: "Contoso.Editor_1.0.0_x64__abc".into(),
+        });
+        app
+    }
+
+    #[test]
+    fn resolves_a_known_catalog_id_to_its_stored_record() {
+        let state = AppState::default();
+        remember_catalog(&state, &[removable("editor")]);
+
+        assert!(resolve_uninstall_record(&state, "editor").is_ok());
+    }
+
+    // Uninstall is destructive, so an unbounded id from the webview is judged before it is used
+    // as a key into the trusted removal map.
+    #[test]
+    fn rejects_an_oversized_id_before_the_lookup() {
+        let state = AppState::default();
+        let app = removable(&"x".repeat(MAX_CATALOG_ID_LENGTH + 1));
+        remember_catalog(&state, std::slice::from_ref(&app));
+
+        assert!(matches!(
+            resolve_uninstall_record(&state, &app.id),
+            Err(AppError::UninstallUnavailable)
+        ));
+    }
+
+    #[test]
+    fn rejects_a_blank_id() {
+        let state = AppState::default();
+
+        assert!(matches!(
+            resolve_uninstall_record(&state, ""),
+            Err(AppError::UninstallUnavailable)
+        ));
+    }
+
+    #[test]
+    fn rejects_an_unknown_id() {
+        let state = AppState::default();
+
+        assert!(matches!(
+            resolve_uninstall_record(&state, "missing"),
+            Err(AppError::UninstallUnavailable)
+        ));
+    }
 }

@@ -9,6 +9,8 @@ pub(crate) fn load_sanitized_document(app_data_dir: &Path) -> Option<CatalogCach
     let mut document = cache::read_document(app_data_dir)?;
     let original = document.apps.clone();
     document.apps = catalog::sanitize(document.apps);
+    document.app_details =
+        crate::catalog::details::retain_cached_details(&document.app_details, &document.apps);
     for app in &mut document.apps {
         app.can_uninstall = app.uninstall.is_some();
         app.icon_base64 = None;
@@ -36,6 +38,9 @@ pub(crate) fn load_sanitized_cache(app_data_dir: &Path) -> Option<Vec<AppInfo>> 
 mod tests {
     use super::*;
     use crate::app_state::cached_app;
+    use crate::catalog::cache::CachedAppDetails;
+    use crate::catalog::AppDetails;
+    use std::collections::BTreeMap;
 
     #[test]
     fn loads_and_persists_a_sanitized_cache() {
@@ -125,5 +130,42 @@ mod tests {
         .unwrap();
         let apps = load_sanitized_cache(dir.path()).unwrap();
         assert!(!apps[0].can_uninstall);
+    }
+
+    #[test]
+    fn sanitize_write_back_removes_details_for_removed_cards_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut removed = cached_app(
+            "Visual Studio Installer",
+            "Microsoft.VisualStudio.Installer",
+        );
+        removed.id = "removed".into();
+        let mut kept = cached_app("Editor", r"C:\Editor.exe");
+        let kept_id = crate::catalog::sanitize(vec![kept.clone()])
+            .pop()
+            .unwrap()
+            .id;
+        kept.id = kept_id.clone();
+        let cached = |fingerprint: &str| CachedAppDetails {
+            fingerprint: fingerprint.into(),
+            details: AppDetails::default(),
+        };
+        cache::write_document(
+            dir.path(),
+            &CatalogCache {
+                apps: vec![removed, kept],
+                app_details: BTreeMap::from([
+                    ("removed".into(), cached("old")),
+                    (kept_id.clone(), cached("current")),
+                ]),
+                ..CatalogCache::default()
+            },
+        )
+        .unwrap();
+
+        let document = load_sanitized_document(dir.path()).unwrap();
+
+        assert!(document.app_details.contains_key(&kept_id));
+        assert!(!document.app_details.contains_key("removed"));
     }
 }

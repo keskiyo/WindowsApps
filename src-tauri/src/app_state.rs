@@ -1,11 +1,12 @@
 //! Process-wide catalog state owned by the Tauri app instance, plus the trusted
 //! id-keyed target maps that keep launch/uninstall resolution server-side.
 
+use crate::catalog::cache::CachedAppDetails;
 use crate::catalog::scan_coordinator::ScanCoordinator;
-use crate::catalog::{self, AppInfo, LaunchKind, SourceKind, UninstallTarget};
+use crate::catalog::{self, AppDetailsTarget, AppInfo, LaunchKind, SourceKind, UninstallTarget};
 use crate::platform::windows::{uninstall_history, uninstaller};
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -76,6 +77,10 @@ pub(crate) struct AppState {
     pub(crate) uninstall_targets: Mutex<HashMap<String, UninstallRecord>>,
     /// Trusted launch targets (kind + path) keyed by catalog id.
     pub(crate) launch_targets: Mutex<HashMap<String, (LaunchKind, String)>>,
+    /// Trusted local metadata inputs keyed by catalog id.
+    pub(crate) app_details_targets: Mutex<HashMap<String, AppDetailsTarget>>,
+    /// Details read during this run, merged into the next synchronized cache document.
+    pub(crate) app_details_cache: Mutex<HashMap<String, CachedAppDetails>>,
     /// Bounds process readiness waits for this application instance.
     pub(crate) launch_waits: Arc<LaunchWaitLimiter>,
     /// Serializes catalog synchronization so scans never write the cache concurrently.
@@ -98,6 +103,8 @@ pub(crate) fn remember_catalog(state: &AppState, apps: &[AppInfo]) {
     remember_catalog_ids(state, apps);
     remember_uninstall_targets(state, apps);
     remember_launch_targets(state, apps);
+    remember_app_details_targets(state, apps);
+    retain_app_details_cache(state, apps);
 }
 
 fn remember_catalog_ids(state: &AppState, apps: &[AppInfo]) {
@@ -150,6 +157,88 @@ pub(crate) fn remember_launch_targets(state: &AppState, apps: &[AppInfo]) {
     if let Ok(mut stored) = state.launch_targets.lock() {
         *stored = targets;
     }
+}
+
+fn remember_app_details_targets(state: &AppState, apps: &[AppInfo]) {
+    let targets = apps
+        .iter()
+        .map(|app| (app.id.clone(), AppDetailsTarget::from_app(app)))
+        .collect();
+    if let Ok(mut stored) = state.app_details_targets.lock() {
+        *stored = targets;
+    }
+}
+
+fn retain_app_details_cache(state: &AppState, apps: &[AppInfo]) {
+    let live_ids = apps
+        .iter()
+        .map(|app| app.id.as_str())
+        .collect::<HashSet<_>>();
+    if let Ok(mut cached) = state.app_details_cache.lock() {
+        cached.retain(|id, _| live_ids.contains(id.as_str()));
+    }
+}
+
+pub(crate) fn app_details_target_for(state: &AppState, id: &str) -> Option<AppDetailsTarget> {
+    state.app_details_targets.lock().ok()?.get(id).cloned()
+}
+
+pub(crate) fn cached_app_details_for(
+    state: &AppState,
+    id: &str,
+    fingerprint: &str,
+) -> Option<catalog::AppDetails> {
+    state
+        .app_details_cache
+        .lock()
+        .ok()?
+        .get(id)
+        .filter(|cached| cached.fingerprint == fingerprint)
+        .map(|cached| cached.details.clone())
+}
+
+pub(crate) fn remember_app_details(
+    state: &AppState,
+    id: String,
+    fingerprint: String,
+    details: catalog::AppDetails,
+) {
+    if let Ok(mut cached) = state.app_details_cache.lock() {
+        cached.insert(
+            id,
+            CachedAppDetails {
+                fingerprint,
+                details,
+            },
+        );
+    }
+}
+
+/// Detail requests update only memory. The next cache synchronization merges that small map
+/// before its existing serialized write, so no command mutex spans filesystem work.
+pub(crate) fn cached_details_for_catalog(
+    state: &AppState,
+    apps: &[AppInfo],
+    persisted: BTreeMap<String, CachedAppDetails>,
+) -> BTreeMap<String, CachedAppDetails> {
+    let live_ids = apps
+        .iter()
+        .map(|app| app.id.as_str())
+        .collect::<HashSet<_>>();
+    let mut current = persisted
+        .into_iter()
+        .filter(|(id, _)| live_ids.contains(id.as_str()))
+        .collect::<BTreeMap<_, _>>();
+    let Ok(cached) = state.app_details_cache.lock() else {
+        return current;
+    };
+    for (id, details) in cached
+        .iter()
+        .filter(|(id, _)| live_ids.contains(id.as_str()))
+    {
+        current.insert(id.clone(), details.clone());
+    }
+    current
 }
 
 pub(crate) fn preview_for(record: &UninstallRecord) -> UninstallPreview {
@@ -239,6 +328,66 @@ mod tests {
             Some((LaunchKind::Executable, r"C:\Code.exe".to_string()))
         );
         assert!(stored.get("unknown-id").is_none());
+    }
+
+    #[test]
+    fn details_targets_resolve_only_catalog_entries_and_keep_trusted_aumid_executables() {
+        let mut executable = cached_app("Editor", r"C:\Editor\editor.exe");
+        executable.id = "editor".into();
+        let mut aumid = cached_app("Store app", "Contoso.Store_123!App");
+        aumid.id = "store".into();
+        aumid.launch_kind = LaunchKind::AppUserModelId;
+        aumid.resolved_path = Some(r"C:\Program Files\WindowsApps\Contoso\app.exe".into());
+        let state = AppState::default();
+
+        remember_catalog(&state, &[executable, aumid]);
+
+        assert!(app_details_target_for(&state, "editor").is_some());
+        assert!(app_details_target_for(&state, "unknown").is_none());
+        let store = app_details_target_for(&state, "store").unwrap();
+        assert!(catalog::details_fingerprint(&store).is_some());
+    }
+
+    #[test]
+    fn keeps_current_memory_details_for_the_next_catalog_cache_write() {
+        use crate::catalog::cache::CachedAppDetails;
+        use std::collections::BTreeMap;
+
+        let mut app = cached_app("Editor", r"C:\Editor\editor.exe");
+        app.id = "editor".into();
+        let state = AppState::default();
+        remember_catalog(&state, &[app.clone()]);
+        remember_app_details(
+            &state,
+            "editor".into(),
+            "current".into(),
+            catalog::AppDetails {
+                file_size_bytes: Some(42),
+                ..Default::default()
+            },
+        );
+        let persisted = BTreeMap::from([
+            (
+                "editor".into(),
+                CachedAppDetails {
+                    fingerprint: "stale".into(),
+                    details: Default::default(),
+                },
+            ),
+            (
+                "removed".into(),
+                CachedAppDetails {
+                    fingerprint: "old".into(),
+                    details: Default::default(),
+                },
+            ),
+        ]);
+
+        let merged = cached_details_for_catalog(&state, &[app], persisted);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged["editor"].fingerprint, "current");
+        assert_eq!(merged["editor"].details.file_size_bytes, Some(42));
     }
 
     #[test]

@@ -19,7 +19,14 @@ pub(super) const DESC: i32 = 30; // PE file description
 pub(super) const NAME: i32 = 25; // display name
 pub(super) const PATH: i32 = 25; // a dedicated store/game install folder
 
-/// Minimum winning score. A lone weak signal (a generic path hit) stays below it and falls to Other.
+/// Minimum winning score, below which the app falls to `Other`.
+///
+/// Note what this does **not** do today: the smallest weight above is `NAME`/`PATH` at 25, so every
+/// rule already clears it on its own and the threshold never rejects anything. It only guards the
+/// zero-match case, which `best_score` starting at 0 already covers. Raising it so a lone weak
+/// signal needs corroboration — a single `Field::Path` substring currently assigns a category
+/// unaided — is a deliberate retune that has to be validated against the fixture corpus, not a
+/// constant to nudge in passing.
 const THRESHOLD: i32 = 20;
 
 /// Tie-break order, mirroring the intent of the previous first-match cascade: the earlier category

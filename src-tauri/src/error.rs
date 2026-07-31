@@ -49,6 +49,10 @@ pub(crate) enum AppError {
     LaunchDataUnavailable,
     /// No trusted launch target exists for the requested id.
     LaunchUnavailable,
+    /// No trusted details target exists for the requested id.
+    AppDetailsUnavailable,
+    /// No trusted local folder exists for the requested id.
+    OpenFolderUnavailable,
     /// The uninstall target map is unavailable (poisoned).
     UninstallDataUnavailable,
     /// No trusted uninstall target exists for the requested id.
@@ -84,6 +88,8 @@ impl AppError {
             Self::InvalidHydrationRequest => "INVALID_HYDRATION_REQUEST",
             Self::LaunchDataUnavailable => "LAUNCH_DATA_UNAVAILABLE",
             Self::LaunchUnavailable => "LAUNCH_UNAVAILABLE",
+            Self::AppDetailsUnavailable => "APP_DETAILS_UNAVAILABLE",
+            Self::OpenFolderUnavailable => "OPEN_FOLDER_UNAVAILABLE",
             Self::UninstallDataUnavailable => "UNINSTALL_DATA_UNAVAILABLE",
             Self::UninstallUnavailable => "UNINSTALL_UNAVAILABLE",
             Self::ProductNameMissing => "PRODUCT_NAME_MISSING",
@@ -111,6 +117,8 @@ impl AppError {
             Self::InvalidHydrationRequest => "The icon hydration request is invalid.",
             Self::LaunchDataUnavailable => "Launch data is temporarily unavailable.",
             Self::LaunchUnavailable => "This application is not available for launch.",
+            Self::AppDetailsUnavailable => "Application details are unavailable.",
+            Self::OpenFolderUnavailable => "The application folder is unavailable.",
             Self::UninstallDataUnavailable => "Uninstall data is temporarily unavailable.",
             Self::UninstallUnavailable => "Uninstall is unavailable for this application.",
             Self::ProductNameMissing => "The installed application could not be identified.",
@@ -190,6 +198,8 @@ mod tests {
             AppError::InvalidHydrationRequest,
             AppError::LaunchDataUnavailable,
             AppError::LaunchUnavailable,
+            AppError::AppDetailsUnavailable,
+            AppError::OpenFolderUnavailable,
             AppError::UninstallDataUnavailable,
             AppError::UninstallUnavailable,
             AppError::ProductNameMissing,
@@ -215,6 +225,7 @@ mod tests {
             codes,
             [
                 "APP_DATA_UNAVAILABLE",
+                "APP_DETAILS_UNAVAILABLE",
                 "CLEAR_ICON_CACHE_FAILED",
                 "CLEAR_UNINSTALL_HISTORY_FAILED",
                 "INVALID_HYDRATION_REQUEST",
@@ -222,6 +233,7 @@ mod tests {
                 "LAUNCH_DATA_UNAVAILABLE",
                 "LAUNCH_UNAVAILABLE",
                 "NO_NEWER_COPY",
+                "OPEN_FOLDER_UNAVAILABLE",
                 "OPERATION_FAILED",
                 "OPERATION_INTERRUPTED",
                 "PRODUCT_NAME_MISSING",

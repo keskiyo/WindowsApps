@@ -9,7 +9,10 @@ mod registry;
 mod shortcuts;
 mod uninstall;
 
-pub(crate) use execution::{exec_target, executable_metadata, launcher};
+pub(crate) use execution::{
+    exec_target, executable_metadata, is_console_subsystem, launcher, open_trusted_folder,
+    read_architecture, verify_signature, AppArchitecture, AppSignatureStatus,
+};
 pub(crate) use locale::{os_ui_script, NameScript};
 pub(crate) use registry::{install_registry, steam_registry, uninstall_registry};
 pub(crate) use shortcuts::{global_shortcut, shortcut};

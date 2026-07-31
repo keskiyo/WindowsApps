@@ -1,3 +1,4 @@
+use crate::catalog::sync::scan_control::{StageBudget, StageStop};
 use crate::catalog::{
     classify::classify, filters::clean_display_icon, find_executable_named, stable_id, AppInfo,
     LaunchKind, SourceKind, UninstallTarget,
@@ -19,14 +20,29 @@ pub(in crate::catalog) struct RegistryMetadata {
 pub(in crate::catalog) struct RegistryScan {
     pub apps: Vec<AppInfo>,
     pub metadata: Vec<RegistryMetadata>,
+    /// `None` when every registry entry was inspected. An incomplete scan must not replace the
+    /// stored registry snapshot.
+    pub stop: Option<StageStop>,
 }
 
-pub(in crate::catalog) fn scan() -> RegistryScan {
+/// Enumerating the uninstall keys is cheap, but each entry then reads PE version metadata and may
+/// search an install directory for a matching executable. That per-entry filesystem work is what
+/// made a cancelled Refresh keep running, so the budget is consulted once per entry.
+pub(in crate::catalog) fn scan(budget: &StageBudget) -> RegistryScan {
     let mut result = RegistryScan::default();
+    // Checked before the hives are enumerated, and recorded, so an already-cancelled scan produces
+    // an *incomplete* result rather than an empty complete one that would wipe the stored snapshot.
+    if budget.should_stop() {
+        result.stop = budget.stop();
+        return result;
+    }
     for values in uninstall_registry::entries()
         .into_iter()
         .map(expand_registry_paths)
     {
+        if !budget.charge_entry() {
+            break;
+        }
         if let Some(metadata) = metadata_from_values(&values) {
             result.metadata.push(metadata);
         }
@@ -34,6 +50,7 @@ pub(in crate::catalog) fn scan() -> RegistryScan {
             result.apps.push(app);
         }
     }
+    result.stop = budget.stop();
     result
 }
 

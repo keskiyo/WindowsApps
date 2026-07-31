@@ -7,6 +7,7 @@
 mod document;
 mod hydration;
 mod scan;
+pub(crate) mod scan_control;
 mod watcher;
 
 pub(crate) use document::{load_sanitized_cache, load_sanitized_document};
@@ -18,6 +19,7 @@ use crate::catalog::cache::{CatalogCache, CatalogDiagnostics};
 use crate::catalog::incremental::{scan_root, FilesystemIndex, ScanMode};
 use crate::catalog::scan_settings::ScanSettings;
 use crate::catalog::source::{merge_sources, SourceKey, SourceSnapshot};
+use crate::catalog::sync::scan_control::ScanControl;
 use crate::catalog::{self, AppInfo, ScanProgress};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -79,7 +81,7 @@ pub(crate) fn compute_delta(
         .collect::<HashMap<_, _>>();
     let mut upserted = current
         .iter()
-        .filter(|app| old.get(app.id.as_str()).map_or(true, |old| *old != *app))
+        .filter(|app| old.get(app.id.as_str()).is_none_or(|old| *old != *app))
         .cloned()
         .collect::<Vec<_>>();
     let mut removed_ids = previous
@@ -114,16 +116,20 @@ pub(crate) fn synchronize(
     is_cancelled: impl Fn() -> bool + Sync,
 ) -> CatalogCache {
     let started_at = Instant::now();
+    let control = ScanControl::new(&is_cancelled);
     progress(ScanProgress {
         stage: "Windows applications".into(),
         location: None,
         completed_roots: 0,
         total_roots: 0,
     });
-    let (registry_apps, registry_metadata) = catalog::scan_registry();
-    let start_menu_apps = catalog::scan_start_menu();
+    // Each Windows source is checked before it starts and bounded while it runs. An incomplete
+    // source is left out of `updates` below so `merge_sources` keeps its previous snapshot —
+    // reporting a partial list would delete every application the source did not reach.
+    let registry = catalog::scan_registry(&control);
+    let start_menu = catalog::scan_start_menu(&control);
     // `None` means PowerShell could not run, not "no Start apps" — see `start_apps::scan`.
-    let start_apps = catalog::start_apps::scan();
+    let start_apps = catalog::start_apps::scan(&control);
 
     let libraries = catalog::steam::installed_libraries();
     let mut steam_apps = Vec::new();
@@ -216,16 +222,6 @@ pub(crate) fn synchronize(
     // from the catalog.
     let mut updates = vec![
         SourceSnapshot {
-            key: SourceKey(catalog::source::REGISTRY_SOURCE.into()),
-            fingerprint: None,
-            apps: registry_apps,
-        },
-        SourceSnapshot {
-            key: SourceKey(catalog::source::START_MENU_SOURCE.into()),
-            fingerprint: None,
-            apps: start_menu_apps,
-        },
-        SourceSnapshot {
             key: SourceKey("steam".into()),
             fingerprint: None,
             apps: steam_apps,
@@ -236,6 +232,20 @@ pub(crate) fn synchronize(
             apps: portable_apps,
         },
     ];
+    if registry.stop.is_none() {
+        updates.push(SourceSnapshot {
+            key: SourceKey(catalog::source::REGISTRY_SOURCE.into()),
+            fingerprint: None,
+            apps: registry.apps,
+        });
+    }
+    if start_menu.stop.is_none() {
+        updates.push(SourceSnapshot {
+            key: SourceKey(catalog::source::START_MENU_SOURCE.into()),
+            fingerprint: None,
+            apps: start_menu.apps,
+        });
+    }
     if let Some(apps) = start_apps {
         updates.push(SourceSnapshot {
             key: SourceKey(catalog::source::START_APPS_SOURCE.into()),
@@ -248,7 +258,7 @@ pub(crate) fn synchronize(
     // Metadata first, deduplication second, exactly once: publisher and install location come
     // from the registry records and are what makes a shortcut and its registered product
     // recognizable as the same application.
-    catalog::attach_registry_metadata(&mut apps, &registry_metadata);
+    catalog::attach_registry_metadata(&mut apps, &registry.metadata);
     // Drop entries whose launch target no longer exists (a shortcut left by an uninstalled app)
     // before dedup, so phantoms neither merge nor reach the catalog. Filesystem-touching, so it
     // stays here on the scan path rather than in the pure sanitize/dedup passes.
@@ -290,6 +300,7 @@ pub(crate) fn synchronize(
         removed: delta.summary.removed,
         updated: delta.summary.updated,
     };
+    let app_details = catalog::details::retain_cached_details(&previous.app_details, &apps);
     CatalogCache {
         schema_version: crate::catalog::cache::CACHE_SCHEMA_VERSION,
         generation: previous.generation.saturating_add(1),
@@ -298,12 +309,15 @@ pub(crate) fn synchronize(
         filesystem_index,
         last_successful_sync: Some(completed_at),
         diagnostics: Some(diagnostics),
+        app_details,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::catalog::sync::scan_control::StageStop;
+    use crate::catalog::StartMenuScan;
     use crate::catalog::{AppCategory, AppInfo, LaunchKind, SourceKind};
 
     fn app(id: &str, name: &str) -> AppInfo {
@@ -349,6 +363,55 @@ mod tests {
         assert_eq!(delta.summary.added, 1);
         assert_eq!(delta.summary.removed, 1);
         assert_eq!(delta.summary.updated, 1);
+    }
+
+    // Cancellation reaches the Windows sources *before* they start, and — the part that matters —
+    // an incomplete source is reported as incomplete rather than as an empty success. Before this,
+    // registry and Start Menu ran to completion before the first check and an empty result would
+    // have been indistinguishable from "this machine has no installed applications".
+    #[test]
+    fn a_cancelled_scan_reports_windows_sources_as_incomplete_not_empty() {
+        let cancelled = || true;
+        let control = ScanControl::new(&cancelled);
+
+        let registry = catalog::scan_registry(&control);
+        let start_menu = catalog::scan_start_menu(&control);
+        let start_apps = catalog::start_apps::scan(&control);
+
+        assert!(registry.apps.is_empty());
+        assert_eq!(registry.stop, Some(StageStop::Cancelled));
+        assert!(start_menu.apps.is_empty());
+        assert_eq!(start_menu.stop, Some(StageStop::Cancelled));
+        // `None` is the "PowerShell did not answer" signal that keeps the stored snapshot.
+        assert_eq!(start_apps, None);
+    }
+
+    // The snapshot rule that makes the above safe: a source left out of the updates keeps its
+    // previous apps, so a cancelled scan cannot delete every Store or Start Menu application.
+    #[test]
+    fn an_incomplete_source_keeps_its_previous_snapshot() {
+        let previous = vec![SourceSnapshot {
+            key: SourceKey(catalog::source::START_MENU_SOURCE.into()),
+            fingerprint: None,
+            apps: vec![app("shortcut", "Editor")],
+        }];
+        let incomplete = StartMenuScan {
+            apps: Vec::new(),
+            stop: Some(StageStop::TimedOut),
+        };
+
+        let mut updates = Vec::new();
+        if incomplete.stop.is_none() {
+            updates.push(SourceSnapshot {
+                key: SourceKey(catalog::source::START_MENU_SOURCE.into()),
+                fingerprint: None,
+                apps: incomplete.apps,
+            });
+        }
+        let merged = merge_sources(previous, updates);
+
+        assert_eq!(merged.apps.len(), 1);
+        assert_eq!(merged.apps[0].name, "Editor");
     }
 
     #[test]

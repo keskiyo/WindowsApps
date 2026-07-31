@@ -28,11 +28,16 @@ pub(crate) struct AppHydrationPatch {
     pub can_uninstall: Option<bool>,
 }
 
-pub(crate) fn hydrate_one(
-    app_data_dir: &Path,
-    app: &AppInfo,
-    generation: u64,
-) -> AppHydrationPatch {
+/// One hydrated application, plus the icon file it wrote if it extracted a fresh one.
+///
+/// The written `(id, fingerprint)` is reported so the batch worker can sweep every superseded icon
+/// in a single directory pass. Sweeping inside the write was quadratic across a full hydration.
+pub(crate) struct HydrationOutcome {
+    pub patch: AppHydrationPatch,
+    pub written_icon: Option<(String, String)>,
+}
+
+pub(crate) fn hydrate_one(app_data_dir: &Path, app: &AppInfo, generation: u64) -> HydrationOutcome {
     hydrate_app(app_data_dir, app, generation)
 }
 
@@ -106,14 +111,15 @@ impl HydrationQueue {
     }
 }
 
-fn hydrate_app(app_data_dir: &Path, app: &AppInfo, generation: u64) -> AppHydrationPatch {
+fn hydrate_app(app_data_dir: &Path, app: &AppInfo, generation: u64) -> HydrationOutcome {
     let target = app.resolved_path.as_deref().unwrap_or(&app.path);
     let metadata = Path::new(target)
         .extension()
         .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
         .then(|| crate::platform::windows::executable_metadata::read(Path::new(target)));
-    let icon_base64 = hydrate_icon(app_data_dir, app);
-    AppHydrationPatch {
+    let icon = hydrate_icon(app_data_dir, app);
+    let icon_base64 = icon.data_url;
+    let patch = AppHydrationPatch {
         id: app.id.clone(),
         generation,
         icon_base64,
@@ -146,10 +152,24 @@ fn hydrate_app(app_data_dir: &Path, app: &AppInfo, generation: u64) -> AppHydrat
                 .map(|path| path.to_string_lossy().into_owned())
         }),
         can_uninstall: Some(app.uninstall.is_some()),
+    };
+    HydrationOutcome {
+        patch,
+        written_icon: icon
+            .written_fingerprint
+            .map(|fingerprint| (app.id.clone(), fingerprint)),
     }
 }
 
-fn hydrate_icon(app_data_dir: &Path, app: &AppInfo) -> Option<String> {
+#[derive(Default)]
+struct HydratedIcon {
+    data_url: Option<String>,
+    /// Set only when a fresh icon was extracted and cached, so the batch sweep knows which
+    /// application's earlier fingerprints are now superseded.
+    written_fingerprint: Option<String>,
+}
+
+fn hydrate_icon(app_data_dir: &Path, app: &AppInfo) -> HydratedIcon {
     // Walk the icon-source candidates (shortcut icon file → resolved target → path) until
     // one yields an icon; a shortcut whose declared .ico fails should still get the icon
     // embedded in its target executable.
@@ -160,19 +180,28 @@ fn hydrate_icon(app_data_dir: &Path, app: &AppInfo) -> Option<String> {
     for source in candidates {
         let fingerprint = icon_cache::source_fingerprint(&source);
         if let Some(bytes) = icon_cache::read_icon(app_data_dir, &app.id, &fingerprint) {
-            return Some(format!("data:image/png;base64,{}", STANDARD.encode(bytes)));
+            return HydratedIcon {
+                data_url: Some(format!("data:image/png;base64,{}", STANDARD.encode(bytes))),
+                written_fingerprint: None,
+            };
         }
         let Some(data_url) = extract_icon_from_source(app, &source) else {
             continue;
         };
+        let mut written_fingerprint = None;
         if let Some((_, encoded)) = data_url.split_once(',') {
             if let Ok(bytes) = STANDARD.decode(encoded) {
-                let _ = icon_cache::write_icon(app_data_dir, &app.id, &fingerprint, &bytes);
+                if icon_cache::write_icon(app_data_dir, &app.id, &fingerprint, &bytes).is_ok() {
+                    written_fingerprint = Some(fingerprint);
+                }
             }
         }
-        return Some(data_url);
+        return HydratedIcon {
+            data_url: Some(data_url),
+            written_fingerprint,
+        };
     }
-    None
+    HydratedIcon::default()
 }
 
 fn extract_icon_from_source(app: &AppInfo, source: &str) -> Option<String> {

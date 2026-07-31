@@ -47,6 +47,7 @@ pub(crate) fn enqueue_hydration(
             const BATCH: usize = 24;
             let mut patches = Vec::new();
             let mut batch: Vec<catalog::hydration::AppHydrationPatch> = Vec::new();
+            let mut written_icons: Vec<(String, String)> = Vec::new();
             loop {
                 let id = {
                     let Ok(mut queue) = state.hydration_queue.lock() else {
@@ -62,10 +63,13 @@ pub(crate) fn enqueue_hydration(
                     break;
                 };
                 if let Some(app_info) = apps.get(&id) {
-                    let patch =
+                    let outcome =
                         catalog::hydration::hydrate_one(&hydration_dir, app_info, generation);
-                    batch.push(patch.clone());
-                    patches.push(patch);
+                    if let Some(written) = outcome.written_icon {
+                        written_icons.push(written);
+                    }
+                    batch.push(outcome.patch.clone());
+                    patches.push(outcome.patch);
                     if batch.len() >= BATCH {
                         let _ = worker_app.emit("catalog://patches", &batch);
                         batch.clear();
@@ -78,6 +82,9 @@ pub(crate) fn enqueue_hydration(
             if !batch.is_empty() {
                 let _ = worker_app.emit("catalog://patches", &batch);
             }
+            // One directory pass for the whole batch. Sweeping per written icon re-read the
+            // entire icons directory N times for N icons.
+            catalog::icon_cache::sweep_superseded(&hydration_dir, &written_icons);
             patches
         })
         .await;

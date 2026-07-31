@@ -1,11 +1,19 @@
+use crate::catalog::sync::scan_control::ScanControl;
 use crate::catalog::{
     classify::classify, filters::is_invalid_display_name, filters::is_maintenance_entry, stable_id,
-    AppInfo, LaunchKind, SourceKind, UninstallTarget,
+    AppInfo, LaunchKind, SourceKind,
 };
 use serde::Deserialize;
 use serde_json::Value;
 use std::os::windows::process::CommandExt;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+mod package;
+
+#[cfg(test)]
+use package::display_publisher;
+use package::enrich_packages;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const UTF8_PREFIX: &str =
@@ -18,7 +26,6 @@ const START_APPS_SCRIPT: &str = "$f=(New-Object -ComObject Shell.Application).Na
 // Fallback used only if the Apps-folder enumeration fails (returns no target).
 const START_APPS_FALLBACK_SCRIPT: &str =
     "Get-StartApps | Select-Object Name,AppID | ConvertTo-Json -Compress";
-const PACKAGES_SCRIPT: &str = "Get-AppxPackage | Select-Object PackageFullName,PackageFamilyName,Name,Publisher,Version,InstallLocation | ConvertTo-Json -Compress";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -30,23 +37,15 @@ struct StartAppRow {
     target: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct PackageRow {
-    package_full_name: String,
-    package_family_name: String,
-    name: String,
-    publisher: Option<String>,
-    version: Option<String>,
-    install_location: Option<String>,
-}
-
 /// Returns `None` when PowerShell could not be run at all, as opposed to `Some(vec![])` for
 /// "this machine has no Start apps". The caller must not replace the stored snapshot on
 /// failure: doing so reports every Store application as removed and wipes them from the
 /// catalog until the next successful scan.
-pub(in crate::catalog) fn scan() -> Option<Vec<AppInfo>> {
-    let primary = run_powershell(START_APPS_SCRIPT);
+pub(in crate::catalog) fn scan(control: &ScanControl) -> Option<Vec<AppInfo>> {
+    if control.is_cancelled() {
+        return None;
+    }
+    let primary = run_powershell(START_APPS_SCRIPT, control);
     let mut powershell_ran = primary.is_some();
     let mut apps = primary
         .as_deref()
@@ -54,7 +53,7 @@ pub(in crate::catalog) fn scan() -> Option<Vec<AppInfo>> {
         .unwrap_or_default();
     if apps.is_empty() {
         // Apps-folder enumeration failed; fall back to Get-StartApps (no launch target).
-        let fallback = run_powershell(START_APPS_FALLBACK_SCRIPT);
+        let fallback = run_powershell(START_APPS_FALLBACK_SCRIPT, control);
         powershell_ran = powershell_ran || fallback.is_some();
         apps = fallback
             .as_deref()
@@ -64,58 +63,9 @@ pub(in crate::catalog) fn scan() -> Option<Vec<AppInfo>> {
     if !powershell_ran {
         return None;
     }
-    let packages_json = run_powershell(PACKAGES_SCRIPT).unwrap_or_default();
-    let packages: Vec<PackageRow> = parse_rows(&packages_json).unwrap_or_default();
-    // Lowercase each side once instead of inside the pairwise comparison: the inner closure
-    // used to allocate two Strings for every (app, package) pair.
-    let package_prefixes = packages
-        .iter()
-        .map(|package| package.package_family_name.to_lowercase())
-        .collect::<Vec<_>>();
-    for app in &mut apps {
-        let path = app.path.to_lowercase();
-        if let Some(package) = package_prefixes
-            .iter()
-            .position(|prefix| path.starts_with(prefix))
-            .map(|index| &packages[index])
-        {
-            app.source_kind = SourceKind::Msix;
-            app.publisher = display_publisher(&package.name, package.publisher.clone());
-            app.version = package
-                .version
-                .clone()
-                .filter(|value| !value.trim().is_empty());
-            app.install_location = package
-                .install_location
-                .clone()
-                .filter(|value| !value.trim().is_empty());
-            app.description = Some(package.name.clone());
-            app.product_name = Some(package.name.clone());
-            app.can_uninstall = true;
-            app.uninstall = Some(UninstallTarget::Msix {
-                package_full_name: package.package_full_name.clone(),
-            });
-        }
-    }
+    let packages_json = run_powershell(package::QUERY, control).unwrap_or_default();
+    enrich_packages(&mut apps, &packages_json);
     Some(apps)
-}
-
-fn display_publisher(package_name: &str, publisher: Option<String>) -> Option<String> {
-    let publisher = publisher
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty());
-    if publisher
-        .as_deref()
-        .is_some_and(|value| value.starts_with("CN="))
-    {
-        return package_name
-            .split('.')
-            .next()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_string);
-    }
-    publisher
 }
 
 /// Interpreters/hosts whose behavior is defined by arguments a Start-App target does not
@@ -155,12 +105,24 @@ fn is_generic_host_target(target: &str) -> bool {
     HOSTS.contains(&file.as_str())
 }
 
-fn run_powershell(script: &str) -> Option<String> {
+/// Ceiling for one PowerShell query. The Apps-folder and AppX providers are COM services that can
+/// wedge; `Command::output()` waited on them forever, which is what made a cancelled Refresh keep
+/// holding the scan lock.
+const POWERSHELL_TIMEOUT: Duration = Duration::from_secs(25);
+const POWERSHELL_POLL_INTERVAL: Duration = Duration::from_millis(50);
+/// Hard cap on captured stdout. The reader would otherwise grow without bound if the interpreter
+/// were made to emit indefinitely; the real payloads are tens of kilobytes.
+const MAX_POWERSHELL_OUTPUT_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Runs one PowerShell query, returning `None` for every failure mode including cancellation and
+/// timeout — see the contract on [`scan`]: `None` means "PowerShell did not answer", never
+/// "this machine has no Start apps".
+fn run_powershell(script: &str, control: &ScanControl) -> Option<String> {
     let script = format!("{UTF8_PREFIX}{script}");
     // Resolve the interpreter by full path: `CreateProcess` searches the directory of the
     // running executable first, so a bare name would run a `powershell.exe` planted next to
     // the app (its per-user install directory is writable) on every scan.
-    let output = Command::new(crate::platform::windows::exec_target::system_powershell())
+    let mut child = Command::new(crate::platform::windows::exec_target::system_powershell())
         .args([
             "-NoLogo",
             "-NoProfile",
@@ -168,14 +130,51 @@ fn run_powershell(script: &str) -> Option<String> {
             "-Command",
             &script,
         ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .creation_flags(CREATE_NO_WINDOW)
-        .output()
+        .spawn()
         .ok()?;
-    output
-        .status
-        .success()
-        .then(|| decode_output(output.stdout))
-        .flatten()
+
+    // stdout is drained on its own thread. Polling `try_wait` while nothing reads the pipe would
+    // deadlock as soon as the payload exceeded the pipe buffer: the child blocks on write, we
+    // decide it hung, and a healthy scan gets killed at the timeout.
+    let stdout = child.stdout.take();
+    let reader = std::thread::spawn(move || {
+        let mut buffer = Vec::new();
+        if let Some(stdout) = stdout {
+            let _ = std::io::Read::read_to_end(
+                &mut std::io::Read::take(stdout, MAX_POWERSHELL_OUTPUT_BYTES),
+                &mut buffer,
+            );
+        }
+        buffer
+    });
+
+    let deadline = Instant::now() + POWERSHELL_TIMEOUT;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) => {}
+            Err(_) => break None,
+        }
+        if control.is_cancelled() || Instant::now() >= deadline {
+            break None;
+        }
+        std::thread::sleep(POWERSHELL_POLL_INTERVAL);
+    };
+
+    if status.is_none() {
+        // Kill closes the write end, which lets the reader thread finish; `wait` then reaps the
+        // process so a timed-out scan cannot leave one behind.
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+    let stdout = reader.join().ok()?;
+    status
+        .filter(std::process::ExitStatus::success)
+        .and_then(|_| decode_output(stdout))
 }
 
 fn decode_output(bytes: Vec<u8>) -> Option<String> {
@@ -260,6 +259,46 @@ mod tests {
         assert_eq!(decode_output(vec![0xff, 0xfe]), None);
     }
 
+    // `Command::output()` waited on the interpreter forever. A wedged Apps-folder or AppX provider
+    // therefore kept the scan lock after the user cancelled, and Refresh looked cancelled while the
+    // worker was still blocked. The supervised child observes cancellation between polls, kills the
+    // process and reaps it. The bound is deliberately loose against the 25 s timeout: it proves the
+    // loop returns on cancellation rather than on the deadline, without measuring latency.
+    #[test]
+    fn a_cancelled_scan_abandons_a_long_running_interpreter() {
+        let cancelled = || true;
+        let control = ScanControl::new(&cancelled);
+        let started = Instant::now();
+
+        let output = run_powershell("Start-Sleep -Seconds 120", &control);
+
+        assert_eq!(output, None);
+        assert!(
+            started.elapsed() < POWERSHELL_TIMEOUT,
+            "cancellation waited for the timeout instead of returning"
+        );
+    }
+
+    // A successful query still has to come back intact: the supervised child drains stdout on its
+    // own thread, so a payload larger than the pipe buffer must not deadlock the poll loop.
+    #[test]
+    fn a_completed_interpreter_returns_output_larger_than_the_pipe_buffer() {
+        let never = || false;
+        let control = ScanControl::new(&never);
+
+        let output = run_powershell("'x' * 200000", &control);
+
+        assert_eq!(output.as_deref().map(str::len), Some(200_000));
+    }
+
+    #[test]
+    fn a_failed_interpreter_reports_no_output() {
+        let never = || false;
+        let control = ScanControl::new(&never);
+
+        assert_eq!(run_powershell("exit 3", &control), None);
+    }
+
     #[test]
     fn ignores_resource_and_replacement_character_names() {
         let apps = parse_start_apps(
@@ -331,5 +370,57 @@ mod tests {
             display_publisher("OpenAI.Codex", Some("CN=certificate".into())).as_deref(),
             Some("OpenAI")
         );
+    }
+
+    fn package_json(application_id: &str, executable: &str) -> String {
+        serde_json::json!({
+            "PackageFullName": "OpenAI.Codex_26.727.4816.0_x64__2p2nqsd0c76g0",
+            "PackageFamilyName": "OpenAI.Codex_2p2nqsd0c76g0",
+            "Name": "OpenAI.Codex",
+            "Publisher": "CN=certificate",
+            "Version": "26.727.4816.0",
+            "InstallLocation": r"C:\Program Files\WindowsApps\OpenAI.Codex_26.727.4816.0_x64__2p2nqsd0c76g0",
+            "Applications": [{ "Id": application_id, "Executable": executable }]
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn resolves_packaged_app_executable_from_exact_manifest_application() {
+        let mut apps =
+            parse_start_apps(r#"{"Name":"Codex","AppID":"OpenAI.Codex_2p2nqsd0c76g0!App"}"#)
+                .unwrap();
+
+        enrich_packages(&mut apps, &package_json("App", "app/ChatGPT.exe"));
+
+        assert_eq!(apps[0].source_kind, SourceKind::Msix);
+        assert_eq!(apps[0].publisher.as_deref(), Some("OpenAI"));
+        assert_eq!(
+            apps[0].resolved_path.as_deref(),
+            Some(
+                r"C:\Program Files\WindowsApps\OpenAI.Codex_26.727.4816.0_x64__2p2nqsd0c76g0\app\ChatGPT.exe"
+            )
+        );
+    }
+
+    #[test]
+    fn rejects_unmatched_or_escaping_package_manifest_executables() {
+        for (application_id, executable) in [
+            ("Other", "app/ChatGPT.exe"),
+            ("App", r"..\Outside.exe"),
+            ("App", r"C:\Outside.exe"),
+            ("App", "app/readme.txt"),
+        ] {
+            let mut apps =
+                parse_start_apps(r#"{"Name":"Codex","AppID":"OpenAI.Codex_2p2nqsd0c76g0!App"}"#)
+                    .unwrap();
+
+            enrich_packages(&mut apps, &package_json(application_id, executable));
+
+            assert_eq!(
+                apps[0].resolved_path, None,
+                "unsafe manifest target was accepted: {executable}"
+            );
+        }
     }
 }

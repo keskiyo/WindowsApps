@@ -13,8 +13,10 @@ permissions:
 
 jobs:
     npm-audit:
+        # Windows so the triage script runs under the same Windows PowerShell dialect the
+        # repository's other verification scripts are written and locally tested against.
         name: npm audit
-        runs-on: ubuntu-latest
+        runs-on: windows-latest
         steps:
             - name: Checkout
               uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -28,8 +30,15 @@ jobs:
             - name: Install dependencies
               run: npm ci
 
-            - name: Audit npm dependencies
-              run: npm audit --audit-level=high
+            # Runtime dependencies admit no exceptions.
+            - name: Audit runtime dependencies
+              run: npm audit --omit=dev --audit-level=high
+
+            # The full tree is triaged rather than gated on a bare exit code: a permanently red
+            # job is not triage, because a genuinely new advisory hides behind the known one.
+            - name: Triage development dependency advisories
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/verify-npm-audit.ps1
 
     cargo-audit:
         name: cargo audit
@@ -46,5 +55,8 @@ jobs:
             - name: Install cargo-audit
               run: cargo install cargo-audit --locked
 
+            # Run from src-tauri so cargo-audit picks up src-tauri/.cargo/audit.toml, where each
+            # accepted advisory is documented with its chain, owner and review date.
             - name: Audit Rust dependencies
-              run: cargo audit --file src-tauri/Cargo.lock
+              working-directory: src-tauri
+              run: cargo audit

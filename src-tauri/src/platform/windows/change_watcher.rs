@@ -57,10 +57,15 @@ impl Drop for WatcherGuard {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Release);
         let stop_event = HANDLE(self.stop_event as *mut _);
+        // SAFETY: `stop_event` was created by `start` and is owned by this guard; it is not closed
+        // until after the join below, so every watcher thread is still waiting on a live handle.
+        // Setting a manual-reset event releases all of them at once.
         let _ = unsafe { SetEvent(stop_event) };
         for thread in self.threads.drain(..) {
             let _ = thread.join();
         }
+        // SAFETY: the close happens only after every thread that borrowed this handle has been
+        // joined, so no wait can still reference it. `Drop` runs once, so it is closed once.
         let _ = unsafe { CloseHandle(stop_event) };
     }
 }
@@ -74,6 +79,11 @@ pub(crate) fn start(
     on_change: Arc<dyn Fn() + Send + Sync>,
 ) -> Option<WatcherGuard> {
     let stop = Arc::new(AtomicBool::new(false));
+    // SAFETY: `CreateEventW` takes no caller-owned memory here — default security attributes, and
+    // a null name. It is created manual-reset (`true`) and unsignalled (`false`) so a single
+    // `SetEvent` in `Drop` releases every watcher thread at once. Ownership stays with
+    // `WatcherGuard`, which closes it after joining; failure returns `None` rather than leaving
+    // threads that could never be woken.
     let Ok(stop_event) = (unsafe { CreateEventW(None, true, false, PCWSTR::null()) }) else {
         return None;
     };
@@ -142,6 +152,11 @@ fn spawn_directory_watcher(
     std::thread::spawn(move || {
         let stop_event = HANDLE(stop_event as *mut _);
         let wide = wide(path.as_os_str());
+        // SAFETY: `wide` is a NUL-terminated UTF-16 buffer alive for the call; the two `None`
+        // arguments are the optional security attributes and template handle.
+        // `FILE_FLAG_BACKUP_SEMANTICS` is what makes opening a *directory* handle legal, and
+        // `FILE_FLAG_OVERLAPPED` is required by the asynchronous `ReadDirectoryChangesW` below.
+        // The handle is closed on every exit path of this thread.
         let handle = unsafe {
             CreateFileW(
                 PCWSTR(wide.as_ptr()),
@@ -156,9 +171,13 @@ fn spawn_directory_watcher(
         let Ok(handle) = handle else {
             return;
         };
+        // SAFETY: as for the stop event, but auto-reset: it is signalled once per completed read
+        // and consumed by the wait below. On failure the directory handle opened above is closed
+        // before returning, so the early exit leaks nothing.
         let change_event = match unsafe { CreateEventW(None, false, false, PCWSTR::null()) } {
             Ok(event) => event,
             Err(_) => {
+                // SAFETY: `handle` is the live directory handle from this thread, closed once.
                 let _ = unsafe { CloseHandle(handle) };
                 return;
             }
@@ -173,6 +192,13 @@ fn spawn_directory_watcher(
             ..Default::default()
         };
         while !stop.load(Ordering::Acquire) {
+            // SAFETY: this starts an *asynchronous* read, so the kernel keeps writing into
+            // `buffer` and `overlapped` after the call returns. Both are declared outside the loop
+            // and outlive every exit path: the `WAIT_OBJECT_0` branch cancels the operation and
+            // then blocks in `GetOverlappedResult` until it has really finished, and the error
+            // branch only breaks after the call itself failed to queue anything. The declared
+            // length matches `buffer`'s real length, so the kernel cannot write past it.
+            // `overlapped.hEvent` is the auto-reset event waited on below.
             if unsafe {
                 ReadDirectoryChangesW(
                     handle,
@@ -192,14 +218,23 @@ fn spawn_directory_watcher(
             {
                 break;
             }
+            // SAFETY: both handles are live — the stop event is kept open by `WatcherGuard` until
+            // after this thread is joined, and the change event is closed only after this loop.
+            // The slice is a live local array of exactly the two handles being waited on.
             let wait =
                 unsafe { WaitForMultipleObjects(&[stop_event, change_event], false, INFINITE) };
             if wait == WAIT_OBJECT_0 {
                 // `CancelIoEx` only *requests* cancellation. Wait for the operation to actually
                 // finish before the buffer and `overlapped` go away, otherwise the kernel may
                 // still write into freed memory.
+                // SAFETY: `handle` is live and `overlapped` identifies the read queued above and
+                // is still at its original address — it is declared outside the loop precisely so
+                // the kernel's pointer stays valid until the wait below confirms completion.
                 let _ = unsafe { CancelIoEx(handle, Some(&overlapped)) };
                 let mut transferred = 0_u32;
+                // SAFETY: the `true` argument blocks until the cancelled I/O has actually
+                // completed, which is what makes it safe for `buffer` and `overlapped` to be
+                // dropped when this thread returns. `transferred` is a live local.
                 let _ = unsafe { GetOverlappedResult(handle, &overlapped, &mut transferred, true) };
                 break;
             }
@@ -207,6 +242,9 @@ fn spawn_directory_watcher(
                 break;
             }
         }
+        // SAFETY: both handles were created by this thread, no I/O is still pending on them (the
+        // loop either never queued a read or waited for its completion above), and this is the
+        // single close for each.
         let _ = unsafe { CloseHandle(change_event) };
         let _ = unsafe { CloseHandle(handle) };
     })
@@ -227,19 +265,30 @@ fn spawn_registry_watcher(
         };
         let wide = wide(OsStr::new(subkey));
         let mut key = HKEY::default();
+        // SAFETY: `root` is a predefined hive handle, `wide` is a NUL-terminated UTF-16 subkey
+        // alive for the call, and `key` is a live local the callee writes. A missing key (the
+        // WOW6432Node hive on a 32-bit-only system, for example) is an error return, and the
+        // thread exits before `key` is used.
         if unsafe { RegOpenKeyExW(root, PCWSTR(wide.as_ptr()), None, KEY_NOTIFY, &mut key) }
             .is_err()
         {
             return;
         }
+        // SAFETY: an auto-reset, unnamed event with default security, as above. On failure the
+        // key opened above is closed before returning.
         let change_event = match unsafe { CreateEventW(None, false, false, PCWSTR::null()) } {
             Ok(event) => event,
             Err(_) => {
+                // SAFETY: `key` was successfully opened above and is closed once.
                 let _ = unsafe { RegCloseKey(key) };
                 return;
             }
         };
         while !stop.load(Ordering::Acquire) {
+            // SAFETY: `key` is open for the whole loop and `change_event` outlives it. The
+            // notification is asynchronous, but unlike the directory watcher it writes nothing
+            // into our memory — it only signals the event — so no buffer has to stay alive.
+            // Re-arming each iteration is required: a registry notification is one-shot.
             if unsafe {
                 RegNotifyChangeKeyValue(
                     key,
@@ -253,6 +302,8 @@ fn spawn_registry_watcher(
             {
                 break;
             }
+            // SAFETY: both handles are live for the same reasons as in the directory watcher —
+            // the stop event outlives every watcher thread, the change event outlives this loop.
             let wait =
                 unsafe { WaitForMultipleObjects(&[stop_event, change_event], false, INFINITE) };
             if wait == WAIT_OBJECT_0 {
@@ -262,6 +313,9 @@ fn spawn_registry_watcher(
                 break;
             }
         }
+        // SAFETY: both were created/opened by this thread and are released once. A pending
+        // registry notification does not reference caller memory, so no completion wait is needed
+        // before closing — unlike the overlapped directory read.
         let _ = unsafe { CloseHandle(change_event) };
         let _ = unsafe { RegCloseKey(key) };
     })

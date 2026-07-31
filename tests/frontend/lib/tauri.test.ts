@@ -30,6 +30,12 @@ describe('tauri app client browser fallback', () => {
 		await expect(
 			tauriAppsClient.onCatalogDelta?.(() => undefined),
 		).resolves.toEqual(expect.any(Function))
+		await expect(tauriAppsClient.getAppDetails('app-id')).rejects.toMatchObject({
+			code: 'DESKTOP_RUNTIME_UNAVAILABLE',
+		})
+		await expect(tauriAppsClient.openAppFolder('app-id')).rejects.toMatchObject({
+			code: 'DESKTOP_RUNTIME_UNAVAILABLE',
+		})
 
 		expect(invokeMock).not.toHaveBeenCalled()
 		expect(listenMock).not.toHaveBeenCalled()
@@ -62,6 +68,7 @@ describe('tauri app client browser fallback', () => {
 		const { APP_ERROR_CODES } = await import('../../../src/lib/clientError')
 		const backend = [
 			'APP_DATA_UNAVAILABLE',
+			'APP_DETAILS_UNAVAILABLE',
 			'CLEAR_ICON_CACHE_FAILED',
 			'CLEAR_UNINSTALL_HISTORY_FAILED',
 			'INVALID_RELEASE_VERSION',
@@ -71,6 +78,7 @@ describe('tauri app client browser fallback', () => {
 			'NO_NEWER_COPY',
 			'OPERATION_FAILED',
 			'OPERATION_INTERRUPTED',
+			'OPEN_FOLDER_UNAVAILABLE',
 			'PRODUCT_NAME_MISSING',
 			'RESET_CATALOG_CACHE_FAILED',
 			'RESET_ICON_CACHE_FAILED',

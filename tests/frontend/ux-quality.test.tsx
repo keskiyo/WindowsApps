@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../src/App'
 import { createAppStore } from '../../src/store/appStore'
@@ -58,6 +59,19 @@ function renderApp(
 		onAppsUpdated: vi.fn().mockResolvedValue(() => undefined),
 		onScanProgress: vi.fn().mockResolvedValue(() => undefined),
 		...overrides,
+		getAppDetails:
+			overrides.getAppDetails ??
+			vi.fn().mockResolvedValue({
+				fileSizeBytes: null,
+				fileCreatedAt: null,
+				fileModifiedAt: null,
+				architecture: 'unknown',
+				signature: 'unavailable',
+				executableExists: null,
+				installLocationExists: null,
+			}),
+		openAppFolder:
+			overrides.openAppFolder ?? vi.fn().mockResolvedValue(undefined),
 	}
 	const systemClient: SystemClient = {
 		getSettings: vi.fn().mockResolvedValue({
@@ -82,7 +96,9 @@ function renderApp(
 		...systemOverrides,
 	}
 	const store = createAppStore(client, localStorage)
-	render(<App store={store} systemClient={systemClient} />)
+	render(
+		<App store={store} systemClient={systemClient} appsClient={client} />,
+	)
 	return { client, store }
 }
 
@@ -360,5 +376,115 @@ describe('UX quality — keyboard & native (round 3)', () => {
 		expect(
 			screen.queryByText(/private-launch-detail/),
 		).not.toBeInTheDocument()
+	})
+
+	// A modal dialog owes the keyboard user their place back. The palette read
+	// `document.activeElement` *after* focusing its own input, so the element it saved to
+	// restore was the input itself — by cleanup time already detached, leaving focus on <body>.
+	it('returns focus to the trigger after the command palette closes', async () => {
+		renderApp()
+		const trigger = await screen.findByRole('button', {
+			name: 'Launch Steam',
+		})
+		trigger.focus()
+		expect(trigger).toHaveFocus()
+
+		await userEvent.keyboard('{Control>}k{/Control}')
+		await screen.findByRole('dialog', { name: 'Quick launch' })
+		await userEvent.keyboard('{Escape}')
+
+		expect(
+			screen.queryByRole('dialog', { name: 'Quick launch' }),
+		).not.toBeInTheDocument()
+		expect(trigger).toHaveFocus()
+	})
+
+	it('keeps focus inside the palette while it is open', async () => {
+		renderApp()
+		await screen.findByText('Steam')
+		await userEvent.keyboard('{Control>}k{/Control}')
+		const dialog = await screen.findByRole('dialog', {
+			name: 'Quick launch',
+		})
+
+		expect(
+			screen.getByRole('combobox', { name: 'Quick launch search' }),
+		).toHaveFocus()
+		await userEvent.tab()
+		expect(dialog.contains(document.activeElement)).toBe(true)
+	})
+
+	// One failed operation, one message. The store also wrote the failure into its global
+	// `error`, which App turned into a second toast beside the contextual one from
+	// useAppFeedback — the same problem reported twice, once without any Retry affordance.
+	it('reports a failed launch exactly once', async () => {
+		// spyOn returns the existing spy when the method is already wrapped, so the history has
+		// to be cleared or earlier tests in this file inflate the count.
+		const errorToast = vi.spyOn(toast, 'error').mockClear()
+		renderApp({
+			launchApp: vi.fn().mockRejectedValue(new Error('access denied')),
+		})
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Launch Steam' }),
+		)
+		await screen.findByText('Could not launch Steam')
+
+		expect(errorToast).toHaveBeenCalledTimes(1)
+	})
+
+	it('reports a failed refresh exactly once', async () => {
+		// spyOn returns the existing spy when the method is already wrapped, so the history has
+		// to be cleared or earlier tests in this file inflate the count.
+		const errorToast = vi.spyOn(toast, 'error').mockClear()
+		renderApp({
+			refreshApps: vi.fn().mockRejectedValue(new Error('scan failed')),
+		})
+		await screen.findByText('Steam')
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Scan for apps' }),
+		)
+		await screen.findByText('Could not refresh the application list')
+
+		expect(errorToast).toHaveBeenCalledTimes(1)
+	})
+
+	it('reports a failed uninstall exactly once', async () => {
+		// spyOn returns the existing spy when the method is already wrapped, so the history has
+		// to be cleared or earlier tests in this file inflate the count.
+		const errorToast = vi.spyOn(toast, 'error').mockClear()
+		renderApp({
+			uninstallApp: vi.fn().mockRejectedValue(new Error('denied')),
+		})
+		await userEvent.click(
+			await screen.findByRole('button', {
+				name: 'Manage Visual Studio Code',
+			}),
+		)
+		await userEvent.click(
+			await screen.findByRole('menuitem', { name: /Uninstall/i }),
+		)
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Confirm uninstall' }),
+		)
+		await screen.findByText('Could not uninstall Visual Studio Code')
+
+		expect(errorToast).toHaveBeenCalledTimes(1)
+	})
+
+	// The header counted every primary app including the ones the user had hidden, so the number
+	// disagreed with the cards on screen the moment anything was hidden.
+	it('counts only the cards the grid actually shows', async () => {
+		renderApp()
+		const header = await screen.findByRole('banner')
+		expect(within(header).getByText('2 apps')).toBeInTheDocument()
+
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Manage Steam' }),
+		)
+		await userEvent.click(
+			await screen.findByRole('menuitem', { name: /Hide/i }),
+		)
+
+		expect(within(header).getByText('1 app')).toBeInTheDocument()
 	})
 })
