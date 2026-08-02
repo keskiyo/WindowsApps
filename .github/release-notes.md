@@ -2,7 +2,7 @@ Windows Apps is a fast, private application catalog and launcher for Windows 10 
 
 ## Highlights
 
-- important fix ui
+- Important fix ui
 
 ## Install
 
