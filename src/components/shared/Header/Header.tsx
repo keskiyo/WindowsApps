@@ -28,7 +28,7 @@ export function Header({
 			: `${appCount} ${appCount === 1 ? 'app' : 'apps'}`
 	return (
 		<header className='app-header-glass sticky top-0 z-300 border-b border-slate-300/65 shadow-(--shadow-header)'>
-			<div className='mx-auto flex w-full max-w-375 items-start gap-3 px-5 pt-4.75 pb-4.75 sm:px-8 md:items-center'>
+			<div className='mx-auto flex w-full max-w-375 items-start gap-3 px-5 pt-4.75 pb-4 sm:px-8 md:items-center'>
 				{showMenu && (
 					<button
 						ref={menuButtonRef}

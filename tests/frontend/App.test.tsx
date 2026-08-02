@@ -324,7 +324,8 @@ describe('App', () => {
 		expect(screen.getByText('Visual Studio Code')).toBeInTheDocument()
 	})
 
-	it('renders persisted category order with accessible reorder controls', async () => {
+	it('renders persisted category order with sidebar reorder controls', async () => {
+		setDesktopNavigation(true)
 		localStorage.setItem(
 			PREFERENCES_KEY,
 			JSON.stringify({
@@ -341,16 +342,19 @@ describe('App', () => {
 			headings.slice(0, 2).map(heading => heading.textContent),
 		).toEqual(['Browsers', 'Games'])
 		expect(
-			screen.getByRole('button', { name: 'Reorder Games category' }),
-		).toBeInTheDocument()
+			within(
+				screen.getByRole('navigation', { name: 'App navigation' }),
+			).getByRole('button', { name: 'Games' }),
+		).toHaveAttribute('aria-roledescription', 'sortable')
 	})
 
-	it('uses the title for collapse while preserving keyboard reordering', async () => {
+	it('uses the title for collapse while keeping reordering in the sidebar', async () => {
+		setDesktopNavigation(true)
 		renderApp()
 		await screen.findByText('Steam')
-		const reorder = screen.getByRole('button', {
-			name: 'Reorder Games category',
-		})
+		const reorder = within(
+			screen.getByRole('navigation', { name: 'App navigation' }),
+		).getByRole('button', { name: 'Games' })
 		const toggle = screen.getByRole('button', { name: 'Collapse Games' })
 		expect(toggle).toHaveTextContent('Games')
 		expect(toggle).toHaveTextContent('1 app')
@@ -839,9 +843,9 @@ describe('App', () => {
 		expect(
 			await screen.findByText('Visual Studio Code'),
 		).toBeInTheDocument()
-		expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+		expect(Element.prototype.scrollTo).toHaveBeenCalledWith({
+			top: 0,
 			behavior: 'smooth',
-			block: 'start',
 		})
 	})
 })

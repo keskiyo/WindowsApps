@@ -81,9 +81,11 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 	const installerLaunch = useInstallerLaunch(feedback.launch)
 	const navigation = useCatalogNavigation({
 		collapsedCategories: state.collapsedCategories,
+		activeView,
 		setActiveView: state.setActiveView,
 		toggleCategory: state.toggleCategory,
 		closeDrawer,
+		isCatalogReady: !isLoading && activeView === 'all',
 	})
 	async function confirmUninstall() {
 		if (!uninstall.app) return
@@ -289,9 +291,6 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 										favoriteAppIds={state.favoriteAppIds}
 										onToggleCategory={state.toggleCategory}
 										onToggleFavorite={state.toggleFavorite}
-										onReorderCategory={
-											state.reorderCategory
-										}
 										onMoveApp={state.moveApp}
 										onLaunch={installerLaunch.requestLaunch}
 										onInfo={appInfoDialog.open}

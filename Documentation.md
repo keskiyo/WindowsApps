@@ -318,9 +318,11 @@ Windows Features is based on known names, targets, and package identities. A gen
 Users can:
 
 - create, rename, delete, and reorder categories;
-- drag a category by holding and moving its header;
+- reorder categories from the sidebar by holding and moving a category row;
 - click anywhere on a category header to collapse or expand it (the chevron is a state indicator);
 - click a category in the sidebar to navigate to it;
+
+All Apps does not reorder categories: category ordering is available only from the sidebar. All Apps application drags render a fixed preview while their source remains in place without a transform, preventing grid overflow and clipped layouts. Pointer drags test the real pointer position against their scroll boundary, so autoscroll does not cancel an in-bounds drag; leaving the All Apps panel or sidebar still clears the preview and cancels the eventual drop. Sidebar category dragging uses the same fixed-preview approach, so labels and the sidebar width stay stable during a drag. Selecting a category from another view waits until All Apps is mounted, then aligns the selected section below the sticky header with a 12 px gap. The alignment rechecks live geometry until it is stable, covering deferred card layout from `content-visibility` without unbounded work. Switching categories inside All Apps starts with a smooth native scroll, waits for real scroll movement to settle, then makes one final smooth alignment. Reduced-motion users retain instant motion. Keyboard reordering remains available through the existing hidden activator.
 - move applications between categories;
 - mark applications as Favorites;
 - hide and later restore applications.

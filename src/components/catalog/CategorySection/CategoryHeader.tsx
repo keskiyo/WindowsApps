@@ -1,5 +1,4 @@
 import { ChevronDown, ChevronRight, Pencil } from 'lucide-react'
-import type { PointerEventHandler } from 'react'
 import type { AppCategory } from '../../../types'
 
 interface Props {
@@ -7,7 +6,6 @@ interface Props {
 	label: string
 	appCount: number
 	collapsed: boolean
-	titlePointerDown?: PointerEventHandler<HTMLButtonElement>
 	onToggle(): void
 	onEdit(): void
 }
@@ -17,7 +15,6 @@ export function CategoryHeader({
 	label,
 	appCount,
 	collapsed,
-	titlePointerDown,
 	onToggle,
 	onEdit,
 }: Props) {
@@ -37,9 +34,8 @@ export function CategoryHeader({
 				aria-expanded={collapsible ? !collapsed : undefined}
 				aria-disabled={collapsible ? undefined : true}
 				aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
-				onPointerDown={titlePointerDown}
 				onClick={collapsible ? onToggle : undefined}
-				className={`group flex h-full min-w-0 flex-1 cursor-grab items-center rounded-l-lg px-2 text-left focus-visible:z-1 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-violet-500 active:cursor-grabbing${collapsible ? '' : ' opacity-60'}`}
+				className={`group flex h-full min-w-0 flex-1 cursor-pointer items-center rounded-l-lg px-2 text-left focus-visible:z-1 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-violet-500${collapsible ? '' : ' opacity-60'}`}
 			>
 				<span
 					aria-hidden='true'

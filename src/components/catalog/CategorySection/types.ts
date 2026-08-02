@@ -1,4 +1,3 @@
-import type { PointerEventHandler } from 'react'
 import type { AppCategory, AppInfo, CategoryDefinition } from '../../../types'
 
 export interface CategorySectionProps {
@@ -9,7 +8,7 @@ export interface CategorySectionProps {
 	apps: AppInfo[]
 	collapsed: boolean
 	favoriteAppIds: string[]
-	titlePointerDown?: PointerEventHandler<HTMLButtonElement>
+	activeAppId?: string | null
 	onToggle(): void
 	onToggleFavorite(id: string): void
 	onLaunch(app: AppInfo): Promise<void>

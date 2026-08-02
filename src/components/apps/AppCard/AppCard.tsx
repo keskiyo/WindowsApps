@@ -27,6 +27,7 @@ function AppCardComponent({
 	onHide,
 	onRestore,
 	onDemote,
+	isDragPreviewActive = false,
 }: AppCardProps) {
 	const [menuOpen, setMenuOpen] = useState(false)
 	const launching = useIsLaunching(app.id)
@@ -50,9 +51,13 @@ function AppCardComponent({
 			onPointerMove={spotlight.onPointerMove}
 			onPointerEnter={spotlight.onPointerEnter}
 			onPointerLeave={spotlight.onPointerLeave}
-			style={{ transform: CSS.Translate.toString(draggable.transform) }}
+			style={{
+				transform: draggable.isDragging
+					? undefined
+					: CSS.Translate.toString(draggable.transform),
+			}}
 			data-launching={launching || undefined}
-			className={`app-card app-card-glass cv-card group relative min-h-34 rounded-[1.15rem] border border-white/85 transition-[transform,border-color,box-shadow,opacity] duration-200 ease-out hover:-translate-y-0.5 focus-within:border-violet-400/45 ${menuOpen ? 'z-100' : ''} ${draggable.isDragging ? 'z-40 opacity-60' : ''}`}
+			className={`app-card app-card-glass cv-card group relative min-h-34 rounded-[1.15rem] border border-white/85 transition-[transform,border-color,box-shadow,opacity] duration-200 ease-out hover:-translate-y-0.5 focus-within:border-violet-400/45 ${menuOpen ? 'z-100' : ''} ${draggable.isDragging && isDragPreviewActive ? 'z-40 opacity-60' : ''}`}
 		>
 			<SpotlightLayer size={110} />
 			<button

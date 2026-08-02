@@ -16,7 +16,6 @@ export interface AppGridProps {
 	favoriteAppIds: string[]
 	onToggleCategory(category: AppCategory): void
 	onToggleFavorite(id: string): void
-	onReorderCategory(active: AppCategory, over: AppCategory): void
 	onMoveApp(id: string, category: AppCategory): void
 	onRenameCategory(
 		id: string,

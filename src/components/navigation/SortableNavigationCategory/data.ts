@@ -12,6 +12,12 @@ type CategoryAccent =
 	| 'slate'
 	| 'neutral'
 
+export const navigationCategoryRowClass =
+	'navigation-category-row relative flex w-full items-center rounded-lg border border-[var(--border-neutral)] border-l-2 bg-[var(--surface-panel)] px-3 py-2 text-left text-sm text-[var(--text-primary)]'
+
+export const navigationCategoryCountClass =
+	'navigation-category-count ml-auto shrink-0 rounded-md border px-1.5 py-0.5 text-xs'
+
 const BUILT_IN_CATEGORY_ACCENTS: Record<string, CategoryAccent> = {
 	games: 'yellow',
 	ai: 'cyan',

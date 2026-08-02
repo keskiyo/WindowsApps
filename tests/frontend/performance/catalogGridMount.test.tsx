@@ -69,7 +69,6 @@ function renderGrid(size: number) {
 			favoriteAppIds={[]}
 			onToggleCategory={vi.fn()}
 			onToggleFavorite={vi.fn()}
-			onReorderCategory={vi.fn()}
 			onMoveApp={vi.fn()}
 			onLaunch={vi.fn().mockResolvedValue(undefined)}
 			onInfo={vi.fn()}

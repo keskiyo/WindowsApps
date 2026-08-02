@@ -1,10 +1,10 @@
 import {
+	DragOverlay,
 	DndContext,
 	KeyboardSensor,
 	PointerSensor,
 	useSensor,
 	useSensors,
-	type DragEndEvent,
 } from '@dnd-kit/core'
 import {
 	SortableContext,
@@ -12,16 +12,18 @@ import {
 	verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { EyeOff, Grid2X2, Plus, Settings, Star, Wrench } from 'lucide-react'
-import { useState } from 'react'
-import { getDropAction } from '../../../lib/catalog'
+import { useRef, useState } from 'react'
 import { categoryLabel } from '../../../types'
 import { CategoryNameEditor } from '../../shared/CategoryNameEditor'
 import { SortableNavigationCategory } from '../SortableNavigationCategory'
+import { CategoryDragOverlay } from './CategoryDragOverlay'
 import { NavItem } from './NavItem'
 import type { AppNavigationProps } from './types'
+import { useNavigationCategoryDrag } from './useNavigationCategoryDrag'
 
 export function AppNavigation(props: AppNavigationProps) {
 	const [adding, setAdding] = useState(false)
+	const navigationRef = useRef<HTMLElement>(null)
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
 		useSensor(KeyboardSensor, {
@@ -35,17 +37,16 @@ export function AppNavigation(props: AppNavigationProps) {
 	const categoryAccents = new Map(
 		props.categories.map(category => [category.id, category.accent]),
 	)
-	function handleDragEnd(event: DragEndEvent) {
-		const action = getDropAction(
-			event.active.data.current,
-			event.over?.data.current,
-		)
-		if (action?.type === 'reorder-category') {
-			props.onReorderCategory(action.active, action.over)
-		}
-	}
+	const categoryDrag = useNavigationCategoryDrag({
+		navigationRef,
+		onReorderCategory: props.onReorderCategory,
+	})
+	const activeDefinition = props.categories.find(
+		category => category.id === categoryDrag.activeCategory,
+	)
 	return (
 		<nav
+			ref={navigationRef}
 			aria-label='App navigation'
 			className='flex min-h-0 flex-1 flex-col'
 		>
@@ -97,7 +98,13 @@ export function AppNavigation(props: AppNavigationProps) {
 						/>
 					</div>
 				)}
-				<DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+				<DndContext
+					sensors={sensors}
+					cancelDrop={categoryDrag.cancelDrop}
+					onDragStart={categoryDrag.handleDragStart}
+					onDragEnd={categoryDrag.handleDragEnd}
+					onDragCancel={categoryDrag.handleDragCancel}
+				>
 					<SortableContext
 						items={visibleCategories.map(
 							category => `navigation-category:${category}`,
@@ -115,11 +122,26 @@ export function AppNavigation(props: AppNavigationProps) {
 										category,
 									)}
 									accent={categoryAccents.get(category)}
+									isDragPreviewActive={
+										categoryDrag.activeCategory === category
+									}
 									onSelect={props.onSelectCategory}
 								/>
 							))}
 						</div>
 					</SortableContext>
+					<DragOverlay dropAnimation={null}>
+						{activeDefinition && categoryDrag.activeCategory && (
+							<CategoryDragOverlay
+								category={categoryDrag.activeCategory}
+								count={
+									props.counts.get(categoryDrag.activeCategory) ?? 0
+								}
+								label={activeDefinition.label}
+								accent={activeDefinition.accent}
+							/>
+						)}
+					</DragOverlay>
 				</DndContext>
 			</div>
 			<div className='border-t border-[var(--border-neutral)] p-4'>

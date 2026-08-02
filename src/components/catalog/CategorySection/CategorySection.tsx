@@ -16,7 +16,7 @@ export function CategorySection({
 	apps,
 	collapsed,
 	favoriteAppIds,
-	titlePointerDown,
+	activeAppId,
 	onToggle,
 	onToggleFavorite,
 	onLaunch,
@@ -64,7 +64,6 @@ export function CategorySection({
 						label={label}
 						appCount={apps.length}
 						collapsed={collapsed}
-						titlePointerDown={titlePointerDown}
 						onToggle={onToggle}
 						onEdit={() => setEditing(true)}
 					/>
@@ -88,6 +87,7 @@ export function CategorySection({
 								key={app.id}
 								app={app}
 								isFavorite={favoriteAppIds.includes(app.id)}
+								isDragPreviewActive={activeAppId === app.id}
 								categories={categories}
 								categoryOrder={categoryOrder}
 								onToggleFavorite={onToggleFavorite}

@@ -1,32 +1,25 @@
 import {
 	closestCenter,
+	DragOverlay,
 	DndContext,
-	KeyboardSensor,
 	PointerSensor,
 	useSensor,
 	useSensors,
-	type DragEndEvent,
 } from '@dnd-kit/core'
 import {
-	SortableContext,
-	sortableKeyboardCoordinates,
-	verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import {
-	getDropAction,
 	groupAppsByCategory,
 	sortFavoritesFirst,
-	type DragData,
 } from '../../../lib/catalog'
-import { SortableCategorySection } from '../SortableCategorySection'
+import { useRef } from 'react'
+import { AppDragOverlay } from '../../apps/AppCard/AppDragOverlay'
+import { CategorySection } from '../CategorySection/CategorySection'
 import type { AppGridProps } from './types'
+import { useCatalogDrag } from './useCatalogDrag'
 
 export function CategoryList(props: AppGridProps) {
+	const listRef = useRef<HTMLDivElement>(null)
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-		useSensor(KeyboardSensor, {
-			coordinateGetter: sortableKeyboardCoordinates,
-		}),
 	)
 	const groups = groupAppsByCategory(props.apps)
 	const visibleCategories = props.categoryOrder.filter(
@@ -35,71 +28,71 @@ export function CategoryList(props: AppGridProps) {
 			props.categories.find(item => item.id === category)?.builtIn ===
 				false,
 	)
-	function dragEnd(event: DragEndEvent) {
-		const action = getDropAction(
-			event.active.data.current as DragData | undefined,
-			event.over?.data.current as DragData | undefined,
-		)
-		if (action?.type === 'move-app')
-			props.onMoveApp(action.appId, action.category)
-		if (action?.type === 'reorder-category')
-			props.onReorderCategory(action.active, action.over)
-	}
+	const drag = useCatalogDrag({
+		listRef,
+		onMoveApp: props.onMoveApp,
+	})
+	const preview = drag.preview
+	const activeApp =
+		preview?.type === 'app'
+			? props.apps.find(app => app.id === preview.appId)
+			: null
 	return (
 		<DndContext
 			sensors={sensors}
 			collisionDetection={closestCenter}
-			onDragEnd={dragEnd}
+			cancelDrop={drag.cancelDrop}
+			onDragStart={drag.handleDragStart}
+			onDragEnd={drag.handleDragEnd}
+			onDragCancel={drag.handleDragCancel}
 		>
-			<SortableContext
-				items={visibleCategories.map(
-					category => `category-sort:${category}`,
-				)}
-				strategy={verticalListSortingStrategy}
+			<div
+				ref={listRef}
+				aria-label='Applications by category'
+				className='space-y-5'
 			>
-				<div
-					aria-label='Applications by category'
-					className='space-y-5'
-				>
-					{visibleCategories.map(category => {
-						const definition = props.categories.find(
-							item => item.id === category,
-						)
-						if (!definition) return null
-						return (
-							<SortableCategorySection
-								key={category}
-								category={category}
-								definition={definition}
-								categories={props.categories}
-								categoryOrder={props.categoryOrder}
-								apps={sortFavoritesFirst(
-									groups.get(category) ?? [],
-									props.favoriteAppIds,
-								)}
-								collapsed={
-									!props.hasQuery &&
-									props.collapsedCategories.includes(category)
-								}
-								favoriteAppIds={props.favoriteAppIds}
-								onToggle={() =>
-									props.onToggleCategory(category)
-								}
-								onToggleFavorite={props.onToggleFavorite}
-								onLaunch={props.onLaunch}
-								onMoveApp={props.onMoveApp}
-								onInfo={props.onInfo}
-								onUninstall={props.onUninstall}
-								onHide={props.onHide}
-								onRestore={props.onRestore}
-								onDemote={props.onDemoteAuxiliary}
-								onRenameCategory={props.onRenameCategory}
-								onDeleteCategory={props.onDeleteCategory}
-							/>
-						)
-					})}
-				</div>
-			</SortableContext>
+				{visibleCategories.map(category => {
+					const definition = props.categories.find(
+						item => item.id === category,
+					)
+					if (!definition) return null
+					return (
+						<CategorySection
+							key={category}
+							category={category}
+							definition={definition}
+							categories={props.categories}
+							categoryOrder={props.categoryOrder}
+							apps={sortFavoritesFirst(
+								groups.get(category) ?? [],
+								props.favoriteAppIds,
+							)}
+							collapsed={
+								!props.hasQuery &&
+								props.collapsedCategories.includes(category)
+							}
+							favoriteAppIds={props.favoriteAppIds}
+							activeAppId={
+								preview?.type === 'app' ? preview.appId : null
+							}
+							onToggle={() => props.onToggleCategory(category)}
+							onToggleFavorite={props.onToggleFavorite}
+							onLaunch={props.onLaunch}
+							onMoveApp={props.onMoveApp}
+							onInfo={props.onInfo}
+							onUninstall={props.onUninstall}
+							onHide={props.onHide}
+							onRestore={props.onRestore}
+							onDemote={props.onDemoteAuxiliary}
+							onRenameCategory={props.onRenameCategory}
+							onDeleteCategory={props.onDeleteCategory}
+						/>
+					)
+				})}
+			</div>
+			<DragOverlay dropAnimation={null}>
+				{activeApp && <AppDragOverlay app={activeApp} />}
+			</DragOverlay>
 		</DndContext>
 	)
 }
