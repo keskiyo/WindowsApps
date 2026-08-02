@@ -7,8 +7,9 @@ mod score;
 mod signals;
 mod tables;
 
-use super::{AppCategory, AppInfo, SourceKind};
+use super::{AppCategory, AppInfo, LaunchKind, SourceKind};
 use signals::Signals;
+use std::path::Path;
 
 /// Final category for a fully resolved catalog entry (runs after deduplication). A Steam entry is
 /// Games by construction; everything else is decided by the weighted scorer, which reads the
@@ -17,7 +18,21 @@ pub(crate) fn classify_app(app: &AppInfo) -> AppCategory {
     if app.source_kind == SourceKind::Steam {
         return AppCategory::Games;
     }
+    if is_wsl_start_app(app) {
+        return AppCategory::Development;
+    }
     score::best(&Signals::from_app(app))
+}
+
+fn is_wsl_start_app(app: &AppInfo) -> bool {
+    app.source_kind == SourceKind::StartApps
+        && app.launch_kind == LaunchKind::AppUserModelId
+        && app.resolved_path.as_deref().is_some_and(|target| {
+            Path::new(target.trim().trim_matches('"'))
+                .file_name()
+                .and_then(|file| file.to_str())
+                .is_some_and(|file| file.eq_ignore_ascii_case("wsl.exe"))
+        })
 }
 
 /// Provisional category during scanning, when only a display name and a path are known. The merged
@@ -62,6 +77,7 @@ mod tests {
             name: fixture.name.clone(),
             path: fixture.path.clone(),
             icon_base64: None,
+            artifact_kind: Default::default(),
             category: AppCategory::default(),
             launch_kind: if fixture.path.ends_with(".lnk") {
                 LaunchKind::Shortcut
@@ -109,5 +125,17 @@ mod tests {
                 fixture.name
             );
         }
+    }
+
+    #[test]
+    fn wsl_backed_start_app_is_development() {
+        let fixture: Fixture = serde_json::from_str(
+            r#"{"name":"Opaque distribution","path":"Vendor.Opaque!App","source":"start_apps","resolvedPath":"C:\\Program Files\\WSL\\wsl.exe","expected":"development"}"#,
+        )
+        .unwrap();
+        let mut app = build(&fixture);
+        app.launch_kind = LaunchKind::AppUserModelId;
+
+        assert_eq!(classify_app(&app), AppCategory::Development);
     }
 }

@@ -28,6 +28,21 @@ describe('preferences', () => {
 		)
 	})
 
+	it('appends the reserved Installers & Docs category to saved preferences', () => {
+		const normalized = normalizePreferences({
+			version: 8,
+			categories: [{ id: 'games', label: 'Games', builtIn: true }],
+			categoryOrder: ['games'],
+		})
+
+		expect(normalized.categories).toContainEqual({
+			id: 'installers_docs',
+			label: 'Installers & Docs',
+			builtIn: true,
+		})
+		expect(normalized.categoryOrder).toContain('installers_docs')
+	})
+
 	it('migrates v7 custom categories with stable accents and durable identities', () => {
 		const migrated = normalizePreferences({
 			version: 7,

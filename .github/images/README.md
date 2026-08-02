@@ -15,6 +15,8 @@ a space has to be percent-encoded in a Markdown image URL and silently breaks wh
 | ---------------------- | ---------------------------------------------------------------------------------------------- |
 | `catalog.png`          | Hero shot: main catalog, wide window, sidebar visible, populated categories with real icons.     |
 | `auxiliary-tools.png`  | The Auxiliary tools view with the count tiles across the top.                                    |
+| `app-info.png`         | The App information dialog — size, dates, architecture, signature, install status.               |
+| `settings.png`         | Settings with scan diagnostics and catalog maintenance.                                          |
 
 ## Worth adding later
 
@@ -22,9 +24,7 @@ Not referenced yet — add the file, then add the `<img>` tag to the README in t
 
 | File               | What to capture                                                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `app-info.png`     | The App information dialog with everything populated — size, dates, architecture, a **Verified** signature. This is the v0.2.8 headline feature and currently has no picture anywhere. |
 | `search.png`       | The `Ctrl+K` quick-launch palette open, with a query typed and ranked results.                                             |
-| `settings.png`     | Settings showing scan diagnostics and the update section.                                                                  |
 
 ## Capture guidance
 

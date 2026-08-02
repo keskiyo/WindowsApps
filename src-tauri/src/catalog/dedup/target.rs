@@ -68,8 +68,8 @@ pub(super) fn launch_target(app: &AppInfo) -> Option<&str> {
 }
 
 /// Interpreter/host executables whose behaviour is defined by their arguments, so the host path
-/// alone does not identify the tool. Mirrors `start_apps::is_generic_host_target` (see FRAG-1 in
-/// the audit: these lists should eventually share one source).
+/// alone does not identify the tool. Start Apps retain these targets as launch evidence, but every
+/// identity and merge consumer passes through this predicate.
 pub(super) fn is_generic_interpreter_host(path: &str) -> bool {
     const HOSTS: &[&str] = &[
         "cmd.exe",

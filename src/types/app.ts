@@ -10,6 +10,7 @@ export type AppSourceKind =
 	| 'portable'
 export type UninstallMechanism = 'registered_command' | 'msi' | 'msix'
 export type AppVisibilityClass = 'primary' | 'auxiliary' | 'rejected'
+export type AppArtifactKind = 'application' | 'installer' | 'documentation'
 export type AppArchitecture =
 	| 'x86'
 	| 'x64'
@@ -43,6 +44,7 @@ export interface AppInfo {
 	name: string
 	path: string
 	iconBase64: string | null
+	artifactKind?: AppArtifactKind
 	category: AppCategory
 	launchKind: AppLaunchKind
 	sourceKind: AppSourceKind
@@ -74,7 +76,13 @@ export interface AppDetails {
 	canOpenFolder?: boolean
 }
 
-export type AppView = 'all' | 'favorites' | 'settings' | 'hidden' | 'auxiliary'
+export type AppView =
+	| 'all'
+	| 'favorites'
+	| 'settings'
+	| 'hidden'
+	| 'auxiliary'
+	| 'installers_docs'
 
 export interface CatalogSnapshot {
 	apps: AppInfo[]

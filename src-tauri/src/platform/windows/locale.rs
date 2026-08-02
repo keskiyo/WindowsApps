@@ -1,7 +1,9 @@
 //! The current user's Windows UI language reduced to the one distinction the catalog acts on: is
-//! it a Cyrillic-script locale or not. A merged card can carry both a localized and an English name
-//! (a Russian Start-Menu shortcut plus an English registry entry); this decides which script the
-//! user should see so a non-Russian user is never shown Cyrillic when a Latin name exists.
+//! it Russian or not. A merged card can carry both a localized and an English name (a Russian
+//! Start-Menu shortcut plus an English registry entry); this decides which the user should see.
+//!
+//! The product ships two card languages, Russian and English, and nothing else. Everyone who is
+//! not on a Russian Windows reads English, which is also the language of the entire interface.
 
 use windows::Win32::Globalization::GetUserDefaultLocaleName;
 
@@ -13,9 +15,9 @@ pub(crate) enum NameScript {
     Other,
 }
 
-/// Script of the current user's Windows UI language: `Cyrillic` for Russian and the other
-/// Cyrillic-script locales, otherwise `Latin`. Falls back to `Latin` when the locale cannot be
-/// read — the safe default that never forces a non-Russian user to read Cyrillic.
+/// Script of the current user's Windows UI language: `Cyrillic` for Russian, `Latin` for every
+/// other language. Falls back to `Latin` when the locale cannot be read — the safe default, since
+/// English is the language the whole audience shares.
 pub(crate) fn os_ui_script() -> NameScript {
     // LOCALE_NAME_MAX_LENGTH is 85 wide chars, including the null terminator.
     let mut buffer = [0u16; 85];
@@ -33,21 +35,15 @@ pub(crate) fn os_ui_script() -> NameScript {
 }
 
 /// Pure classification of a BCP-47 locale name (`ru-ru`, `sr-cyrl-rs`, `en-us`, `kk-kz`).
+///
+/// Russian is the only language that reads a localized card name; every other language reads the
+/// English one. That is the product's language policy, not a limitation of this function: the
+/// interface itself is English throughout because it is the one language the whole audience shares,
+/// so a Ukrainian or Serbian-Cyrillic user seeing Cyrillic card names inside an English interface
+/// would be reading a mix, not a translation.
 fn locale_name_script(name: &str) -> NameScript {
-    if name.contains("cyrl") {
-        return NameScript::Cyrillic;
-    }
-    // Latin-script variants are tagged explicitly (`sr-latn-…`, `uz-latn-…`); trust that over the
-    // language subtag, which is otherwise ambiguous for a few languages.
-    if name.contains("latn") {
-        return NameScript::Latin;
-    }
-    const CYRILLIC_LANGUAGES: &[&str] = &[
-        "ru", "uk", "be", "bg", "mk", "sr", "kk", "ky", "tg", "mn", "tt", "ba", "cv", "sah", "ce",
-        "os", "ab", "kv",
-    ];
     let primary = name.split('-').next().unwrap_or(name);
-    if CYRILLIC_LANGUAGES.contains(&primary) {
+    if primary == "ru" {
         NameScript::Cyrillic
     } else {
         NameScript::Latin
@@ -59,11 +55,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn maps_locale_names_to_script() {
-        for name in ["ru-ru", "uk-ua", "kk-kz", "sr-cyrl-rs", "mn-mn"] {
+    fn only_russian_reads_localized_names() {
+        for name in ["ru", "ru-ru", "ru-by", "ru-kz"] {
             assert_eq!(locale_name_script(name), NameScript::Cyrillic, "{name}");
         }
-        for name in ["en-us", "de-de", "sr-latn-rs", "uz-latn-uz", "ja-jp"] {
+        // Every other language, Cyrillic-script or not, reads the English name.
+        for name in [
+            "en-us",
+            "de-de",
+            "ja-jp",
+            "uk-ua",
+            "kk-kz",
+            "sr-cyrl-rs",
+            "mn-mn",
+            "bg-bg",
+        ] {
             assert_eq!(locale_name_script(name), NameScript::Latin, "{name}");
         }
     }

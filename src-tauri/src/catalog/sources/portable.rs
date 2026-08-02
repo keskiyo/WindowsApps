@@ -66,9 +66,13 @@ pub(in crate::catalog) fn is_portable_candidate(path: &Path) -> bool {
         .unwrap_or_default()
         .to_string_lossy()
         .to_lowercase();
-    if crate::catalog::filters::is_installer_file_name(&stem)
-        || crate::catalog::filters::is_helper_executable_stem(&stem)
+    if crate::catalog::filters::is_uninstall_target_path(path)
+        || stem.contains("redist")
+        || stem.contains("redistributable")
     {
+        return false;
+    }
+    if crate::catalog::filters::is_helper_executable_stem(&stem) {
         return false;
     }
     let name = path
@@ -126,10 +130,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn rejects_installer_helper_and_documentation_executables() {
+    fn keeps_installers_but_rejects_helpers_and_documentation_executables() {
         for path in [
-            r"C:\Apps\setup-app.exe",
-            r"C:\Apps\App-Installer.exe",
             r"C:\Apps\vcredist_x64.exe",
             r"C:\Apps\unins000.exe",
             r"C:\Apps\readme.exe",
@@ -142,10 +144,16 @@ mod tests {
             r"C:\Apps\gettext.exe",
             r"C:\Apps\printf_gettext.exe",
             r"C:\Apps\printf_ngettext.exe",
-            r"C:\Downloads\tsetup-x64.7.3.4.exe",
         ] {
             assert!(!is_portable_candidate(Path::new(path)), "{path}");
         }
+        assert!(is_portable_candidate(Path::new(r"C:\Apps\setup-app.exe")));
+        assert!(is_portable_candidate(Path::new(
+            r"C:\Apps\App-Installer.exe"
+        )));
+        assert!(is_portable_candidate(Path::new(
+            r"C:\Downloads\tsetup-x64.7.3.4.exe"
+        )));
         assert!(is_portable_candidate(Path::new(r"C:\Apps\rufus-4.11p.exe")));
         assert!(is_portable_candidate(Path::new(r"C:\Apps\Notepad.exe")));
     }

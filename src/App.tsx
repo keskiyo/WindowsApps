@@ -4,6 +4,7 @@ import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
 import { AppGrid } from './components/catalog/AppGrid/AppGrid'
 import { AppInfoDialog } from './components/dialogs/AppInfoDialog/AppInfoDialog'
+import { InstallerLaunchDialog } from './components/dialogs/InstallerLaunchDialog/InstallerLaunchDialog'
 import { UninstallDialog } from './components/dialogs/UninstallDialog'
 import { AppDrawer } from './components/navigation/AppDrawer'
 import { AppSidebar } from './components/navigation/AppSidebar'
@@ -21,6 +22,7 @@ import { useIconRecovery } from './hooks/useIconRecovery'
 import { useAppInfoDialog } from './hooks/useAppInfoDialog'
 import { useCatalogView } from './hooks/useCatalogView'
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
+import { useInstallerLaunch } from './hooks/useInstallerLaunch'
 import { useStaleCopy } from './hooks/useStaleCopy'
 import { useUninstallFlow } from './hooks/useUninstallFlow'
 import { useUpdater } from './hooks/useUpdater'
@@ -76,6 +78,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		onRefresh: state.refresh,
 		onUninstall: state.uninstall,
 	})
+	const installerLaunch = useInstallerLaunch(feedback.launch)
 	const navigation = useCatalogNavigation({
 		collapsedCategories: state.collapsedCategories,
 		setActiveView: state.setActiveView,
@@ -290,7 +293,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 											state.reorderCategory
 										}
 										onMoveApp={state.moveApp}
-										onLaunch={feedback.launch}
+										onLaunch={installerLaunch.requestLaunch}
 										onInfo={appInfoDialog.open}
 										onUninstall={uninstall.select}
 										onHide={state.hideApp}
@@ -312,7 +315,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 				{drawerMounted && !desktopNavigation && (
 					<AppDrawer
 						open={drawerOpen}
-						apps={visibleCategorizedApps}
+						counts={navigationCounts}
 						categoryOrder={state.categoryOrder}
 						categories={state.categories}
 						activeView={state.activeView}
@@ -331,7 +334,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 				{paletteOpen && (
 					<CommandPalette
 						apps={paletteApps}
-						onLaunch={feedback.launch}
+						onLaunch={installerLaunch.requestLaunch}
 						onClose={() => setPaletteOpen(false)}
 					/>
 				)}
@@ -351,6 +354,14 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 						previewError={uninstall.previewError}
 						onClose={uninstall.close}
 						onConfirm={confirmUninstall}
+					/>
+				)}
+				{installerLaunch.app && (
+					<InstallerLaunchDialog
+						app={installerLaunch.app}
+						pending={installerLaunch.pending}
+						onCancel={installerLaunch.cancel}
+						onConfirm={installerLaunch.confirm}
 					/>
 				)}
 				<Toaster

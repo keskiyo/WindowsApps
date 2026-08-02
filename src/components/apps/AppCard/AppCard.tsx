@@ -3,6 +3,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Grip } from 'lucide-react'
 import { memo, useCallback, useRef, useState } from 'react'
 import { useSpotlight } from '../../../hooks/useSpotlight'
+import { isCatalogArtifact } from '../../../lib/catalogArtifacts'
 import { useIsLaunching } from '../../../store/useIsLaunching'
 import { SpotlightLayer } from '../../shared/SpotlightLayer'
 import { AppActionsMenu } from '../AppActionsMenu/AppActionsMenu'
@@ -36,9 +37,11 @@ function AppCardComponent({
 		gripRef.current?.focus()
 	}, [])
 	const spotlight = useSpotlight()
+	const artifact = isCatalogArtifact(app)
 	const draggable = useDraggable({
 		id: `app:${app.id}`,
 		data: { type: 'app', appId: app.id, category: app.category },
+		disabled: artifact,
 	})
 	return (
 		<article
@@ -90,7 +93,7 @@ function AppCardComponent({
 			>
 				<Grip size={16} aria-hidden='true' />
 			</button>
-			{!isAuxiliary && (
+			{!isAuxiliary && !artifact && (
 				<FavoriteButton
 					appName={app.name}
 					isFavorite={isFavorite}

@@ -45,14 +45,17 @@ mod tests {
     #[test]
     fn loads_and_persists_a_sanitized_cache() {
         let dir = tempfile::tempdir().unwrap();
+        // A shortcut that only opens a folder in Explorer is rejected structurally, so this test
+        // proves the sanitize write-back rather than any particular vocabulary.
+        let mut shell_shortcut = cached_app("Windows Kits", r"C:\Menu\Windows Kits.lnk");
+        shell_shortcut.resolved_path = Some(r"C:\Windows\explorer.exe".into());
+        shell_shortcut.launch_arguments =
+            Some(r#""C:\Program Files (x86)\Windows Kits\10\""#.into());
         cache::write_document(
             dir.path(),
             &CatalogCache {
                 apps: vec![
-                    cached_app(
-                        "Visual Studio Installer",
-                        "Microsoft.VisualStudio.Installer",
-                    ),
+                    shell_shortcut,
                     cached_app("Visual Studio Code", r"C:\Code.exe"),
                 ],
                 ..CatalogCache::default()

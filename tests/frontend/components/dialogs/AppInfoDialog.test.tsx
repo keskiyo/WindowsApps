@@ -189,4 +189,19 @@ describe('AppInfoDialog', () => {
 		expect(screen.getByRole('button', { name: 'Open folder' })).toBeEnabled()
 	})
 
+	it('shows the original file name without repeating the launch type', async () => {
+		renderDialog({
+			app: {
+				...app,
+				originalFilename: 'example-editor.exe',
+			},
+		})
+
+		await screen.findByText('Application')
+		expect(screen.getByText('Original filename')).toBeVisible()
+		expect(screen.getByText('example-editor.exe')).toBeVisible()
+		expect(screen.getAllByText('Launch type')).toHaveLength(1)
+		expect(screen.queryByText('Method')).not.toBeInTheDocument()
+	})
+
 })

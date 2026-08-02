@@ -80,6 +80,7 @@ pub(crate) struct IncrementalScanResult {
     pub limit_reached: Option<ScanLimit>,
 }
 
+#[cfg(test)]
 pub(crate) fn scan_root(
     root: &Path,
     previous: &FilesystemIndex,
@@ -97,6 +98,27 @@ pub(crate) fn scan_root(
     )
 }
 
+pub(crate) fn scan_root_with_duration(
+    root: &Path,
+    previous: &FilesystemIndex,
+    mode: ScanMode,
+    excluded: &[PathBuf],
+    is_cancelled: impl Fn() -> bool,
+    max_duration: Duration,
+) -> IncrementalScanResult {
+    scan_root_with_limits(
+        root,
+        previous,
+        mode,
+        excluded,
+        is_cancelled,
+        ScanLimits {
+            max_duration,
+            ..ScanLimits::default()
+        },
+    )
+}
+
 fn scan_root_with_limits(
     root: &Path,
     previous: &FilesystemIndex,
@@ -111,6 +133,8 @@ fn scan_root_with_limits(
         statistics: ScanStatistics::default(),
         limit_reached: None,
     };
+    // Resolved once per root: the shell's known folders do not change during a walk.
+    let facts = crate::catalog::machine::MachineFacts::current();
     let context = VisitContext {
         previous,
         mode,
@@ -118,6 +142,7 @@ fn scan_root_with_limits(
         is_cancelled: &is_cancelled,
         limits,
         started_at: Instant::now(),
+        facts: &facts,
     };
     visit_directory(root, 0, &context, &mut result);
     result
@@ -133,6 +158,7 @@ struct VisitContext<'a, F: Fn() -> bool> {
     is_cancelled: &'a F,
     limits: ScanLimits,
     started_at: Instant,
+    facts: &'a crate::catalog::machine::MachineFacts,
 }
 
 fn visit_directory<F: Fn() -> bool>(
@@ -211,7 +237,7 @@ fn visit_directory<F: Fn() -> bool>(
             }
         } else if file_type.is_file() && portable::is_portable_candidate(&path) {
             result.statistics.executables_inspected += 1;
-            if let Some(app) = portable_app(path) {
+            if let Some(app) = portable_app(path, context.facts) {
                 direct_apps.push(app);
             }
         }

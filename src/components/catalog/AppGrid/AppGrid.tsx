@@ -1,6 +1,7 @@
 import { AuxiliaryGrid } from '../AuxiliaryGrid'
 import { FavoritesGrid } from '../FavoritesGrid'
 import { HiddenGrid } from '../HiddenGrid'
+import { InstallersDocsGrid } from '../InstallersDocsGrid/InstallersDocsGrid'
 import { CategoryList } from './CategoryList'
 import { EmptyState } from './EmptyState'
 import { Skeleton } from './Skeleton'
@@ -70,6 +71,8 @@ export function AppGrid(props: AppGridProps) {
 				onDemote={props.onDemoteAuxiliary}
 			/>
 		)
+	if (props.activeView === 'installers_docs')
+		return <InstallersDocsGrid {...props} />
 	if (!props.apps.length) return <EmptyState hasQuery={props.hasQuery} />
 	return <CategoryList {...props} />
 }

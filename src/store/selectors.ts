@@ -5,6 +5,10 @@ import {
 	rankAppsByQueryTop,
 } from '../lib/catalogSearch'
 import type { AppInfo, AppView } from '../types'
+import {
+	INSTALLERS_DOCS_CATEGORY,
+	isCatalogArtifact,
+} from '../lib/catalogArtifacts'
 import type { AppState } from './appStore'
 
 export { filterAppsByQuery, rankAppsByQuery, rankAppsByQueryTop }
@@ -19,14 +23,24 @@ export function filterVisibleApps(
 	// Set lookups, not Array.includes: this runs over the whole catalog on every
 	// hydration patch, so a linear scan per app makes it O(apps × hidden).
 	const hidden = new Set(hiddenAppIds)
+	if (activeView === 'installers_docs')
+		return categorized.filter(
+			app => isCatalogArtifact(app) && !hidden.has(app.id),
+		)
 	if (activeView === 'auxiliary')
 		return categorized.filter(
-			app => app.visibilityClass === 'auxiliary' && !hidden.has(app.id),
+			app =>
+				!isCatalogArtifact(app) &&
+				app.visibilityClass === 'auxiliary' &&
+				!hidden.has(app.id),
 		)
 	if (activeView === 'hidden')
 		return categorized.filter(app => hidden.has(app.id))
 	const visible = categorized.filter(
-		app => app.visibilityClass !== 'auxiliary' && !hidden.has(app.id),
+		app =>
+			!isCatalogArtifact(app) &&
+			app.visibilityClass !== 'auxiliary' &&
+			!hidden.has(app.id),
 	)
 	if (activeView !== 'favorites') return visible
 	const favorites = new Set(favoriteAppIds)
@@ -76,6 +90,14 @@ export function selectCatalogCounts(
 	for (const app of categorized) {
 		const isHidden = hidden.has(app.id)
 		if (isHidden) hiddenCount += 1
+		if (isCatalogArtifact(app)) {
+			if (!isHidden)
+				navigationCounts.set(
+					INSTALLERS_DOCS_CATEGORY,
+					(navigationCounts.get(INSTALLERS_DOCS_CATEGORY) ?? 0) + 1,
+				)
+			continue
+		}
 		if (app.visibilityClass === 'auxiliary') {
 			classifiedAuxiliaryCount += 1
 			if (!isHidden) auxiliaryCount += 1
@@ -121,6 +143,11 @@ export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 	const promotedIdentities = new Set(state.promotedAppIdentities)
 	return deduplicateVisibleApps(
 		state.apps.map(app => {
+			if (isCatalogArtifact(app)) {
+				return app.category === INSTALLERS_DOCS_CATEGORY
+					? app
+					: { ...app, category: INSTALLERS_DOCS_CATEGORY }
+			}
 			// Identity-first: the durable override (keyed by canonicalIdentity) wins so a manual
 			// category survives a Force full scan / Reset cache / dedup change that renamed the id.
 			const category =
@@ -131,6 +158,8 @@ export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 				] ??
 				state.categoryOverrides[app.id] ??
 				app.category
+			const safeCategory =
+				category === INSTALLERS_DOCS_CATEGORY ? app.category : category
 			const promote =
 				app.visibilityClass === 'auxiliary' &&
 				(promotedIds.has(app.id) ||
@@ -139,8 +168,8 @@ export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 							app.canonicalIdentity ??
 							app.id,
 					))
-			if (category === app.category && !promote) return app
-			const categorized = { ...app, category }
+			if (safeCategory === app.category && !promote) return app
+			const categorized = { ...app, category: safeCategory }
 			return promote
 				? {
 						...categorized,

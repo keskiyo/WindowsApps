@@ -1,3 +1,4 @@
+pub(super) mod installer_cache;
 pub(super) mod portable;
 pub(super) mod registry;
 pub(crate) mod source;

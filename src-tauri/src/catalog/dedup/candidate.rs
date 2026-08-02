@@ -10,7 +10,7 @@ use super::target::{
     is_system_tool_target, launch_target, normalize_path, parent_path, steam_app_id,
     system_tool_alias,
 };
-use crate::catalog::{AppInfo, LaunchKind, SourceKind};
+use crate::catalog::{AppInfo, LaunchKind, SourceKind, VisibilityReason};
 use std::path::Path;
 
 #[derive(Clone, Debug)]
@@ -81,8 +81,25 @@ impl CandidateIdentity {
     }
 }
 
+/// An entry visibility demoted because it performs a side action on a product — "reset preferences
+/// and cache files", an updater, a help link — rather than opening it.
+///
+/// Such a record is never the best representative of a merged card. It matters because a shortcut
+/// outranks a plain executable on the score below, and these entries resolve to the very executable
+/// they act upon: without this, the merged VLC card inherited `--reset-config` and launching it
+/// from the catalog wiped the user's settings. They only reach deduplication at all because word-
+/// based markers demote instead of rejecting.
+fn is_side_action(app: &AppInfo) -> bool {
+    app.visibility_reasons.iter().any(|reason| {
+        matches!(
+            reason,
+            VisibilityReason::MaintenanceExecutable | VisibilityReason::DocumentationShortcut
+        )
+    })
+}
+
 pub(super) fn candidate_score(app: &AppInfo) -> u8 {
-    if is_helper_candidate(app) {
+    if is_helper_candidate(app) || is_side_action(app) {
         return 1;
     }
     if app.source_kind == SourceKind::Steam {
@@ -103,6 +120,13 @@ pub(super) fn candidate_score(app: &AppInfo) -> u8 {
         .and_then(|value| value.to_str())
     {
         Some(extension) if extension.eq_ignore_ascii_case("lnk") => return 4,
+        Some(extension)
+            if extension.eq_ignore_ascii_case("url")
+                && app.source_kind == SourceKind::StartMenu
+                && app.launch_kind == LaunchKind::Shortcut =>
+        {
+            return 4;
+        }
         Some(extension) if extension.eq_ignore_ascii_case("exe") => return 3,
         _ => {}
     }

@@ -11,6 +11,7 @@ export const CATEGORY_ORDER = [
 	'security',
 	'utilities',
 	'system',
+	'installers_docs',
 	'windows_features',
 	'other',
 ] as const
@@ -46,6 +47,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
 	security: 'Security & Privacy',
 	utilities: 'Utilities',
 	system: 'System',
+	installers_docs: 'Installers & Docs',
 	windows_features: 'Windows Features',
 	other: 'Other',
 }

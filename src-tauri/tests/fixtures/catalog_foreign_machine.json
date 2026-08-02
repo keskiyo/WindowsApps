@@ -1,0 +1,124 @@
+[
+	{
+		"name": "Total Uninstall",
+		"path": "F:\\Programy\\TotalUninstall\\TotalUninst.exe",
+		"source": "portable",
+		"publisher": "Gavrila Martau",
+		"description": "Total Uninstall",
+		"mustBePrimary": true
+	},
+	{
+		"name": "IObit Uninstaller",
+		"path": "G:\\Programme\\IObit\\Uninstaller\\IObitUnin.exe",
+		"source": "registry",
+		"canUninstall": true,
+		"publisher": "IObit",
+		"description": "IObit Uninstaller",
+		"mustBePrimary": true
+	},
+	{
+		"name": "Universal USB Installer",
+		"path": "F:\\Narzedzia\\UniversalUSB\\uusb.exe",
+		"source": "portable",
+		"publisher": "Pendrivelinux",
+		"description": "Universal USB Installer",
+		"mustBePrimary": true
+	},
+	{
+		"name": "Inno Setup",
+		"path": "D:\\Programmi\\Inno Setup 6\\Compil32.exe",
+		"source": "registry",
+		"canUninstall": true,
+		"publisher": "jrsoftware.org",
+		"description": "Inno Setup",
+		"mustBePrimary": true
+	},
+	{
+		"name": "Windows Sandbox",
+		"path": "C:\\Menu\\Windows Sandbox.lnk",
+		"resolvedPath": "C:\\Windows\\System32\\WindowsSandbox.exe",
+		"source": "start_menu",
+		"mustBePrimary": true
+	},
+	{
+		"name": "Krita",
+		"path": "G:\\Programme\\Krita (x64)\\bin\\krita.exe",
+		"source": "registry",
+		"canUninstall": true,
+		"publisher": "Krita Foundation",
+		"description": "Krita",
+		"mustBePrimary": true
+	},
+	{
+		"name": "Bitwarden",
+		"path": "C:\\Users\\Kowalski\\AppData\\Local\\Programs\\Bitwarden\\Bitwarden.exe",
+		"source": "portable",
+		"publisher": "Bitwarden Inc.",
+		"description": "Bitwarden",
+		"mustBePrimary": true
+	},
+	{
+		"name": "Sandboxie Plus",
+		"path": "D:\\Programmi\\Sandboxie-Plus\\SandMan.exe",
+		"source": "registry",
+		"canUninstall": true,
+		"publisher": "David Xanatos",
+		"description": "Sandboxie Manager",
+		"mustBePrimary": true
+	},
+	{
+		"name": "Assistente di installazione",
+		"path": "D:\\Programmi\\Contabilita\\avvio.exe",
+		"source": "portable",
+		"publisher": "Contabilita Srl",
+		"description": "Avvio guidato",
+		"mustBePrimary": true
+	},
+	{
+		"name": "Hilfe",
+		"path": "C:\\Menu\\Vendor\\Hilfe.lnk",
+		"resolvedPath": "D:\\Programme\\Vendor\\hilfe.chm",
+		"source": "start_menu",
+		"kind": "documentation"
+	},
+	{
+		"name": "Aide utilisateur",
+		"path": "C:\\Menu\\Vendor\\Aide utilisateur.lnk",
+		"resolvedPath": "D:\\Programmes\\Vendor\\guide.pdf",
+		"source": "start_menu",
+		"kind": "documentation"
+	},
+	{
+		"name": "Guia do usuario",
+		"path": "C:\\Menu\\Vendor\\Guia do usuario.lnk",
+		"resolvedPath": "https://vendor.example/pt-br/guia",
+		"source": "start_menu",
+		"kind": "documentation"
+	},
+	{
+		"name": "Instalator sterownikow",
+		"path": "F:\\Pobrane\\sterowniki-setup.exe",
+		"source": "portable",
+		"kind": "installer"
+	},
+	{
+		"name": "Programma di installazione",
+		"path": "D:\\Distr\\contabilita_setup_2024.exe",
+		"source": "portable",
+		"kind": "installer"
+	},
+	{
+		"name": "Microsoft.VCLibs.140.00",
+		"path": "Microsoft.VCLibs.140.00_8wekyb3d8bbwe",
+		"source": "msix",
+		"structuralRejection": true
+	},
+	{
+		"name": "Narzedzia systemowe",
+		"path": "C:\\Menu\\Narzedzia systemowe.lnk",
+		"resolvedPath": "C:\\Windows\\explorer.exe",
+		"launchArguments": "\"C:\\Windows\\System32\"",
+		"source": "start_menu",
+		"structuralRejection": true
+	}
+]

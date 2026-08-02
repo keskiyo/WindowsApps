@@ -87,6 +87,26 @@ function client(overrides: Partial<AppsClient> = {}): AppsClient {
 }
 
 describe('app store', () => {
+	it('blocks favorites and category moves across the artifact boundary', () => {
+		const installer = app({
+			id: 'setup',
+			name: 'Editor Setup',
+			path: String.raw`C:\Downloads\setup.exe`,
+			category: 'installers_docs',
+			artifactKind: 'installer',
+		})
+		const store = createAppStore(client())
+		store.setState({ apps: [...apps, installer] })
+
+		store.getState().toggleFavorite(installer.id)
+		store.getState().moveApp(installer.id, 'games')
+		store.getState().moveApp('code', 'installers_docs')
+
+		expect(store.getState().favoriteAppIds).toEqual([])
+		expect(store.getState().categoryOverrides).toEqual({})
+		expect(store.getState().categoryOverrideIdentities).toEqual({})
+	})
+
 	it('keeps auxiliary tools out of the normal catalog and search', () => {
 		const store = createAppStore(client())
 		store.setState({

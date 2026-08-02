@@ -1,6 +1,6 @@
 use crate::catalog::incremental::FilesystemIndex;
 use crate::catalog::source::SourceSnapshot;
-use crate::catalog::{AppDetails, AppInfo};
+use crate::catalog::{AppCategory, AppDetails, AppInfo, ArtifactKind};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
@@ -8,8 +8,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 const CACHE_FILE: &str = "apps-cache.json";
-/// 8 recomputes cached detail records after the canonical local-folder target change.
-pub(crate) const CACHE_SCHEMA_VERSION: u32 = 8;
+/// 9 persists artifact classification and rebuilds sources that previously filtered installers.
+pub(crate) const CACHE_SCHEMA_VERSION: u32 = 9;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,11 +80,15 @@ pub(crate) fn read_document(app_data_dir: &Path) -> Option<CatalogCache> {
 }
 
 fn parse_document(bytes: &[u8]) -> Option<CatalogCache> {
+    // Artifact kind is recomputed on every load, and installer evidence reads where a file lives.
+    // Resolved once per document, never per record.
+    let places = crate::catalog::machine::MachineFacts::current();
     if let Ok(mut document) = serde_json::from_slice::<CatalogCache>(bytes) {
         if document.schema_version == CACHE_SCHEMA_VERSION {
+            promote_cached_artifacts(&mut document, &places);
             return Some(document);
         }
-        if matches!(document.schema_version, 2..=7) {
+        if matches!(document.schema_version, 2..=8) {
             // Visibility classification arrived in 4; older documents need it recomputed.
             if document.schema_version < 4 {
                 for app in &mut document.apps {
@@ -103,6 +107,20 @@ fn parse_document(bytes: &[u8]) -> Option<CatalogCache> {
             if document.schema_version < 8 {
                 document.app_details.clear();
             }
+            if document.schema_version < 9 {
+                for app in &mut document.apps {
+                    classify_artifact(app, &places);
+                }
+                document.sources.retain(|snapshot| {
+                    !matches!(snapshot.key.0.as_str(), "portable" | "installer-cache")
+                });
+                for snapshot in &mut document.sources {
+                    for app in &mut snapshot.apps {
+                        classify_artifact(app, &places);
+                    }
+                }
+                document.filesystem_index = FilesystemIndex::default();
+            }
             document.schema_version = CACHE_SCHEMA_VERSION;
             return Some(document);
         }
@@ -111,12 +129,56 @@ fn parse_document(bytes: &[u8]) -> Option<CatalogCache> {
     let mut apps = serde_json::from_slice::<Vec<AppInfo>>(bytes).ok()?;
     for app in &mut apps {
         app.icon_base64 = None;
-        crate::catalog::visibility::apply_visibility(app);
+        classify_artifact(app, &places);
     }
     Some(CatalogCache {
         apps,
         ..CatalogCache::default()
     })
+}
+
+fn classify_artifact(app: &mut AppInfo, places: &crate::catalog::machine::MachineFacts) {
+    app.artifact_kind = crate::catalog::artifact::classify(app, None, places);
+    if app.artifact_kind != ArtifactKind::Application {
+        app.category = AppCategory::InstallersDocs;
+    }
+    crate::catalog::visibility::apply_visibility(app);
+}
+
+fn promote_cached_artifacts(
+    document: &mut CatalogCache,
+    places: &crate::catalog::machine::MachineFacts,
+) {
+    for app in &mut document.apps {
+        promote_artifact(app, places);
+    }
+    for snapshot in &mut document.sources {
+        for app in &mut snapshot.apps {
+            promote_artifact(app, places);
+        }
+    }
+    for directory in document.filesystem_index.directories.values_mut() {
+        for app in &mut directory.apps {
+            promote_artifact(app, places);
+        }
+    }
+}
+
+fn promote_artifact(app: &mut AppInfo, places: &crate::catalog::machine::MachineFacts) {
+    if app.artifact_kind != ArtifactKind::Application {
+        if app.category != AppCategory::InstallersDocs {
+            app.category = AppCategory::InstallersDocs;
+            crate::catalog::visibility::apply_visibility(app);
+        }
+        return;
+    }
+    let artifact_kind = crate::catalog::artifact::classify(app, None, places);
+    if artifact_kind == ArtifactKind::Application {
+        return;
+    }
+    app.artifact_kind = artifact_kind;
+    app.category = AppCategory::InstallersDocs;
+    crate::catalog::visibility::apply_visibility(app);
 }
 
 pub(crate) fn write_document(app_data_dir: &Path, document: &CatalogCache) -> io::Result<()> {
@@ -167,7 +229,10 @@ pub(crate) fn reset(app_data_dir: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::AppInfo;
+    use crate::app_state::cached_app;
+    use crate::catalog::incremental::DirectoryRecord;
+    use crate::catalog::source::{SourceKey, SourceSnapshot};
+    use crate::catalog::{AppCategory, AppInfo, ArtifactKind, LaunchKind, SourceKind};
 
     #[test]
     fn ignores_corrupt_cache() {
@@ -212,6 +277,199 @@ mod tests {
     }
 
     #[test]
+    fn migrates_v8_for_artifact_discovery_without_losing_user_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let ordinary = cached_app("Editor", r"C:\Editor.exe");
+        let mut docs = cached_app("Application Verifier Help", r"C:\Menu\Verifier Help.lnk");
+        docs.launch_kind = LaunchKind::Shortcut;
+        docs.source_kind = SourceKind::StartMenu;
+        docs.canonical_identity = Some("docs:verifier".into());
+        docs.preference_identity = Some("preference:verifier".into());
+        let mut filesystem_index = FilesystemIndex::default();
+        filesystem_index.directories.insert(
+            r"D:\Apps".into(),
+            DirectoryRecord {
+                modified_nanos: 1,
+                child_directories: Vec::new(),
+                apps: vec![ordinary.clone()],
+            },
+        );
+        let mut app_details = BTreeMap::new();
+        app_details.insert(
+            docs.id.clone(),
+            CachedAppDetails {
+                fingerprint: "stable".into(),
+                details: AppDetails::default(),
+            },
+        );
+        let document = CatalogCache {
+            schema_version: 8,
+            generation: 17,
+            apps: vec![ordinary, docs.clone()],
+            sources: vec![
+                SourceSnapshot {
+                    key: SourceKey("start-menu".into()),
+                    fingerprint: None,
+                    apps: vec![docs],
+                },
+                SourceSnapshot {
+                    key: SourceKey("portable".into()),
+                    fingerprint: None,
+                    apps: Vec::new(),
+                },
+                SourceSnapshot {
+                    key: SourceKey("installer-cache".into()),
+                    fingerprint: None,
+                    apps: Vec::new(),
+                },
+            ],
+            filesystem_index,
+            last_successful_sync: Some(10),
+            diagnostics: None,
+            app_details,
+        };
+        std::fs::write(
+            dir.path().join(CACHE_FILE),
+            serde_json::to_vec(&document).unwrap(),
+        )
+        .unwrap();
+
+        let migrated = read_document(dir.path()).unwrap();
+
+        assert_eq!(migrated.schema_version, 9);
+        let docs = migrated
+            .apps
+            .iter()
+            .find(|app| app.name == "Application Verifier Help")
+            .unwrap();
+        assert_eq!(docs.artifact_kind, ArtifactKind::Documentation);
+        assert_eq!(docs.category, AppCategory::InstallersDocs);
+        assert_eq!(docs.canonical_identity.as_deref(), Some("docs:verifier"));
+        assert_eq!(
+            docs.preference_identity.as_deref(),
+            Some("preference:verifier")
+        );
+        assert!(migrated.filesystem_index.directories.is_empty());
+        assert!(migrated.sources.iter().all(|snapshot| {
+            !matches!(snapshot.key.0.as_str(), "portable" | "installer-cache")
+        }));
+        assert_eq!(migrated.app_details.len(), 1);
+    }
+
+    #[test]
+    fn current_schema_promotes_new_structural_artifact_rules_without_rescan() {
+        let dir = tempfile::tempdir().unwrap();
+        let amd = cached_app(
+            "AMD Software Compatibility Tool",
+            r"C:\Program Files\AMD\CIM\BIN64\AMDSoftwareCompatibilityTool.exe",
+        );
+        let mut docs = cached_app(
+            "Tools for Desktop Apps",
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Windows Kits\Windows Software Development Kit\Tools for Desktop Apps.lnk",
+        );
+        docs.launch_kind = LaunchKind::Shortcut;
+        docs.source_kind = SourceKind::StartMenu;
+        docs.resolved_path = Some(
+            r"C:\Program Files (x86)\Windows Kits\10\Shortcuts\DesktopDevCenterToolsDocumentation.url"
+                .into(),
+        );
+        let mut existing_installer = cached_app("Yandex setup", r"E:\Apps\Yandex 32bit.exe");
+        existing_installer.artifact_kind = ArtifactKind::Installer;
+        existing_installer.category = AppCategory::Other;
+        let mut filesystem_index = FilesystemIndex::default();
+        filesystem_index.directories.insert(
+            r"D:\Apps".into(),
+            DirectoryRecord {
+                modified_nanos: 1,
+                child_directories: Vec::new(),
+                apps: vec![amd.clone()],
+            },
+        );
+        let document = CatalogCache {
+            schema_version: CACHE_SCHEMA_VERSION,
+            apps: vec![amd.clone(), docs.clone(), existing_installer],
+            sources: vec![SourceSnapshot {
+                key: SourceKey("start-menu".into()),
+                fingerprint: None,
+                apps: vec![amd, docs],
+            }],
+            filesystem_index,
+            ..CatalogCache::default()
+        };
+        std::fs::write(
+            dir.path().join(CACHE_FILE),
+            serde_json::to_vec(&document).unwrap(),
+        )
+        .unwrap();
+
+        let loaded = read_document(dir.path()).unwrap();
+
+        assert_eq!(loaded.apps[0].artifact_kind, ArtifactKind::Installer);
+        assert_eq!(loaded.apps[0].category, AppCategory::InstallersDocs);
+        assert_eq!(loaded.apps[1].artifact_kind, ArtifactKind::Documentation);
+        assert_eq!(loaded.apps[1].category, AppCategory::InstallersDocs);
+        assert_eq!(loaded.apps[2].artifact_kind, ArtifactKind::Installer);
+        assert_eq!(loaded.apps[2].category, AppCategory::InstallersDocs);
+        assert_eq!(
+            loaded.sources[0].apps[0].artifact_kind,
+            ArtifactKind::Installer
+        );
+        assert_eq!(
+            loaded.sources[0].apps[1].artifact_kind,
+            ArtifactKind::Documentation
+        );
+        assert_eq!(loaded.filesystem_index.directories.len(), 1);
+        assert_eq!(
+            loaded.filesystem_index.directories[r"D:\Apps"].apps[0].artifact_kind,
+            ArtifactKind::Installer
+        );
+    }
+
+    #[test]
+    fn current_schema_promotes_url_backed_start_app_documentation() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut website = cached_app("Node.js website", "https://nodejs.org/");
+        website.source_kind = SourceKind::StartApps;
+        website.launch_kind = LaunchKind::AppUserModelId;
+        website.resolved_path = Some("https://nodejs.org/".into());
+        let mut filesystem_index = FilesystemIndex::default();
+        filesystem_index.directories.insert(
+            r"D:\Apps".into(),
+            DirectoryRecord {
+                modified_nanos: 1,
+                child_directories: Vec::new(),
+                apps: vec![cached_app("Editor", r"D:\Apps\Editor.exe")],
+            },
+        );
+        let document = CatalogCache {
+            schema_version: CACHE_SCHEMA_VERSION,
+            apps: vec![website.clone()],
+            sources: vec![SourceSnapshot {
+                key: SourceKey("start-apps".into()),
+                fingerprint: None,
+                apps: vec![website],
+            }],
+            filesystem_index,
+            ..CatalogCache::default()
+        };
+        std::fs::write(
+            dir.path().join(CACHE_FILE),
+            serde_json::to_vec(&document).unwrap(),
+        )
+        .unwrap();
+
+        let loaded = read_document(dir.path()).unwrap();
+
+        assert_eq!(loaded.apps[0].artifact_kind, ArtifactKind::Documentation);
+        assert_eq!(loaded.apps[0].category, AppCategory::InstallersDocs);
+        assert_eq!(
+            loaded.sources[0].apps[0].artifact_kind,
+            ArtifactKind::Documentation
+        );
+        assert_eq!(loaded.filesystem_index.directories.len(), 1);
+    }
+
+    #[test]
     fn migrates_legacy_array_to_lightweight_versioned_cache() {
         let dir = tempfile::tempdir().unwrap();
         let mut legacy = AppInfo {
@@ -219,6 +477,7 @@ mod tests {
             name: "Editor".into(),
             path: r"C:\Editor.exe".into(),
             icon_base64: Some("data:image/png;base64,abc".into()),
+            artifact_kind: Default::default(),
             category: Default::default(),
             launch_kind: Default::default(),
             source_kind: Default::default(),
@@ -264,6 +523,7 @@ mod tests {
             name: "iconv".into(),
             path: r"C:\Git\usr\bin\iconv.exe".into(),
             icon_base64: None,
+            artifact_kind: Default::default(),
             category: Default::default(),
             launch_kind: Default::default(),
             source_kind: crate::catalog::SourceKind::Portable,
@@ -306,6 +566,7 @@ mod tests {
             name: "Firefox".into(),
             path: r"C:\Menu\Firefox.lnk".into(),
             icon_base64: None,
+            artifact_kind: Default::default(),
             category: Default::default(),
             launch_kind: Default::default(),
             source_kind: Default::default(),
@@ -416,7 +677,7 @@ mod tests {
             .iter()
             .map(|snapshot| snapshot.key.0.as_str())
             .collect::<Vec<_>>();
-        assert_eq!(keys, vec!["steam", "portable"]);
+        assert_eq!(keys, vec!["steam"]);
     }
 
     #[test]
@@ -441,7 +702,7 @@ mod tests {
 
         assert_eq!(migrated.schema_version, CACHE_SCHEMA_VERSION);
         assert_eq!(migrated.generation, 21);
-        assert_eq!(migrated.sources.len(), 1);
+        assert!(migrated.sources.is_empty());
         assert!(migrated.app_details.is_empty());
     }
 

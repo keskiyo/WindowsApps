@@ -22,11 +22,21 @@ pub(crate) enum AppCategory {
     Utilities,
     System,
     WindowsFeatures,
+    InstallersDocs,
     // `serde(other)` makes an unrecognized category from a newer cache degrade to Other instead of
     // failing the whole document — an older build must not discard a cache a newer build wrote.
     #[default]
     #[serde(other)]
     Other,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ArtifactKind {
+    #[default]
+    Application,
+    Installer,
+    Documentation,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
@@ -69,6 +79,8 @@ pub(crate) struct AppInfo {
     pub name: String,
     pub path: String,
     pub icon_base64: Option<String>,
+    #[serde(default)]
+    pub artifact_kind: ArtifactKind,
     #[serde(default)]
     pub category: AppCategory,
     #[serde(default)]

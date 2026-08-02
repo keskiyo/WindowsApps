@@ -6,6 +6,7 @@
 
 mod document;
 mod hydration;
+mod portable;
 mod scan;
 pub(crate) mod scan_control;
 mod watcher;
@@ -16,7 +17,7 @@ pub(crate) use scan::run_coordinated_scan;
 pub(crate) use watcher::restart_change_watcher;
 
 use crate::catalog::cache::{CatalogCache, CatalogDiagnostics};
-use crate::catalog::incremental::{scan_root, FilesystemIndex, ScanMode};
+use crate::catalog::incremental::{ScanMode, DEFAULT_MAX_DURATION};
 use crate::catalog::scan_settings::ScanSettings;
 use crate::catalog::source::{merge_sources, SourceKey, SourceSnapshot};
 use crate::catalog::sync::scan_control::ScanControl;
@@ -131,6 +132,26 @@ pub(crate) fn synchronize(
     // `None` means PowerShell could not run, not "no Start apps" — see `start_apps::scan`.
     let start_apps = catalog::start_apps::scan(&control);
 
+    let installer_roots = catalog::installer_cache::roots();
+    progress(ScanProgress {
+        stage: "Installer caches".into(),
+        location: None,
+        completed_roots: 0,
+        total_roots: installer_roots.len(),
+    });
+    let installer_budget = control.stage_with(
+        catalog::installer_cache::MAX_DURATION,
+        catalog::installer_cache::MAX_ENTRIES,
+        catalog::installer_cache::MAX_DEPTH,
+    );
+    let installer_cache = catalog::installer_cache::scan_roots(&installer_roots, &installer_budget);
+    progress(ScanProgress {
+        stage: "Installer caches".into(),
+        location: None,
+        completed_roots: installer_roots.len(),
+        total_roots: installer_roots.len(),
+    });
+
     let libraries = catalog::steam::installed_libraries();
     let mut steam_apps = Vec::new();
     progress(ScanProgress {
@@ -181,40 +202,24 @@ pub(crate) fn synchronize(
     } else {
         ScanMode::Incremental
     };
-    let mut portable_apps = Vec::new();
-    let mut filesystem_index = FilesystemIndex::default();
-    progress(ScanProgress {
-        stage: "Portable applications".into(),
-        location: None,
-        completed_roots: 0,
-        total_roots: roots.len(),
-    });
-    for (index, root) in roots.iter().enumerate() {
-        if is_cancelled() {
-            break;
-        }
-        let scanned = scan_root(
-            root,
-            &previous.filesystem_index,
+    let previous_portable_apps = previous
+        .sources
+        .iter()
+        .find(|snapshot| snapshot.key.0 == "portable")
+        .map(|snapshot| snapshot.apps.as_slice())
+        .unwrap_or_default();
+    let portable = portable::scan_roots(
+        portable::PortableScanInput {
+            previous_apps: previous_portable_apps,
+            previous_index: &previous.filesystem_index,
+            roots: &roots,
+            excluded: &excluded,
             mode,
-            &excluded,
-            &is_cancelled,
-        );
-        let limit_reached = scanned.limit_reached;
-        portable_apps.extend(scanned.apps);
-        filesystem_index
-            .directories
-            .extend(scanned.index.directories);
-        progress(ScanProgress {
-            stage: limit_reached.map_or_else(
-                || "Portable applications".into(),
-                |limit| format!("Portable applications · {}", limit.message()),
-            ),
-            location: Some(root.to_string_lossy().into_owned()),
-            completed_roots: index + 1,
-            total_roots: roots.len(),
-        });
-    }
+            max_duration: DEFAULT_MAX_DURATION,
+        },
+        &progress,
+        &is_cancelled,
+    );
 
     // One snapshot per scanner, so a scanner that failed can be left out of `updates` and keep
     // its previous snapshot instead of being replaced by an empty one. Merging all of Windows
@@ -229,7 +234,7 @@ pub(crate) fn synchronize(
         SourceSnapshot {
             key: SourceKey("portable".into()),
             fingerprint: None,
-            apps: portable_apps,
+            apps: portable.apps,
         },
     ];
     if registry.stop.is_none() {
@@ -251,6 +256,13 @@ pub(crate) fn synchronize(
             key: SourceKey(catalog::source::START_APPS_SOURCE.into()),
             fingerprint: None,
             apps,
+        });
+    }
+    if installer_cache.stop.is_none() {
+        updates.push(SourceSnapshot {
+            key: SourceKey(catalog::source::INSTALLER_CACHE_SOURCE.into()),
+            fingerprint: None,
+            apps: installer_cache.apps,
         });
     }
     let merged = merge_sources(previous.sources.clone(), updates);
@@ -306,7 +318,7 @@ pub(crate) fn synchronize(
         generation: previous.generation.saturating_add(1),
         apps,
         sources: merged.sources,
-        filesystem_index,
+        filesystem_index: portable.filesystem_index,
         last_successful_sync: Some(completed_at),
         diagnostics: Some(diagnostics),
         app_details,
@@ -326,6 +338,7 @@ mod tests {
             name: name.into(),
             path: format!(r"C:\{name}.exe"),
             icon_base64: None,
+            artifact_kind: Default::default(),
             category: AppCategory::Other,
             launch_kind: LaunchKind::Executable,
             source_kind: SourceKind::Registry,

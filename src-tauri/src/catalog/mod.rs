@@ -3,16 +3,21 @@ use std::env;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
+mod artifact;
 mod classify;
 mod dedup;
 mod details;
+mod fields;
 mod filters;
+mod machine;
 mod model;
 mod naming;
+mod place;
 mod scan;
 mod sources;
 mod storage;
 pub(crate) mod sync;
+mod tree;
 mod visibility;
 
 pub(crate) use details::{
@@ -20,13 +25,14 @@ pub(crate) use details::{
     AppDetailsTarget,
 };
 pub(crate) use model::{
-    AppCategory, AppDetails, AppInfo, LaunchKind, ScanProgress, SourceKind, UninstallTarget,
+    AppCategory, AppDetails, AppInfo, ArtifactKind, LaunchKind, ScanProgress, SourceKind,
+    UninstallTarget,
 };
 pub(crate) use scan::{
     coordinator as scan_coordinator, hydration, incremental, settings as scan_settings,
 };
 pub(crate) use sources::source;
-use sources::{portable, registry, start_apps, steam};
+use sources::{installer_cache, portable, registry, start_apps, steam};
 pub(crate) use storage::{cache, icon_cache};
 use sync::scan_control::{
     ScanControl, StageBudget, StageStop, DEFAULT_STAGE_TIMEOUT, START_MENU_MAX_DEPTH,
@@ -43,6 +49,7 @@ fn steam_app(game: steam::SteamGame) -> AppInfo {
         name: game.name,
         path,
         icon_base64: None,
+        artifact_kind: ArtifactKind::Application,
         launch_kind: LaunchKind::Executable,
         source_kind: SourceKind::Steam,
         description: None,
@@ -65,12 +72,20 @@ fn steam_app(game: steam::SteamGame) -> AppInfo {
     }
 }
 
-pub(super) fn portable_app(path: PathBuf) -> Option<AppInfo> {
+pub(in crate::catalog) fn portable_app(
+    path: PathBuf,
+    facts: &machine::MachineFacts,
+) -> Option<AppInfo> {
     let metadata = crate::platform::windows::executable_metadata::read(&path);
     let has_metadata = metadata.product_name.is_some()
         || metadata.description.is_some()
         || metadata.publisher.is_some()
         || metadata.original_filename.is_some();
+    let installer_candidate = artifact::has_installer_filename_evidence(
+        &path.to_string_lossy(),
+        metadata.original_filename.as_deref(),
+        metadata.internal_name.as_deref(),
+    );
     let stem = path.file_stem()?.to_string_lossy().trim().to_string();
     let parent_matches = path
         .parent()
@@ -79,7 +94,11 @@ pub(super) fn portable_app(path: PathBuf) -> Option<AppInfo> {
             naming::normalized_portable_name(&parent.to_string_lossy())
                 == naming::normalized_portable_name(&stem)
         });
-    if !has_metadata && !parent_matches && !is_known_standalone_portable(&stem) {
+    if !has_metadata
+        && !parent_matches
+        && !is_known_standalone_portable(&stem)
+        && !installer_candidate
+    {
         return None;
     }
     let parent_name = path
@@ -91,9 +110,6 @@ pub(super) fn portable_app(path: PathBuf) -> Option<AppInfo> {
         parent_name.as_deref(),
         metadata.product_name.as_deref(),
     );
-    if filters::is_maintenance_entry(&name, &path.to_string_lossy(), None) {
-        return None;
-    }
     let mut app = make_app(name, path.clone());
     app.source_kind = SourceKind::Portable;
     app.description = metadata.description;
@@ -103,6 +119,15 @@ pub(super) fn portable_app(path: PathBuf) -> Option<AppInfo> {
     app.publisher = metadata.publisher;
     app.product_name = metadata.product_name;
     app.original_filename = metadata.original_filename;
+    app.artifact_kind = artifact::classify(&app, metadata.internal_name.as_deref(), facts);
+    if app.artifact_kind == ArtifactKind::Application
+        && filters::is_maintenance_entry(&app.name, &path.to_string_lossy(), None)
+    {
+        return None;
+    }
+    if app.artifact_kind != ArtifactKind::Application {
+        app.category = AppCategory::InstallersDocs;
+    }
     app.install_location = path
         .parent()
         .map(|value| value.to_string_lossy().into_owned());
@@ -194,7 +219,7 @@ fn registry_metadata_matches(app: &AppInfo, record: &registry::RegistryMetadata)
 }
 
 fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
-    let classified = apps
+    let mut classified = apps
         .into_iter()
         .filter(|app| !filters::is_invalid_display_name(&app.name))
         .map(|mut app| {
@@ -202,6 +227,10 @@ fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
             app
         })
         .collect::<Vec<_>>();
+    // Runs after per-record classification because it is the one decision that needs the whole
+    // catalog: whether some *other* discovered executable sits above this one in its install tree.
+    // Pure, so it re-applies identically on the cache path, which is why it needs no persisted flag.
+    tree::demote_nested_components(&mut classified, &machine::Registrations::current());
     visibility::write_dev_report(&classified);
     classified
         .into_iter()
@@ -310,7 +339,7 @@ fn scan_start_menu(control: &ScanControl) -> StartMenuScan {
             stop: budget.stop(),
         };
     }
-    let apps = walk_start_menu_shortcuts(roots, &budget);
+    let apps = walk_start_menu_shortcuts(roots, &budget, &machine::MachineFacts::current());
 
     StartMenuScan {
         apps,
@@ -320,7 +349,11 @@ fn scan_start_menu(control: &ScanControl) -> StartMenuScan {
 
 /// Roots are a parameter so the bounds can be exercised against a fixture tree; `scan_start_menu`
 /// supplies the real Start Menu locations.
-fn walk_start_menu_shortcuts(roots: Vec<PathBuf>, budget: &StageBudget) -> Vec<AppInfo> {
+fn walk_start_menu_shortcuts(
+    roots: Vec<PathBuf>,
+    budget: &StageBudget,
+    facts: &machine::MachineFacts,
+) -> Vec<AppInfo> {
     // `take_while` rather than `filter`: the traversal must end at the limit, not keep walking a
     // pathological tree while discarding its entries. Every visited entry is charged, including
     // directories, because directory enumeration is what an unbounded tree makes expensive.
@@ -336,44 +369,61 @@ fn walk_start_menu_shortcuts(roots: Vec<PathBuf>, budget: &StageBudget) -> Vec<A
         .filter_map(Result::ok)
         .filter(|entry| entry.file_type().is_file())
         .filter(|entry| {
-            entry
-                .path()
-                .extension()
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("lnk"))
+            entry.path().extension().is_some_and(|extension| {
+                extension.eq_ignore_ascii_case("lnk") || extension.eq_ignore_ascii_case("url")
+            })
         })
         .filter_map(|entry| {
             let path = entry.into_path();
             let name = path.file_stem()?.to_string_lossy().trim().to_string();
-            let details = crate::platform::windows::shortcut::resolve(&path);
+            if name.is_empty() {
+                return None;
+            }
+            let is_url = path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("url"));
+            let details = if is_url {
+                Default::default()
+            } else {
+                crate::platform::windows::shortcut::resolve(&path)
+            };
             let target = details
                 .target
                 .as_ref()
                 .map(|value| value.to_string_lossy().into_owned());
-            (!name.is_empty()
-                && !filters::is_maintenance_entry(
-                    &name,
-                    &path.to_string_lossy(),
-                    target.as_deref(),
-                ))
-            .then(|| {
-                let mut app = make_app(name, path);
-                app.source_kind = SourceKind::StartMenu;
-                app.resolved_path = target;
-                app.shortcut_icon_path = details
-                    .icon_location
-                    .map(|value| value.to_string_lossy().into_owned());
-                app.launch_arguments = details.arguments;
-                if let Some(target) = app.resolved_path.as_deref() {
-                    let metadata =
-                        crate::platform::windows::executable_metadata::read(Path::new(target));
-                    app.product_name = metadata.product_name;
-                    app.original_filename = metadata.original_filename;
-                    app.description = metadata.description;
-                    app.version = metadata.version;
-                    app.publisher = metadata.publisher;
-                }
-                app
-            })
+            if !is_url
+                && filters::is_maintenance_entry(&name, &path.to_string_lossy(), target.as_deref())
+            {
+                return None;
+            }
+            let mut app = make_app(name, path);
+            app.source_kind = SourceKind::StartMenu;
+            if is_url {
+                app.launch_kind = LaunchKind::Shortcut;
+            }
+            app.resolved_path = target;
+            app.shortcut_icon_path = details
+                .icon_location
+                .map(|value| value.to_string_lossy().into_owned());
+            app.launch_arguments = details.arguments;
+            if let Some(target) = app.resolved_path.as_deref() {
+                let metadata =
+                    crate::platform::windows::executable_metadata::read(Path::new(target));
+                let internal_name = metadata.internal_name.clone();
+                app.product_name = metadata.product_name;
+                app.original_filename = metadata.original_filename;
+                app.description = metadata.description;
+                app.version = metadata.version;
+                app.publisher = metadata.publisher;
+                app.artifact_kind = artifact::classify(&app, internal_name.as_deref(), facts);
+            }
+            if app.artifact_kind == ArtifactKind::Application {
+                app.artifact_kind = artifact::classify(&app, None, facts);
+            }
+            if app.artifact_kind != ArtifactKind::Application {
+                app.category = AppCategory::InstallersDocs;
+            }
+            (!is_url || app.artifact_kind == ArtifactKind::Documentation).then_some(app)
         })
         .collect()
 }
@@ -396,6 +446,7 @@ fn make_app(name: String, path: PathBuf) -> AppInfo {
         name,
         path,
         icon_base64: None,
+        artifact_kind: ArtifactKind::Application,
         category,
         launch_kind,
         source_kind: SourceKind::Registry,
@@ -588,6 +639,20 @@ mod tests {
     use std::path::PathBuf;
     use std::time::Duration;
 
+    /// Nothing resolved and nothing registered, so classification here depends only on Windows'
+    /// own path constants and never on the machine running the suite.
+    fn facts() -> machine::MachineFacts {
+        machine::MachineFacts::empty()
+    }
+
+    fn portable_app(path: PathBuf) -> Option<AppInfo> {
+        super::portable_app(path, &facts())
+    }
+
+    fn walk_start_menu_shortcuts(roots: Vec<PathBuf>, budget: &StageBudget) -> Vec<AppInfo> {
+        super::walk_start_menu_shortcuts(roots, budget, &facts())
+    }
+
     /// Builds a Start Menu fixture: `folders` nested directories, each holding one `.lnk`.
     fn nested_shortcuts(root: &Path, folders: usize) {
         let mut current = root.to_path_buf();
@@ -678,12 +743,34 @@ mod tests {
         assert_eq!(budget.stop(), None);
     }
 
+    #[test]
+    fn start_menu_url_documentation_is_discovered_without_scanning_arbitrary_docs() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("Node.js website.url"),
+            b"[InternetShortcut]",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("Unrelated.url"), b"[InternetShortcut]").unwrap();
+        std::fs::write(dir.path().join("Manual.pdf"), b"fixture").unwrap();
+        let never = || false;
+        let control = ScanControl::new(&never);
+        let budget = control.stage_with(DEFAULT_STAGE_TIMEOUT, 50, 4);
+
+        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
+
+        assert_eq!(apps.len(), 1);
+        assert_eq!(apps[0].name, "Node.js website");
+        assert_eq!(apps[0].artifact_kind, ArtifactKind::Documentation);
+    }
+
     fn app(name: &str, path: &str) -> AppInfo {
         AppInfo {
             id: String::new(),
             name: name.to_string(),
             path: path.to_string(),
             icon_base64: None,
+            artifact_kind: ArtifactKind::Application,
             category: AppCategory::Other,
             launch_kind: LaunchKind::Executable,
             source_kind: SourceKind::Registry,
@@ -867,18 +954,34 @@ mod tests {
             .contains(&VisibilityReason::ConsoleApplication));
     }
 
+    /// Auxiliary entries stay, and an installation artifact is no longer deleted: the source that
+    /// discovered it has already classified it, and `sanitize` keeps it so Installers & Docs can
+    /// list it.
     #[test]
-    fn sanitize_keeps_auxiliary_entries_but_rejects_installers() {
+    fn sanitize_keeps_auxiliary_entries_and_installation_artifacts() {
         let mut helper = app("iconv", r"C:\Git\usr\bin\iconv.exe");
         helper.source_kind = SourceKind::Portable;
         let mut installer = app("Telegram Desktop Setup", r"C:\Downloads\tsetup.exe");
         installer.source_kind = SourceKind::Portable;
+        installer.artifact_kind = artifact::classify(&installer, None, &facts());
+        installer.category = AppCategory::InstallersDocs;
+        assert_eq!(installer.artifact_kind, ArtifactKind::Installer);
 
         let result = sanitize(vec![helper, installer]);
 
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].name, "iconv");
-        assert_eq!(result[0].visibility_class, VisibilityClass::Auxiliary);
+        assert_eq!(result.len(), 2);
+        let by_name = result
+            .iter()
+            .map(|app| (app.name.as_str(), app))
+            .collect::<std::collections::HashMap<_, _>>();
+        assert_eq!(
+            by_name["iconv"].visibility_class,
+            VisibilityClass::Auxiliary
+        );
+        assert_eq!(
+            by_name["Telegram Desktop Setup"].category,
+            AppCategory::InstallersDocs
+        );
     }
 
     #[test]
@@ -1079,22 +1182,8 @@ mod tests {
     }
 
     #[test]
-    fn detects_documentation_display_names() {
-        assert!(is_documentation_name("Документация AIDA64 Extreme"));
-        assert!(is_documentation_name("AIDA64 Documentation"));
-        assert!(is_documentation_name("Release Notes"));
-        assert!(is_documentation_name("What's New"));
-        assert!(is_documentation_name("Samples"));
-        assert!(is_documentation_name("MSI Afterburner SDK"));
-        assert!(is_documentation_name("Steam Support Center"));
-        assert!(!is_documentation_name("HelpDesk Pro"));
-        assert!(!is_documentation_name("AIDA64 Extreme"));
-        assert!(!is_documentation_name("Visual Studio Code"));
-    }
-
-    #[test]
-    fn maintenance_entry_filters_installers_and_doc_shortcuts() {
-        assert!(is_maintenance_entry(
+    fn structural_filter_keeps_shortcuts_for_visibility() {
+        assert!(!is_maintenance_entry(
             "Документация AIDA64 Extreme",
             r"C:\Menu\Документация AIDA64 Extreme.lnk",
             Some(r"C:\Program Files\AIDA64\aida64.chm"),
@@ -1112,9 +1201,27 @@ mod tests {
     }
 
     #[test]
+    fn real_product_words_are_not_maintenance_entries() {
+        for (name, path) in [
+            ("Revo Uninstaller", r"C:\Program Files\Revo\RevoUninPro.exe"),
+            (
+                "Advanced Installer",
+                r"C:\Program Files\Caphyon\AdvancedInstaller.exe",
+            ),
+            ("Half-Life 2 Demo", r"D:\Games\Half-Life 2 Demo\hl2.exe"),
+            (
+                "Bootstrap Studio",
+                r"C:\Users\Public\Bootstrap Studio\bstudio.exe",
+            ),
+        ] {
+            assert!(!is_noise(name, path), "{name}");
+        }
+    }
+
+    #[test]
     fn identifies_uninstaller_noise() {
-        assert!(is_noise("Microsoft Visual C++ Update", r"C:\update.exe"));
-        assert!(is_noise("Editor Uninstall", r"C:\uninstall.exe"));
+        assert!(!is_noise("Microsoft Visual C++ Update", r"C:\update.exe"));
+        assert!(!is_noise("Editor Uninstall", r"C:\uninstall.exe"));
         assert!(!is_noise("Visual Studio Code", r"C:\Code.exe"));
     }
 
@@ -1162,23 +1269,23 @@ mod tests {
 
     #[test]
     fn identifies_maintenance_and_resource_noise() {
-        assert!(is_noise(
+        assert!(!is_noise(
             "Удалить Ассистент",
             r"C:\Menu\Удалить Ассистент.lnk"
         ));
-        assert!(is_noise(
+        assert!(!is_noise(
             "Docker Desktop",
             r"C:\Docker\Docker Desktop Installer.exe"
         ));
-        assert!(is_noise("Updater", r"C:\App\update.exe"));
-        assert!(is_noise("Repair", r"C:\App\repair.exe"));
+        assert!(!is_noise("Updater", r"C:\App\update.exe"));
+        assert!(!is_noise("Repair", r"C:\App\repair.exe"));
         assert!(is_noise("Icon", r"C:\App\app.ico"));
         assert!(!is_noise("Docker Desktop", r"C:\Docker\Docker Desktop.exe"));
     }
 
     #[test]
     fn identifies_maintenance_from_resolved_shortcut_target() {
-        assert!(is_maintenance_entry(
+        assert!(!is_maintenance_entry(
             "Visual Studio Installer",
             r"C:\Menu\Visual Studio Installer.lnk",
             Some(r"C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe"),
@@ -1293,6 +1400,11 @@ mod tests {
         );
     }
 
+    /// Documentation shortcuts are recognized by a word in their name, so they only step aside
+    /// into Auxiliary and stay restorable. Records whose *only* installer evidence is a word in
+    /// the display name stay in the catalog outright: "Installer" and "Setup" name real products
+    /// on machines this corpus never saw, and `catalog::artifact` decides installation artifacts
+    /// from file-name evidence instead.
     #[test]
     fn sanitizes_stale_maintenance_entries() {
         let apps = sanitize(vec![
@@ -1311,10 +1423,22 @@ mod tests {
             app("AIDA64 Setup", r"C:\Apps\setup-app.exe"),
             app("Visual Studio Code", r"C:\Code.exe"),
         ]);
+
+        let by_name = apps
+            .iter()
+            .map(|app| (app.name.as_str(), app.visibility_class))
+            .collect::<std::collections::HashMap<_, _>>();
+        assert!(by_name.contains_key("Visual Studio Code"));
         assert_eq!(
-            apps.iter().map(|app| app.name.as_str()).collect::<Vec<_>>(),
-            vec!["Visual Studio Code"],
+            by_name.get("Installation notes"),
+            Some(&VisibilityClass::Auxiliary)
         );
+        assert_eq!(
+            by_name.get("Документация AIDA64 Extreme"),
+            Some(&VisibilityClass::Auxiliary)
+        );
+        assert!(by_name.contains_key("Visual Studio Installer"));
+        assert!(by_name.contains_key("AIDA64 Setup"));
     }
 
     #[test]

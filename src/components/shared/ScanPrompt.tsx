@@ -9,7 +9,7 @@ interface Props {
 export function ScanPrompt({ isScanning, onScan, onDismiss }: Props) {
 	return (
 		<section className='grid min-h-[55vh] place-items-center px-4 text-center'>
-			<div className='relative w-full max-w-md rounded-2xl border border-white/85 bg-white/58 px-8 py-10 shadow-(--shadow-soft-panel) backdrop-blur-xl'>
+			<div className='settings-surface relative w-full max-w-md rounded-2xl border border-white/85 bg-white/58 px-8 py-10 backdrop-blur-xl'>
 				<button
 					type='button'
 					aria-label='Dismiss scan prompt'

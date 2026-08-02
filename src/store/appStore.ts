@@ -1,5 +1,9 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { chooseCustomCategoryAccent } from '../lib/categoryAccents'
+import {
+	INSTALLERS_DOCS_CATEGORY,
+	isCatalogArtifact,
+} from '../lib/catalogArtifacts'
 import { toAppClientError } from '../lib/clientError'
 import {
 	readPreferences,
@@ -544,6 +548,7 @@ export function createAppStore(
 			toggleFavorite(id) {
 				set(state => {
 					const app = state.apps.find(item => item.id === id)
+					if (app && isCatalogArtifact(app)) return state
 					const promoted = app
 						? state.promotedAppIds.includes(app.id) ||
 							state.promotedAppIdentities.includes(
@@ -646,6 +651,11 @@ export function createAppStore(
 			moveApp(id, category) {
 				set(state => {
 					const app = state.apps.find(item => item.id === id)
+					if (
+						(app ? isCatalogArtifact(app) : false) ||
+						category === INSTALLERS_DOCS_CATEGORY
+					)
+						return state
 					const identity = app ? identityOf(app) : id
 					return {
 						categoryOverrides: {

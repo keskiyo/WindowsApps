@@ -36,6 +36,8 @@ pub(in crate::catalog) fn scan(budget: &StageBudget) -> RegistryScan {
         result.stop = budget.stop();
         return result;
     }
+    // Resolved once: it reads the shell's known folders, which no per-entry loop should repeat.
+    let facts = crate::catalog::machine::MachineFacts::current();
     for values in uninstall_registry::entries()
         .into_iter()
         .map(expand_registry_paths)
@@ -46,7 +48,7 @@ pub(in crate::catalog) fn scan(budget: &StageBudget) -> RegistryScan {
         if let Some(metadata) = metadata_from_values(&values) {
             result.metadata.push(metadata);
         }
-        if let Some(app) = from_values(values) {
+        if let Some(app) = from_values(values, &facts) {
             result.apps.push(app);
         }
     }
@@ -54,7 +56,10 @@ pub(in crate::catalog) fn scan(budget: &StageBudget) -> RegistryScan {
     result
 }
 
-pub(in crate::catalog) fn from_values(values: RegistryValues) -> Option<AppInfo> {
+pub(in crate::catalog) fn from_values(
+    values: RegistryValues,
+    facts: &crate::catalog::machine::MachineFacts,
+) -> Option<AppInfo> {
     if values.system_component {
         return None;
     }
@@ -64,6 +69,7 @@ pub(in crate::catalog) fn from_values(values: RegistryValues) -> Option<AppInfo>
         .and_then(clean_display_icon)
         .filter(|path| {
             crate::catalog::is_launchable(path)
+                && !crate::catalog::filters::is_uninstall_target_path(path)
                 && !crate::catalog::filters::is_noise(&values.display_name, &path.to_string_lossy())
         })
         .or_else(|| {
@@ -82,12 +88,14 @@ pub(in crate::catalog) fn from_values(values: RegistryValues) -> Option<AppInfo>
     let can_uninstall = uninstall.is_some();
     let name = values.display_name.trim().to_string();
     let executable_metadata = crate::platform::windows::executable_metadata::read(&path);
-    Some(AppInfo {
+    let internal_name = executable_metadata.internal_name.clone();
+    let mut app = AppInfo {
         id: stable_id(&path_text),
         category: classify(&name, &path_text),
         name,
         path: path_text,
         icon_base64: None,
+        artifact_kind: Default::default(),
         launch_kind: if path
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("lnk"))
@@ -113,7 +121,12 @@ pub(in crate::catalog) fn from_values(values: RegistryValues) -> Option<AppInfo>
         visibility_class: Default::default(),
         visibility_score: 0,
         visibility_reasons: Vec::new(),
-    })
+    };
+    app.artifact_kind = crate::catalog::artifact::classify(&app, internal_name.as_deref(), facts);
+    if app.artifact_kind != crate::catalog::ArtifactKind::Application {
+        app.category = crate::catalog::AppCategory::InstallersDocs;
+    }
+    Some(app)
 }
 
 fn metadata_from_values(values: &RegistryValues) -> Option<RegistryMetadata> {
@@ -194,6 +207,11 @@ mod tests {
             quiet_uninstall_string: None,
             system_component: false,
         }
+    }
+
+    /// No resolved user folders, so these assertions depend only on Windows' own path constants.
+    fn from_values(values: RegistryValues) -> Option<AppInfo> {
+        super::from_values(values, &crate::catalog::machine::MachineFacts::empty())
     }
 
     // `REG_EXPAND_SZ` values arrive unexpanded. Before expansion these entries failed the
@@ -283,6 +301,24 @@ mod tests {
         assert_eq!(app.version.as_deref(), Some("1.2.3"));
         assert_eq!(app.publisher.as_deref(), Some("OpenAI"));
         assert!(app.uninstall.is_some());
+    }
+
+    #[test]
+    fn registry_installer_target_uses_artifact_classification() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("Package Cache").join("{fixture}");
+        std::fs::create_dir_all(&cache).unwrap();
+        let executable = cache.join("winsdksetup.exe");
+        std::fs::write(&executable, []).unwrap();
+
+        let app = from_values(values(
+            "Windows Software Development Kit",
+            Some(executable.to_string_lossy().into_owned()),
+        ))
+        .unwrap();
+
+        assert_eq!(app.artifact_kind, crate::catalog::ArtifactKind::Installer);
+        assert_eq!(app.category, crate::catalog::AppCategory::InstallersDocs);
     }
 
     #[test]

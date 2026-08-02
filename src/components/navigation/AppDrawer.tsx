@@ -4,7 +4,6 @@ import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import type {
 	AppCategory,
-	AppInfo,
 	AppView,
 	CategoryDefinition,
 } from '../../types'
@@ -12,7 +11,7 @@ import { AppNavigation } from './AppNavigation/AppNavigation'
 
 interface Props {
 	open: boolean
-	apps: AppInfo[]
+	counts: Map<AppCategory, number>
 	categoryOrder: AppCategory[]
 	categories: CategoryDefinition[]
 	activeView: AppView
@@ -52,9 +51,6 @@ export function AppDrawer(props: Props) {
 		const timeout = window.setTimeout(onExited, 240)
 		return () => window.clearTimeout(timeout)
 	}, [onExited, open])
-	const counts = new Map<AppCategory, number>()
-	for (const app of props.apps)
-		counts.set(app.category, (counts.get(app.category) ?? 0) + 1)
 	return (
 		<div
 			className={`drawer-shell fixed inset-0 z-400 ${open ? 'is-open' : 'is-closing'}`}
@@ -93,7 +89,7 @@ export function AppDrawer(props: Props) {
 				<AppNavigation
 					categoryOrder={props.categoryOrder}
 					categories={props.categories}
-					counts={counts}
+					counts={props.counts}
 					activeView={props.activeView}
 					favoriteCount={props.favoriteCount}
 					hiddenCount={props.hiddenCount ?? 0}

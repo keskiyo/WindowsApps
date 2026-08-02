@@ -13,6 +13,7 @@ pub(crate) struct ExecutableMetadata {
     pub publisher: Option<String>,
     pub product_name: Option<String>,
     pub original_filename: Option<String>,
+    pub internal_name: Option<String>,
 }
 
 /// Whether an executable targets the console subsystem — a command-line tool such as `7z.exe` or
@@ -63,6 +64,7 @@ pub(crate) fn read(path: &Path) -> ExecutableMetadata {
         publisher: value("CompanyName"),
         product_name: value("ProductName"),
         original_filename: value("OriginalFilename"),
+        internal_name: value("InternalName"),
     }
 }
 

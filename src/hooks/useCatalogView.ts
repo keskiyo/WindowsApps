@@ -6,6 +6,7 @@ import {
 	selectCategorizedApps,
 	type AppState,
 } from '../store/appStore'
+import { isCatalogArtifact } from '../lib/catalogArtifacts'
 
 /** Icons hydrate for the cards a user can plausibly reach without scrolling first. */
 const HYDRATION_WINDOW = 48
@@ -65,7 +66,9 @@ export function useCatalogView(state: CatalogViewState) {
 	)
 	const paletteApps = useMemo(() => {
 		const hidden = new Set(state.hiddenAppIds)
-		return categorizedApps.filter(app => !hidden.has(app.id))
+		return categorizedApps.filter(
+			app => !hidden.has(app.id) && !isCatalogArtifact(app),
+		)
 	}, [categorizedApps, state.hiddenAppIds])
 	// Defer the query so fast typing never blocks the input. React will render
 	// the grid with the deferred value while keeping the input state current.

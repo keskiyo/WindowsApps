@@ -46,6 +46,21 @@ components, bundled helpers. They stay out of your categories and out of search,
 deleted and any of them is one click from returning to the main catalog. The tiles across the top
 count each view, and every count matches the list it opens.
 
+<div align="center">
+  <img src=".github/images/app-info.png" alt="App information dialog" width="880">
+</div>
+
+**App information** answers what a launcher usually cannot: how big the file is, when it was built,
+which CPU architecture it targets, whether it carries a valid Authenticode signature, and whether
+its install location still exists. Copy the path, copy a full report, or open the containing folder.
+
+<div align="center">
+  <img src=".github/images/settings.png" alt="Settings and catalog maintenance" width="880">
+</div>
+
+**Settings** keeps catalog maintenance honest — scan diagnostics from the last run, a force full
+scan, and a cache reset that preserves your Favorites, Hidden items and categories.
+
 ## Install
 
 1. Download **`Windows.Apps_0.2.8_x64-setup.exe`** from the [latest release](https://github.com/keskiyo/WindowsApps/releases/latest).
@@ -112,7 +127,9 @@ Each scan root is limited to **16 directory levels**, **500,000 entries** and **
 
 Favorites, Hidden items, promoted tools, custom categories and assignments survive all of these.
 
-Visibility is conservative. Dropping an entry entirely cannot be undone from the interface, so it takes more than a suggestive name: an application Windows registered as a real product is kept even when its name reads like an installer. Shared runtimes and redistributables are matched separately and always dropped. Anything merely uncertain lands in **Auxiliary tools**, where **Restore to catalog** makes a permanent override.
+Visibility is conservative. Every marker is bound to the field where it is actually evidence — a helper binary is recognized by the file name its vendor gave it, a documentation shortcut by what it opens — and an application's packaged identifier is never read as text, so a vendor or packaging framework appearing in an id cannot decide anything.
+
+Dropping an entry entirely cannot be undone from the interface, so **no word can do it**. Removal is reserved for the two cases that are structurally not applications at all: framework packages, and shortcuts that merely open a folder. Setup files and redistributables are filed under **Installers & Docs**, and anything decided by vocabulary — documentation, updaters, crash handlers, uninstall entries — is demoted to **Auxiliary tools**, still listed and one click from returning via **Restore to catalog**. Needles written against one machine are capped so they can tip a borderline entry but never settle it alone, and components are recognized structurally instead: an executable nested under another from the same publisher belongs to it, and one Windows itself registers as launchable does not.
 
 ## Privacy
 

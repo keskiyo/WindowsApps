@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
+import { isCatalogArtifact } from '../../../lib/catalogArtifacts'
 import { CategorySubmenu } from './CategorySubmenu'
 import { MenuItem } from './MenuItem'
 import type { AppActionsMenuProps } from './types'
@@ -29,6 +30,7 @@ export function AppActionsMenu({
 	anchorRef,
 }: AppActionsMenuProps) {
 	const [showCategories, setShowCategories] = useState(false)
+	const artifact = isCatalogArtifact(app)
 	const { menuRef, position, onMenuKeyDown } = useActionsMenu({
 		anchorRef,
 		onClose,
@@ -51,7 +53,7 @@ export function AppActionsMenu({
 			aria-label={`${app.name} actions`}
 			className='motion-panel fixed z-[600] flex max-h-[calc(100vh-1.5rem)] w-56 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 overflow-y-auto rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-[var(--shadow-menu)]'
 		>
-			{!isHidden && (
+			{!isHidden && !artifact && (
 				<MenuItem
 					icon={ChevronRight}
 					iconClassName={`text-slate-400 transition-transform ${showCategories ? 'rotate-90' : ''}`}
@@ -59,7 +61,7 @@ export function AppActionsMenu({
 					onClick={() => setShowCategories(value => !value)}
 				/>
 			)}
-			{!isHidden && showCategories && (
+			{!isHidden && !artifact && showCategories && (
 				<CategorySubmenu
 					categories={categories}
 					categoryOrder={categoryOrder}

@@ -1,7 +1,7 @@
 use crate::catalog::sync::scan_control::ScanControl;
 use crate::catalog::{
-    classify::classify, filters::is_invalid_display_name, filters::is_maintenance_entry, stable_id,
-    AppInfo, LaunchKind, SourceKind,
+    classify::classify, filters::is_invalid_display_name, stable_id, AppInfo, LaunchKind,
+    SourceKind,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -66,43 +66,6 @@ pub(in crate::catalog) fn scan(control: &ScanControl) -> Option<Vec<AppInfo>> {
     let packages_json = run_powershell(package::QUERY, control).unwrap_or_default();
     enrich_packages(&mut apps, &packages_json);
     Some(apps)
-}
-
-/// Interpreters/hosts whose behavior is defined by arguments a Start-App target does not
-/// carry. Merging by these would collapse distinct tools (Command Prompt vs Node.js prompt
-/// vs x64 Native Tools prompt — all cmd.exe). `.msc`/`.cpl` and dedicated tool exes are safe.
-fn is_generic_host_target(target: &str) -> bool {
-    const HOSTS: &[&str] = &[
-        "cmd.exe",
-        "powershell.exe",
-        "pwsh.exe",
-        "mmc.exe",
-        "wscript.exe",
-        "cscript.exe",
-        "rundll32.exe",
-        "mshta.exe",
-        "conhost.exe",
-        "control.exe",
-        "explorer.exe",
-        "python.exe",
-        "pythonw.exe",
-        "py.exe",
-        "node.exe",
-        "java.exe",
-        "javaw.exe",
-        "mysql.exe",
-        "wsl.exe",
-        "bash.exe",
-        "sh.exe",
-    ];
-    let file = target
-        .trim_matches('"')
-        .rsplit(['\\', '/'])
-        .next()
-        .unwrap_or(target)
-        .trim()
-        .to_lowercase();
-    HOSTS.contains(&file.as_str())
 }
 
 /// Ceiling for one PowerShell query. The Apps-folder and AppX providers are COM services that can
@@ -185,6 +148,8 @@ fn decode_output(bytes: Vec<u8>) -> Option<String> {
 
 pub(in crate::catalog) fn parse_start_apps(json: &str) -> Result<Vec<AppInfo>, serde_json::Error> {
     let rows: Vec<StartAppRow> = parse_rows(json)?;
+    // Resolved once for the whole batch rather than per row.
+    let facts = crate::catalog::machine::MachineFacts::current();
     Ok(rows
         .into_iter()
         .filter_map(|row| {
@@ -192,29 +157,25 @@ pub(in crate::catalog) fn parse_start_apps(json: &str) -> Result<Vec<AppInfo>, s
             let app_id = row.app_id.trim().to_string();
             // Real launch target from System.Link.TargetParsingPath — the bridge that lets
             // dedup merge this localized Start-App with the equivalent English shortcut.
-            // A Start-App's target has NO arguments, so drop targets that are generic hosts
-            // (cmd/powershell/mysql/…): several distinct tools share one interpreter and would
-            // wrongly collapse into one. Self-contained targets (.msc/.cpl/mstsc/perfmon/…)
-            // are safe and stay.
+            // Preserve the target as launch evidence. The dedup target layer separately refuses
+            // to use generic interpreter hosts (cmd/powershell/wsl/...) as application identity,
+            // so distinct host-backed Start Apps cannot collapse by this path alone.
             let resolved_path = row
                 .target
                 .as_deref()
                 .map(str::trim)
                 .filter(|value| !value.is_empty())
-                .filter(|value| !is_generic_host_target(value))
                 .map(str::to_string);
-            if is_invalid_display_name(&name)
-                || app_id.is_empty()
-                || is_maintenance_entry(&name, &app_id, resolved_path.as_deref())
-            {
+            if is_invalid_display_name(&name) || app_id.is_empty() {
                 return None;
             }
-            Some(AppInfo {
+            let mut app = AppInfo {
                 id: stable_id(&app_id),
                 category: classify(&name, &app_id),
                 name,
                 path: app_id,
                 icon_base64: None,
+                artifact_kind: Default::default(),
                 launch_kind: LaunchKind::AppUserModelId,
                 source_kind: SourceKind::StartApps,
                 description: None,
@@ -233,7 +194,12 @@ pub(in crate::catalog) fn parse_start_apps(json: &str) -> Result<Vec<AppInfo>, s
                 visibility_class: Default::default(),
                 visibility_score: 0,
                 visibility_reasons: Vec::new(),
-            })
+            };
+            app.artifact_kind = crate::catalog::artifact::classify(&app, None, &facts);
+            if app.artifact_kind != crate::catalog::ArtifactKind::Application {
+                app.category = crate::catalog::AppCategory::InstallersDocs;
+            }
+            Some(app)
         })
         .collect())
 }
@@ -317,15 +283,23 @@ mod tests {
     }
 
     #[test]
-    fn drops_generic_host_targets_to_avoid_over_merge() {
-        // cmd.exe-hosted Start-Apps must NOT get a target (they differ only by arguments a
-        // Start-App does not carry) — otherwise Command Prompt, Node.js prompt, etc. collapse.
+    fn preserves_generic_host_targets_as_launch_evidence() {
+        // The target proves an AutoGenerated Apps Folder entry is launchable. Deduplication owns
+        // the separate rule that a shared interpreter path is not application identity.
         let apps = parse_start_apps(
-            r#"[{"Name":"Командная строка","AppID":"X\\cmd.exe","Target":"C:\\Windows\\system32\\cmd.exe"},{"Name":"Reload Configuration","AppID":"Microsoft.AutoGenerated.{F5}","Target":"C:\\Program Files\\PostgreSQL\\15\\bin\\pg_ctl.exe"}]"#,
+            r#"[{"Name":"Ubuntu","AppID":"Microsoft.AutoGenerated.{WSL}","Target":"C:\\Program Files\\WSL\\wsl.exe"},{"Name":"Командная строка","AppID":"X\\cmd.exe","Target":"C:\\Windows\\system32\\cmd.exe"},{"Name":"Reload Configuration","AppID":"Microsoft.AutoGenerated.{F5}","Target":"C:\\Program Files\\PostgreSQL\\15\\bin\\pg_ctl.exe"}]"#,
         )
         .unwrap();
+        let ubuntu = apps.iter().find(|app| app.name == "Ubuntu").unwrap();
+        assert_eq!(
+            ubuntu.resolved_path.as_deref(),
+            Some(r"C:\Program Files\WSL\wsl.exe")
+        );
         let cmd = apps.iter().find(|a| a.name == "Командная строка").unwrap();
-        assert_eq!(cmd.resolved_path, None, "generic host target dropped");
+        assert_eq!(
+            cmd.resolved_path.as_deref(),
+            Some(r"C:\Windows\system32\cmd.exe")
+        );
         let reload = apps
             .iter()
             .find(|a| a.name == "Reload Configuration")
@@ -348,13 +322,52 @@ mod tests {
     }
 
     #[test]
-    fn filters_start_apps_maintenance_entries() {
+    fn trusted_mysql_installer_target_is_classified_without_parsing_the_aumid() {
+        let apps = parse_start_apps(
+            r#"[{"Name":"MySQL Installer - Community","AppID":"Microsoft.AutoGenerated.{2C7C9013-A7FD-5C12-D811-939AFE2A3592}","Target":"C:\\Program Files (x86)\\MySQL\\MySQL Installer for Windows\\MySQLInstaller.exe"}]"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            apps[0].artifact_kind,
+            crate::catalog::ArtifactKind::Installer
+        );
+        assert_eq!(
+            apps[0].category,
+            crate::catalog::AppCategory::InstallersDocs
+        );
+    }
+
+    #[test]
+    fn parses_url_backed_start_apps_as_documentation() {
+        let apps = parse_start_apps(
+            r#"[{"Name":"Node.js website","AppID":"https://nodejs.org/","Target":"https://nodejs.org/"}]"#,
+        )
+        .unwrap();
+
+        assert_eq!(apps.len(), 1);
+        assert_eq!(
+            apps[0].artifact_kind,
+            crate::catalog::ArtifactKind::Documentation
+        );
+        assert_eq!(
+            apps[0].category,
+            crate::catalog::AppCategory::InstallersDocs
+        );
+    }
+
+    #[test]
+    fn keeps_start_apps_with_product_words_in_names_or_aumids() {
         let apps = parse_start_apps(
             r#"[{"Name":"Visual Studio Installer","AppID":"Microsoft.VisualStudio.Installer"},{"Name":"Uninstall Node.js","AppID":"Microsoft.AutoGenerated.Uninstall"},{"Name":"Visual Studio Code","AppID":"Microsoft.VisualStudioCode"}]"#,
         ).unwrap();
         assert_eq!(
             apps.iter().map(|app| app.name.as_str()).collect::<Vec<_>>(),
-            vec!["Visual Studio Code"]
+            vec![
+                "Visual Studio Installer",
+                "Uninstall Node.js",
+                "Visual Studio Code"
+            ]
         );
     }
 

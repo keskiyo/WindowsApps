@@ -77,6 +77,7 @@ mod tests {
             name: "Details test".into(),
             path,
             icon_base64: None,
+            artifact_kind: Default::default(),
             category: AppCategory::Other,
             launch_kind,
             source_kind: SourceKind::Registry,

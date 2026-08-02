@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 pub(crate) const REGISTRY_SOURCE: &str = "registry";
 pub(crate) const START_MENU_SOURCE: &str = "start-menu";
 pub(crate) const START_APPS_SOURCE: &str = "start-apps";
+pub(crate) const INSTALLER_CACHE_SOURCE: &str = "installer-cache";
 
 /// Schema versions before 5 stored the registry, Start Menu and Start-Apps scanners under one
 /// combined key. A cache carrying it must have it dropped on upgrade, otherwise its stale apps
@@ -70,6 +71,7 @@ mod tests {
             name: name.into(),
             path: path.into(),
             icon_base64: None,
+            artifact_kind: Default::default(),
             category: AppCategory::Other,
             launch_kind: LaunchKind::Executable,
             source_kind: SourceKind::Registry,

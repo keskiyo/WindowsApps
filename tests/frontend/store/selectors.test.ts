@@ -194,6 +194,36 @@ describe('selectCatalogCounts', () => {
 
 		expect(counts.visibleCategorizedApps[0]).toBe(mixed[0])
 	})
+
+	it('isolates installers and docs from ordinary views and counts them in the reserved category', () => {
+		const installer = app({
+			id: 'setup',
+			name: 'Editor Setup',
+			artifactKind: 'installer',
+			category: 'installers_docs',
+		})
+		const docs = app({
+			id: 'docs',
+			name: 'Editor Help',
+			artifactKind: 'documentation',
+			category: 'installers_docs',
+		})
+		const apps = [catalog[0]!, installer, docs]
+
+		expect(filterVisibleApps(apps, 'all', [], ['setup'])).toEqual([
+			catalog[0],
+		])
+		expect(filterVisibleApps(apps, 'favorites', [], ['setup'])).toEqual([])
+		expect(filterVisibleApps(apps, 'auxiliary', [], ['setup'])).toEqual([])
+		expect(filterVisibleApps(apps, 'installers_docs', [], [])).toEqual([
+			installer,
+			docs,
+		])
+		const counts = selectCatalogCounts(apps, [], ['setup'])
+		expect(counts.visibleCategorizedApps).toEqual([catalog[0]])
+		expect(counts.navigationCounts.get('installers_docs')).toBe(2)
+		expect(counts.favoriteCount).toBe(0)
+	})
 })
 
 describe('search index freshness', () => {

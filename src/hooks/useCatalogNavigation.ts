@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import type { AppCategory, AppView } from '../types'
+import { INSTALLERS_DOCS_CATEGORY } from '../lib/catalogArtifacts'
 
 interface CatalogNavigationOptions {
 	collapsedCategories: AppCategory[]
@@ -38,6 +39,11 @@ export function useCatalogNavigation({
 
 	const selectCategory = useCallback(
 		(category: AppCategory) => {
+			if (category === INSTALLERS_DOCS_CATEGORY) {
+				setActiveView('installers_docs')
+				closeDrawer()
+				return
+			}
 			setActiveView('all')
 			if (collapsedCategories.includes(category)) toggleCategory(category)
 			closeDrawer()

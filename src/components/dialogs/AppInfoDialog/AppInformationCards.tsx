@@ -104,7 +104,10 @@ export function AppInformationCards({
 				<DetailRows
 					rows={[
 						['Source', SOURCE_LABELS[app.sourceKind]],
-						['Method', app.launchKind.replace(/_/g, ' ')],
+						[
+							'Original filename',
+							valueOrUnavailable(app.originalFilename),
+						],
 						[
 							'Catalog state',
 							app.visibilityClass === 'auxiliary'

@@ -11,6 +11,7 @@ use super::family::normalize_name;
 use super::family::normalized_publisher;
 use super::target::normalize_path;
 use crate::catalog::{path_is_within, AppInfo, LaunchKind, SourceKind};
+use std::path::{Component, Path};
 
 /// Both entries carry a version and the two differ — they are distinct releases of the product,
 /// which the user treats as distinct applications, so a name-level merge must not collapse them.
@@ -161,6 +162,7 @@ pub(super) fn registry_install_contains_exe(left: &AppCandidate, right: &AppCand
     pairs.iter().any(|(registry, executable)| {
         registry.app.source_kind == SourceKind::Registry
             && executable.app.path.to_lowercase().ends_with(".exe")
+            && registry.launcher_family == executable.launcher_family
             && registry
                 .identity
                 .install_root
@@ -169,8 +171,20 @@ pub(super) fn registry_install_contains_exe(left: &AppCandidate, right: &AppCand
                 // install root of `C:\Prog` "contained" `C:\Program Files\other.exe`, and this
                 // evidence requires neither a matching name nor a matching publisher, so
                 // nothing else in the scoring would have vetoed the merge.
-                .is_some_and(|root| path_is_within(&executable.identity.path, root))
+                .is_some_and(|root| {
+                    is_specific_install_root(root)
+                        && path_is_within(&executable.identity.path, root)
+                })
     })
+}
+
+fn is_specific_install_root(root: &str) -> bool {
+    Path::new(root)
+        .components()
+        .filter(|component| matches!(component, Component::Normal(_)))
+        .take(2)
+        .count()
+        == 2
 }
 
 /// Two entry points of one installed package.

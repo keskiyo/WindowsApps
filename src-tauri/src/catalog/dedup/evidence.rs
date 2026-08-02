@@ -51,6 +51,12 @@ pub(super) struct EvidenceSummary {
 
 pub(super) fn should_merge(existing: &ResolvedApp, candidate: &AppCandidate) -> bool {
     if existing.candidates.iter().any(|left| {
+        left.app.artifact_kind != candidate.app.artifact_kind
+            && !summarize_evidence(left, candidate).has_identity_match
+    }) {
+        return false;
+    }
+    if existing.candidates.iter().any(|left| {
         both_unversioned_portable_copies(left, candidate) && !same_portable_root(left, candidate)
     }) {
         return false;

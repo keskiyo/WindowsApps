@@ -47,16 +47,14 @@
 	--shadow-menu: 0 18px 45px rgba(53, 61, 82, 0.2);
 	--shadow-drawer: 24px 0 70px rgba(50, 58, 78, 0.24);
 	--shadow-active-navigation: inset 1px 1px 3px rgba(119, 105, 160, 0.1);
-	--shadow-soft-panel:
-		8px 9px 22px rgba(104, 114, 136, 0.13),
-		-7px -7px 18px rgba(255, 255, 255, 0.78);
 	--shadow-app-icon:
 		inset 1px 1px 3px rgba(111, 124, 146, 0.13),
 		inset -2px -2px 5px rgba(255, 255, 255, 0.55),
 		0 0 0 1px rgba(167, 139, 250, 0.18);
-	--shadow-skeleton:
-		7px 7px 15px rgba(126, 137, 156, 0.12),
-		-7px -7px 15px rgba(255, 255, 255, 0.72);
+	/* Depth only. The outer highlight this used to carry was a light-theme neumorphic bevel, and
+	   the dark-theme compatibility layer below rewrites background, border and text colours but
+	   never box-shadow — so a white halo survived on every loading placeholder. */
+	--shadow-skeleton: 0 12px 28px oklch(0.15 0.014 270 / 0.24);
 	--motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 	--motion-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
 	--motion-fast: 180ms;

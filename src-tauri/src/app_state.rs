@@ -289,6 +289,7 @@ pub(crate) fn cached_app(name: &str, path: &str) -> AppInfo {
         name: name.into(),
         path: path.into(),
         icon_base64: None,
+        artifact_kind: Default::default(),
         category: catalog::AppCategory::Other,
         launch_kind: LaunchKind::Executable,
         source_kind: SourceKind::Registry,
