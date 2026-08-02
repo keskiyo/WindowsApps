@@ -2,7 +2,10 @@ Windows Apps is a fast, private application catalog and launcher for Windows 10 
 
 ## Highlights
 
-- Important fix ui
+- Category navigation now opens the selected section reliably from Favorites, Settings, Auxiliary tools, Installers & Docs, and Hidden.
+- Category transitions inside All Apps are smooth and keep the selected heading below the sticky header.
+- Dragging applications and sidebar categories no longer breaks the layout or leaves a stale drag preview.
+- Category ordering is available only in the sidebar, keeping All Apps focused on moving applications.
 
 ## Install
 
