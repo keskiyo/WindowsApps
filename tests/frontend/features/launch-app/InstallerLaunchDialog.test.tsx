@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { InstallerLaunchDialog } from '../../../../src/components/dialogs/InstallerLaunchDialog/InstallerLaunchDialog'
-import type { AppInfo } from '../../../../src/types'
+import { InstallerLaunchDialog } from '../../../../src/features/launch-app/ui/InstallerLaunchDialog/InstallerLaunchDialog'
+import type { AppInfo } from '../../../../src/entities/app'
 
 const app: AppInfo = {
 	id: 'setup',

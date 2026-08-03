@@ -1,12 +1,12 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AuxiliaryToolRow } from '../../../../src/components/catalog/AuxiliaryToolRow/AuxiliaryToolRow'
+import { AuxiliaryToolRow } from '../../../../src/widgets/catalog-content/ui/AuxiliaryToolRow/AuxiliaryToolRow'
+import type { AppInfo } from '../../../../src/entities/app'
 import type {
 	AppCategory,
-	AppInfo,
 	CategoryDefinition,
-} from '../../../../src/types'
+} from '../../../../src/entities/category'
 
 const draggable = vi.hoisted(() => ({
 	setNodeRef: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock('@dnd-kit/core', () => ({
 	}),
 }))
 
-vi.mock('../../../../src/store/useIsLaunching', () => ({
+vi.mock('../../../../src/features/launch-app/model/useIsLaunching', () => ({
 	useIsLaunching: () => false,
 }))
 

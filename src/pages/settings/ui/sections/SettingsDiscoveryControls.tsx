@@ -1,7 +1,7 @@
 import { FolderPlus, FolderX, HardDrive } from 'lucide-react'
 import { useState } from 'react'
-import type { ScanSettings, SystemSettings } from '../../types'
-import { PathEditor } from './PathEditor'
+import type { ScanSettings, SystemSettings } from '../../../../entities/system'
+import { PathEditor } from '../components/PathEditor'
 
 type ScanPathKind = 'includedPaths' | 'excludedPaths'
 

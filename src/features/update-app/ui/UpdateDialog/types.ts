@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import type { UpdateInstallPhase } from '../../../hooks/useUpdater'
+import type { UpdateInstallPhase } from '../../model/useUpdater'
 
 export interface UpdateDialogProps {
 	version: string

@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { createRef } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { AppActionsMenu } from '../../../../src/components/apps/AppActionsMenu/AppActionsMenu'
-import type { AppInfo } from '../../../../src/types'
+import { AppActionsMenu } from '../../../../src/features/app-actions/ui/AppActionsMenu/AppActionsMenu'
+import type { AppInfo } from '../../../../src/entities/app'
 
 describe('AppActionsMenu artifacts', () => {
 	it('does not offer category moves or favorites for an installer artifact', () => {

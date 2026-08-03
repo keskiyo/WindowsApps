@@ -3,8 +3,8 @@ import {
 	filterAppsByQuery,
 	filterVisibleApps,
 	selectCategorizedApps,
-} from '../../../src/store/selectors'
-import type { AppInfo } from '../../../src/types'
+} from '../../../src/app/store/selectors'
+import type { AppInfo } from '../../../src/entities/app'
 
 function app(index: number): AppInfo {
 	const category = index % 3 === 0 ? 'development' : index % 3 === 1 ? 'games' : 'utilities'

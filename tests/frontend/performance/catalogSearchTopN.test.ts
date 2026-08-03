@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
 	rankAppsByQuery,
 	rankAppsByQueryTop,
-} from '../../../src/lib/catalogSearch'
-import type { AppInfo } from '../../../src/types'
+} from '../../../src/entities/app/lib/catalogSearch'
+import type { AppInfo } from '../../../src/entities/app'
 
 const PALETTE_LIMIT = 50
 

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useRef } from 'react'
 import { describe, expect, it } from 'vitest'
-import { useFocusTrap } from '../../../src/hooks/useFocusTrap'
+import { useFocusTrap } from '../../../src/shared/hooks/useFocusTrap'
 
 function Trapped({ disabledMiddle = false }: { disabledMiddle?: boolean }) {
 	const dialog = useRef<HTMLDivElement>(null)

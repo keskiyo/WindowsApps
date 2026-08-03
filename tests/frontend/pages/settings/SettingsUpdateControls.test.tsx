@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { SettingsUpdateControls } from '../../../../src/components/settings/SettingsUpdateControls'
-import type { UpdaterState } from '../../../../src/hooks/useUpdater'
+import { SettingsUpdateControls } from '../../../../src/pages/settings/ui/sections/SettingsUpdateControls'
+import type { UpdaterState } from '../../../../src/features/update-app/model/useUpdater'
 
 function updater(overrides: Partial<UpdaterState> = {}): UpdaterState {
 	return {

@@ -1,9 +1,8 @@
+import type { AppInfo, AppView } from '../../../../entities/app'
 import type {
 	AppCategory,
-	AppInfo,
-	AppView,
 	CategoryDefinition,
-} from '../../../types'
+} from '../../../../entities/category'
 
 export interface AppGridProps {
 	apps: AppInfo[]

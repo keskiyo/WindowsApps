@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import type { AppView } from '../../../types'
+import type { AppView } from '../../../../entities/app'
 
 export interface FilterItem {
 	view: Exclude<AppView, 'settings'>

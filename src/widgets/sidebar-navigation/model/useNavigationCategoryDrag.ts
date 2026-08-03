@@ -3,8 +3,8 @@ import type {
 	DragStartEvent,
 } from '@dnd-kit/core'
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { getDropAction } from '../../../lib/catalog'
-import type { AppCategory } from '../../../types'
+import { getDropAction } from '../../../entities/app'
+import type { AppCategory } from '../../../entities/category'
 
 interface Props {
 	navigationRef: RefObject<HTMLElement>

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
-import { isInstaller } from '../lib/catalogArtifacts'
-import type { AppInfo } from '../types'
+import { isInstaller } from '../../../entities/app'
+import type { AppInfo } from '../../../entities/app'
 
 export function useInstallerLaunch(onLaunch: (app: AppInfo) => Promise<void>) {
 	const [app, setApp] = useState<AppInfo | null>(null)

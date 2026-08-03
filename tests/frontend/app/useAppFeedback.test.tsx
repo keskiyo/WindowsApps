@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useAppFeedback } from '../../../src/hooks/useAppFeedback'
-import type { AppInfo } from '../../../src/types'
+import { useAppFeedback } from '../../../src/app/model/useAppFeedback'
+import type { AppInfo } from '../../../src/entities/app'
 
 const { toastError, toastInfo } = vi.hoisted(() => ({
 	toastError: vi.fn(),

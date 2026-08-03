@@ -1,6 +1,6 @@
 import { AppWindow, Keyboard, Power } from 'lucide-react'
-import { SettingsUpdateControls } from '../SettingsUpdateControls'
-import type { GeneralSettingsProps } from './types'
+import { SettingsUpdateControls } from './SettingsUpdateControls'
+import type { GeneralSettingsProps } from '../../types'
 
 export function GeneralSettings({
 	settings,

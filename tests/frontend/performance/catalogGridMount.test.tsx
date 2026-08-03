@@ -1,9 +1,10 @@
 import { act, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { AppGrid } from '../../../src/components/catalog/AppGrid/AppGrid'
-import { createAppStore } from '../../../src/store/appStore'
-import { AppStoreProvider } from '../../../src/store/storeContext'
-import type { AppInfo, AppsClient, CategoryDefinition } from '../../../src/types'
+import { AppGrid } from '../../../src/widgets/catalog-content/ui/AppGrid/AppGrid'
+import { createAppStore } from '../../../src/app/store/appStore'
+import { AppStoreProvider } from '../../../src/app/store/storeContext'
+import type { AppInfo, AppsClient } from '../../../src/entities/app'
+import type { CategoryDefinition } from '../../../src/entities/category'
 import { triggerIntersection } from '../setup'
 
 function emptyClient(): AppsClient {

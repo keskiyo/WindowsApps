@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createRef } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { Header } from '../../../../src/components/shared/Header/Header'
+import { Header } from '../../../../src/widgets/app-header/ui/Header'
 
 describe('Header', () => {
 	it('keeps navigation, search, and scan controls available together', () => {

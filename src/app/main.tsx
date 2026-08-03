@@ -1,10 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import { tauriSystemClient } from './lib/system'
-import { tauriAppsClient } from './lib/tauri'
+import { tauriAppsClient } from '../entities/app/api/appsClient'
+import { tauriSystemClient } from '../entities/system/api/systemClient'
 import { createAppStore } from './store/appStore'
-import './index.css'
+import './styles/index.css'
 
 const appStore = createAppStore(tauriAppsClient)
 

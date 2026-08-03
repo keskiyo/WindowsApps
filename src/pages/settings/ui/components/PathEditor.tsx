@@ -1,7 +1,7 @@
 import { FolderSearch, Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useSpotlight } from '../../hooks/useSpotlight'
-import { SpotlightLayer } from '../shared/SpotlightLayer'
+import { useSpotlight } from '../../../../shared/hooks/useSpotlight'
+import { SpotlightLayer } from '../../../../shared/ui/SpotlightLayer'
 
 export interface PathEditorProps {
 	label: string

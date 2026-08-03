@@ -1,7 +1,7 @@
 import { RefreshCw, RotateCcw, ScanSearch } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { ScanDiagnostics } from './ScanDiagnostics'
-import type { CatalogMaintenanceProps } from './types'
+import type { CatalogMaintenanceProps } from '../../types'
 
 /**
  * One geometry for every control in this card, so a variant differs by colour alone. The two

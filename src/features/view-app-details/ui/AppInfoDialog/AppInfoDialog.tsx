@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../../hooks/useFocusTrap'
+import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
+import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap'
 import { AdditionalInformation } from './AdditionalInformation'
 import { AppIdentityHeader } from './AppIdentityHeader'
 import { AppInformationCards } from './AppInformationCards'
 import { DialogActions } from './DialogActions'
 import type { AppInfoDialogProps } from './types'
-import { useAppDetails } from './useAppDetails'
-import { useAppInfoActions } from './useAppInfoActions'
+import { useAppDetails } from '../../model/useAppDetails'
+import { useAppInfoActions } from '../../model/useAppInfoActions'
 
 export function AppInfoDialog({
 	app,

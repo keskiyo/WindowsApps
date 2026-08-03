@@ -483,16 +483,24 @@ client-side ceiling clears it. A top activity bar reflects any in-flight launch 
 
 ```text
 public/                          Static assets and application icon
-src/components/apps/             Application cards and action menus
-src/components/catalog/          Catalog grids and sortable sections
-src/components/dialogs/          App information and destructive confirmations
-src/components/navigation/       Sidebar, drawer, and category navigation
-src/components/settings/         Settings and uninstall history
-src/components/shared/           Header, title bar, scan prompt, shared UI
-src/hooks/                       Catalog derivation, shortcuts, dialog flows, and updater hooks
-src/lib/                         Tauri clients, preferences, catalog utilities
-src/store/                       Zustand application state and catalog selectors
-src/types/                       Shared TypeScript contracts
+src/app/                         Composition root: App, main, app shell, global shortcuts
+src/app/layout/                  Title bar, activity bar, shell chrome, persistence banner
+src/app/store/                   Zustand root store, store-shaped selectors, persisted preferences
+src/pages/catalog/               Catalog screen: scan prompt, summary and grid composition
+src/pages/settings/              Settings screen and its sections
+src/widgets/                     Large self-contained interface areas, each with a public index.ts
+  app-header/                   Search field, scan button, header bar
+  catalog-content/              Grids, category sections, catalog view derivation
+  sidebar-navigation/           Sidebar, drawer, navigation state and category drag
+  workspace-summary/            View filter tiles
+src/features/                    User scenarios, each with a public index.ts
+  app-actions, command-palette, edit-settings, launch-app, manage-category,
+  stale-copy, uninstall-app, update-app, view-app-details
+src/entities/app/                App entity: contracts, card UI, catalog selectors, metadata, IPC client
+src/entities/category/           Category entity: contracts, labels, accents
+src/entities/system/             System entity: settings contracts and IPC client
+src/shared/api/tauri/            Generic Tauri transport and error normalization
+src/shared/                      Domain-agnostic UI, hooks, platform access, and utilities
 src-tauri/src/app_state.rs       Process-wide trusted catalog target state
 src-tauri/src/catalog/           Catalog model, classify, deduplication, and visibility rules
 src-tauri/src/catalog/details/   Trusted per-app detail targets, local reads, and their cache

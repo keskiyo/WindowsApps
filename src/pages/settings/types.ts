@@ -1,9 +1,6 @@
-import type { UpdaterState } from '../../../hooks/useUpdater'
-import type {
-	CatalogDiagnostics,
-	SystemClient,
-	SystemSettings,
-} from '../../../types'
+import type { UpdaterState } from '../../features/update-app'
+import type { CatalogDiagnostics } from '../../entities/app'
+import type { SystemClient, SystemSettings } from '../../entities/system'
 
 export interface SettingsPageProps {
 	client: SystemClient

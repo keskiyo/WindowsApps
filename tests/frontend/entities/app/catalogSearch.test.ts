@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
 	filterAppsByQuery,
 	rankAppsByQuery,
-} from '../../../src/lib/catalogSearch'
-import type { AppInfo } from '../../../src/types'
+} from '../../../../src/entities/app/lib/catalogSearch'
+import type { AppInfo } from '../../../../src/entities/app'
 
 function app(
 	value: Partial<AppInfo> & Pick<AppInfo, 'id' | 'name'>,

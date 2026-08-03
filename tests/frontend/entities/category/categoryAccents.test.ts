@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	chooseCustomCategoryAccent,
 	stableCustomCategoryAccent,
-} from '../../../src/lib/categoryAccents'
+} from '../../../../src/entities/category/lib/categoryAccents'
 
 describe('category accents', () => {
 	it('uses an available accent before repeating one', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { deduplicateVisibleApps } from '../../../src/lib/appDeduplication'
-import type { AppInfo } from '../../../src/types'
+import { deduplicateVisibleApps } from '../../../../src/entities/app/lib/appDeduplication'
+import type { AppInfo } from '../../../../src/entities/app'
 
 function app(
 	value: Partial<AppInfo> & Pick<AppInfo, 'id' | 'name' | 'path'>,

@@ -5,8 +5,11 @@ import type {
 import { act, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { AppNavigation } from '../../../../src/components/navigation/AppNavigation/AppNavigation'
-import type { AppCategory, CategoryDefinition } from '../../../../src/types'
+import { AppNavigation } from '../../../../src/widgets/sidebar-navigation/ui/AppNavigation/AppNavigation'
+import type {
+	AppCategory,
+	CategoryDefinition,
+} from '../../../../src/entities/category'
 
 const dragContext = vi.hoisted(() => ({
 	onDragStart: undefined as ((event: DragStartEvent) => void) | undefined,
@@ -54,7 +57,7 @@ vi.mock('@dnd-kit/sortable', async importOriginal => {
 })
 
 vi.mock(
-	'../../../../src/components/navigation/SortableNavigationCategory',
+	'../../../../src/widgets/sidebar-navigation/ui/SortableNavigationCategory/SortableNavigationCategory',
 	() => ({
 		SortableNavigationCategory: ({ label }: { label: string }) => (
 			<button type='button'>{label}</button>

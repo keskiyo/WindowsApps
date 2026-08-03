@@ -3,8 +3,8 @@ import type {
 	DragStartEvent,
 } from '@dnd-kit/core'
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { getDropAction, type DragData } from '../../../lib/catalog'
-import type { AppCategory } from '../../../types'
+import { getDropAction, type DragData } from '../../../../entities/app'
+import type { AppCategory } from '../../../../entities/category'
 
 export type CatalogDragPreview =
 	| { type: 'app'; appId: string }

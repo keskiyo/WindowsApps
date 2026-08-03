@@ -1,8 +1,6 @@
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
 import type {
-	AppHydrationPatch,
 	AppDetails,
+	AppHydrationPatch,
 	AppInfo,
 	AppsClient,
 	CatalogChangeSummary,
@@ -11,47 +9,13 @@ import type {
 	LaunchStatus,
 	ScanProgress,
 	UninstallPreview,
-} from '../types'
-import { AppClientError, toAppClientError } from './clientError'
-
-type TauriGlobal = typeof globalThis & {
-	__TAURI_INTERNALS__?: unknown
-}
-
-function isTauriRuntime(): boolean {
-	return Boolean((globalThis as TauriGlobal).__TAURI_INTERNALS__)
-}
-
-export async function invokeTauri<T>(
-	command: string,
-	args?: Record<string, unknown>,
-): Promise<T> {
-	try {
-		return await invoke<T>(command, args)
-	} catch (error) {
-		throw toAppClientError(error)
-	}
-}
-
-async function invokeIfTauri<T>(
-	command: string,
-	args?: Record<string, unknown>,
-): Promise<T> {
-	if (!isTauriRuntime())
-		throw new AppClientError(
-			'DESKTOP_RUNTIME_UNAVAILABLE',
-			'This action is available only in the desktop app.',
-		)
-	return invokeTauri<T>(command, args)
-}
-
-async function listenIfTauri<T>(
-	event: string,
-	handler: (payload: T) => void,
-): Promise<() => void> {
-	if (!isTauriRuntime()) return () => undefined
-	return listen<T>(event, ({ payload }) => handler(payload))
-}
+} from '../model/app.types'
+import {
+	invokeIfTauri,
+	invokeTauri,
+	isTauriRuntime,
+	listenIfTauri,
+} from '../../../shared/api/tauri/client'
 
 export const tauriAppsClient: AppsClient = {
 	getApps: () =>

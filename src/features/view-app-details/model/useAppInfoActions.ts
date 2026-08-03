@@ -1,6 +1,10 @@
 import { useCallback, useState } from 'react'
-import { buildAppReport } from '../../../lib/appMetadata'
-import type { AppDetails, AppInfo, AppsClient } from '../../../types'
+import {
+	type AppDetails,
+	type AppInfo,
+	type AppsClient,
+	buildAppReport,
+} from '../../../entities/app'
 
 async function copyToClipboard(value: string): Promise<void> {
 	if (navigator.clipboard?.writeText) {

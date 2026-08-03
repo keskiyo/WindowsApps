@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { catalogChangeMessage } from '../../../src/lib/catalogChanges'
+import { catalogChangeMessage } from '../../../../src/widgets/catalog-content/lib/catalogChanges'
 
 describe('catalog change messages', () => {
 	it('formats added and removed application counts', () => {

@@ -1,9 +1,8 @@
 import { AlertTriangle, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../hooks/useFocusTrap'
-import { SOURCE_LABELS } from '../../lib/appMetadata'
-import type { UninstallPreview } from '../../types'
+import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
+import { useFocusTrap } from '../../../shared/hooks/useFocusTrap'
+import { SOURCE_LABELS, type UninstallPreview } from '../../../entities/app'
 
 interface Props {
 	appName: string

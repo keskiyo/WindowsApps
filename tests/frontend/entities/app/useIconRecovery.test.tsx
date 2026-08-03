@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { useIconRecovery } from '../../../src/hooks/useIconRecovery'
+import { useIconRecovery } from '../../../../src/entities/app/model/useIconRecovery'
 
 describe('useIconRecovery', () => {
 	afterEach(() => vi.useRealTimers())

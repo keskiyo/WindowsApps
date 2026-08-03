@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { useInstallerLaunch } from '../../../src/hooks/useInstallerLaunch'
-import type { AppInfo } from '../../../src/types'
+import { useInstallerLaunch } from '../../../../src/features/launch-app/model/useInstallerLaunch'
+import type { AppInfo } from '../../../../src/entities/app'
 
 function app(artifactKind?: AppInfo['artifactKind']): AppInfo {
 	return {

@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useUpdater } from '../../../src/hooks/useUpdater'
+import { useUpdater } from '../../../../src/features/update-app/model/useUpdater'
 
 const check = vi.fn()
 const relaunch = vi.fn()

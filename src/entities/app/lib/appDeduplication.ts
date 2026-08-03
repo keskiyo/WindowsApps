@@ -1,4 +1,4 @@
-import type { AppInfo } from '../types'
+import type { AppInfo } from '../model/app.types'
 
 /**
  * Frontend-only safety net for stale caches. Rust owns product identity and evidence-based

@@ -1,6 +1,10 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode, RefObject } from 'react'
-import type { AppCategory, AppInfo, CategoryDefinition } from '../../../types'
+import type { AppInfo } from '../../../../entities/app'
+import type {
+	AppCategory,
+	CategoryDefinition,
+} from '../../../../entities/category'
 
 export interface AppActionsMenuProps {
 	app: AppInfo

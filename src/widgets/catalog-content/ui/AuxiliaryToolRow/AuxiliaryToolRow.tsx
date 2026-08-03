@@ -2,9 +2,9 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { Grip } from 'lucide-react'
 import { memo, useCallback, useRef, useState } from 'react'
-import { useIsLaunching } from '../../../store/useIsLaunching'
-import { AppActionsMenu } from '../../apps/AppActionsMenu/AppActionsMenu'
-import { CardIcon } from '../../apps/AppCard/CardIcon'
+import { useIsLaunching } from '../../../../features/launch-app'
+import { AppActionsMenu } from '../../../../features/app-actions'
+import { CardIcon } from '../../../../entities/app'
 import type { AuxiliaryToolRowProps } from './types'
 
 function AuxiliaryToolRowComponent({

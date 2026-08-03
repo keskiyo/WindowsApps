@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { SettingsDiscoveryControls } from '../../../../src/components/settings/SettingsDiscoveryControls'
-import type { SystemSettings } from '../../../../src/types'
+import { SettingsDiscoveryControls } from '../../../../src/pages/settings/ui/sections/SettingsDiscoveryControls'
+import type { SystemSettings } from '../../../../src/entities/system'
 
 const settings: SystemSettings = {
 	version: '0.2.8',

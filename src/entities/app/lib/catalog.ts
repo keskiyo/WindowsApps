@@ -1,4 +1,5 @@
-import type { AppCategory, AppInfo } from '../types'
+import type { AppInfo } from '../model/app.types'
+import type { AppCategory } from '../../category'
 
 export type DragData = {
 	type?: string

@@ -1,7 +1,7 @@
 import { Search, X } from 'lucide-react'
-import { useSpotlight } from '../../../hooks/useSpotlight'
-import { SpotlightLayer } from '../SpotlightLayer'
-import type { SearchFieldProps } from './types'
+import { useSpotlight } from '../../../shared/hooks/useSpotlight'
+import { SpotlightLayer } from '../../../shared/ui/SpotlightLayer'
+import type { SearchFieldProps } from '../types'
 
 export function SearchField({
 	query,

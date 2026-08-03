@@ -1,8 +1,8 @@
+import type { AppInfo } from '../../../../entities/app'
 import type {
 	AppCategory,
-	AppInfo,
 	CategoryDefinition,
-} from '../../../types'
+} from '../../../../entities/category'
 
 export interface AuxiliaryToolRowProps {
 	app: AppInfo

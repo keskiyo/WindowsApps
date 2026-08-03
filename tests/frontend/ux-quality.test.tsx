@@ -2,9 +2,10 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../../src/App'
-import { createAppStore } from '../../src/store/appStore'
-import type { AppInfo, AppsClient, SystemClient } from '../../src/types'
+import { App } from '../../src/app/App'
+import { createAppStore } from '../../src/app/store/appStore'
+import type { AppInfo, AppsClient } from '../../src/entities/app'
+import type { SystemClient } from '../../src/entities/system'
 
 function app(
 	value: Partial<AppInfo> &

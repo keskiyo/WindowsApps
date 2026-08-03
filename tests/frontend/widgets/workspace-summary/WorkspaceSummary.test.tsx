@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { WorkspaceSummary } from '../../../../src/components/shared/WorkspaceSummary/WorkspaceSummary'
+import { WorkspaceSummary } from '../../../../src/widgets/workspace-summary/ui/WorkspaceSummary/WorkspaceSummary'
 
 describe('WorkspaceSummary', () => {
 	it('selects catalog views and marks the active filter', async () => {

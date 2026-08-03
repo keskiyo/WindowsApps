@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { useCatalogView } from '../../../src/hooks/useCatalogView'
-import type { AppInfo } from '../../../src/types'
+import { useCatalogView } from '../../../../src/widgets/catalog-content/model/useCatalogView'
+import type { AppInfo } from '../../../../src/entities/app'
 
 function app(id: string, artifactKind?: AppInfo['artifactKind']): AppInfo {
 	return {

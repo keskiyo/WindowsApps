@@ -1,7 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { AppCard } from '../../../../src/components/apps/AppCard/AppCard'
-import type { AppCategory, AppInfo, CategoryDefinition } from '../../../../src/types'
+import { CatalogAppCard } from '../../../../src/widgets/catalog-content/ui/CatalogAppCard/CatalogAppCard'
+import type { AppInfo } from '../../../../src/entities/app'
+import type {
+	AppCategory,
+	CategoryDefinition,
+} from '../../../../src/entities/category'
 
 vi.mock('@dnd-kit/core', () => ({
 	useDraggable: () => ({
@@ -14,7 +18,7 @@ vi.mock('@dnd-kit/core', () => ({
 	}),
 }))
 
-vi.mock('../../../../src/store/useIsLaunching', () => ({
+vi.mock('../../../../src/features/launch-app/model/useIsLaunching', () => ({
 	useIsLaunching: () => false,
 }))
 
@@ -39,10 +43,10 @@ const app: AppInfo = {
 	canUninstall: false,
 }
 
-describe('AppCard', () => {
+describe('CatalogAppCard', () => {
 	it('keeps an active source in the grid without a transform', () => {
 		render(
-			<AppCard
+			<CatalogAppCard
 				app={app}
 				isFavorite={false}
 				categories={[development]}

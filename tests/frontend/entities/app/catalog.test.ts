@@ -3,8 +3,8 @@ import {
 	getDropAction,
 	groupAppsByCategory,
 	sortFavoritesFirst,
-} from '../../../src/lib/catalog'
-import type { AppInfo } from '../../../src/types'
+} from '../../../../src/entities/app/lib/catalog'
+import type { AppInfo } from '../../../../src/entities/app'
 
 const apps = [
 	{ id: 'wow', name: 'World of Warcraft', category: 'games' },

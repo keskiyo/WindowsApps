@@ -1,13 +1,16 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useSpotlight } from '../../hooks/useSpotlight'
-import type { AppCategory, CustomCategoryAccent } from '../../types'
-import { SpotlightLayer } from '../shared/SpotlightLayer'
+import { useSpotlight } from '../../../../shared/hooks/useSpotlight'
+import type {
+	AppCategory,
+	CustomCategoryAccent,
+} from '../../../../entities/category'
+import { SpotlightLayer } from '../../../../shared/ui/SpotlightLayer'
 import {
 	categoryAccent,
 	navigationCategoryCountClass,
 	navigationCategoryRowClass,
-} from './SortableNavigationCategory/data'
+} from './data'
 
 interface Props {
 	category: AppCategory

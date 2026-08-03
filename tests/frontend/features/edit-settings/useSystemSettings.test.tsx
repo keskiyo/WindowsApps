@@ -1,8 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { useSystemSettings } from '../../../src/hooks/useSystemSettings'
-import { AppClientError } from '../../../src/lib/clientError'
-import type { SystemClient } from '../../../src/types'
+import { useSystemSettings } from '../../../../src/features/edit-settings/model/useSystemSettings'
+import { AppClientError } from '../../../../src/shared/api/tauri/errors'
+import type { SystemClient } from '../../../../src/entities/system'
 
 const client: SystemClient = {
 	getSettings: vi.fn().mockResolvedValue({

@@ -1,7 +1,7 @@
 import { EyeOff } from 'lucide-react'
-import { sortFavoritesFirst } from '../../lib/catalog'
-import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
-import { AppCard } from '../apps/AppCard/AppCard'
+import { type AppInfo, sortFavoritesFirst } from '../../../entities/app'
+import type { AppCategory, CategoryDefinition } from '../../../entities/category'
+import { CatalogAppCard } from './CatalogAppCard/CatalogAppCard'
 
 interface Props {
 	apps: AppInfo[]
@@ -48,7 +48,7 @@ export function HiddenGrid(props: Props) {
 			className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
 		>
 			{sortFavoritesFirst(props.apps, props.favoriteAppIds).map(app => (
-				<AppCard
+				<CatalogAppCard
 					key={app.id}
 					app={app}
 					isHidden

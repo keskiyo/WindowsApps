@@ -1,4 +1,4 @@
-import type { AppCategory } from './category'
+import type { AppCategory } from '../../category'
 
 export type AppLaunchKind = 'executable' | 'shortcut' | 'app_user_model_id'
 export type AppSourceKind =

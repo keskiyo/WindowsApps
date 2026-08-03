@@ -1,7 +1,13 @@
 import { Box, FolderOpen, Search, ShieldCheck } from 'lucide-react'
-import { SOURCE_LABELS } from '../../../lib/appMetadata'
-import { categoryLabel } from '../../../types'
-import type { AppDetails, AppInfo, CategoryDefinition } from '../../../types'
+import {
+	type AppDetails,
+	type AppInfo,
+	SOURCE_LABELS,
+} from '../../../../entities/app'
+import {
+	type CategoryDefinition,
+	categoryLabel,
+} from '../../../../entities/category'
 import { InfoCard } from './InfoCard'
 
 interface AppInformationCardsProps {

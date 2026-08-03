@@ -1,8 +1,11 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { AppNavigation } from '../../../../src/components/navigation/AppNavigation/AppNavigation'
-import type { AppCategory, CategoryDefinition } from '../../../../src/types'
+import { AppNavigation } from '../../../../src/widgets/sidebar-navigation/ui/AppNavigation/AppNavigation'
+import type {
+	AppCategory,
+	CategoryDefinition,
+} from '../../../../src/entities/category'
 
 const categories: CategoryDefinition[] = [
 	{ id: 'games', label: 'Games', builtIn: true },

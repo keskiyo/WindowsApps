@@ -1,6 +1,6 @@
 import { Wrench } from 'lucide-react'
 import { useState } from 'react'
-import type { ScanDiagnosticsProps } from './types'
+import type { ScanDiagnosticsProps } from '../../types'
 
 export function ScanDiagnostics({ diagnostics }: ScanDiagnosticsProps) {
 	const [expanded, setExpanded] = useState(false)

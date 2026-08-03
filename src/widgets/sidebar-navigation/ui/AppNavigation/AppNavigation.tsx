@@ -13,13 +13,13 @@ import {
 } from '@dnd-kit/sortable'
 import { EyeOff, Grid2X2, Plus, Settings, Star, Wrench } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { categoryLabel } from '../../../types'
-import { CategoryNameEditor } from '../../shared/CategoryNameEditor'
-import { SortableNavigationCategory } from '../SortableNavigationCategory'
+import { categoryLabel } from '../../../../entities/category'
+import { CategoryNameEditor } from '../../../../features/manage-category'
+import { SortableNavigationCategory } from '../SortableNavigationCategory/SortableNavigationCategory'
 import { CategoryDragOverlay } from './CategoryDragOverlay'
 import { NavItem } from './NavItem'
 import type { AppNavigationProps } from './types'
-import { useNavigationCategoryDrag } from './useNavigationCategoryDrag'
+import { useNavigationCategoryDrag } from '../../model/useNavigationCategoryDrag'
 
 export function AppNavigation(props: AppNavigationProps) {
 	const [adding, setAdding] = useState(false)

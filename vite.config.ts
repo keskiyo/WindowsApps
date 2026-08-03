@@ -19,7 +19,13 @@ export default defineConfig({
 			// Only frontend production sources. The Rust crate has its own colocated tests, and
 			// test/build files would otherwise dilute the report into meaninglessness.
 			include: ['src/**/*.{ts,tsx}'],
-			exclude: ['src/**/types.ts', 'src/main.tsx', 'src/vite-env.d.ts'],
+			exclude: [
+				'src/**/types.ts',
+				'src/**/*.types.ts',
+				'src/**/index.ts',
+				'src/app/main.tsx',
+				'src/vite-env.d.ts',
+			],
 		},
 	},
 	server: {

@@ -9,7 +9,7 @@ import {
 import {
 	floatingMenuPosition,
 	requiredMenuScroll,
-} from '../../../lib/positioning'
+} from '../../../shared/lib/positioning'
 
 interface Options {
 	anchorRef: RefObject<HTMLButtonElement | null>

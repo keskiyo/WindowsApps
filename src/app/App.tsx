@@ -2,35 +2,35 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast, Toaster } from 'sonner'
 import { useStore } from 'zustand'
 import type { StoreApi } from 'zustand/vanilla'
-import { AppGrid } from './components/catalog/AppGrid/AppGrid'
-import { AppInfoDialog } from './components/dialogs/AppInfoDialog/AppInfoDialog'
-import { InstallerLaunchDialog } from './components/dialogs/InstallerLaunchDialog/InstallerLaunchDialog'
-import { UninstallDialog } from './components/dialogs/UninstallDialog'
-import { AppDrawer } from './components/navigation/AppDrawer'
-import { AppSidebar } from './components/navigation/AppSidebar'
-import { SettingsPage } from './components/settings/SettingsPage/SettingsPage'
-import { AppShellChrome } from './components/shared/AppShellChrome'
-import { CommandPalette } from './components/shared/CommandPalette/CommandPalette'
-import { Header } from './components/shared/Header/Header'
-import { ScanPrompt } from './components/shared/ScanPrompt'
-import { useAppFeedback } from './hooks/useAppFeedback'
-import { useCatalogNavigation } from './hooks/useCatalogNavigation'
-import { useDesktopNavigation } from './hooks/useDesktopNavigation'
+import { catalogChangeMessage, useCatalogView } from '../widgets/catalog-content'
+import { AppInfoDialog, useAppInfoDialog } from '../features/view-app-details'
+import {
+	InstallerLaunchDialog,
+	useInstallerLaunch,
+} from '../features/launch-app'
+import { UninstallDialog, useUninstallFlow } from '../features/uninstall-app'
+import {
+	AppDrawer,
+	AppSidebar,
+	useCatalogNavigation,
+	useDesktopNavigation,
+} from '../widgets/sidebar-navigation'
+import { CatalogPage } from '../pages/catalog'
+import { SettingsPage } from '../pages/settings'
+import { AppShellChrome } from './layout/AppShellChrome'
+import { CommandPalette } from '../features/command-palette'
+import { Header } from '../widgets/app-header'
+import { useAppFeedback } from './model/useAppFeedback'
 
-import { WorkspaceSummary } from './components/shared/WorkspaceSummary/WorkspaceSummary'
-import { useIconRecovery } from './hooks/useIconRecovery'
-import { useAppInfoDialog } from './hooks/useAppInfoDialog'
-import { useCatalogView } from './hooks/useCatalogView'
-import { useGlobalShortcuts } from './hooks/useGlobalShortcuts'
-import { useInstallerLaunch } from './hooks/useInstallerLaunch'
-import { useStaleCopy } from './hooks/useStaleCopy'
-import { useUninstallFlow } from './hooks/useUninstallFlow'
-import { useUpdater } from './hooks/useUpdater'
-import { catalogChangeMessage } from './lib/catalogChanges'
-import { toAppClientError } from './lib/clientError'
+import { useIconRecovery } from '../entities/app'
+import { useGlobalShortcuts } from './model/useGlobalShortcuts'
+import { useStaleCopy } from '../features/stale-copy'
+import { useUpdater } from '../features/update-app'
+import { toAppClientError } from '../shared/api/tauri/errors'
 import { type AppState } from './store/appStore'
 import { AppStoreProvider } from './store/storeContext'
-import type { AppsClient, SystemClient } from './types'
+import type { AppsClient } from '../entities/app'
+import type { SystemClient } from '../entities/system'
 
 interface AppProps {
 	store: StoreApi<AppState>
@@ -253,60 +253,51 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									}}
 									updater={updater}
 								/>
-							) : !state.isLoading &&
-							  !state.hasCache &&
-							  !state.apps.length &&
-							  !scanPromptDismissed ? (
-								<ScanPrompt
-									isScanning={state.isRefreshing}
-									onDismiss={() =>
-										setScanPromptDismissed(true)
-									}
-									onScan={feedback.refresh}
-								/>
 							) : (
-								<>
-									{!state.isLoading && (
-										<WorkspaceSummary
-											activeView={state.activeView}
-											allCount={
-												visibleCategorizedApps.length
-											}
-											favoriteCount={favoriteCount}
-											hiddenCount={hiddenCount}
-											auxiliaryCount={auxiliaryCount}
-											onSelectView={navigation.selectView}
-										/>
-									)}
-									<AppGrid
-										apps={filteredApps}
-										isLoading={state.isLoading}
-										hasQuery={hasQuery}
-										activeView={state.activeView}
-										categoryOrder={state.categoryOrder}
-										categories={state.categories}
-										collapsedCategories={
-											state.collapsedCategories
-										}
-										favoriteAppIds={state.favoriteAppIds}
-										onToggleCategory={state.toggleCategory}
-										onToggleFavorite={state.toggleFavorite}
-										onMoveApp={state.moveApp}
-										onLaunch={installerLaunch.requestLaunch}
-										onInfo={appInfoDialog.open}
-										onUninstall={uninstall.select}
-										onHide={state.hideApp}
-										onRestore={state.restoreApp}
-										onPromoteAuxiliary={
-											state.promoteAuxiliary
-										}
-										onDemoteAuxiliary={
-											state.demoteAuxiliary
-										}
-										onRenameCategory={state.renameCategory}
-										onDeleteCategory={state.deleteCategory}
-									/>
-								</>
+								<CatalogPage
+									showScanPrompt={
+										!state.isLoading &&
+										!state.hasCache &&
+										!state.apps.length &&
+										!scanPromptDismissed
+									}
+									scanPrompt={{
+										isScanning: state.isRefreshing,
+										onDismiss: () =>
+											setScanPromptDismissed(true),
+										onScan: feedback.refresh,
+									}}
+									summary={{
+										activeView: state.activeView,
+										allCount: visibleCategorizedApps.length,
+										favoriteCount,
+										hiddenCount,
+										auxiliaryCount,
+										onSelectView: navigation.selectView,
+									}}
+									grid={{
+										apps: filteredApps,
+										isLoading: state.isLoading,
+										hasQuery,
+										activeView: state.activeView,
+										categoryOrder: state.categoryOrder,
+										categories: state.categories,
+										collapsedCategories: state.collapsedCategories,
+										favoriteAppIds: state.favoriteAppIds,
+										onToggleCategory: state.toggleCategory,
+										onToggleFavorite: state.toggleFavorite,
+										onMoveApp: state.moveApp,
+										onLaunch: installerLaunch.requestLaunch,
+										onInfo: appInfoDialog.open,
+										onUninstall: uninstall.select,
+										onHide: state.hideApp,
+										onRestore: state.restoreApp,
+										onPromoteAuxiliary: state.promoteAuxiliary,
+										onDemoteAuxiliary: state.demoteAuxiliary,
+										onRenameCategory: state.renameCategory,
+										onDeleteCategory: state.deleteCategory,
+									}}
+								/>
 							)}
 						</main>
 					</div>

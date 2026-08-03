@@ -1,10 +1,10 @@
 import { ChevronDown, Info } from 'lucide-react'
 import { useId, useState } from 'react'
 import {
+	type AppDetails,
 	formatFileDate,
 	formatFileSize,
-} from '../../../lib/appMetadata'
-import type { AppDetails } from '../../../types'
+} from '../../../../entities/app'
 
 interface AdditionalInformationProps {
 	details: AppDetails | null

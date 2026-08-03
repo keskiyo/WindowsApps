@@ -9,9 +9,9 @@ import {
 import {
 	groupAppsByCategory,
 	sortFavoritesFirst,
-} from '../../../lib/catalog'
+} from '../../../../entities/app'
 import { useRef } from 'react'
-import { AppDragOverlay } from '../../apps/AppCard/AppDragOverlay'
+import { AppDragOverlay } from '../../../../entities/app'
 import { CategorySection } from '../CategorySection/CategorySection'
 import type { AppGridProps } from './types'
 import { useCatalogDrag } from './useCatalogDrag'

@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { SettingsPage } from '../../../../src/components/settings/SettingsPage/SettingsPage'
-import type { SystemClient } from '../../../../src/types'
+import { SettingsPage } from '../../../../src/pages/settings/ui/SettingsPage'
+import type { SystemClient } from '../../../../src/entities/system'
 
 describe('SettingsPage', () => {
 	const settings = {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AppInfo } from '../types'
+import type { AppInfo } from '../../../entities/app'
 
 export function useAppInfoDialog() {
 	const [app, setApp] = useState<AppInfo | null>(null)

@@ -1,5 +1,5 @@
-import { useSpotlight } from '../../../hooks/useSpotlight'
-import { SpotlightLayer } from '../../shared/SpotlightLayer'
+import { useSpotlight } from '../../../../shared/hooks/useSpotlight'
+import { SpotlightLayer } from '../../../../shared/ui/SpotlightLayer'
 import type { MenuItemProps } from './types'
 
 const BASE =

@@ -1,36 +1,31 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { Grip } from 'lucide-react'
-import { memo, useCallback, useRef, useState } from 'react'
-import { useSpotlight } from '../../../hooks/useSpotlight'
-import { isCatalogArtifact } from '../../../lib/catalogArtifacts'
-import { useIsLaunching } from '../../../store/useIsLaunching'
-import { SpotlightLayer } from '../../shared/SpotlightLayer'
-import { AppActionsMenu } from '../AppActionsMenu/AppActionsMenu'
+import { useCallback, useRef, useState } from 'react'
+import { useSpotlight } from '../../../../shared/hooks/useSpotlight'
+import { isCatalogArtifact } from '../../lib/catalogArtifacts'
+import { SpotlightLayer } from '../../../../shared/ui/SpotlightLayer'
 import { CardIcon } from './CardIcon'
 import { CardLabel } from './CardLabel'
 import { FavoriteButton } from './FavoriteButton'
 import type { AppCardProps } from './types'
 
-function AppCardComponent({
+/**
+ * How one application looks in the catalog. The card owns its own presentation — drag handle,
+ * grip menu trigger, focus restoration, favorite toggle — and nothing about launching,
+ * uninstalling, hiding or moving: those are features, injected through `renderActions`.
+ */
+export function AppCard({
 	app,
 	isFavorite,
-	categories,
-	categoryOrder,
+	launching,
 	onToggleFavorite,
 	onLaunch,
-	onMove,
-	onInfo,
-	onUninstall,
-	isHidden = false,
 	isAuxiliary = false,
-	onHide,
-	onRestore,
-	onDemote,
 	isDragPreviewActive = false,
+	renderActions,
 }: AppCardProps) {
 	const [menuOpen, setMenuOpen] = useState(false)
-	const launching = useIsLaunching(app.id)
 	const gripRef = useRef<HTMLButtonElement | null>(null)
 	// Return focus to the grip trigger when the menu closes (keyboard users keep their place).
 	const closeMenu = useCallback(() => {
@@ -105,27 +100,7 @@ function AppCardComponent({
 					onToggle={() => onToggleFavorite(app.id)}
 				/>
 			)}
-			{menuOpen && (
-				<AppActionsMenu
-					app={app}
-					categories={categories}
-					categoryOrder={categoryOrder}
-					onClose={closeMenu}
-					onMove={onMove}
-					onInfo={onInfo}
-					onUninstall={onUninstall}
-					isHidden={isHidden}
-					isUserPromoted={app.userPromoted}
-					onHide={onHide}
-					onRestore={onRestore}
-					onDemote={onDemote}
-					anchorRef={gripRef}
-				/>
-			)}
+			{menuOpen && renderActions({ close: closeMenu, anchorRef: gripRef })}
 		</article>
 	)
 }
-
-// Memoized so background icon patches re-render only the changed cards, not the whole
-// grid. All callback/array props from the parents are stable (store actions / useCallback).
-export const AppCard = memo(AppCardComponent)

@@ -1,6 +1,6 @@
-import { useSpotlight } from '../../../hooks/useSpotlight'
-import { categoryLabel } from '../../../types'
-import { SpotlightLayer } from '../../shared/SpotlightLayer'
+import { useSpotlight } from '../../../../shared/hooks/useSpotlight'
+import { categoryLabel } from '../../../../entities/category'
+import { SpotlightLayer } from '../../../../shared/ui/SpotlightLayer'
 import type { CategorySubmenuProps } from './types'
 
 export function CategorySubmenu({

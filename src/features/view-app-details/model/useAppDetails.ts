@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { AppDetails, AppsClient } from '../../../types'
+import type { AppDetails, AppsClient } from '../../../entities/app'
 
 interface DetailsState {
 	details: AppDetails | null

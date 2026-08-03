@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 const capabilities = JSON.parse(
 	readFileSync('src-tauri/capabilities/default.json', 'utf8'),
 )
-const updaterHook = readFileSync('src/hooks/useUpdater.ts', 'utf8')
+const updaterHook = readFileSync('src/features/update-app/model/useUpdater.ts', 'utf8')
 
 // The webview is untrusted, so a capability is an attack surface, not a convenience. `*:default`
 // bundles every operation a plugin offers: `process:default` also grants `exit`, and

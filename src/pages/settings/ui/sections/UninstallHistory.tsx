@@ -1,6 +1,9 @@
 import { ShieldCheck, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import type { SystemClient, UninstallHistoryEntry } from '../../types'
+import type {
+	SystemClient,
+	UninstallHistoryEntry,
+} from '../../../../entities/system'
 
 interface Props {
 	client: SystemClient

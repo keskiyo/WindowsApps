@@ -2,7 +2,7 @@ import { Menu } from 'lucide-react'
 import { useRef } from 'react'
 import { ScanButton } from './ScanButton'
 import { SearchField } from './SearchField'
-import type { HeaderProps } from './types'
+import type { HeaderProps } from '../types'
 
 export function Header({
 	appCount,

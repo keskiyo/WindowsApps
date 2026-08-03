@@ -1,6 +1,6 @@
 import { open } from '@tauri-apps/plugin-dialog'
-import type { SystemClient } from '../types'
-import { invokeTauri } from './tauri'
+import type { SystemClient } from '../model/system.types'
+import { invokeTauri } from '../../../shared/api/tauri/client'
 
 export const tauriSystemClient: SystemClient = {
 	getSettings: () => invokeTauri('get_system_settings'),

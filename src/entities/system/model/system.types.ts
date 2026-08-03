@@ -1,4 +1,4 @@
-import type { UninstallMechanism } from './app'
+import type { UninstallMechanism } from '../../app'
 
 export interface GlobalShortcutStatus {
 	available: boolean

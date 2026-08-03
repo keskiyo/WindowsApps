@@ -1,4 +1,4 @@
-import { AppCard } from '../../apps/AppCard/AppCard'
+import { CatalogAppCard } from '../CatalogAppCard/CatalogAppCard'
 import type { ArtifactSectionProps } from './types'
 
 export function ArtifactSection({ title, apps, ...actions }: ArtifactSectionProps) {
@@ -15,7 +15,7 @@ export function ArtifactSection({ title, apps, ...actions }: ArtifactSectionProp
 			</h2>
 			<div className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'>
 				{apps.map(app => (
-					<AppCard
+					<CatalogAppCard
 						key={app.id}
 						app={app}
 						isFavorite={false}

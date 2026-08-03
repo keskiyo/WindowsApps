@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { useCatalogNavigation } from '../../../src/hooks/useCatalogNavigation'
-import type { AppView } from '../../../src/types'
+import { useCatalogNavigation } from '../../../../src/widgets/sidebar-navigation/model/useCatalogNavigation'
+import type { AppView } from '../../../../src/entities/app'
 
 const sourceViews: AppView[] = [
 	'favorites',

@@ -1,6 +1,6 @@
 import { AlertTriangle } from 'lucide-react'
 import { useEffect, useRef } from 'react'
-import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock'
+import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
 import { DialogFooter } from './DialogFooter'
 import { DialogHeader } from './DialogHeader'
 import { formatReleaseDate } from './format'

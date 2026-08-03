@@ -1,9 +1,5 @@
-import {
-	categoryLabel,
-	type AppDetails,
-	type AppInfo,
-	type CategoryDefinition,
-} from '../types'
+import type { AppDetails, AppInfo } from '../model/app.types'
+import { type CategoryDefinition, categoryLabel } from '../../category'
 
 export const SOURCE_LABELS = {
 	registry: 'Registry',

@@ -1,10 +1,11 @@
 import {
-	CATEGORY_ORDER,
-	DEFAULT_CATEGORIES,
 	type AppCategory,
+	CATEGORY_ORDER,
 	type CategoryDefinition,
-} from '../types'
-import { isCustomCategoryAccent, stableCustomCategoryAccent } from './categoryAccents'
+	DEFAULT_CATEGORIES,
+	isCustomCategoryAccent,
+	stableCustomCategoryAccent,
+} from '../../entities/category'
 
 export const PREFERENCES_KEY = 'windows-apps.preferences.v1'
 

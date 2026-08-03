@@ -173,7 +173,7 @@ mod tests {
         );
     }
 
-    // The error-code set is a cross-language contract mirrored in `src/lib/tauri.ts`
+    // The error-code set is a cross-language contract mirrored in `src/shared/api/tauri/errors.ts`
     // (`AppErrorCode`). This pins the Rust half: every code is a unique, non-empty
     // SCREAMING_SNAKE value with a non-empty safe message, and the whole set is exactly the
     // documented list. A drift here (renamed or duplicated code) fails the build; the frontend

@@ -1,10 +1,10 @@
-import { useSystemSettings } from '../../../hooks/useSystemSettings'
-import { useUpdater } from '../../../hooks/useUpdater'
-import { SettingsDiscoveryControls } from '../SettingsDiscoveryControls'
-import { UninstallHistory } from '../UninstallHistory'
-import { CatalogMaintenance } from './CatalogMaintenance'
-import { GeneralSettings } from './GeneralSettings'
-import type { SettingsPageProps } from './types'
+import { useSystemSettings } from '../../../features/edit-settings'
+import { useUpdater } from '../../../features/update-app'
+import { CatalogMaintenance } from './sections/CatalogMaintenance'
+import { GeneralSettings } from './sections/GeneralSettings'
+import { SettingsDiscoveryControls } from './sections/SettingsDiscoveryControls'
+import { UninstallHistory } from './sections/UninstallHistory'
+import type { SettingsPageProps } from '../types'
 
 export function SettingsPage({
 	client,

@@ -1,5 +1,9 @@
 import type { LucideIcon } from 'lucide-react'
-import type { AppCategory, AppView, CategoryDefinition } from '../../../types'
+import type { AppView } from '../../../../entities/app'
+import type {
+	AppCategory,
+	CategoryDefinition,
+} from '../../../../entities/category'
 
 export interface AppNavigationProps {
 	categoryOrder: AppCategory[]

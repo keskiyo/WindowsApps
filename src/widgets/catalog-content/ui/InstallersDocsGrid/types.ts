@@ -1,4 +1,8 @@
-import type { AppCategory, AppInfo, CategoryDefinition } from '../../../types'
+import type { AppInfo } from '../../../../entities/app'
+import type {
+	AppCategory,
+	CategoryDefinition,
+} from '../../../../entities/category'
 
 export interface InstallersDocsGridProps {
 	apps: AppInfo[]

@@ -1,8 +1,8 @@
 import { Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../../hooks/useFocusTrap'
-import { rankAppsByQueryTop } from '../../../store/appStore'
+import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
+import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap'
+import { rankAppsByQueryTop } from '../../../../entities/app'
 import { ResultItem } from './ResultItem'
 import type { CommandPaletteProps } from './types'
 

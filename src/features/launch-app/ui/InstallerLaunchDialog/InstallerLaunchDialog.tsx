@@ -1,7 +1,7 @@
 import { AlertTriangle, Loader2, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
-import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../../hooks/useFocusTrap'
+import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
+import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap'
 import type { InstallerLaunchDialogProps } from './types'
 
 export function InstallerLaunchDialog({

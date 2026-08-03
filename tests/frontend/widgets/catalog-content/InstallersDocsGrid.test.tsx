@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { InstallersDocsGrid } from '../../../../src/components/catalog/InstallersDocsGrid/InstallersDocsGrid'
-import type { AppInfo } from '../../../../src/types'
+import { InstallersDocsGrid } from '../../../../src/widgets/catalog-content/ui/InstallersDocsGrid/InstallersDocsGrid'
+import type { AppInfo } from '../../../../src/entities/app'
 
-vi.mock('../../../../src/components/apps/AppCard/AppCard', () => ({
-	AppCard: ({ app }: { app: AppInfo }) => <article>{app.name}</article>,
+vi.mock('../../../../src/widgets/catalog-content/ui/CatalogAppCard/CatalogAppCard', () => ({
+	CatalogAppCard: ({ app }: { app: AppInfo }) => <article>{app.name}</article>,
 }))
 
 function app(id: string, artifactKind: 'installer' | 'documentation'): AppInfo {

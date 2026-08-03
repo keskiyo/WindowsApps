@@ -3,7 +3,7 @@ import {
 	floatingMenuPosition,
 	horizontalViewportShift,
 	requiredMenuScroll,
-} from '../../../src/lib/positioning'
+} from '../../../src/shared/lib/positioning'
 
 describe('horizontalViewportShift', () => {
 	it('moves an overflowing menu left into the viewport', () => {

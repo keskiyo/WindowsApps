@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getDropAction } from '../../../../src/lib/catalog'
+import { getDropAction } from '../../../../src/entities/app/lib/catalog'
 
 describe('application drop routing', () => {
 	it('moves an application to the target category', () => {

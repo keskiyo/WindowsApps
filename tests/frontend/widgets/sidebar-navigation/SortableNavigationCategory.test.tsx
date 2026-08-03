@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { SortableNavigationCategory } from '../../../../src/components/navigation/SortableNavigationCategory'
+import { SortableNavigationCategory } from '../../../../src/widgets/sidebar-navigation/ui/SortableNavigationCategory/SortableNavigationCategory'
 
 vi.mock('@dnd-kit/sortable', () => ({
 	useSortable: () => ({

@@ -1,7 +1,13 @@
 import { AppWindow, BadgeCheck, X } from 'lucide-react'
-import { displayVersion } from '../../../lib/appMetadata'
-import { categoryLabel } from '../../../types'
-import type { AppDetails, AppInfo, CategoryDefinition } from '../../../types'
+import {
+	type AppDetails,
+	type AppInfo,
+	displayVersion,
+} from '../../../../entities/app'
+import {
+	type CategoryDefinition,
+	categoryLabel,
+} from '../../../../entities/category'
 
 interface AppIdentityHeaderProps {
 	app: AppInfo

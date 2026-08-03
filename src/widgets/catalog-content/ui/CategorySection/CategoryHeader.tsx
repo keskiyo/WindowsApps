@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Pencil } from 'lucide-react'
-import type { AppCategory } from '../../../types'
+import type { AppCategory } from '../../../../entities/category'
 
 interface Props {
 	category: AppCategory

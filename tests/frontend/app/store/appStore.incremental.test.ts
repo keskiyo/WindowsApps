@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createAppStore } from '../../../src/store/appStore'
-import type { AppInfo, AppsClient } from '../../../src/types'
+import { createAppStore } from '../../../../src/app/store/appStore'
+import type { AppInfo, AppsClient } from '../../../../src/entities/app'
 
 const code: AppInfo = {
 	id: 'code',

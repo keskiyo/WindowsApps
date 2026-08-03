@@ -1,5 +1,5 @@
-import type { AppInfo } from '../types'
-import { isWithinOneEdit, queryTokenVariants } from './searchQueryVariants'
+import type { AppInfo } from '../model/app.types'
+import { isWithinOneEdit, queryTokenVariants } from '../../../shared/lib/searchQueryVariants'
 
 const MIN_FUZZY_LENGTH = 4
 

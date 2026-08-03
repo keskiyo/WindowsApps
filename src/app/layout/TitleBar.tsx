@@ -1,5 +1,5 @@
 import { Copy, Minus, Square, X } from 'lucide-react'
-import { useWindowControls } from '../../hooks/useWindowControls'
+import { useWindowControls } from '../../shared/platform/window/useWindowControls'
 
 /**
  * Custom window title bar (native decorations are disabled) so the very top matches the

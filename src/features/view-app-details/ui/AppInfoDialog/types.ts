@@ -1,4 +1,5 @@
-import type { AppInfo, AppsClient, CategoryDefinition } from '../../../types'
+import type { AppInfo, AppsClient } from '../../../../entities/app'
+import type { CategoryDefinition } from '../../../../entities/category'
 
 export interface AppInfoDialogProps {
 	app: AppInfo

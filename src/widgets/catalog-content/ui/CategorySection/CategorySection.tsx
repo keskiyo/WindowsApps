@@ -1,9 +1,11 @@
 import { useDroppable } from '@dnd-kit/core'
 import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { AppCard } from '../../apps/AppCard/AppCard'
-import { DeleteCategoryDialog } from '../../dialogs/DeleteCategoryDialog'
-import { CategoryNameEditor } from '../../shared/CategoryNameEditor'
+import { CatalogAppCard } from '../CatalogAppCard/CatalogAppCard'
+import {
+	CategoryNameEditor,
+	DeleteCategoryDialog,
+} from '../../../../features/manage-category'
 import { CategoryHeader } from './CategoryHeader'
 import type { CategorySectionProps } from './types'
 import { useProgressiveCards } from './useProgressiveCards'
@@ -83,7 +85,7 @@ export function CategorySection({
 				<>
 					<div className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'>
 						{cards.visible.map(app => (
-							<AppCard
+							<CatalogAppCard
 								key={app.id}
 								app={app}
 								isFavorite={favoriteAppIds.includes(app.id)}

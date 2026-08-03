@@ -1,4 +1,7 @@
-import type { AppCategory, CustomCategoryAccent } from '../../../types'
+import type {
+	AppCategory,
+	CustomCategoryAccent,
+} from '../../../../entities/category'
 
 type CategoryAccent =
 	| 'yellow'

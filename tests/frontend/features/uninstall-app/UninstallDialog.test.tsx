@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { UninstallDialog } from '../../../../src/components/dialogs/UninstallDialog'
-import type { UninstallPreview } from '../../../../src/types'
+import { UninstallDialog } from '../../../../src/features/uninstall-app/ui/UninstallDialog'
+import type { UninstallPreview } from '../../../../src/entities/app'
 
 describe('UninstallDialog', () => {
 	it('does not render backend command details', () => {

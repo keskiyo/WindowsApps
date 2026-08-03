@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import type { ScanProgress } from '../../../types'
+import type { ScanProgress } from '../../entities/app'
 
 export interface HeaderProps {
 	appCount: number

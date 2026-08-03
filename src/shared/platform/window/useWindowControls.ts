@@ -20,8 +20,9 @@ function runOnWindow(action: (win: AppWindow) => Promise<unknown>): void {
 }
 
 /**
- * Keeps the Tauri window API out of components — `no-restricted-imports` bans
- * `@tauri-apps/*` under `src/components/**`, so window chrome talks to the runtime
+ * Keeps the Tauri window API out of the rest of the app — `no-restricted-imports` bans
+ * `@tauri-apps/*` across `src/**` except the four integration modules named in
+ * `eslint.config.js`, so window chrome talks to the runtime
  * through this hook. Outside the Tauri runtime every control is inert instead of
  * throwing, which is what lets the title bar render in jsdom tests.
  */

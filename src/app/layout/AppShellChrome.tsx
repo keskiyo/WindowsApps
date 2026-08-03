@@ -1,10 +1,9 @@
-import type { useUpdater } from '../../hooks/useUpdater'
-import type { StaleCopyInfo, SystemClient } from '../../types'
+import { UpdateDialog, type useUpdater } from '../../features/update-app'
+import type { StaleCopyInfo, SystemClient } from '../../entities/system'
 import { GlobalActivityBar } from './GlobalActivityBar'
 import { PreferencesNotSavedBanner } from './PreferencesNotSavedBanner'
-import { StaleCopyBanner } from './StaleCopyBanner'
+import { StaleCopyBanner } from '../../features/stale-copy'
 import { TitleBar } from './TitleBar'
-import { UpdateDialog } from './UpdateDialog/UpdateDialog'
 
 interface AppShellChromeProps {
 	activityActive: boolean

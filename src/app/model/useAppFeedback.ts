@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { toast } from 'sonner'
-import { toAppClientError } from '../lib/clientError'
-import type { AppInfo } from '../types'
+import { toAppClientError } from '../../shared/api/tauri/errors'
+import type { AppInfo } from '../../entities/app'
 
 interface AppFeedbackOptions {
 	onLaunch(app: AppInfo): Promise<void>

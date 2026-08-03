@@ -1,4 +1,4 @@
-import type { CustomCategoryAccent } from '../types/category'
+import type { CustomCategoryAccent } from '../model/category.types'
 
 export const CUSTOM_CATEGORY_ACCENTS = [
 	'yellow',

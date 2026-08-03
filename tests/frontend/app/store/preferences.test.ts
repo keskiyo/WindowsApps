@@ -6,9 +6,9 @@ import {
 	normalizePreferences,
 	readPreferences,
 	writePreferences,
-} from '../../../src/lib/preferences'
-import { stableCustomCategoryAccent } from '../../../src/lib/categoryAccents'
-import { CATEGORY_ORDER } from '../../../src/types'
+} from '../../../../src/app/store/preferences'
+import { stableCustomCategoryAccent } from '../../../../src/entities/category/lib/categoryAccents'
+import { CATEGORY_ORDER } from '../../../../src/entities/category'
 
 describe('preferences', () => {
 	it('uses complete defaults', () => {

@@ -1,4 +1,4 @@
-import type { CatalogChangeSummary } from '../types'
+import type { CatalogChangeSummary } from '../../../entities/app'
 
 export function catalogChangeMessage(
 	summary: CatalogChangeSummary,

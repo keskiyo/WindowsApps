@@ -1,6 +1,6 @@
 import { ExternalLink, RefreshCw, Send } from 'lucide-react'
-import type { UpdateCheckStatus, UpdaterState } from '../../hooks/useUpdater'
-import { GithubIcon } from '../shared/GithubIcon'
+import type { UpdateCheckStatus, UpdaterState } from '../../../../features/update-app'
+import { GithubIcon } from '../../../../shared/ui/GithubIcon'
 
 interface Props {
 	updater: UpdaterState

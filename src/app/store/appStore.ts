@@ -1,17 +1,20 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
-import { chooseCustomCategoryAccent } from '../lib/categoryAccents'
+import {
+	type AppCategory,
+	type CategoryDefinition,
+	chooseCustomCategoryAccent,
+} from '../../entities/category'
 import {
 	INSTALLERS_DOCS_CATEGORY,
 	isCatalogArtifact,
-} from '../lib/catalogArtifacts'
-import { toAppClientError } from '../lib/clientError'
+} from '../../entities/app'
+import { toAppClientError } from '../../shared/api/tauri/errors'
 import {
 	readPreferences,
 	writePreferences,
 	type LegacyCanonicalPreferences,
-} from '../lib/preferences'
+} from './preferences'
 import type {
-	AppCategory,
 	AppHydrationPatch,
 	AppInfo,
 	AppsClient,
@@ -19,10 +22,9 @@ import type {
 	CatalogChangeSummary,
 	CatalogDelta,
 	CatalogDiagnostics,
-	CategoryDefinition,
 	ScanProgress,
 	UninstallPreview,
-} from '../types'
+} from '../../entities/app'
 
 export interface AppState {
 	apps: AppInfo[]

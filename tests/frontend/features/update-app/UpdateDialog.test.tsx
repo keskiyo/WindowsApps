@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { UpdateDialog } from '../../../../src/components/shared/UpdateDialog/UpdateDialog'
-import { releaseHighlights } from '../../../../src/components/shared/UpdateDialog/releaseHighlights'
+import { UpdateDialog } from '../../../../src/features/update-app/ui/UpdateDialog/UpdateDialog'
+import { releaseHighlights } from '../../../../src/features/update-app/ui/UpdateDialog/releaseHighlights'
 
 describe('releaseHighlights', () => {
 	it('extracts the Highlights section from GitHub release markdown', () => {

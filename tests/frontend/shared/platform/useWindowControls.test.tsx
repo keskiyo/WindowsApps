@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useWindowControls } from '../../../src/hooks/useWindowControls'
+import { useWindowControls } from '../../../../src/shared/platform/window/useWindowControls'
 
 const mocks = vi.hoisted(() => ({
 	appWindow: {

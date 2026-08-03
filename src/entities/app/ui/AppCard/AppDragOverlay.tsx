@@ -1,4 +1,4 @@
-import type { AppInfo } from '../../../types'
+import type { AppInfo } from '../../model/app.types'
 import { CardIcon } from './CardIcon'
 import { CardLabel } from './CardLabel'
 

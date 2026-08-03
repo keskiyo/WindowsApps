@@ -1,12 +1,9 @@
 import { X } from 'lucide-react'
 import { useEffect, useRef, type RefObject } from 'react'
-import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../hooks/useFocusTrap'
-import type {
-	AppCategory,
-	AppView,
-	CategoryDefinition,
-} from '../../types'
+import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
+import { useFocusTrap } from '../../../shared/hooks/useFocusTrap'
+import type { AppView } from '../../../entities/app'
+import type { AppCategory, CategoryDefinition } from '../../../entities/category'
 import { AppNavigation } from './AppNavigation/AppNavigation'
 
 interface Props {

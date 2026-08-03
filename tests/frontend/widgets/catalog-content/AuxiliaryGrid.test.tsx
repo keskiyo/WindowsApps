@@ -1,14 +1,14 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { AuxiliaryGrid } from '../../../../src/components/catalog/AuxiliaryGrid'
+import { AuxiliaryGrid } from '../../../../src/widgets/catalog-content/ui/AuxiliaryGrid'
+import type { AppInfo } from '../../../../src/entities/app'
 import type {
 	AppCategory,
-	AppInfo,
 	CategoryDefinition,
-} from '../../../../src/types'
+} from '../../../../src/entities/category'
 
 vi.mock(
-	'../../../../src/components/catalog/AuxiliaryToolRow/AuxiliaryToolRow',
+	'../../../../src/widgets/catalog-content/ui/AuxiliaryToolRow/AuxiliaryToolRow',
 	() => ({
 		AuxiliaryToolRow: ({ app }: { app: AppInfo }) => (
 			<button type='button' aria-label={`Launch ${app.name}`}>

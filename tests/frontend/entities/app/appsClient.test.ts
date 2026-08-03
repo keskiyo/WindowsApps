@@ -21,7 +21,7 @@ describe('tauri app client browser fallback', () => {
 	})
 
 	it('does not call Tauri IPC when opened in a regular browser', async () => {
-		const { tauriAppsClient } = await import('../../../src/lib/tauri')
+		const { tauriAppsClient } = await import('../../../../src/entities/app/api/appsClient')
 
 		await expect(tauriAppsClient.getApps()).resolves.toEqual({
 			apps: [],
@@ -42,7 +42,7 @@ describe('tauri app client browser fallback', () => {
 	})
 
 	it('preserves structured backend error codes and hides unknown transport details', async () => {
-		const { toAppClientError } = await import('../../../src/lib/clientError')
+		const { toAppClientError } = await import('../../../../src/shared/api/tauri/errors')
 		expect(
 			toAppClientError({
 				code: 'LAUNCH_UNAVAILABLE',
@@ -65,7 +65,7 @@ describe('tauri app client browser fallback', () => {
 	// cannot drift silently: every backend code is recognized, plus exactly the two the frontend
 	// owns. Adding a backend code without mirroring it here fails this test.
 	it('mirrors the backend AppError code contract exactly', async () => {
-		const { APP_ERROR_CODES } = await import('../../../src/lib/clientError')
+		const { APP_ERROR_CODES } = await import('../../../../src/shared/api/tauri/errors')
 		const backend = [
 			'APP_DATA_UNAVAILABLE',
 			'APP_DETAILS_UNAVAILABLE',

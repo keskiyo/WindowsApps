@@ -1,4 +1,4 @@
-import { displayVersion } from '../../../lib/appMetadata'
+import { displayVersion } from '../../lib/appMetadata'
 import type { CardLabelProps } from './types'
 
 export function CardLabel({ name, version, launching }: CardLabelProps) {

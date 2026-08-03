@@ -1,6 +1,6 @@
 import { Wrench } from 'lucide-react'
-import { sortFavoritesFirst } from '../../lib/catalog'
-import type { AppCategory, AppInfo, CategoryDefinition } from '../../types'
+import { type AppInfo, sortFavoritesFirst } from '../../../entities/app'
+import type { AppCategory, CategoryDefinition } from '../../../entities/category'
 import { AuxiliaryToolRow } from './AuxiliaryToolRow/AuxiliaryToolRow'
 
 interface Props {

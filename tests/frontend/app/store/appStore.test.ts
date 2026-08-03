@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PREFERENCES_KEY } from '../../../src/lib/preferences'
-import { AppClientError } from '../../../src/lib/clientError'
+import { PREFERENCES_KEY } from '../../../../src/app/store/preferences'
+import { AppClientError } from '../../../../src/shared/api/tauri/errors'
 import {
 	createAppStore,
 	selectFilteredApps,
 	selectVisibleApps,
-} from '../../../src/store/appStore'
-import type { AppInfo, AppsClient } from '../../../src/types'
+} from '../../../../src/app/store/appStore'
+import type { AppInfo, AppsClient } from '../../../../src/entities/app'
 
 function app(
 	value: Partial<AppInfo> &

@@ -1,28 +1,27 @@
 import { useDeferredValue, useMemo } from 'react'
 import {
+	type AppView,
+	type CategorizedAppsState,
 	filterVisibleApps,
+	isCatalogArtifact,
 	rankAppsByQuery,
 	selectCatalogCounts,
 	selectCategorizedApps,
-	type AppState,
-} from '../store/appStore'
-import { isCatalogArtifact } from '../lib/catalogArtifacts'
+} from '../../../entities/app'
 
 /** Icons hydrate for the cards a user can plausibly reach without scrolling first. */
 const HYDRATION_WINDOW = 48
 
-type CatalogViewState = Pick<
-	AppState,
-	| 'activeView'
-	| 'apps'
-	| 'categoryOverrideIdentities'
-	| 'categoryOverrides'
-	| 'favoriteAppIds'
-	| 'hiddenAppIds'
-	| 'promotedAppIdentities'
-	| 'promotedAppIds'
-	| 'query'
->
+/**
+ * The store fields this view reads. Structural, not `Pick<AppState>`: the widget derives a
+ * catalog view, it does not depend on the root store.
+ */
+interface CatalogViewState extends CategorizedAppsState {
+	activeView: AppView
+	favoriteAppIds: string[]
+	hiddenAppIds: string[]
+	query: string
+}
 
 /**
  * Everything the shell derives from the catalog, memoized against the store fields each step

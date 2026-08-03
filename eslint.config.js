@@ -13,7 +13,7 @@ const localRules = {
 				schema: [],
 				messages: {
 					literal:
-						'Component-local colors are forbidden; use a token from src/index.css.',
+						'Component-local colors are forbidden; use a token from src/app/styles/index.css.',
 				},
 			},
 			create(context) {
@@ -75,15 +75,18 @@ export default tseslint.config(
 		},
 	},
 	{
-		// Architectural boundary, not a preference: the Tauri runtime is reached through
-		// the typed clients in src/lib or a hook in src/hooks, so presentation and state
-		// stay testable without the desktop runtime. See AGENTS.md §5.
-		files: ['src/components/**/*.{ts,tsx}', 'src/store/**/*.{ts,tsx}'],
-		plugins: {
-			local: localRules,
-		},
+		// Architectural boundary, not a preference: the Tauri runtime is reached only through
+		// the four integration modules listed in `ignores`, so presentation, state, entity
+		// logic and shared utilities stay testable without the desktop runtime.
+		// See AGENTS.md §4 and src/AGENTS.md §1.
+		files: ['src/**/*.{ts,tsx}'],
+		ignores: [
+			'src/shared/api/tauri/client.ts',
+			'src/shared/platform/window/useWindowControls.ts',
+			'src/entities/system/api/systemClient.ts',
+			'src/features/update-app/model/useUpdater.ts',
+		],
 		rules: {
-			'local/no-component-color-literals': 'error',
 			'no-restricted-imports': [
 				'error',
 				{
@@ -91,11 +94,22 @@ export default tseslint.config(
 						{
 							group: ['@tauri-apps/*', '@tauri-apps/**'],
 							message:
-								'Import the typed client from src/lib (tauri.ts, system.ts) or wrap the API in a hook under src/hooks.',
+								'Reach the runtime through shared/api/tauri, a typed entity client (entities/*/api) or an owning integration hook; components, stores, entity logic and shared code never import Tauri directly.',
 						},
 					],
 				},
 			],
+		},
+	},
+	{
+		// Colors come from the token layer in src/app/styles/index.css, never from a literal
+		// next to the markup that uses it.
+		files: ['src/**/*.{ts,tsx}'],
+		plugins: {
+			local: localRules,
+		},
+		rules: {
+			'local/no-component-color-literals': 'error',
 		},
 	},
 )

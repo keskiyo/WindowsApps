@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { toAppClientError } from '../lib/clientError'
-import type { AppInfo, UninstallPreview } from '../types'
+import { toAppClientError } from '../../../shared/api/tauri/errors'
+import type { AppInfo, UninstallPreview } from '../../../entities/app'
 
 /**
  * Owns the uninstall confirmation: which app is pending, and the preview fetched for it.

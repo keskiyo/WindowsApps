@@ -5,12 +5,12 @@ import type {
 import { act, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { CategoryList } from '../../../../src/components/catalog/AppGrid/CategoryList'
+import { CategoryList } from '../../../../src/widgets/catalog-content/ui/AppGrid/CategoryList'
+import type { AppInfo } from '../../../../src/entities/app'
 import type {
 	AppCategory,
-	AppInfo,
 	CategoryDefinition,
-} from '../../../../src/types'
+} from '../../../../src/entities/category'
 
 const dragContext = vi.hoisted(() => ({
 	onDragStart: undefined as ((event: DragStartEvent) => void) | undefined,
@@ -50,7 +50,7 @@ vi.mock('@dnd-kit/sortable', async importOriginal => {
 })
 
 vi.mock(
-	'../../../../src/components/catalog/CategorySection/CategorySection',
+	'../../../../src/widgets/catalog-content/ui/CategorySection/CategorySection',
 	() => ({
 		CategorySection: () => <div data-testid='category-section' />,
 	}),

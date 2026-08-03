@@ -1,8 +1,9 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AppInfoDialog } from '../../../../src/components/dialogs/AppInfoDialog/AppInfoDialog'
-import type { AppDetails, AppInfo, CategoryDefinition } from '../../../../src/types'
+import { AppInfoDialog } from '../../../../src/features/view-app-details/ui/AppInfoDialog/AppInfoDialog'
+import type { AppDetails, AppInfo } from '../../../../src/entities/app'
+import type { CategoryDefinition } from '../../../../src/entities/category'
 
 const app: AppInfo = {
 	id: 'example-editor',

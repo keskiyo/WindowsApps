@@ -4,8 +4,8 @@ import {
 	formatFileDate,
 	formatFileSize,
 	middleEllipsis,
-} from '../../../src/lib/appMetadata'
-import type { AppDetails, AppInfo } from '../../../src/types'
+} from '../../../../src/entities/app/lib/appMetadata'
+import type { AppDetails, AppInfo } from '../../../../src/entities/app'
 
 const app: AppInfo = {
 	id: 'target:editor',

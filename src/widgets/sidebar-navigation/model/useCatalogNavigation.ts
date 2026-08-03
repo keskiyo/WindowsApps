@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import type { AppCategory, AppView } from '../types'
-import { INSTALLERS_DOCS_CATEGORY } from '../lib/catalogArtifacts'
+import type { AppView } from '../../../entities/app'
+import type { AppCategory } from '../../../entities/category'
+import { INSTALLERS_DOCS_CATEGORY } from '../../../entities/app'
 
 const CATEGORY_SCROLL_GAP = 12
 const MAX_CATEGORY_SCROLL_CORRECTIONS = 8

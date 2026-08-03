@@ -8,11 +8,11 @@ import {
 } from 'lucide-react'
 import { useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { isCatalogArtifact } from '../../../lib/catalogArtifacts'
+import { isCatalogArtifact } from '../../../../entities/app'
 import { CategorySubmenu } from './CategorySubmenu'
 import { MenuItem } from './MenuItem'
 import type { AppActionsMenuProps } from './types'
-import { useActionsMenu } from './useActionsMenu'
+import { useActionsMenu } from '../../model/useActionsMenu'
 
 export function AppActionsMenu({
 	app,

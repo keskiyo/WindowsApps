@@ -5,8 +5,9 @@ import {
 	rankAppsByQuery,
 	selectCatalogCounts,
 	selectCategorizedApps,
-} from '../../../src/store/selectors'
-import type { AppCategory, AppInfo } from '../../../src/types'
+} from '../../../../src/app/store/selectors'
+import type { AppInfo } from '../../../../src/entities/app'
+import type { AppCategory } from '../../../../src/entities/category'
 
 function app(
 	value: Partial<AppInfo> & Pick<AppInfo, 'id' | 'name'>,

@@ -1,4 +1,4 @@
-import type { UpdateInstallPhase } from '../../../hooks/useUpdater'
+import type { UpdateInstallPhase } from '../../model/useUpdater'
 
 export const UPDATE_STEPS: Exclude<UpdateInstallPhase, 'idle' | 'failed'>[] = [
 	'downloading',

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { StaleCopyInfo, SystemClient } from '../types'
+import type { StaleCopyInfo, SystemClient } from '../../../entities/system'
 
 /**
  * Reports a second, outdated copy of the app running from a different location.
