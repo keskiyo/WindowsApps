@@ -1,4 +1,3 @@
-// Public API of the Category entity.
 export {
 	CATEGORY_LABELS,
 	CATEGORY_ORDER,

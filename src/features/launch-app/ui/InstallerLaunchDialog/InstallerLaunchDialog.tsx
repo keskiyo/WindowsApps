@@ -28,59 +28,70 @@ export function InstallerLaunchDialog({
 	}, [onCancel, pending])
 	return (
 		<div
-			className='motion-overlay fixed inset-0 z-400 grid place-items-center bg-black/35 p-4 backdrop-blur-[2px]'
+			className="motion-overlay fixed inset-0 z-400 grid place-items-center bg-black/35 p-4 backdrop-blur-[2px]"
 			onClick={event => {
 				if (!pending && event.currentTarget === event.target) onCancel()
 			}}
 		>
 			<section
 				ref={dialogRef}
-				role='alertdialog'
-				aria-modal='true'
+				role="alertdialog"
+				aria-modal="true"
 				aria-label={`Run installer ${app.name}`}
-				className='motion-panel w-full max-w-lg rounded-2xl border border-(--border-neutral) bg-(--surface-panel) p-5 text-(--text-primary) shadow-(--shadow-dialog)'
+				className="motion-panel w-full max-w-lg rounded-2xl border border-(--border-neutral) bg-(--surface-panel) p-5 text-(--text-primary) shadow-(--shadow-dialog)"
 			>
-				<header className='flex items-start gap-3'>
-					<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-[color-mix(in_oklab,var(--category-yellow)_20%,transparent)] text-(--category-yellow)'>
-						<AlertTriangle size={20} aria-hidden='true' />
+				<header className="flex items-start gap-3">
+					<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[color-mix(in_oklab,var(--category-yellow)_20%,transparent)] text-(--category-yellow)">
+						<AlertTriangle size={20} aria-hidden="true" />
 					</span>
-					<div className='min-w-0 flex-1'>
-						<h2 className='truncate font-semibold'>Run {app.name}?</h2>
-						<p className='mt-2 text-sm leading-6 text-(--text-muted)'>
-							Installers can change system files and settings. Continue only if you trust this source.
+					<div className="min-w-0 flex-1">
+						<h2 className="truncate font-semibold">
+							Run {app.name}?
+						</h2>
+						<p className="mt-2 text-sm leading-6 text-(--text-muted)">
+							Installers can change system files and settings.
+							Continue only if you trust this source.
 						</p>
 					</div>
 					<button
-						type='button'
-						aria-label='Close installer confirmation'
+						type="button"
+						aria-label="Close installer confirmation"
 						disabled={pending}
 						onClick={onCancel}
-						className='grid size-8 place-items-center rounded-lg text-(--text-muted) hover:bg-(--utility-accent) focus-visible:outline-2 focus-visible:outline-(--accent-strong) disabled:cursor-not-allowed'
+						className="grid size-8 place-items-center rounded-lg text-(--text-muted) hover:bg-(--utility-accent) focus-visible:outline-2 focus-visible:outline-(--accent-strong) disabled:cursor-not-allowed"
 					>
 						<X size={16} />
 					</button>
 				</header>
-				<dl className='mt-5 grid grid-cols-[7rem_minmax(0,1fr)] gap-3 rounded-xl border border-(--border-neutral) bg-(--surface-inset) p-4 text-sm'>
-					<dt className='text-(--text-subtle)'>Publisher</dt>
-					<dd className='truncate'>{app.publisher?.trim() || 'Unknown publisher'}</dd>
+				<dl className="mt-5 grid grid-cols-[7rem_minmax(0,1fr)] gap-3 rounded-xl border border-(--border-neutral) bg-(--surface-inset) p-4 text-sm">
+					<dt className="text-(--text-subtle)">Publisher</dt>
+					<dd className="truncate">
+						{app.publisher?.trim() || 'Unknown publisher'}
+					</dd>
 				</dl>
-				<div className='mt-5 flex justify-end gap-3'>
+				<div className="mt-5 flex justify-end gap-3">
 					<button
 						ref={cancelRef}
-						type='button'
+						type="button"
 						disabled={pending}
 						onClick={onCancel}
-						className='rounded-xl border border-(--border-neutral) px-4 py-2 text-sm text-(--text-primary) hover:bg-(--utility-accent) focus-visible:outline-2 focus-visible:outline-(--accent-strong) disabled:cursor-not-allowed'
+						className="rounded-xl border border-(--border-neutral) px-4 py-2 text-sm text-(--text-primary) hover:bg-(--utility-accent) focus-visible:outline-2 focus-visible:outline-(--accent-strong) disabled:cursor-not-allowed"
 					>
 						Cancel
 					</button>
 					<button
-						type='button'
+						type="button"
 						disabled={pending}
 						onClick={() => void onConfirm()}
-						className='inline-flex items-center gap-2 rounded-xl bg-(--accent) px-4 py-2 text-sm font-medium text-(--text-primary) hover:bg-(--accent-strong) focus-visible:outline-2 focus-visible:outline-(--accent-strong) disabled:cursor-progress disabled:opacity-60'
+						className="inline-flex items-center gap-2 rounded-xl bg-(--accent) px-4 py-2 text-sm font-medium text-(--text-primary) hover:bg-(--accent-strong) focus-visible:outline-2 focus-visible:outline-(--accent-strong) disabled:cursor-progress disabled:opacity-60"
 					>
-						{pending && <Loader2 size={15} className='animate-spin' aria-hidden='true' />}
+						{pending && (
+							<Loader2
+								size={15}
+								className="animate-spin"
+								aria-hidden="true"
+							/>
+						)}
 						{pending ? 'Starting…' : 'Run installer'}
 					</button>
 				</div>

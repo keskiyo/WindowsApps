@@ -26,32 +26,21 @@ export interface AppState {
 	catalogDiagnostics: CatalogDiagnostics | null
 	error: string | null
 	activeView: AppView
-	// `*AppIds` are the runtime projection the components read (`.includes(app.id)`); they are
-	// re-derived from `*AppIdentities` against the current catalog on load, so favorites and
-	// hidden survive an id change from a dedup rule change. `*AppIdentities` is the durable form.
 	favoriteAppIds: string[]
 	favoriteAppIdentities: string[]
 	categoryOrder: AppCategory[]
 	collapsedCategories: AppCategory[]
-	// `categoryOverrides` is the runtime id-keyed projection; `categoryOverrideIdentities` is the
-	// durable form (keyed by `canonicalIdentity`) that survives a Force full scan, Reset cache, or
-	// dedup rule change. The selector resolves identity-first so the override follows the app.
 	categoryOverrides: Record<string, AppCategory>
 	categoryOverrideIdentities: Record<string, AppCategory>
 	hiddenAppIds: string[]
 	hiddenAppIdentities: string[]
 	promotedAppIds: string[]
 	promotedAppIdentities: string[]
-	// Applications the user filed into Installers & Docs by hand. Same id/identity pairing as the
-	// sets above; the selector turns a mark into `artifactKind: 'installer'`.
 	installerAppIds: string[]
 	installerAppIdentities: string[]
-	/** Named launch/close lists, keyed by card identity so they survive a rescan. */
 	scenarios: Scenario[]
-	/** When each card was first seen in the catalog; the only source of "recently added". */
 	firstSeenAt: Record<string, number>
 	legacyCanonicalPreferences: LegacyCanonicalPreferences
-	/** False once a preferences write was refused (quota, private mode, storage disabled). */
 	preferencesPersisted: boolean
 	categories: CategoryDefinition[]
 	launchingIds: string[]
@@ -75,7 +64,6 @@ export interface AppState {
 	hydrateVisibleIcons(ids: string[]): Promise<void>
 	cancelScan(): Promise<void>
 	launch(app: AppInfo): Promise<void>
-	/** Closes a whole batch in one request; see `CloseAppsResult` for what the counts mean. */
 	closeApps(ids: string[]): Promise<CloseAppsResult>
 	createScenario(
 		name: string,
@@ -111,12 +99,7 @@ export interface AppState {
 	subscribeScanProgress(): Promise<() => void>
 }
 
-/**
- * What every action module receives. The store is created once by `createAppStore`; each module
- * contributes a slice of actions built against these, never against a store it reaches for itself.
- */
 export type SetAppState = StoreApi<AppState>['setState']
 export type GetAppState = StoreApi<AppState>['getState']
 
-/** Writes the current state to storage and reports a refused write through `preferencesPersisted`. */
 export type PersistPreferences = () => void

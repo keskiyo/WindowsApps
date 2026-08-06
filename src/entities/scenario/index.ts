@@ -1,4 +1,3 @@
-// Public API of the Scenario entity.
 export {
 	MAX_SCENARIO_ENTRIES,
 	MAX_SCENARIOS,

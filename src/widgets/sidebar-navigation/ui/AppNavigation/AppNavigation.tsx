@@ -32,8 +32,6 @@ export function AppNavigation(props: AppNavigationProps) {
 		}),
 	)
 	const visibleCategories = props.categoryOrder.filter(category => {
-		// Installers & Docs is reachable from the More page, not from the category list: it holds
-		// scan artifacts rather than applications the user organizes.
 		if (category === INSTALLERS_DOCS_CATEGORY) return false
 		const definition = props.categories.find(item => item.id === category)
 		return definition && (props.counts.has(category) || !definition.builtIn)
@@ -51,55 +49,55 @@ export function AppNavigation(props: AppNavigationProps) {
 	return (
 		<nav
 			ref={navigationRef}
-			aria-label='App navigation'
-			className='flex min-h-0 flex-1 flex-col'
+			aria-label="App navigation"
+			className="flex min-h-0 flex-1 flex-col"
 		>
-			<div className='space-y-1 p-4 pb-2'>
+			<div className="space-y-1 p-4 pb-2">
 				<NavItem
 					icon={Grid2X2}
-					label='All Apps'
+					label="All Apps"
 					active={props.activeView === 'all'}
 					count={props.appCount}
 					onClick={() => props.onSelectView('all')}
 				/>
 				<NavItem
 					icon={Star}
-					label='Favorites'
+					label="Favorites"
 					active={props.activeView === 'favorites'}
 					count={props.favoriteCount}
 					onClick={() => props.onSelectView('favorites')}
 				/>
 				<NavItem
 					icon={WandSparkles}
-					label='More'
+					label="More"
 					active={props.activeView === 'more'}
 					onClick={() => props.onSelectView('more')}
 				/>
 				<NavItem
 					icon={Settings}
-					label='Settings'
+					label="Settings"
 					active={props.activeView === 'settings'}
 					onClick={() => props.onSelectView('settings')}
 				/>
 			</div>
-			<div className='min-h-0 flex-1 overflow-y-auto px-4 pb-4'>
-				<div className='mb-2 mt-4 flex items-center justify-between px-1'>
-					<p className='text-[.68rem] font-semibold uppercase tracking-[.16em] text-(--text-subtle)'>
+			<div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+				<div className="mt-4 mb-2 flex items-center justify-between px-1">
+					<p className="text-[.68rem] font-semibold tracking-[.16em] text-(--text-subtle) uppercase">
 						Categories
 					</p>
 					<button
-						type='button'
-						aria-label='Add category'
+						type="button"
+						aria-label="Add category"
 						onClick={() => setAdding(true)}
-						className='grid size-7 place-items-center rounded-lg border border-(--border-neutral) bg-(--surface-raised) text-(--text-muted) transition-colors hover:bg-(--utility-accent) hover:text-(--text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong)'
+						className="grid size-7 place-items-center rounded-lg border border-(--border-neutral) bg-(--surface-raised) text-(--text-muted) transition-colors hover:bg-(--utility-accent) hover:text-(--text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong)"
 					>
 						<Plus size={16} />
 					</button>
 				</div>
 				{adding && (
-					<div className='mb-2'>
+					<div className="mb-2">
 						<CategoryNameEditor
-							label='New category name'
+							label="New category name"
 							onCancel={() => setAdding(false)}
 							onSave={value => {
 								const result = props.onCreateCategory(value)
@@ -122,7 +120,7 @@ export function AppNavigation(props: AppNavigationProps) {
 						)}
 						strategy={verticalListSortingStrategy}
 					>
-						<div className='space-y-1'>
+						<div className="space-y-1">
 							{visibleCategories.map(category => (
 								<SortableNavigationCategory
 									key={category}
@@ -146,7 +144,9 @@ export function AppNavigation(props: AppNavigationProps) {
 							<CategoryDragOverlay
 								category={categoryDrag.activeCategory}
 								count={
-									props.counts.get(categoryDrag.activeCategory) ?? 0
+									props.counts.get(
+										categoryDrag.activeCategory,
+									) ?? 0
 								}
 								label={activeDefinition.label}
 								accent={activeDefinition.accent}

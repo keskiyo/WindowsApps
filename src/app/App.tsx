@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast, Toaster } from 'sonner'
 import { useStore } from 'zustand'
-import type { StoreApi } from 'zustand/vanilla'
-import { catalogChangeMessage, useCatalogView } from '../widgets/catalog-content'
+import {
+	catalogChangeMessage,
+	useCatalogView,
+} from '../widgets/catalog-content'
 import { AppInfoDialog, useAppInfoDialog } from '../features/view-app-details'
 import {
 	InstallerLaunchDialog,
@@ -30,16 +32,8 @@ import { useGlobalShortcuts } from './model/useGlobalShortcuts'
 import { useStaleCopy } from '../features/stale-copy'
 import { useUpdater } from '../features/update-app'
 import { toAppClientError } from '../shared/api/tauri/errors'
-import { type AppState } from './store/appStore'
 import { AppStoreProvider } from './store/storeContext'
-import type { AppsClient } from '../entities/app'
-import type { SystemClient } from '../entities/system'
-
-interface AppProps {
-	store: StoreApi<AppState>
-	systemClient: SystemClient
-	appsClient: Pick<AppsClient, 'getAppDetails' | 'openAppFolder'>
-}
+import type { AppProps } from './types'
 
 export function App({ store, systemClient, appsClient }: AppProps) {
 	const state = useStore(store)
@@ -99,8 +93,8 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		uninstall.select(null)
 		try {
 			await state.refresh()
-		} catch {
-			// The store exposes the refresh error through the existing toast effect.
+		} catch (ignored) {
+			void ignored
 		}
 	}
 
@@ -112,9 +106,6 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 				if (cancelled) value()
 				else dispose = value
 			})
-			// Subscribing to the catalog can fail before the store ever reaches its own
-			// error state. Surface it through the existing toast path, but never after
-			// unmount, and never as an unhandled rejection.
 			.catch(error => {
 				if (!cancelled) toast.error(toAppClientError(error).message)
 			})
@@ -159,7 +150,6 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		if (drawerOpen) setDrawerMounted(true)
 	}, [drawerOpen])
 
-	// These pages render no catalog grid of their own.
 	const isCatalogView =
 		activeView !== 'settings' &&
 		activeView !== 'more' &&
@@ -167,22 +157,16 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 	const scenarioRunner = useScenarioRunner({
 		apps: catalogApps,
 		scenarios: state.scenarios,
-		// The store action, not `feedback.launch`: a scenario is one action to the user, and the
-		// per-app launch toasts would report it as five. The run reports itself once, below.
 		launch: state.launch,
 		closeApps: state.closeApps,
 		onFinished: useCallback((scenario, summary) => {
-			// Keyed by the scenario so a re-run replaces its own notice instead of stacking one.
 			const notice = { id: `scenario-${scenario.id}` }
-			// An app the scenario could not act on is the whole run failing to do what it says;
-			// one that was simply not running already is the outcome the close list wanted.
 			if (summary.unavailable > 0)
 				toast.error(`Scenario “${scenario.name}” failed`, notice)
 			else toast.success(`Scenario “${scenario.name}” started`, notice)
 		}, []),
 	})
 
-	// The view decides what is on screen to hydrate; a page with nothing to show reports no ids.
 	useEffect(() => {
 		if (isLoading) return
 		const ids = visibleHydrationIds.split('|').filter(Boolean)
@@ -202,9 +186,6 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		categories: state.categories,
 		counts: navigationCounts,
 		activeView: state.activeView,
-		// The grid shows the visible primary cards, so the All Apps badge counts the same set.
-		// `primaryCount` includes apps the user hid, which made the count disagree with what is
-		// on screen right after a Hide.
 		appCount: visibleCategorizedApps.length,
 		favoriteCount,
 		onSelectView: navigation.selectView,
@@ -232,7 +213,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 
 	return (
 		<AppStoreProvider store={store}>
-			<div className='app-shell theme-graphite-surface flex h-screen flex-col overflow-hidden'>
+			<div className="app-shell theme-graphite-surface flex h-screen flex-col overflow-hidden">
 				<AppShellChrome
 					activityActive={activityActive}
 					activityLabel={activityLabel}
@@ -242,7 +223,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 					updater={updater}
 					onDismissStaleCopy={dismissStaleCopy}
 				/>
-				<div className='flex min-h-0 flex-1 gap-2 px-2 pb-2'>
+				<div className="flex min-h-0 flex-1 gap-2 px-2 pb-2">
 					{desktopNavigation && (
 						<AppSidebar
 							{...navigationProps}
@@ -250,8 +231,8 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 						/>
 					)}
 					<div
-						id='catalog-scroll'
-						className='app-panel flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto rounded-2xl'
+						id="catalog-scroll"
+						className="app-panel flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto rounded-2xl"
 					>
 						<Header
 							visibleCount={filteredApps.length}
@@ -266,7 +247,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 							onOpenNavigation={() => setDrawerOpen(true)}
 							showMenu={!desktopNavigation}
 						/>
-						<main className='mx-auto w-full max-w-375 px-5 pb-12 pt-7 sm:px-8'>
+						<main className="mx-auto w-full max-w-375 px-5 pt-7 pb-12 sm:px-8">
 							{state.activeView === 'more' && (
 								<MorePage
 									auxiliaryCount={auxiliaryCount}
@@ -342,7 +323,8 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 											navigation.selectView('more'),
 										categoryOrder: state.categoryOrder,
 										categories: state.categories,
-										collapsedCategories: state.collapsedCategories,
+										collapsedCategories:
+											state.collapsedCategories,
 										favoriteAppIds: state.favoriteAppIds,
 										onToggleCategory: state.toggleCategory,
 										onToggleFavorite: state.toggleFavorite,
@@ -352,8 +334,10 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 										onUninstall: uninstall.select,
 										onHide: state.hideApp,
 										onRestore: state.restoreApp,
-										onPromoteAuxiliary: state.promoteAuxiliary,
-										onDemoteAuxiliary: state.demoteAuxiliary,
+										onPromoteAuxiliary:
+											state.promoteAuxiliary,
+										onDemoteAuxiliary:
+											state.demoteAuxiliary,
 										onRenameCategory: state.renameCategory,
 										onDeleteCategory: state.deleteCategory,
 									}}
@@ -415,9 +399,9 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 					/>
 				)}
 				<Toaster
-					className='app-toaster'
-					theme='light'
-					position='bottom-right'
+					className="app-toaster"
+					theme="light"
+					position="bottom-right"
 					expand
 					visibleToasts={5}
 					gap={10}

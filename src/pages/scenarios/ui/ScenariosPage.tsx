@@ -8,11 +8,6 @@ import { sortScenariosByNewest } from '../../../entities/scenario'
 import { CatalogViewHeader } from '../../../widgets/catalog-content'
 import type { ScenariosPageProps } from './types'
 
-/**
- * The scenario workshop. Everything a scenario needs is on one screen — its name, its two lists
- * and the button that runs it — because the lists only make sense next to the button that acts
- * on them.
- */
 export function ScenariosPage({
 	scenarios,
 	apps,
@@ -33,8 +28,6 @@ export function ScenariosPage({
 			aria-labelledby="scenarios-title"
 			className="mx-auto max-w-3xl"
 		>
-			{/* The name field is wider than the button it replaces, so it gets a slot of its own
-			    width: sharing the row freely let it squeeze the title down to an ellipsis. */}
 			<div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div className="min-w-0 sm:flex-1">
 					<CatalogViewHeader

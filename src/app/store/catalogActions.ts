@@ -35,14 +35,12 @@ type CatalogActions = Pick<
 	| 'setActiveView'
 >
 
-/** Everything that asks the backend for a catalog and reports the wait. */
 export function createCatalogActions({
 	set,
 	get,
 	client,
 	persist,
 }: CatalogActionOptions): CatalogActions {
-	/** Every scan result lands here so a newly discovered app is stamped exactly once. */
 	function commitScan(apps: AppInfo[]) {
 		const previous = get().firstSeenAt
 		const firstSeenAt = reconcileFirstSeen(apps, previous, Date.now())

@@ -1,19 +1,8 @@
 import { SettingsToggle } from '../components/SettingsToggle'
 import { FolderPlus, FolderX, HardDrive } from 'lucide-react'
 import { useState } from 'react'
-import type { ScanSettings, SystemSettings } from '../../../../entities/system'
 import { PathEditor } from '../components/PathEditor'
-
-type ScanPathKind = 'includedPaths' | 'excludedPaths'
-
-interface Props {
-	settings: SystemSettings | null
-	saving: boolean
-	onSaveScanSettings(settings: ScanSettings): Promise<void>
-	onAddPath(kind: ScanPathKind, value: string): void
-	onRemovePath(kind: ScanPathKind, value: string): void
-	onPickFolder(): Promise<string | null>
-}
+import type { SettingsDiscoveryControlsProps } from '../../types'
 
 export function SettingsDiscoveryControls({
 	settings,
@@ -22,27 +11,29 @@ export function SettingsDiscoveryControls({
 	onAddPath,
 	onRemovePath,
 	onPickFolder,
-}: Props) {
+}: SettingsDiscoveryControlsProps) {
 	const [includedPath, setIncludedPath] = useState('')
 	const [excludedPath, setExcludedPath] = useState('')
 	const disabled = !settings || saving
 
 	return (
-		<div className='settings-surface mt-6 rounded-2xl border border-white/85 bg-white/58 p-5'>
-			<div className='flex items-start gap-4'>
-				<span className='grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>
-					<HardDrive size={19} aria-hidden='true' />
+		<div className="settings-surface mt-6 rounded-2xl border border-white/85 bg-white/58 p-5">
+			<div className="flex items-start gap-4">
+				<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner">
+					<HardDrive size={19} aria-hidden="true" />
 				</span>
-				<div className='min-w-0 flex-1'>
-					<h2 className='font-medium'>Application discovery</h2>
-					<p className='mt-1 text-sm leading-6 text-slate-600'>
+				<div className="min-w-0 flex-1">
+					<h2 className="font-medium">Application discovery</h2>
+					<p className="mt-1 text-sm leading-6 text-slate-600">
 						Scan permanent local drives and Steam libraries.
 						Removable and network drives are ignored.
 					</p>
 				</div>
 				<SettingsToggle
-					label='Scan all fixed local drives'
-					checked={settings?.scanSettings.autoScanFixedDrives ?? false}
+					label="Scan all fixed local drives"
+					checked={
+						settings?.scanSettings.autoScanFixedDrives ?? false
+					}
 					disabled={disabled}
 					onToggle={() =>
 						settings &&
@@ -55,15 +46,15 @@ export function SettingsDiscoveryControls({
 				/>
 			</div>
 
-			<div className='mt-5'>
-				<p className='text-xs font-semibold uppercase tracking-[.14em] text-slate-500'>
+			<div className="mt-5">
+				<p className="text-xs font-semibold tracking-[.14em] text-slate-500 uppercase">
 					Fixed local drives
 				</p>
-				<div className='mt-2 flex flex-wrap gap-2'>
+				<div className="mt-2 flex flex-wrap gap-2">
 					{settings?.fixedDrives.map(drive => (
 						<code
 							key={drive}
-							className='rounded-lg border border-slate-200 bg-white/70 px-2.5 py-1 text-xs text-slate-600'
+							className="rounded-lg border border-slate-200 bg-white/70 px-2.5 py-1 text-xs text-slate-600"
 						>
 							{drive}
 						</code>
@@ -71,14 +62,14 @@ export function SettingsDiscoveryControls({
 				</div>
 			</div>
 
-			<div className='mt-5 grid gap-5 md:grid-cols-2'>
+			<div className="mt-5 grid gap-5 md:grid-cols-2">
 				<PathEditor
-					label='Additional scan folder'
-					buttonLabel='Add scan folder'
-					browseLabel='Browse for scan folder'
+					label="Additional scan folder"
+					buttonLabel="Add scan folder"
+					browseLabel="Browse for scan folder"
 					value={includedPath}
 					paths={settings?.scanSettings.includedPaths ?? []}
-					icon={<FolderPlus size={16} aria-hidden='true' />}
+					icon={<FolderPlus size={16} aria-hidden="true" />}
 					disabled={disabled}
 					onChange={setIncludedPath}
 					onAdd={value => {
@@ -89,12 +80,12 @@ export function SettingsDiscoveryControls({
 					onRemove={value => onRemovePath('includedPaths', value)}
 				/>
 				<PathEditor
-					label='Excluded folder'
-					buttonLabel='Exclude folder'
-					browseLabel='Browse for excluded folder'
+					label="Excluded folder"
+					buttonLabel="Exclude folder"
+					browseLabel="Browse for excluded folder"
 					value={excludedPath}
 					paths={settings?.scanSettings.excludedPaths ?? []}
-					icon={<FolderX size={16} aria-hidden='true' />}
+					icon={<FolderX size={16} aria-hidden="true" />}
 					disabled={disabled}
 					onChange={setExcludedPath}
 					onAdd={value => {

@@ -22,7 +22,6 @@ type AppMarkActions = Pick<
 	| 'demoteAuxiliary'
 >
 
-/** What the user marked about one application: favorite, hidden, promoted out of Auxiliary. */
 export function createAppMarkActions({
 	set,
 	get,
@@ -37,7 +36,8 @@ export function createAppMarkActions({
 					? state.promotedAppIds.includes(app.id) ||
 						state.promotedAppIdentities.includes(identityOf(app))
 					: false
-				if (app?.visibilityClass === 'auxiliary' && !promoted) return state
+				if (app?.visibilityClass === 'auxiliary' && !promoted)
+					return state
 				const identity = app ? identityOf(app) : id
 				const wasFavorite = state.favoriteAppIds.includes(id)
 				return {

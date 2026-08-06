@@ -4,10 +4,6 @@ import { AppActionsMenu } from '../../../../features/app-actions'
 import { useIsLaunching } from '../../../../features/launch-app'
 import type { CatalogAppCardProps } from './types'
 
-/**
- * The catalog's card: the App entity's presentation wired to the features that act on it.
- * The entity stays free of launch, uninstall, hide and move so it can be rendered anywhere.
- */
 function CatalogAppCardComponent({
 	app,
 	isFavorite,
@@ -24,7 +20,6 @@ function CatalogAppCardComponent({
 	onRestore,
 	onDemote,
 }: CatalogAppCardProps) {
-	// Per-card subscription: a launch must not re-render the whole grid.
 	const launching = useIsLaunching(app.id)
 	return (
 		<AppCard
@@ -55,6 +50,4 @@ function CatalogAppCardComponent({
 	)
 }
 
-// Memoized so background icon patches re-render only the changed cards, not the whole
-// grid. All callback/array props from the parents are stable (store actions / useCallback).
 export const CatalogAppCard = memo(CatalogAppCardComponent)

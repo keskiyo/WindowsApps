@@ -14,7 +14,7 @@ export function CategoryList(props: AppGridProps) {
 				false,
 	)
 	return (
-		<div aria-label='Applications by category' className='space-y-5'>
+		<div aria-label="Applications by category" className="space-y-5">
 			{visibleCategories.map(category => {
 				const definition = props.categories.find(
 					item => item.id === category,

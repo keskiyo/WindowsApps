@@ -1,4 +1,4 @@
-﻿import { createStore, type StoreApi } from 'zustand/vanilla'
+import { createStore, type StoreApi } from 'zustand/vanilla'
 import { createAppMarkActions } from './appMarkActions'
 import { createAppPlacementActions } from './appPlacementActions'
 import { createCatalogActions } from './catalogActions'
@@ -14,7 +14,6 @@ import type { AppPreferencesV12 } from './preferences'
 import type { AppsClient } from '../../entities/app'
 import type { AppState } from './types'
 
-/** The persisted half of the initial state; the rest is runtime-only and always starts empty. */
 function initialState(preferences: AppPreferencesV12) {
 	return {
 		apps: [],
@@ -49,11 +48,6 @@ function initialState(preferences: AppPreferencesV12) {
 	}
 }
 
-/**
- * The single root store. It owns no behaviour itself: every action group is a focused module in
- * this folder, assembled here against one `set`/`get` and one `persist`. Adding a domain means
- * adding a module and one line below, never another branch in this file.
- */
 export function createAppStore(
 	client: AppsClient,
 	storage: Storage = globalThis.localStorage,
@@ -84,8 +78,6 @@ export function createAppStore(
 
 export type { AppState } from './types'
 
-// Pure selectors/filters live in ./selectors. Re-exported here so existing imports from
-// '../store/appStore' keep working after the split.
 export {
 	filterAppsByQuery,
 	filterVisibleApps,

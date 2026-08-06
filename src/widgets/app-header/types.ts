@@ -2,7 +2,6 @@ import type { RefObject } from 'react'
 import type { ScanProgress } from '../../entities/app'
 
 export interface HeaderProps {
-	/** Matches for the current query; shown only while one is typed. */
 	visibleCount: number
 	query: string
 	isRefreshing: boolean

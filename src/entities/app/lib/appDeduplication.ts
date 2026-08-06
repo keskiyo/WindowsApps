@@ -1,10 +1,5 @@
 import type { AppInfo } from '../model/app.types'
 
-/**
- * Frontend-only safety net for stale caches. Rust owns product identity and evidence-based
- * deduplication; the UI only collapses entries that already share a canonical id or the exact
- * same normalized path.
- */
 export function deduplicateVisibleApps(apps: AppInfo[]): AppInfo[] {
 	const unique: AppInfo[] = []
 	const byId = new Map<string, number>()
@@ -16,8 +11,6 @@ export function deduplicateVisibleApps(apps: AppInfo[]): AppInfo[] {
 	}
 
 	for (const app of apps) {
-		// Normalizing lowercases the path locale-aware; compute it once per app rather
-		// than for both the lookup and the registration.
 		const path = normalizeVisiblePath(app.path)
 		const index = byId.get(app.id) ?? byPath.get(path)
 		if (index === undefined) {

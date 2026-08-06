@@ -1,9 +1,7 @@
 import { useSpotlight } from '../../../../shared/hooks/useSpotlight'
 import { SpotlightLayer } from '../../../../shared/ui/SpotlightLayer'
+import { MENU_ITEM_BASE } from './data'
 import type { MenuItemProps } from './types'
-
-const BASE =
-	'relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm focus-visible:outline-2'
 
 export function MenuItem({
 	icon: Icon,
@@ -25,17 +23,29 @@ export function MenuItem({
 
 	return (
 		<button
-			type='button'
-			role='menuitem'
+			type="button"
+			role="menuitem"
 			disabled={disabled}
 			onClick={onClick}
 			{...(withSpotlight ? spotlight : {})}
-			className={`${BASE} ${toneClass}`}
-	>
+			className={`${MENU_ITEM_BASE} ${toneClass}`}
+		>
 			{withSpotlight && <SpotlightLayer size={70} />}
-			{Icon && <Icon size={15} className={iconClassName} aria-hidden='true' />}
-			{TrailingIcon ? <span className='min-w-0 flex-1'>{label}</span> : label}
-			{TrailingIcon && <TrailingIcon size={15} className='shrink-0' aria-hidden='true' />}
+			{Icon && (
+				<Icon size={15} className={iconClassName} aria-hidden="true" />
+			)}
+			{TrailingIcon ? (
+				<span className="min-w-0 flex-1">{label}</span>
+			) : (
+				label
+			)}
+			{TrailingIcon && (
+				<TrailingIcon
+					size={15}
+					className="shrink-0"
+					aria-hidden="true"
+				/>
+			)}
 		</button>
 	)
 }

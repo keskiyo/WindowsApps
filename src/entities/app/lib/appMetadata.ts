@@ -38,14 +38,7 @@ const VISIBILITY_REASON_LABELS = {
 	unknown: 'Unknown',
 } as const
 
-/**
- * Version string for display. Executable metadata sometimes stores the version with its own
- * "Version " or "v" prefix (e.g. World of Warcraft reports "Version 12.0.7.68887"); the UI already
- * prepends "v", so strip a leading marker to avoid "vVersion 12.0.7".
- */
 export function displayVersion(version: string): string {
-	// Strip a leading "v"/"version" marker only when a digit follows, so real names that merely
-	// start with "v" (e.g. a product literally called "Vista …") are left untouched.
 	return (
 		version.replace(/^\s*v(?:ersion)?[\s.:]*(?=\d)/i, '').trim() || version
 	)
@@ -66,7 +59,8 @@ export function middleEllipsis(value: string, maxLength: number): string {
 }
 
 export function formatFileSize(bytes: number | null): string {
-	if (bytes == null || !Number.isFinite(bytes) || bytes < 0) return 'Not available'
+	if (bytes == null || !Number.isFinite(bytes) || bytes < 0)
+		return 'Not available'
 	let value = bytes
 	let unitIndex = 0
 	while (value >= 1024 && unitIndex < FILE_SIZE_UNITS.length - 1) {
@@ -114,7 +108,9 @@ export function buildAppReport(
 		app.sourceKind === 'start_apps' &&
 		app.launchKind === 'app_user_model_id' &&
 		Boolean(app.resolvedPath?.trim())
-	const targetLabel = hasResolvedStartAppTarget ? 'Launch target' : 'Executable'
+	const targetLabel = hasResolvedStartAppTarget
+		? 'Launch target'
+		: 'Executable'
 	const targetPath = hasResolvedStartAppTarget ? app.resolvedPath : app.path
 	const fileDetails = details ?? {
 		fileSizeBytes: null,

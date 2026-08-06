@@ -10,9 +10,7 @@ import { toAppClientError } from '../../../shared/api/tauri/errors'
 export interface ScenarioRunSummary {
 	launched: number
 	closed: number
-	/** Apps that were already not running — the scenario's goal, not a failure. */
 	notRunning: number
-	/** Entries that resolved to no catalog app, plus the ones that could not be started or closed. */
 	unavailable: number
 }
 
@@ -30,19 +28,6 @@ const NOTHING_CLOSED: CloseAppsResult = {
 	unavailable: 0,
 }
 
-/**
- * Runs one scenario: start the launch list, then close the close list.
- *
- * Launch-first matches how the user described it — the apps they asked for appear immediately —
- * and closing afterwards frees the machine while they are starting. Launches are awaited one at a
- * time rather than fired together: each resolves once its process exists, which is what keeps a
- * twenty-app scenario from starting twenty programs at the same instant. The whole close list is
- * one request, because the backend enumerates once and waits out a single grace period for the
- * batch; asking per app would make the user wait that period once per program.
- *
- * Nothing here throws. A scenario is a batch, and one app that refuses to start is reported in the
- * summary instead of aborting the rest.
- */
 export function useScenarioRunner({
 	apps,
 	scenarios,
@@ -73,15 +58,15 @@ export function useScenarioRunner({
 						await launch(app)
 						launched += 1
 					} catch (error) {
-						// Reported through the summary; `toAppClientError` keeps a raw transport
-						// value from reaching the interface.
 						void toAppClientError(error)
 						unavailable += 1
 					}
 				}
 				if (toClose.apps.length) {
 					try {
-						closeResult = await closeApps(toClose.apps.map(app => app.id))
+						closeResult = await closeApps(
+							toClose.apps.map(app => app.id),
+						)
 					} catch (error) {
 						void toAppClientError(error)
 						unavailable += toClose.apps.length

@@ -1,11 +1,7 @@
 const ENGLISH_KEYS = "`qwertyuiop[]asdfghjkl;'zxcvbnm,."
 const RUSSIAN_KEYS = 'ёйцукенгшщзхъфывапролджэячсмитьбю'
 
-function remapToken(
-	token: string,
-	from: string,
-	to: string,
-): string | null {
+function remapToken(token: string, from: string, to: string): string | null {
 	let changed = false
 	const mapped = [...token]
 		.map(character => {

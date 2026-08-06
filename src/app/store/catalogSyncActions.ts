@@ -24,7 +24,6 @@ type CatalogSyncActions = Pick<
 	| 'subscribeScanProgress'
 >
 
-/** Everything the backend pushes: whole snapshots, deltas and hydration patches. */
 export function createCatalogSyncActions({
 	set,
 	get,
@@ -46,8 +45,6 @@ export function createCatalogSyncActions({
 					firstSeenAt,
 				}
 			})
-			// A background sync is the other way a new app reaches the catalog, so it has to
-			// stamp too — but only a real change is worth a storage write.
 			if (firstSeenAt !== previousFirstSeen) persist()
 		},
 		applyDelta(delta) {

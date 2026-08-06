@@ -1,27 +1,17 @@
 import { Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { type AppInfo, rankAppsByQueryTop } from '../../../entities/app'
+import { rankAppsByQueryTop } from '../../../entities/app'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { useFocusTrap } from '../../../shared/hooks/useFocusTrap'
+import { APP_PICKER_MAX_RESULTS } from '../data'
+import type { AppPickerDialogProps } from '../types'
 
-const MAX_RESULTS = 50
-
-interface Props {
-	apps: AppInfo[]
-	label: string
-	onSelect(app: AppInfo): void
-	onClose(): void
-}
-
-/**
- * Picks one application out of the catalog for a scenario list.
- *
- * Deliberately a separate dialog from the quick-launch palette rather than a mode of it: this one
- * selects and that one launches, and a picker that could start an app by mistake is the wrong
- * thing to put behind a row the user is still editing. The keyboard contract is the same, so the
- * ranking, the scroll lock and the focus trap are the catalog's own.
- */
-export function AppPickerDialog({ apps, label, onSelect, onClose }: Props) {
+export function AppPickerDialog({
+	apps,
+	label,
+	onSelect,
+	onClose,
+}: AppPickerDialogProps) {
 	useBodyScrollLock()
 	const dialogRef = useRef<HTMLDivElement>(null)
 	const inputRef = useRef<HTMLInputElement>(null)
@@ -31,12 +21,10 @@ export function AppPickerDialog({ apps, label, onSelect, onClose }: Props) {
 	useFocusTrap(dialogRef)
 
 	const results = useMemo(
-		() => rankAppsByQueryTop(apps, query, MAX_RESULTS),
+		() => rankAppsByQueryTop(apps, query, APP_PICKER_MAX_RESULTS),
 		[apps, query],
 	)
 
-	// Capture the trigger before focus moves: reading `activeElement` during cleanup would find
-	// this dialog's own input, which is detached by then, and a keyboard user would lose the row.
 	useEffect(() => {
 		const trigger = document.activeElement
 		inputRef.current?.focus()
@@ -52,8 +40,7 @@ export function AppPickerDialog({ apps, label, onSelect, onClose }: Props) {
 
 	useEffect(() => {
 		const node = listRef.current?.children[selected] as
-			| HTMLElement
-			| undefined
+			HTMLElement | undefined
 		node?.scrollIntoView({ block: 'nearest' })
 	}, [selected])
 
@@ -69,7 +56,9 @@ export function AppPickerDialog({ apps, label, onSelect, onClose }: Props) {
 		} else if (event.key === 'ArrowUp') {
 			event.preventDefault()
 			setSelected(value =>
-				results.length ? (value - 1 + results.length) % results.length : 0,
+				results.length
+					? (value - 1 + results.length) % results.length
+					: 0,
 			)
 		} else if (event.key === 'Enter') {
 			event.preventDefault()
@@ -80,63 +69,69 @@ export function AppPickerDialog({ apps, label, onSelect, onClose }: Props) {
 
 	return (
 		<div
-			className='motion-overlay fixed inset-0 z-500 grid place-items-start justify-center bg-slate-700/40 px-4 pt-[14vh] backdrop-blur-[2px]'
+			className="motion-overlay fixed inset-0 z-500 grid place-items-start justify-center bg-slate-700/40 px-4 pt-[14vh] backdrop-blur-[2px]"
 			onMouseDown={event => {
 				if (event.currentTarget === event.target) onClose()
 			}}
 		>
 			<div
 				ref={dialogRef}
-				role='dialog'
-				aria-modal='true'
+				role="dialog"
+				aria-modal="true"
 				aria-label={label}
 				onKeyDown={onKeyDown}
-				className='motion-panel flex h-[min(24rem,calc(100vh-7rem))] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-(--border-neutral) bg-(--surface-panel) shadow-(--shadow-palette)'
+				className="motion-panel flex h-[min(24rem,calc(100vh-7rem))] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-(--border-neutral) bg-(--surface-panel) shadow-(--shadow-palette)"
 			>
-				<div className='flex items-center gap-3 border-b border-(--border-neutral) px-4'>
-					<Search size={18} aria-hidden='true' />
+				<div className="flex items-center gap-3 border-b border-(--border-neutral) px-4">
+					<Search size={18} aria-hidden="true" />
 					<input
 						ref={inputRef}
 						value={query}
 						onChange={event => setQuery(event.target.value)}
-						placeholder='Search apps…'
-						role='combobox'
-						aria-expanded='true'
-						aria-controls='scenario-picker-list'
+						placeholder="Search apps…"
+						role="combobox"
+						aria-expanded="true"
+						aria-controls="scenario-picker-list"
 						aria-label={label}
-						className='h-13 w-full bg-transparent text-sm text-(--text-primary) outline-none placeholder:text-(--text-subtle)'
+						className="h-13 w-full bg-transparent text-sm text-(--text-primary) outline-none placeholder:text-(--text-subtle)"
 					/>
 				</div>
 				<ul
 					ref={listRef}
-					id='scenario-picker-list'
-					role='listbox'
-					aria-label='Applications'
-					className='min-h-0 flex-1 overflow-y-auto overscroll-contain p-2'
+					id="scenario-picker-list"
+					role="listbox"
+					aria-label="Applications"
+					className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2"
 				>
 					{results.length === 0 ? (
-						<li className='px-3 py-6 text-center text-sm text-(--text-muted)'>
+						<li className="px-3 py-6 text-center text-sm text-(--text-muted)">
 							No apps match “{query}”
 						</li>
 					) : (
 						results.map((app, index) => (
-							<li key={app.id} role='option' aria-selected={index === selected}>
+							<li
+								key={app.id}
+								role="option"
+								aria-selected={index === selected}
+							>
 								<button
-									type='button'
+									type="button"
 									onMouseMove={() => setSelected(index)}
 									onClick={() => onSelect(app)}
 									className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm ${index === selected ? 'palette-result-selected font-medium' : 'text-(--text-primary) hover:bg-(--surface-raised)'}`}
 								>
-									<span className='grid size-7 shrink-0 place-items-center rounded-md bg-(--surface-inset)'>
+									<span className="grid size-7 shrink-0 place-items-center rounded-md bg-(--surface-inset)">
 										{app.iconBase64 ? (
 											<img
 												src={app.iconBase64}
-												alt=''
-												className='size-5 object-contain'
+												alt=""
+												className="size-5 object-contain"
 											/>
 										) : null}
 									</span>
-									<span className='min-w-0 flex-1 truncate'>{app.name}</span>
+									<span className="min-w-0 flex-1 truncate">
+										{app.name}
+									</span>
 								</button>
 							</li>
 						))

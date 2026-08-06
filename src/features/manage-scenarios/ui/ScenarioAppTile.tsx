@@ -1,12 +1,7 @@
 import { AppWindow, X } from 'lucide-react'
-import type { AppInfo } from '../../../entities/app'
+import type { ScenarioAppTileProps } from '../types'
 
-interface Props {
-	app: AppInfo
-	remove?: { label: string; onRemove(): void }
-}
-
-export function ScenarioAppTile({ app, remove }: Props) {
+export function ScenarioAppTile({ app, remove }: ScenarioAppTileProps) {
 	return (
 		<li
 			title={app.name}

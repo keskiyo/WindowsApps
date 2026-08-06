@@ -1,13 +1,6 @@
 import { useCallback, useRef, type PointerEvent } from 'react'
 
-/**
- * Neon "flashlight" border effect (see design/design.md). Writes the cursor position and
- * fade into CSS custom properties directly on the hovered element — no React state, so it
- * never re-renders the card and stays compatible with `React.memo`. Pair with the
- * `.card-spotlight` layer in index.css, which reads `--mouse-x`/`--mouse-y`/`--spotlight-opacity`.
- */
 export function useSpotlight() {
-	// Batch pointer-move updates through rAF to avoid forced layout reflows on every event.
 	const rafRef = useRef<number | undefined>(undefined)
 
 	const onPointerMove = useCallback((event: PointerEvent<HTMLElement>) => {

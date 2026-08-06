@@ -7,10 +7,6 @@ interface LifecycleOptions {
 	client: AppsClient
 }
 
-/**
- * Catalog subscriptions plus the first load, reference-counted so several mounts share one
- * registration and the last one to leave detaches it.
- */
 export function createLifecycleActions({
 	set,
 	get,
@@ -36,26 +32,27 @@ export function createLifecycleActions({
 					const disposers: Array<() => void> = []
 					const subscribe = async <T>(
 						registration:
-							| ((handler: (value: T) => void) => Promise<() => void>)
+							| ((
+									handler: (value: T) => void,
+							  ) => Promise<() => void>)
 							| undefined,
 						handler: (value: T) => void,
 					) => {
 						if (registration)
 							disposers.push(await registration(handler))
 					}
-					// Registration is all-or-nothing. Each listener was awaited in turn, so a
-					// rejection partway through left the earlier ones attached with no owner
-					// to detach them, and the rejected promise was cached — every later
-					// initialize() returned that same failure without ever retrying. On
-					// failure the accumulated disposers run and the cached state is cleared,
-					// so a transient bridge error is recoverable.
 					try {
 						await subscribe(client.onCatalogDelta, get().applyDelta)
-						await subscribe(client.onCatalogPatches, get().applyPatches)
+						await subscribe(
+							client.onCatalogPatches,
+							get().applyPatches,
+						)
 						await subscribe(client.onCatalogChanged, summary =>
 							set({ catalogChange: summary }),
 						)
-						disposers.push(await client.onAppsUpdated(get().replaceApps))
+						disposers.push(
+							await client.onAppsUpdated(get().replaceApps),
+						)
 						disposers.push(
 							await client.onScanProgress(scanProgress =>
 								set({ scanProgress }),
@@ -68,11 +65,14 @@ export function createLifecycleActions({
 						disposers.splice(0).forEach(dispose => {
 							try {
 								dispose()
-							} catch {
-								// One listener that refuses to detach must not strand the rest.
+							} catch (ignored) {
+								void ignored
 							}
 						})
-						initializationUsers = Math.max(0, initializationUsers - 1)
+						initializationUsers = Math.max(
+							0,
+							initializationUsers - 1,
+						)
 						initializationDispose = null
 						initializationPromise = null
 						throw error

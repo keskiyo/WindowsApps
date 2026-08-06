@@ -3,11 +3,7 @@ import { check, type Update } from '@tauri-apps/plugin-updater'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type UpdateCheckStatus =
-	| 'idle'
-	| 'checking'
-	| 'current'
-	| 'available'
-	| 'error'
+	'idle' | 'checking' | 'current' | 'available' | 'error'
 export type UpdateInstallPhase =
 	| 'idle'
 	| 'downloading'
@@ -39,7 +35,6 @@ export interface UpdaterState {
 }
 
 interface Options {
-	/** Check automatically on mount. Off for the manual Settings button. */
 	autoCheck?: boolean
 }
 
@@ -66,9 +61,8 @@ function dismissedVersion(): string | null {
 function rememberDismissedVersion(version: string) {
 	try {
 		globalThis.localStorage?.setItem(DISMISSED_UPDATE_KEY, version)
-	} catch {
-		// Storage can be unavailable in restricted environments; dismissal still hides
-		// the current in-memory prompt for this session.
+	} catch (ignored) {
+		void ignored
 	}
 }
 
@@ -123,12 +117,6 @@ function updateErrorMessage(error: unknown): string {
 	return 'The update could not be installed. Try again or download it manually.'
 }
 
-/**
- * Checks for an application update (GitHub Releases endpoint). Silent when there is no
- * update, no network, or when not running inside Tauri (dev browser / tests). `install()`
- * downloads with progress, then relaunches into the new version. `checkNow()` runs an
- * on-demand check and reports `status` for a manual "Check for updates" control.
- */
 export function useUpdater(options?: Options): UpdaterState {
 	const autoCheck = options?.autoCheck ?? true
 	const [available, setAvailable] = useState<Update | null>(null)
@@ -172,8 +160,8 @@ export function useUpdater(options?: Options): UpdaterState {
 					setAvailable(found)
 					setStatus('available')
 				}
-			} catch {
-				// Not in Tauri, offline, or no published release yet — nothing to surface.
+			} catch (ignored) {
+				void ignored
 			}
 		})()
 		return () => {

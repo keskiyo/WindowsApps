@@ -20,13 +20,12 @@ export function isCustomCategoryAccent(
 	)
 }
 
-export function stableCustomCategoryAccent(
-	id: string,
-): CustomCategoryAccent {
+export function stableCustomCategoryAccent(id: string): CustomCategoryAccent {
 	let hash = 0
-	for (const character of id)
-		hash = (hash * 31 + character.charCodeAt(0)) | 0
-	return CUSTOM_CATEGORY_ACCENTS[Math.abs(hash) % CUSTOM_CATEGORY_ACCENTS.length]!
+	for (const character of id) hash = (hash * 31 + character.charCodeAt(0)) | 0
+	return CUSTOM_CATEGORY_ACCENTS[
+		Math.abs(hash) % CUSTOM_CATEGORY_ACCENTS.length
+	]!
 }
 
 export function chooseCustomCategoryAccent(

@@ -21,8 +21,10 @@ export interface InstallersDocsGridProps {
 	onDemoteAuxiliary(id: string): void
 }
 
-export interface ArtifactSectionProps
-	extends Omit<InstallersDocsGridProps, 'apps' | 'hasQuery' | 'onBack'> {
+export interface ArtifactSectionProps extends Omit<
+	InstallersDocsGridProps,
+	'apps' | 'hasQuery' | 'onBack'
+> {
 	title: string
 	apps: AppInfo[]
 }

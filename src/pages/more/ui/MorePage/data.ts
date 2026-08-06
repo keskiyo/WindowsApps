@@ -5,11 +5,6 @@ import type {
 	ScenarioPreviewControl,
 } from './types'
 
-/**
- * A stored timestamp as a day, or `null` when there is nothing trustworthy to show. Shared by both
- * preview rows: an app carries a first-seen stamp, a scenario a creation date, and neither should
- * render a date it does not actually have.
- */
 export function formatPreviewDate(
 	timestamp: number | null,
 ): { display: string; iso: string } | null {
@@ -74,7 +69,8 @@ export function buildMoreDestinations({
 		{
 			view: 'installers_docs',
 			label: 'Installers & Docs',
-			description: 'Setup packages and documentation found while scanning.',
+			description:
+				'Setup packages and documentation found while scanning.',
 			count: installersDocsCount,
 			icon: Box,
 			recent: { kind: 'apps', items: preview.installersDocs },

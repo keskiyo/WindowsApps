@@ -14,17 +14,8 @@ interface Options {
 
 type PathKind = 'includedPaths' | 'excludedPaths'
 
-/**
- * Which maintenance action is waiting to be confirmed, if any. A single value rather than one flag
- * per action: the two act on the same catalog, so "both at once" is a state the interface should
- * not be able to reach, and opening one answers the other.
- */
 export type MaintenanceConfirmation = 'force' | 'reset' | null
 
-/**
- * Owns all SettingsPage state and side effects (load, autostart, scan settings, scan
- * paths, catalog maintenance) so the component stays presentational.
- */
 export function useSystemSettings({
 	client,
 	onForceFullScan,
@@ -33,8 +24,6 @@ export function useSystemSettings({
 	const [settings, setSettings] = useState<SystemSettings | null>(null)
 	const [error, setError] = useState<string | null>(null)
 	const [saving, setSaving] = useState(false)
-	// One value rather than a flag each: two booleans could both be true, and both confirmations
-	// open at once asked the user to answer two questions about the same catalog.
 	const [confirming, setConfirming] = useState<MaintenanceConfirmation>(null)
 	const [forcing, setForcing] = useState(false)
 	const [resetting, setResetting] = useState(false)

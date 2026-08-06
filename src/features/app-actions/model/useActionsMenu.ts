@@ -18,10 +18,6 @@ interface Options {
 	showCategories: boolean
 }
 
-/**
- * Owns the floating menu's placement, dismissal, and keyboard behavior so the component stays
- * presentational. Returns the menu ref, computed position, and the arrow-key handler.
- */
 export function useActionsMenu({
 	anchorRef,
 	onClose,
@@ -56,7 +52,8 @@ export function useActionsMenu({
 				top: nextPosition.top,
 				bottom: nextPosition.top + menu.height,
 			}
-			const categoryMenu = categoryMenuRef.current?.getBoundingClientRect()
+			const categoryMenu =
+				categoryMenuRef.current?.getBoundingClientRect()
 			if (
 				showCategories &&
 				categoryMenu &&
@@ -115,9 +112,6 @@ export function useActionsMenu({
 		}
 		function pointerdown(event: PointerEvent) {
 			const target = event.target as Node
-			// Ignore clicks on the anchor (grip) button: it owns the open/close toggle. Without
-			// this, a click on the grip while open fires pointerdown (closing) then click
-			// (re-toggling open), so the menu never closes on a repeat press.
 			if (menuRef.current?.contains(target)) return
 			if (categoryMenuRef.current?.contains(target)) return
 			if (anchorRef.current?.contains(target)) return
@@ -131,7 +125,6 @@ export function useActionsMenu({
 		}
 	}, [onClose, anchorRef])
 
-	// WAI-ARIA menu pattern: move focus into the menu on open so arrow keys work immediately.
 	useEffect(() => {
 		const first = menuRef.current?.querySelector<HTMLElement>(
 			'[role="menuitem"]:not([disabled])',

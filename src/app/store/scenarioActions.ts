@@ -43,7 +43,6 @@ function listKey(list: ScenarioList): 'launchIdentities' | 'closeIdentities' {
 	return list === 'launch' ? 'launchIdentities' : 'closeIdentities'
 }
 
-/** The user's launch/close scenarios: naming them and choosing what each list contains. */
 export function createScenarioActions({
 	set,
 	get,
@@ -98,7 +97,9 @@ export function createScenarioActions({
 		},
 		deleteScenario(id) {
 			set(state => ({
-				scenarios: state.scenarios.filter(scenario => scenario.id !== id),
+				scenarios: state.scenarios.filter(
+					scenario => scenario.id !== id,
+				),
 			}))
 			persist()
 		},
@@ -106,8 +107,6 @@ export function createScenarioActions({
 			const key = listKey(list)
 			const scenario = get().scenarios.find(entry => entry.id === id)
 			if (!scenario) return { ok: false, error: 'Scenario not found' }
-			// Silently ignoring a duplicate would look like the click did nothing; the caller
-			// closes the picker either way and this is the message it shows.
 			if (scenario[key].includes(identity))
 				return { ok: false, error: 'Already in this list' }
 			if (scenario[key].length >= MAX_SCENARIO_ENTRIES)

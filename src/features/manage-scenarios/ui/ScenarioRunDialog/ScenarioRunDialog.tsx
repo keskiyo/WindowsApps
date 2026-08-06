@@ -1,23 +1,11 @@
 import { ListChecks, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import type { AppInfo } from '../../../../entities/app'
-import {
-	type Scenario,
-	sortScenariosByNewest,
-} from '../../../../entities/scenario'
+import { sortScenariosByNewest } from '../../../../entities/scenario'
 import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
 import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap'
+import { DIALOG_LABEL } from './data'
 import { ScenarioRunRow } from './ScenarioRunRow'
-
-const LABEL = 'All scenarios'
-
-interface Props {
-	scenarios: Scenario[]
-	apps: AppInfo[]
-	runningId: string | null
-	onRun(id: string): void
-	onClose(): void
-}
+import type { ScenarioRunDialogProps } from './types'
 
 export function ScenarioRunDialog({
 	scenarios,
@@ -25,7 +13,7 @@ export function ScenarioRunDialog({
 	runningId,
 	onRun,
 	onClose,
-}: Props) {
+}: ScenarioRunDialogProps) {
 	useBodyScrollLock()
 	const dialogRef = useRef<HTMLDivElement>(null)
 	const closeRef = useRef<HTMLButtonElement>(null)
@@ -60,7 +48,7 @@ export function ScenarioRunDialog({
 				ref={dialogRef}
 				role="dialog"
 				aria-modal="true"
-				aria-label={LABEL}
+				aria-label={DIALOG_LABEL}
 				onKeyDown={event => {
 					if (event.key !== 'Escape') return
 					event.preventDefault()
@@ -71,7 +59,7 @@ export function ScenarioRunDialog({
 				<div className="flex items-center gap-3 border-b border-(--border-neutral) px-4 py-3">
 					<ListChecks size={18} aria-hidden="true" />
 					<h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-(--text-primary)">
-						{LABEL}
+						{DIALOG_LABEL}
 					</h2>
 					<button
 						ref={closeRef}

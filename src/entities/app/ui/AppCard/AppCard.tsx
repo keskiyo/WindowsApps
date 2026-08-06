@@ -8,11 +8,6 @@ import { CardLabel } from './CardLabel'
 import { FavoriteButton } from './FavoriteButton'
 import type { AppCardProps } from './types'
 
-/**
- * How one application looks in the catalog. The card owns its own presentation: menu trigger,
- * focus restoration, favorite toggle, and nothing about launching, uninstalling, hiding or
- * moving. Those actions are features injected through `renderActions`.
- */
 export function AppCard({
 	app,
 	isFavorite,
@@ -24,7 +19,6 @@ export function AppCard({
 }: AppCardProps) {
 	const [menuOpen, setMenuOpen] = useState(false)
 	const menuTriggerRef = useRef<HTMLButtonElement | null>(null)
-	// Return focus to the menu trigger when the menu closes (keyboard users keep their place).
 	const closeMenu = useCallback(() => {
 		setMenuOpen(false)
 		menuTriggerRef.current?.focus()
@@ -38,11 +32,11 @@ export function AppCard({
 			onPointerEnter={spotlight.onPointerEnter}
 			onPointerLeave={spotlight.onPointerLeave}
 			data-launching={launching || undefined}
-			className={`app-card app-card-tile app-card-glass cv-card group relative rounded-[1.15rem] border border-white/85 transition-[transform,border-color,box-shadow,opacity] duration-200 ease-out hover:-translate-y-0.5 focus-within:border-violet-400/45 ${menuOpen ? 'z-100' : ''}`}
+			className={`app-card app-card-tile app-card-glass cv-card group relative rounded-[1.15rem] border border-white/85 transition-[transform,border-color,box-shadow,opacity] duration-200 ease-out focus-within:border-violet-400/45 hover:-translate-y-0.5 ${menuOpen ? 'z-100' : ''}`}
 		>
 			<SpotlightLayer size={110} />
 			<button
-				type='button'
+				type="button"
 				onClick={() => {
 					if (launching) return
 					void onLaunch(app)
@@ -51,7 +45,7 @@ export function AppCard({
 				aria-busy={launching}
 				disabled={launching}
 				title={launching ? 'Launching…' : app.name}
-				className='relative z-1 flex size-full flex-col items-center justify-center gap-3 px-3 py-4 text-center focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-violet-500 disabled:cursor-progress'
+				className="relative z-1 flex size-full flex-col items-center justify-center gap-3 px-3 py-4 text-center focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-violet-500 disabled:cursor-progress"
 			>
 				<CardIcon iconBase64={app.iconBase64} launching={launching} />
 				<CardLabel
@@ -61,18 +55,18 @@ export function AppCard({
 				/>
 			</button>
 			<button
-				type='button'
+				type="button"
 				ref={menuTriggerRef}
 				aria-label={`Manage ${app.name}`}
 				aria-expanded={menuOpen}
-				aria-haspopup='menu'
+				aria-haspopup="menu"
 				onClick={event => {
 					event.stopPropagation()
 					setMenuOpen(value => !value)
 				}}
-				className='absolute left-2 top-2 z-2 grid size-8 place-items-center rounded-lg border border-white/85 bg-white/72 text-slate-500 opacity-75 shadow-sm transition hover:text-violet-700 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-violet-500'
+				className="absolute top-2 left-2 z-2 grid size-8 place-items-center rounded-lg border border-white/85 bg-white/72 text-slate-500 opacity-75 shadow-sm transition hover:text-violet-700 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-violet-500"
 			>
-				<EllipsisVertical size={16} aria-hidden='true' />
+				<EllipsisVertical size={16} aria-hidden="true" />
 			</button>
 			{!isAuxiliary && !artifact && (
 				<FavoriteButton
@@ -81,7 +75,8 @@ export function AppCard({
 					onToggle={() => onToggleFavorite(app.id)}
 				/>
 			)}
-			{menuOpen && renderActions({ close: closeMenu, anchorRef: menuTriggerRef })}
+			{menuOpen &&
+				renderActions({ close: closeMenu, anchorRef: menuTriggerRef })}
 		</article>
 	)
 }

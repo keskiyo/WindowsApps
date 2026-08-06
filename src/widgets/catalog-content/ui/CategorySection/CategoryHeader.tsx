@@ -1,14 +1,5 @@
 import { ChevronDown, ChevronRight, Pencil } from 'lucide-react'
-import type { AppCategory } from '../../../../entities/category'
-
-interface Props {
-	category: AppCategory
-	label: string
-	appCount: number
-	collapsed: boolean
-	onToggle(): void
-	onEdit(): void
-}
+import type { CategoryHeaderProps } from '../../types'
 
 export function CategoryHeader({
 	category,
@@ -17,29 +8,25 @@ export function CategoryHeader({
 	collapsed,
 	onToggle,
 	onEdit,
-}: Props) {
-	// An empty category has nothing to collapse, so the click toggle is inert — but the row stays
-	// the pointer drag handle for reordering. Guarding `onClick` (instead of `disabled`) keeps the
-	// button pointer-interactive so dnd-kit's PointerSensor can still start a drag on an empty
-	// category; a `disabled` button swallows pointerdown and would make empty categories undraggable.
+}: CategoryHeaderProps) {
 	const collapsible = appCount > 0
 	return (
 		<div
-			role='group'
+			role="group"
 			aria-label={`${label} category controls`}
-			className='flex h-9 w-full min-w-0 flex-1 items-center gap-2'
+			className="flex h-9 w-full min-w-0 flex-1 items-center gap-2"
 		>
 			<button
-				type='button'
+				type="button"
 				aria-expanded={collapsible ? !collapsed : undefined}
 				aria-disabled={collapsible ? undefined : true}
 				aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
 				onClick={collapsible ? onToggle : undefined}
-				className={`flex h-full min-w-0 flex-1 cursor-pointer items-center rounded-lg px-1 text-left focus-visible:z-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong)${collapsible ? '' : ' opacity-60'}`}
+				className={`flex h-full min-w-0 flex-1 cursor-pointer items-center rounded-lg px-1 text-left focus-visible:z-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong)${collapsible ? '' : 'opacity-60'}`}
 			>
 				<span
-					aria-hidden='true'
-					className='mr-1.5 grid size-5 shrink-0 place-items-center'
+					aria-hidden="true"
+					className="mr-1.5 grid size-5 shrink-0 place-items-center"
 				>
 					{collapsed ? (
 						<ChevronRight size={15} />
@@ -49,20 +36,20 @@ export function CategoryHeader({
 				</span>
 				<h2
 					id={`category-${category}`}
-					className='min-w-0 truncate text-base font-semibold tracking-tight text-(--text-primary)'
+					className="min-w-0 truncate text-base font-semibold tracking-tight text-(--text-primary)"
 					title={label}
 				>
 					{label}
 				</h2>
-				<span className='category-count ml-2.5 shrink-0 rounded-full border px-2.5 py-0.5 text-[0.7rem] font-medium'>
+				<span className="category-count ml-2.5 shrink-0 rounded-full border px-2.5 py-0.5 text-[0.7rem] font-medium">
 					{appCount} {appCount === 1 ? 'app' : 'apps'}
 				</span>
 			</button>
 			<button
-				type='button'
+				type="button"
 				aria-label={`Rename ${label} category`}
 				onClick={onEdit}
-				className='inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-(--border-neutral) bg-(--surface-panel) px-3 text-xs font-medium text-(--text-primary) transition-[background-color,border-color] duration-200 hover:border-(--accent) hover:bg-(--surface-raised) focus-visible:z-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong)'
+				className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-(--border-neutral) bg-(--surface-panel) px-3 text-xs font-medium text-(--text-primary) transition-[background-color,border-color] duration-200 hover:border-(--accent) hover:bg-(--surface-raised) focus-visible:z-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong)"
 			>
 				<Pencil size={15} />
 				<span>Edit</span>

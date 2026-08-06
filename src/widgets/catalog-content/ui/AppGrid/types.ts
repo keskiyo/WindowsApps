@@ -13,7 +13,6 @@ export interface AppGridProps {
 	categories: CategoryDefinition[]
 	collapsedCategories: AppCategory[]
 	favoriteAppIds: string[]
-	/** Returns to the More page, the only entry point of the auxiliary/hidden/artifact views. */
 	onBack(): void
 	onToggleCategory(category: AppCategory): void
 	onToggleFavorite(id: string): void

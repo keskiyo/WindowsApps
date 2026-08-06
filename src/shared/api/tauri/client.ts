@@ -6,10 +6,6 @@ type TauriGlobal = typeof globalThis & {
 	__TAURI_INTERNALS__?: unknown
 }
 
-/**
- * The generic Tauri transport. It knows commands, events and error normalization, and nothing
- * about App, Category or System — the typed clients that do live in each entity's `api` segment.
- */
 export function isTauriRuntime(): boolean {
 	return Boolean((globalThis as TauriGlobal).__TAURI_INTERNALS__)
 }

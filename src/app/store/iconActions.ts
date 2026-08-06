@@ -13,7 +13,6 @@ type IconActions = Pick<
 	'hydrateVisibleIcons' | 'clearIconCache' | 'repairMissingIcons'
 >
 
-/** Icon hydration: lazy, batched, and best-effort by design. */
 export function createIconActions({
 	get,
 	client,
@@ -25,9 +24,8 @@ export function createIconActions({
 				await client.hydrateVisibleIcons(
 					ids.slice(start, start + HYDRATION_BATCH_SIZE),
 				)
-			} catch {
-				// Hydration is best-effort. One failed batch must not starve later
-				// visible cards; background hydration can retry the failed IDs.
+			} catch (ignored) {
+				void ignored
 			}
 		}
 	}

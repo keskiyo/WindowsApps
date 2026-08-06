@@ -2,12 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { toAppClientError } from '../../../shared/api/tauri/errors'
 import type { AppInfo, UninstallPreview } from '../../../entities/app'
 
-/**
- * Owns the uninstall confirmation: which app is pending, and the preview fetched for it.
- *
- * The preview request is guarded against stale results — selecting a second app before the
- * first response lands must not show the first app's mechanism next to the second app's name.
- */
 export function useUninstallFlow(
 	getUninstallPreview: (id: string) => Promise<UninstallPreview>,
 ) {
@@ -43,5 +37,12 @@ export function useUninstallFlow(
 		setPreviewError(null)
 	}, [])
 
-	return { app, close, isPreviewLoading, preview, previewError, select: setApp }
+	return {
+		app,
+		close,
+		isPreviewLoading,
+		preview,
+		previewError,
+		select: setApp,
+	}
 }

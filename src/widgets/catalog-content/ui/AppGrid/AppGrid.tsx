@@ -11,8 +11,8 @@ export function AppGrid(props: AppGridProps) {
 	if (props.isLoading)
 		return (
 			<section
-				aria-label='Loading applications'
-				className='app-card-grid'
+				aria-label="Loading applications"
+				className="app-card-grid"
 			>
 				{Array.from({ length: 12 }, (_, index) => (
 					<Skeleton key={index} />

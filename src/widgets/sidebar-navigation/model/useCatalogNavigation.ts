@@ -66,7 +66,9 @@ export function useCatalogNavigation({
 			if (observedSmoothScroll) {
 				const currentTop = scroller.scrollTop
 				stableSmoothFrames =
-					currentTop === previousSmoothTop ? stableSmoothFrames + 1 : 0
+					currentTop === previousSmoothTop
+						? stableSmoothFrames + 1
+						: 0
 				previousSmoothTop = currentTop
 				if (stableSmoothFrames === 2) {
 					setPendingCategory({
@@ -124,9 +126,8 @@ export function useCatalogNavigation({
 						passive: true,
 					})
 					scroller.scrollTo({ top, behavior: scrollBehavior() })
-					alignmentFrame.current = requestAnimationFrame(
-						finishSmoothScroll,
-					)
+					alignmentFrame.current =
+						requestAnimationFrame(finishSmoothScroll)
 					return
 				}
 				if (pendingCategory.finalSmooth) {
@@ -172,7 +173,6 @@ export function useCatalogNavigation({
 		setPendingCategory(null)
 		setActiveView('all')
 		closeDrawer()
-		// The catalog scrolls inside its rounded panel, not the window.
 		const scroller = document.getElementById('catalog-scroll')
 		;(scroller ?? window).scrollTo({ top: 0, behavior: scrollBehavior() })
 	}, [closeDrawer, setActiveView])

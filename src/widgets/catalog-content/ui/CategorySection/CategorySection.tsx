@@ -32,16 +32,14 @@ export function CategorySection({
 	const label = definition.label
 	const [editing, setEditing] = useState(false)
 	const [deleting, setDeleting] = useState(false)
-	// The heading still reports `apps.length`: the count is the size of the category, not of the
-	// batch currently mounted.
 	const cards = useProgressiveCards(apps)
 	return (
 		<section
 			aria-labelledby={`category-${category}`}
 			data-category={category}
-			className='relative scroll-mt-40 rounded-2xl transition-colors duration-200 focus-within:z-90 lg:scroll-mt-24'
+			className="relative scroll-mt-40 rounded-2xl transition-colors duration-200 focus-within:z-90 lg:scroll-mt-24"
 		>
-			<div className='mb-3 flex items-center gap-2'>
+			<div className="mb-3 flex items-center gap-2">
 				{editing ? (
 					<CategoryNameEditor
 						initialValue={label}
@@ -65,10 +63,10 @@ export function CategorySection({
 				)}
 				{!definition.builtIn && (
 					<button
-						type='button'
+						type="button"
 						aria-label={`Delete ${label} category`}
 						onClick={() => setDeleting(true)}
-						className='grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-red-100 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-red-500'
+						className="grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-red-100 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-red-500"
 					>
 						<Trash2 size={15} />
 					</button>
@@ -76,7 +74,7 @@ export function CategorySection({
 			</div>
 			{!collapsed && (
 				<>
-					<div className='app-card-grid'>
+					<div className="app-card-grid">
 						{cards.visible.map(app => (
 							<CatalogAppCard
 								key={app.id}
@@ -98,8 +96,8 @@ export function CategorySection({
 					{cards.hasMore && (
 						<div
 							ref={cards.sentinelRef}
-							aria-hidden='true'
-							className='h-1'
+							aria-hidden="true"
+							className="h-1"
 						/>
 					)}
 				</>

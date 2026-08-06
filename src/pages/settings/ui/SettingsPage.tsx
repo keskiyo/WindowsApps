@@ -29,23 +29,21 @@ export function SettingsPage({
 		forceFullScan,
 		resetCatalogCache,
 	} = useSystemSettings({ client, onForceFullScan, onResetCatalogCache })
-	// Hooks must run unconditionally; the local instance is a fallback for isolated
-	// rendering (tests, storybook-style usage) and stays idle when App provides one.
 	const localUpdater = useUpdater({ autoCheck: false })
 	const updater = sharedUpdater ?? localUpdater
 	return (
-		<section aria-labelledby='settings-title' className='mx-auto max-w-3xl'>
-			<div className='mb-8 flex items-center gap-4'>
+		<section aria-labelledby="settings-title" className="mx-auto max-w-3xl">
+			<div className="mb-8 flex items-center gap-4">
 				<img
-					src='/app-icon.png'
-					alt='Windows Apps logo'
-					className='size-16 rounded-2xl ring-1 ring-violet-400/25'
+					src="/app-icon.png"
+					alt="Windows Apps logo"
+					className="size-16 rounded-2xl ring-1 ring-violet-400/25"
 				/>
 				<div>
-					<h1 id='settings-title' className='text-2xl font-semibold'>
+					<h1 id="settings-title" className="text-2xl font-semibold">
 						Settings
 					</h1>
-					<p className='mt-1 text-sm text-slate-600'>
+					<p className="mt-1 text-sm text-slate-600">
 						{settings
 							? `Version ${settings.version}`
 							: 'Loading version…'}
@@ -84,7 +82,7 @@ export function SettingsPage({
 			)}
 			<UninstallHistory client={client} />
 			{error && (
-				<p role='alert' className='mt-4 text-sm text-red-700'>
+				<p role="alert" className="mt-4 text-sm text-red-700">
 					{error}
 				</p>
 			)}

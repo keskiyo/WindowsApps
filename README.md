@@ -38,28 +38,32 @@ Everything runs locally. Nothing about your machine is uploaded.
 ## Screenshots
 
 <div align="center">
-  <img src=".github/images/auxiliary-tools.png" alt="Auxiliary tools view" width="880">
+  <img src=".github/images/more.png" alt="More: auxiliary tools, scenarios, hidden apps and installers" width="880">
 </div>
 
-**Auxiliary tools** is where the catalog puts what it is not sure about — CLI executables, browser
-components, bundled helpers. They stay out of your categories and out of search, but nothing is
-deleted and any of them is one click from returning to the main catalog. The tiles across the top
-count each view, and every count matches the list it opens.
+**More** holds what is kept out of the main list — Auxiliary tools, Scenarios, Hidden apps and
+Installers & Docs. Each card carries the count of the view it opens and previews its newest entries.
+
+<div align="center">
+  <img src=".github/images/scenarios.png" alt="Scenarios with launch and close lists" width="880">
+</div>
+
+**Scenarios** pair a launch list with a close list. One click starts everything in the first and
+fully closes everything in the second.
 
 <div align="center">
   <img src=".github/images/app-info.png" alt="App information dialog" width="880">
 </div>
 
-**App information** answers what a launcher usually cannot: how big the file is, when it was built,
-which CPU architecture it targets, whether it carries a valid Authenticode signature, and whether
-its install location still exists. Copy the path, copy a full report, or open the containing folder.
+**App information** — size, dates, architecture, Authenticode signature and whether the install
+location still exists. Copy the path, copy a full report, or open the containing folder.
 
 <div align="center">
   <img src=".github/images/settings.png" alt="Settings and catalog maintenance" width="880">
 </div>
 
-**Settings** keeps catalog maintenance honest — scan diagnostics from the last run, a force full
-scan, and a cache reset that preserves your Favorites, Hidden items and categories.
+**Settings** — scan folders, autostart, the global shortcut and updates, plus catalog maintenance
+whose force scan and cache reset preserve Favorites, Hidden apps and categories.
 
 ## Install
 
@@ -84,13 +88,14 @@ scan, and a cache reset that preserves your Favorites, Hidden items and categori
 - **Quick-launch palette** — `Ctrl+K` from anywhere, `Ctrl+F` or `/` to jump to search.
 - **Launches the way Windows intends** — shortcuts, executables, packaged apps and Steam entries each use their native mechanism, so Steam overlay, cloud saves and playtime keep working.
 - **Honest feedback** — the card stays busy until the app's window is actually ready, not just until the process spawned.
+- **Scenarios** — a named launch list and close list, up to 20 apps each. Running one starts the first set, then closes the second by stopping every process of those programs, and reports the result once. Start it from the Scenarios page or straight from the More card.
 
 ### A catalog that thinks
 
 - **One card per application** — merging weighs resolved targets, product families, publishers and install roots. Ambiguous cases are kept, not guessed away.
 - **Auxiliary instead of deletion** — runtime components and maintenance executables leave your categories but stay inspectable, and any of them is one click from coming back.
 - **Explainable decisions** — every entry carries a visibility score and stable reason codes; `ServiceDesk` is not mistaken for a service.
-- **Choices that survive** — Favorites, Hidden items and category assignments are tracked by application identity, so they follow the app through a rescan, a version change or a cache reset.
+- **Choices that survive** — Favorites, Hidden items, category assignments and scenario entries are tracked by application identity, so they follow the app through a rescan, a version change or a cache reset.
 
 ### App information
 
@@ -125,7 +130,7 @@ Each scan root is limited to **16 directory levels**, **500,000 entries** and **
 | **Clear icon cache**     | Rebuild icons without rescanning drives        |
 | **Reset catalog cache**  | Remove generated caches and scan clean         |
 
-Favorites, Hidden items, promoted tools, custom categories and assignments survive all of these.
+Favorites, Hidden items, promoted tools, custom categories, assignments and scenarios survive all of these.
 
 Visibility is conservative. Every marker is bound to the field where it is actually evidence — a helper binary is recognized by the file name its vendor gave it, a documentation shortcut by what it opens — and an application's packaged identifier is never read as text, so a vendor or packaging framework appearing in an id cannot decide anything.
 

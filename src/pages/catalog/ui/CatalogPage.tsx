@@ -1,19 +1,6 @@
-import {
-	AppGrid,
-	type AppGridProps,
-} from '../../../widgets/catalog-content'
+import { AppGrid } from '../../../widgets/catalog-content'
+import type { CatalogPageProps } from '../types'
 import { ScanPrompt } from './ScanPrompt'
-
-export interface CatalogPageProps {
-	/** An empty first run has nothing to grid, so it offers a scan instead. */
-	showScanPrompt: boolean
-	scanPrompt: {
-		isScanning: boolean
-		onScan(): Promise<void>
-		onDismiss(): void
-	}
-	grid: AppGridProps
-}
 
 export function CatalogPage({
 	showScanPrompt,

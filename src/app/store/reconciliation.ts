@@ -4,11 +4,6 @@ import type { AppInfo } from '../../entities/app'
 
 export const identityOf = appIdentity
 
-/**
- * Stamp every card the catalog reports, drop the stamps of cards it no longer reports, and keep
- * the existing stamps untouched. Returning `previous` unchanged when nothing moved is what lets
- * the callers skip a storage write — the catalog is re-set on every scan and every push.
- */
 export function reconcileFirstSeen(
 	apps: AppInfo[],
 	previous: Record<string, number>,
@@ -23,7 +18,6 @@ export function reconcileFirstSeen(
 		if (seenAt === undefined) changed = true
 		next[identity] = seenAt ?? now
 	}
-	// A catalog that only lost entries still has to shrink the map, or it grows without bound.
 	return changed || Object.keys(next).length !== Object.keys(previous).length
 		? next
 		: previous
@@ -33,9 +27,10 @@ export function addUnique(list: string[], value: string): string[] {
 	return list.includes(value) ? list : [...list, value]
 }
 
-// Preserve an already-loaded icon when an incoming app record has none, so background
-// syncs (which ship icon-less app data) don't blank the grid before patches re-arrive.
-export function mergeIcon(previous: AppInfo | undefined, next: AppInfo): AppInfo {
+export function mergeIcon(
+	previous: AppInfo | undefined,
+	next: AppInfo,
+): AppInfo {
 	return previous?.iconBase64 && !next.iconBase64
 		? { ...next, iconBase64: previous.iconBase64 }
 		: next
@@ -52,12 +47,6 @@ function groupByCanonicalIdentity(apps: AppInfo[]): Map<string, AppInfo[]> {
 	return groups
 }
 
-/**
- * Reconcile a favorite/hidden set against a freshly loaded catalog. Legacy ids (saved before
- * identities existed, or by an older app version) are resolved to their identity, then the
- * runtime id list is re-derived from the identities against the current apps — so a selection
- * follows the app across a dedup rule change that renamed its id.
- */
 export function reconcileSelection(
 	apps: AppInfo[],
 	ids: string[],
@@ -91,12 +80,6 @@ export function reconcileSelection(
 	}
 }
 
-/**
- * Reconcile the manual category overrides against a freshly loaded catalog, mirroring
- * `reconcileSelection`. Legacy id-keyed entries (written before identities existed) are folded into
- * the identity map for apps present in the catalog, then the runtime id map is re-derived from the
- * identity map — so an override follows its app across a dedup rule change that renamed its id.
- */
 export function reconcileOverrides(
 	apps: AppInfo[],
 	idOverrides: Record<string, AppCategory>,
@@ -108,7 +91,9 @@ export function reconcileOverrides(
 	unresolvedLegacy: Record<string, AppCategory>
 } {
 	const byId = new Map(apps.map(app => [app.id, app]))
-	const mergedIdentities: Record<string, AppCategory> = { ...identityOverrides }
+	const mergedIdentities: Record<string, AppCategory> = {
+		...identityOverrides,
+	}
 	const unresolvedLegacy = { ...legacyCanonicalOverrides }
 	for (const [legacyId, category] of Object.entries(idOverrides)) {
 		const app = byId.get(legacyId)

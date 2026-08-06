@@ -20,15 +20,15 @@ export function CategorySubmenu({
 			ref={menuRef}
 			onKeyDown={onKeyDown}
 			style={position}
-			role='menu'
+			role="menu"
 			aria-label={label}
-			className='motion-panel fixed z-[600] flex w-56 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-(--shadow-menu)'
+			className="motion-panel fixed z-[600] flex w-56 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-(--shadow-menu)"
 		>
 			{categoryOrder.map(category => (
 				<button
 					key={category}
-					type='button'
-					role='menuitem'
+					type="button"
+					role="menuitem"
 					aria-current={
 						category === activeCategory ? 'true' : undefined
 					}

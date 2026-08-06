@@ -8,7 +8,6 @@ import type { MoreCardProps } from './types'
 export function MoreCard({ destination, onSelect }: MoreCardProps) {
 	const Icon = destination.icon
 	const spotlight = useSpotlight()
-	// Read once so the variant narrows inside the row callbacks below.
 	const preview = destination.recent
 
 	return (
@@ -65,8 +64,6 @@ export function MoreCard({ destination, onSelect }: MoreCardProps) {
 							))}
 				</ul>
 			)}
-			{/* Only the scenarios card: the preview cuts the list off, and the rest of it is
-			    something to run rather than a view to browse. */}
 			{preview.kind === 'scenarios' && preview.items.length > 0 && (
 				<button
 					type="button"

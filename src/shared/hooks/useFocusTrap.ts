@@ -3,16 +3,6 @@ import { useEffect, type RefObject } from 'react'
 const FOCUSABLE =
 	'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
 
-/**
- * Whether an element can actually receive focus.
- *
- * This deliberately does not consult layout. The previous check was
- * `offsetParent !== null || el === document.activeElement`, and jsdom never computes layout, so
- * under test the set collapsed to the single focused element: `first === last`, and the trap
- * silently stopped trapping. Every dialog using this hook therefore had an unverifiable focus
- * trap. Attribute-based reachability behaves the same in both environments, and the dialogs
- * here render conditionally rather than hiding focusables with CSS.
- */
 function isReachable(element: HTMLElement): boolean {
 	return (
 		!element.hasAttribute('hidden') &&
@@ -21,11 +11,6 @@ function isReachable(element: HTMLElement): boolean {
 	)
 }
 
-/**
- * Traps Tab / Shift+Tab focus within the referenced container while it is mounted, so a
- * modal can't leak focus to the page behind it (WCAG 2.1 — No Keyboard Trap inverse: keep
- * focus inside an explicitly modal surface). Pair with `aria-modal='true'` on the element.
- */
 export function useFocusTrap(ref: RefObject<HTMLElement | null>) {
 	useEffect(() => {
 		const container = ref.current

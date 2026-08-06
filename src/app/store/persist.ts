@@ -5,7 +5,6 @@ interface PersistOptions {
 	set: SetAppState
 	get: GetAppState
 	storage: Storage
-	/** Root fields written by a newer build, carried through untouched. */
 	unknownFields?: Record<string, unknown>
 }
 
@@ -37,8 +36,6 @@ export function createPersist({
 			legacyCanonicalPreferences: state.legacyCanonicalPreferences,
 			unknownFields,
 		})
-		// A refused write leaves the UI showing changes that will not survive a restart,
-		// so the condition is surfaced instead of being swallowed.
 		if (persisted !== state.preferencesPersisted) {
 			set({ preferencesPersisted: persisted })
 		}

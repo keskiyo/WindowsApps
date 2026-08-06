@@ -1,6 +1,3 @@
-// Public API of the App entity. `api/appsClient.ts` is deliberately absent: the concrete IPC
-// client is composition-time wiring for `app/main.tsx`, and exporting it here would drag
-// `@tauri-apps/*` into every consumer that only wants a type.
 export type {
 	AppArchitecture,
 	AppArtifactKind,

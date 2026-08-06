@@ -13,16 +13,12 @@ export function filterVisibleApps(
 	hiddenAppIds: string[],
 	favoriteAppIds: string[],
 ): AppInfo[] {
-	// None of these render the grid, so nothing downstream (icon hydration included) should pay
-	// for a catalog-wide filter while the user sits on Settings, More or Scenarios.
 	if (
 		activeView === 'settings' ||
 		activeView === 'more' ||
 		activeView === 'scenarios'
 	)
 		return []
-	// Set lookups, not Array.includes: this runs over the whole catalog on every
-	// hydration patch, so a linear scan per app makes it O(apps × hidden).
 	const hidden = new Set(hiddenAppIds)
 	if (activeView === 'installers_docs')
 		return categorized.filter(
@@ -48,15 +44,6 @@ export function filterVisibleApps(
 	return visible.filter(app => favorites.has(app.id))
 }
 
-/**
- * The newest entries of one catalog area, for a preview that points at the full view.
- *
- * "Newest" is per-area, not global: what counts as recent for Hidden is when the user hid the
- * app, while for the scanner-owned areas it is when the catalog first reported the app at all.
- * The caller supplies that rank, so no area has to pretend it has a timestamp it does not.
- * Ties keep alphabetical order, so a first run — where every stamp is the same — still reads
- * as a list rather than as scan order.
- */
 export function selectRecentApps(
 	apps: AppInfo[],
 	rankOf: (app: AppInfo) => number,
@@ -74,32 +61,15 @@ export function selectRecentApps(
 }
 
 export interface CatalogCounts {
-	/** Non-auxiliary, non-hidden apps: the set the grid, the header and the drawer list show. */
 	visibleCategorizedApps: AppInfo[]
-	/** Per-category counts over `visibleCategorizedApps`. */
 	navigationCounts: Map<string, number>
-	/** Each badge is the length of the view it opens, so the number never contradicts the list. */
 	favoriteCount: number
 	hiddenCount: number
 	auxiliaryCount: number
-	/** Scanner classification totals for the settings page; hidden apps still count as scanned. */
 	classifiedPrimaryCount: number
 	classifiedAuxiliaryCount: number
 }
 
-/**
- * Every count the navigation and settings surfaces show, derived in one `Set`-based pass.
- *
- * It exists as a selector for two reasons. It is the single definition the sidebar and the
- * drawer share — they used to disagree, one counting favorites over the whole categorized
- * catalog and the other over the visible subset, so the same nav item showed different numbers
- * at different window widths. And `App` subscribes to the entire store, so the nested
- * `Array.includes`/`Array.some` scans this replaces re-ran over the catalog on every keystroke.
- *
- * The badges deliberately mirror `filterVisibleApps`: a count that disagrees with the list it
- * opens is a bug, not a different metric. The two `classified*` totals are the exception, and
- * are named for it — the settings page reports what the scanner classified, hidden or not.
- */
 export function selectCatalogCounts(
 	categorized: AppInfo[],
 	hiddenAppIds: string[],
@@ -148,10 +118,6 @@ export function selectCatalogCounts(
 	}
 }
 
-/**
- * The catalog fields `selectCategorizedApps` reads. Spelled out rather than `Pick<AppState>`:
- * the entity must not depend on the root store, and this is the whole contract it needs.
- */
 export interface CategorizedAppsState {
 	apps: AppInfo[]
 	categoryOverrides: Record<string, AppCategory>
@@ -162,13 +128,6 @@ export interface CategorizedAppsState {
 	installerAppIdentities: string[]
 }
 
-/**
- * Object identity is the point here, not just speed. Every `catalog://patches` event
- * replaces the apps array while icons stream in, and cloning every record would hand each
- * card a new `app` reference, defeating `memo(CatalogAppCard)` and re-rendering the whole grid
- * ~N/24 times during startup. Records that nothing applies to are returned untouched, so a
- * patch only invalidates the cards it actually changed.
- */
 export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 	const promotedIds = new Set(state.promotedAppIds)
 	const promotedIdentities = new Set(state.promotedAppIdentities)
@@ -181,8 +140,6 @@ export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 					? app
 					: { ...app, category: INSTALLERS_DOCS_CATEGORY }
 			}
-			// A manual mark makes the record an installer artifact, which is what puts it in the
-			// Installers & Docs view: that view selects on `artifactKind`, not on the category.
 			if (
 				installerIds.has(app.id) ||
 				installerIdentities.has(appIdentity(app))
@@ -193,8 +150,6 @@ export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 					category: INSTALLERS_DOCS_CATEGORY,
 					userInstaller: true,
 				}
-			// Identity-first: the durable override (keyed by canonicalIdentity) wins so a manual
-			// category survives a Force full scan / Reset cache / dedup change that renamed the id.
 			const category =
 				state.categoryOverrideIdentities[appIdentity(app)] ??
 				state.categoryOverrides[app.id] ??

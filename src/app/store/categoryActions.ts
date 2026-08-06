@@ -34,7 +34,6 @@ function nameTaken(
 	)
 }
 
-/** The user's own category list: creating, renaming, deleting, ordering and collapsing it. */
 export function createCategoryActions({
 	set,
 	get,
@@ -50,7 +49,9 @@ export function createCategoryActions({
 			const id = idFactory()
 			const accent = chooseCustomCategoryAccent(
 				get().categories.flatMap(category =>
-					category.builtIn || !category.accent ? [] : [category.accent],
+					category.builtIn || !category.accent
+						? []
+						: [category.accent],
 				),
 			)
 			set(state => ({
@@ -72,7 +73,9 @@ export function createCategoryActions({
 				return { ok: false, error: 'Category not found' }
 			set(state => ({
 				categories: state.categories.map(category =>
-					category.id === id ? { ...category, label: value } : category,
+					category.id === id
+						? { ...category, label: value }
+						: category,
 				),
 			}))
 			persist()
@@ -130,8 +133,12 @@ export function createCategoryActions({
 		},
 		toggleCategory(category) {
 			set(state => ({
-				collapsedCategories: state.collapsedCategories.includes(category)
-					? state.collapsedCategories.filter(item => item !== category)
+				collapsedCategories: state.collapsedCategories.includes(
+					category,
+				)
+					? state.collapsedCategories.filter(
+							item => item !== category,
+						)
 					: [...state.collapsedCategories, category],
 			}))
 			persist()

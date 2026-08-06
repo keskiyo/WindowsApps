@@ -23,7 +23,8 @@ export function useAppDetails(
 		void appsClient
 			.getAppDetails(appId)
 			.then(details => {
-				if (current) setState({ details, isLoading: false, error: null })
+				if (current)
+					setState({ details, isLoading: false, error: null })
 			})
 			.catch(() => {
 				if (current)

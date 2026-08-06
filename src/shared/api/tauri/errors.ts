@@ -89,8 +89,8 @@ export function toAppClientError(error: unknown): AppClientError {
 			const payload = readAppErrorPayload(JSON.parse(error))
 			if (payload)
 				return new AppClientError(payload.code, payload.message)
-		} catch {
-			// Unknown values must not surface raw transport details in the interface.
+		} catch (ignored) {
+			void ignored
 		}
 	}
 	return new AppClientError(

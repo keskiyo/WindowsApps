@@ -1,8 +1,6 @@
 import type { AppsClient } from '../../entities/app'
 import type { AppState, GetAppState, SetAppState } from './types'
 
-// Ceiling for the "launching" visual when the backend can't report real readiness
-// (Store/UWP, shell hand-off). Cleared early by the launch://status event when available.
 const LAUNCH_CEILING_MS = 12000
 
 interface LaunchActionOptions {
@@ -21,15 +19,6 @@ type LaunchActions = Pick<
 	| 'uninstall'
 >
 
-/**
- * Launch and uninstall.
- *
- * Actions reject; they do not also write `error`. `error` is the *background* failure channel —
- * work nobody is waiting on, which only `load()` produces — and App toasts it. An action already
- * has an owner for its message (`useAppFeedback` for launch/refresh/uninstall, `useSystemSettings`
- * for the maintenance scans), so writing it here too reported one failure twice, the second time
- * with no Retry.
- */
 export function createLaunchActions({
 	set,
 	get,
@@ -68,7 +57,10 @@ export function createLaunchActions({
 			if (existing) clearTimeout(existing)
 			launchTimers.set(
 				app.id,
-				setTimeout(() => get().clearLaunching(app.id), LAUNCH_CEILING_MS),
+				setTimeout(
+					() => get().clearLaunching(app.id),
+					LAUNCH_CEILING_MS,
+				),
 			)
 			try {
 				await client.launchApp({ id: app.id })

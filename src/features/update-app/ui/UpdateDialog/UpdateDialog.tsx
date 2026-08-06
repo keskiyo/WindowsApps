@@ -44,10 +44,6 @@ export function UpdateDialog({
 							: 'Update & restart'
 
 	useBodyScrollLock()
-	// The Tab cycling below is deliberately not replaced by `useFocusTrap`: that hook keeps only
-	// elements with `offsetParent !== null`, which jsdom never provides, so under test it
-	// collapses to the currently focused element and stops trapping. This copy is the one the
-	// dialog's own regression test exercises.
 	useEffect(() => {
 		const previousFocus = document.activeElement
 		closeButtonRef.current?.focus()
@@ -89,14 +85,14 @@ export function UpdateDialog({
 	}, [installing, onDismiss])
 
 	return (
-		<div className='update-modal-backdrop fixed inset-0 z-500 grid place-items-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm'>
+		<div className="update-modal-backdrop fixed inset-0 z-500 grid place-items-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
 			<section
 				ref={dialogRef}
-				role='dialog'
-				aria-modal='true'
-				aria-labelledby='update-dialog-title'
-				aria-describedby='update-dialog-description'
-				className='update-modal-panel relative flex min-h-124 max-h-[calc(100vh-3rem)] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-violet-300/35 bg-(--color-update-surface) text-slate-100 shadow-(--shadow-update-dialog)'
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="update-dialog-title"
+				aria-describedby="update-dialog-description"
+				className="update-modal-panel relative flex max-h-[calc(100vh-3rem)] min-h-124 w-full max-w-xl flex-col overflow-hidden rounded-lg border border-violet-300/35 bg-(--color-update-surface) text-slate-100 shadow-(--shadow-update-dialog)"
 			>
 				<DialogHeader
 					version={version}
@@ -107,7 +103,7 @@ export function UpdateDialog({
 					onDismiss={onDismiss}
 				/>
 
-				<div className='min-h-0 overflow-y-auto px-6 py-5'>
+				<div className="min-h-0 overflow-y-auto px-6 py-5">
 					<HighlightsList
 						highlights={highlights}
 						releaseUrl={releaseUrl}
@@ -125,12 +121,12 @@ export function UpdateDialog({
 
 					{phase === 'failed' && error && (
 						<div
-							role='alert'
-							className='mt-5 flex gap-3 rounded-xl border border-rose-300/30 bg-rose-500/10 px-4 py-3 text-sm leading-6 text-rose-100'
+							role="alert"
+							className="mt-5 flex gap-3 rounded-xl border border-rose-300/30 bg-rose-500/10 px-4 py-3 text-sm leading-6 text-rose-100"
 						>
 							<AlertTriangle
-								className='mt-0.5 size-4 shrink-0'
-								aria-hidden='true'
+								className="mt-0.5 size-4 shrink-0"
+								aria-hidden="true"
 							/>
 							<span>{error}</span>
 						</div>

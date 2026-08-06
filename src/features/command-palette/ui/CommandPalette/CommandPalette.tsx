@@ -3,16 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
 import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap'
 import { rankAppsByQueryTop } from '../../../../entities/app'
+import { MAX_RESULTS } from './data'
 import { ResultItem } from './ResultItem'
 import type { CommandPaletteProps } from './types'
 
-const MAX_RESULTS = 50
-
-/**
- * Ctrl+K quick-launch overlay (command palette pattern). Keyboard-first: type to filter,
- * arrows to move, Enter to launch, Escape to close. Reuses the catalog's own
- * `filterAppsByQuery` so ranking matches the main grid.
- */
 export function CommandPalette({
 	apps,
 	onLaunch,
@@ -26,18 +20,11 @@ export function CommandPalette({
 	const [selected, setSelected] = useState(0)
 	useFocusTrap(dialogRef)
 
-	// Bounded selection rather than ranking the whole catalog and slicing: on a large catalog a
-	// broad query matches nearly everything, and only these rows are ever shown. The result is
-	// identical to the full sort's first MAX_RESULTS entries, ties included.
 	const results = useMemo(
 		() => rankAppsByQueryTop(apps, query, MAX_RESULTS),
 		[apps, query],
 	)
 
-	// The trigger has to be captured *before* the input takes focus: reading `activeElement`
-	// afterwards saved the palette's own input, which is detached by the time cleanup runs, so
-	// focus fell to <body> and a keyboard user lost their place in the grid. Restoring only a
-	// still-connected element keeps that from resurrecting a control the close itself unmounted.
 	useEffect(() => {
 		const trigger = document.activeElement
 		inputRef.current?.focus()
@@ -53,8 +40,7 @@ export function CommandPalette({
 
 	useEffect(() => {
 		const node = listRef.current?.children[selected] as
-			| HTMLElement
-			| undefined
+			HTMLElement | undefined
 		node?.scrollIntoView({ block: 'nearest' })
 	}, [selected])
 
@@ -88,54 +74,54 @@ export function CommandPalette({
 
 	return (
 		<div
-			className='motion-overlay fixed inset-0 z-500 grid place-items-start justify-center bg-slate-700/40 px-4 pt-[14vh] backdrop-blur-[2px]'
+			className="motion-overlay fixed inset-0 z-500 grid place-items-start justify-center bg-slate-700/40 px-4 pt-[14vh] backdrop-blur-[2px]"
 			onMouseDown={event => {
 				if (event.currentTarget === event.target) onClose()
 			}}
 		>
 			<div
 				ref={dialogRef}
-				role='dialog'
-				aria-modal='true'
-				aria-label='Quick launch'
+				role="dialog"
+				aria-modal="true"
+				aria-label="Quick launch"
 				onKeyDown={onKeyDown}
-				className='motion-panel flex h-[min(22rem,calc(100vh-7rem))] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/90 bg-slate-50 shadow-(--shadow-palette)'
+				className="motion-panel flex h-[min(22rem,calc(100vh-7rem))] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/90 bg-slate-50 shadow-(--shadow-palette)"
 			>
-				<div className='flex items-center gap-3 border-b border-slate-200 px-4'>
+				<div className="flex items-center gap-3 border-b border-slate-200 px-4">
 					<Search
 						size={18}
-						className='text-slate-500'
-						aria-hidden='true'
+						className="text-slate-500"
+						aria-hidden="true"
 					/>
 					<input
 						ref={inputRef}
 						value={query}
 						onChange={event => setQuery(event.target.value)}
-						placeholder='Search apps to launch…'
-						role='combobox'
-						aria-expanded='true'
-						aria-controls='command-palette-list'
+						placeholder="Search apps to launch…"
+						role="combobox"
+						aria-expanded="true"
+						aria-controls="command-palette-list"
 						aria-activedescendant={
 							results[selected]
 								? `cp-option-${results[selected].id}`
 								: undefined
 						}
-						aria-label='Quick launch search'
-						className='h-13 w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-500'
+						aria-label="Quick launch search"
+						className="h-13 w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-500"
 					/>
-					<kbd className='hidden rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[0.65rem] font-medium text-slate-500 sm:block'>
+					<kbd className="hidden rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[0.65rem] font-medium text-slate-500 sm:block">
 						Esc
 					</kbd>
 				</div>
 				<ul
 					ref={listRef}
-					id='command-palette-list'
-					role='listbox'
-					aria-label='Applications'
-					className='min-h-0 flex-1 overflow-y-auto overscroll-contain p-2'
+					id="command-palette-list"
+					role="listbox"
+					aria-label="Applications"
+					className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2"
 				>
 					{results.length === 0 ? (
-						<li className='px-3 py-6 text-center text-sm text-slate-500'>
+						<li className="px-3 py-6 text-center text-sm text-slate-500">
 							No apps match “{query}”
 						</li>
 					) : (

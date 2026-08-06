@@ -12,7 +12,7 @@ export function ScanButton({
 
 	return (
 		<button
-			type='button'
+			type="button"
 			onClick={() => void (isRefreshing ? onCancelScan() : onRefresh())}
 			aria-label={isRefreshing ? 'Cancel scan' : 'Scan for apps'}
 			onPointerMove={scanSpotlight.onPointerMove}

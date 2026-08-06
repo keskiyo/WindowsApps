@@ -1,15 +1,8 @@
-import type {
-	DragEndEvent,
-	DragStartEvent,
-} from '@dnd-kit/core'
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
+import { useEffect, useRef, useState } from 'react'
 import { getDropAction } from '../../../entities/app'
 import type { AppCategory } from '../../../entities/category'
-
-interface Props {
-	navigationRef: RefObject<HTMLElement>
-	onReorderCategory(active: AppCategory, over: AppCategory): void
-}
+import type { NavigationCategoryDragOptions } from '../types'
 
 function categoryFromDrag(event: DragStartEvent) {
 	const data = event.active.data.current
@@ -18,10 +11,7 @@ function categoryFromDrag(event: DragStartEvent) {
 		: null
 }
 
-function isPointerInside(
-	event: PointerEvent,
-	navigation: HTMLElement,
-) {
+function isPointerInside(event: PointerEvent, navigation: HTMLElement) {
 	const bounds = navigation.getBoundingClientRect()
 	return (
 		event.clientX >= bounds.left &&
@@ -34,15 +24,13 @@ function isPointerInside(
 export function useNavigationCategoryDrag({
 	navigationRef,
 	onReorderCategory,
-}: Props) {
+}: NavigationCategoryDragOptions) {
 	const [activeCategory, setActiveCategory] = useState<AppCategory | null>(
 		null,
 	)
 	const activeCategoryRef = useRef<AppCategory | null>(null)
 	const cancelled = useRef(false)
-	const pointerListener = useRef<((event: PointerEvent) => void) | null>(
-		null,
-	)
+	const pointerListener = useRef<((event: PointerEvent) => void) | null>(null)
 	function stopPointerListener() {
 		if (pointerListener.current) {
 			window.removeEventListener(

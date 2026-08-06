@@ -2,9 +2,7 @@ import { useEffect } from 'react'
 
 interface GlobalShortcuts {
 	onToggleQuickLaunch: () => void
-	/** Ctrl+F: the user is retyping a query, so the existing text is replaced. */
 	onSearchFromShortcut: () => void
-	/** "/": a bare jump to the field that leaves any existing query alone. */
 	onFocusSearch: () => void
 }
 
@@ -16,15 +14,6 @@ function isTypingTarget(target: EventTarget | null): boolean {
 	)
 }
 
-/**
- * Global keyboard shortcuts: Ctrl+K opens the quick-launch palette; Ctrl+F or "/"
- * jump to the search field (a launcher should be keyboard-first).
- *
- * Each combination is matched on the physical `event.code` as well as `event.key`, because on a
- * non-Latin keyboard layout `key` carries the translated character and the shortcut would
- * otherwise stop working for exactly the users who most need the palette. Ctrl+P is swallowed
- * so the webview never opens a print dialog over the app.
- */
 export function useGlobalShortcuts({
 	onToggleQuickLaunch,
 	onSearchFromShortcut,

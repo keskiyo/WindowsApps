@@ -14,16 +14,8 @@ import {
 
 export const PREFERENCES_KEY = 'windows-apps.preferences.v1'
 
-/** The schema version this build understands. `version` in the stored document is independent
- * of the key name; see `AGENTS_frontend.md` §3. */
 export const CURRENT_PREFERENCES_VERSION = 12
 
-/**
- * Previous known-good copy. The backend cache has kept a `.bak` and recovered from it since the
- * beginning; this store had nothing, so a value that failed to parse — a partial write, a
- * hand-edit, anything — silently became "no favorites, nothing hidden, default categories" with
- * no way back.
- */
 export const PREFERENCES_BACKUP_KEY = 'windows-apps.preferences.v1.bak'
 
 export interface LegacyCanonicalPreferences {
@@ -38,36 +30,18 @@ export interface AppPreferencesV12 {
 	version: 12
 	categories: CategoryDefinition[]
 	categoryOrder: AppCategory[]
-	// `*AppIds` are catalog ids: durable within a version, but an id is a function of the
-	// deduplication grouping, so it can change between releases. `*AppIdentities` carry the
-	// stable `canonicalIdentity`, which is what actually survives a dedup rule change — the
-	// ids are re-derived from them on load (see the store). The id arrays/maps are kept for the
-	// one-time migration of preferences written before the identities existed, exactly as
-	// `promotedAppIds` is kept beside `promotedAppIdentities`.
 	favoriteAppIds: string[]
 	favoriteAppIdentities: string[]
 	collapsedCategories: AppCategory[]
-	// A manual category override keyed by catalog id (runtime projection) and by the durable
-	// `canonicalIdentity` (`categoryOverrideIdentities`). The identity map is what survives a
-	// Force full scan / Reset cache / dedup rule change; the id map is re-derived from it on load.
 	categoryOverrides: Record<string, AppCategory>
 	categoryOverrideIdentities: Record<string, AppCategory>
 	hiddenAppIds: string[]
 	hiddenAppIdentities: string[]
 	promotedAppIds: string[]
 	promotedAppIdentities: string[]
-	// Applications the user filed into Installers & Docs by hand. The scanner's own verdict lives
-	// on `AppInfo.artifactKind` and is not stored here: only the manual marks are user data.
-	// There is no documentation counterpart on purpose — the scanner detects docs reliably, and a
-	// manual mark always means "this is an installer".
 	installerAppIds: string[]
 	installerAppIdentities: string[]
-	// Named launch/close lists. Their entries are card identities for the same reason the sets
-	// above are: a scenario keyed by catalog id would quietly empty itself after a Force full scan.
 	scenarios: Scenario[]
-	// When each card was first seen in the catalog, keyed by the durable card identity. The
-	// catalog itself carries no timestamp, so this is the only source for "recently added"; it is
-	// pruned to the current catalog on every load, which bounds it to the catalog's size.
 	firstSeenAt: Record<string, number>
 	legacyCanonicalPreferences: LegacyCanonicalPreferences
 	unknownFields?: Record<string, unknown>
@@ -112,7 +86,6 @@ function uniqueStrings(value: unknown): string[] {
 		: []
 }
 
-/** A `{ key -> category }` map, keeping only entries with a non-empty key and a known category. */
 function normalizeOverrideMap(
 	value: unknown,
 	known: Set<string>,
@@ -189,11 +162,6 @@ const KNOWN_PREFERENCE_FIELDS = new Set([
 	'legacyCanonicalPreferences',
 ])
 
-/**
- * Scenarios as the store may use them: named, bounded, and free of entries it cannot act on.
- * A malformed record is dropped rather than repaired — a scenario with half its list missing
- * would run something the user never chose.
- */
 function normalizeScenarios(value: unknown): Scenario[] {
 	if (!Array.isArray(value)) return []
 	const seenIds = new Set<string>()
@@ -205,8 +173,6 @@ function normalizeScenarios(value: unknown): Scenario[] {
 		const name = typeof raw.name === 'string' ? raw.name.trim() : ''
 		if (!id || !name || seenIds.has(id)) continue
 		seenIds.add(id)
-		// v11 scenarios carry no creation date. Stamping them with the migration's own clock
-		// would say "created today" about a scenario made weeks ago, so they stay undated.
 		const createdAt = raw.createdAt
 		scenarios.push({
 			id,
@@ -230,13 +196,15 @@ function normalizeScenarios(value: unknown): Scenario[] {
 	return scenarios
 }
 
-/** A `{ identity -> epoch millis }` map, keeping only usable keys and finite positive times. */
 function normalizeTimestampMap(value: unknown): Record<string, number> {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
 	return Object.fromEntries(
 		Object.entries(value as Record<string, unknown>).filter(
 			([key, at]) =>
-				key.trim() && typeof at === 'number' && Number.isFinite(at) && at > 0,
+				key.trim() &&
+				typeof at === 'number' &&
+				Number.isFinite(at) &&
+				at > 0,
 		),
 	) as Record<string, number>
 }
@@ -262,12 +230,7 @@ export function normalizePreferences(value: unknown): AppPreferencesV12 {
 		known,
 	)
 	const version = typeof raw.version === 'number' ? raw.version : 0
-	// Durable identities landed in v7 and every later version keeps them; a `>=` test upgrades a
-	// document written by a newer build without wiping the identities it does carry.
 	const hasDurableIdentities = version >= 7
-	// v9 added the manual installer marks, v10 the first-seen stamps, v11 the scenarios. Nothing
-	// older can carry them, so an earlier document upgrades to an empty value rather than to a
-	// guess — and the stamps refill themselves from the next catalog load.
 	const hasInstallerMarks = version >= 9
 	const hasFirstSeen = version >= 10
 	const hasScenarios = version >= 11
@@ -349,7 +312,6 @@ export function readPreferences(storage: Storage): AppPreferencesV12 {
 	)
 }
 
-/** `null` means "nothing usable here", so the caller can fall through to the next source. */
 function readSlot(storage: Storage, key: string): AppPreferencesV12 | null {
 	try {
 		const value = storage.getItem(key)
@@ -359,22 +321,10 @@ function readSlot(storage: Storage, key: string): AppPreferencesV12 | null {
 	}
 }
 
-/**
- * Persist preferences, reporting whether the write landed. Storage can refuse silently —
- * quota exhausted, private mode, storage disabled — and the store keeps showing the change
- * either way, so the caller has to know: favorites, hidden apps and custom categories would
- * otherwise disappear at the next start with nothing ever told to the user.
- * Still never throws; a failed write is a reported condition, not an exception.
- */
 export function writePreferences(
 	storage: Storage,
 	preferences: AppPreferencesV12,
 ): boolean {
-	// If the stored document was written by a newer version than this build understands, leave
-	// it untouched: overwriting it with the older shape would strip fields the newer build
-	// added, silently losing settings the moment the user downgrades. The runtime still reflects
-	// the change this session; it simply is not persisted over the newer format. Reported as a
-	// success because it is a deliberate protection, not a storage failure.
 	if (storedVersionIsNewer(storage)) {
 		return true
 	}
@@ -404,17 +354,11 @@ function storedVersionIsNewer(storage: Storage): boolean {
 	}
 }
 
-/**
- * Move the current value aside so the backup always holds the last state that was successfully
- * stored — never the one being written now. Best-effort on purpose: the return value of
- * `writePreferences` answers "were the user's preferences persisted", and a failed backup does
- * not change that answer.
- */
 function rotateBackup(storage: Storage): void {
 	try {
 		const current = storage.getItem(PREFERENCES_KEY)
 		if (current) storage.setItem(PREFERENCES_BACKUP_KEY, current)
-	} catch {
-		/* keeping a spare copy is an improvement, never a precondition */
+	} catch (ignored) {
+		void ignored
 	}
 }

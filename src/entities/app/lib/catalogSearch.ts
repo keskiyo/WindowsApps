@@ -1,5 +1,8 @@
 import type { AppInfo } from '../model/app.types'
-import { isWithinOneEdit, queryTokenVariants } from '../../../shared/lib/searchQueryVariants'
+import {
+	isWithinOneEdit,
+	queryTokenVariants,
+} from '../../../shared/lib/searchQueryVariants'
 
 const MIN_FUZZY_LENGTH = 4
 
@@ -67,13 +70,10 @@ function directScore(fields: SearchFields, token: string): number {
 	if (fields.name.startsWith(token)) return 90
 	if (fields.aliases === token) return 80
 	if (
-		fields.name
-			.split(/[\s\-_.()[\]]+/)
-			.some(word => word.startsWith(token))
+		fields.name.split(/[\s\-_.()[\]]+/).some(word => word.startsWith(token))
 	)
 		return 70
-	if (fields.name.includes(token) || fields.product.includes(token))
-		return 50
+	if (fields.name.includes(token) || fields.product.includes(token)) return 50
 	if (fields.publisher.includes(token)) return 30
 	if (token.length >= 3 && fields.secondary.includes(token)) return 10
 	return 0
@@ -133,10 +133,6 @@ interface ScoredApp {
 	score: number
 }
 
-/**
- * Ranking order: score, then the shorter name, then alphabetical. Shared by the full sort and the
- * bounded selection so the two can never drift apart.
- */
 function compareRanked(left: ScoredApp, right: ScoredApp): number {
 	return (
 		right.score - left.score ||
@@ -155,17 +151,6 @@ export function rankAppsByQuery(apps: AppInfo[], query: string): AppInfo[] {
 		.map(entry => entry.app)
 }
 
-/**
- * The first `limit` results of {@link rankAppsByQuery}, without ranking the rest.
- *
- * The quick-launch palette shows at most 50 rows, but a broad query on a large catalog matches
- * nearly everything, so scoring was followed by an `O(N log N)` sort of every match on each
- * keystroke. This keeps a sorted window of at most `limit` entries instead: an entry that cannot
- * beat the current worst is discarded without being placed.
- *
- * Insertion is after equal entries, which reproduces the stability of `Array.prototype.sort`, so
- * ties resolve to input order exactly as the full sort does.
- */
 export function rankAppsByQueryTop(
 	apps: AppInfo[],
 	query: string,

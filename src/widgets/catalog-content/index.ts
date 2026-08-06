@@ -1,4 +1,3 @@
-// Public API of the catalog-content widget.
 export { AppGrid } from './ui/AppGrid/AppGrid'
 export type { AppGridProps } from './ui/AppGrid/types'
 export { CatalogViewHeader } from './ui/CatalogViewHeader'

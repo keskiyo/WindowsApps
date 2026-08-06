@@ -2,21 +2,12 @@ import type { AppCategory } from '../../category'
 
 export type AppLaunchKind = 'executable' | 'shortcut' | 'app_user_model_id'
 export type AppSourceKind =
-	| 'registry'
-	| 'start_menu'
-	| 'start_apps'
-	| 'msix'
-	| 'steam'
-	| 'portable'
+	'registry' | 'start_menu' | 'start_apps' | 'msix' | 'steam' | 'portable'
 export type UninstallMechanism = 'registered_command' | 'msi' | 'msix'
 export type AppVisibilityClass = 'primary' | 'auxiliary' | 'rejected'
 export type AppArtifactKind = 'application' | 'installer' | 'documentation'
 export type AppArchitecture =
-	| 'x86'
-	| 'x64'
-	| 'arm64'
-	| 'notApplicable'
-	| 'unknown'
+	'x86' | 'x64' | 'arm64' | 'notApplicable' | 'unknown'
 export type AppSignatureStatus = 'verified' | 'unsigned' | 'unavailable'
 export type AppVisibilityReason =
 	| 'start_menu_registration'
@@ -60,7 +51,6 @@ export interface AppInfo {
 	canonicalIdentity?: string | null
 	preferenceIdentity?: string | null
 	userPromoted?: boolean
-	/** Derived, never from the backend: the user filed this application into Installers & Docs. */
 	userInstaller?: boolean
 	visibilityClass?: AppVisibilityClass
 	visibilityScore?: number
@@ -147,20 +137,11 @@ export interface ScanProgress {
 	totalRoots: number
 }
 
-// Best-effort launch outcome from the backend: 'ready' when the launched process reached
-// its input-idle state, 'failed' when the shell/process reported an error. Absent for
-// launches where no process handle is available (Store/UWP, shell hand-off) — the UI's
-// ceiling timer covers those.
 export interface LaunchStatus {
 	id: string
 	state: 'ready' | 'failed'
 }
 
-/**
- * What one close request achieved, counted across the batch it was given. Three outcomes stay
- * distinguishable: the app was stopped, it was not running, or nothing identifies the program it
- * runs as — a `steam://` target, a Store package whose manifest resolved no executable.
- */
 export interface CloseAppsResult {
 	closed: number
 	notRunning: number
@@ -177,11 +158,6 @@ export interface AppsClient {
 	startBackgroundSync?(): Promise<void>
 	cancelScan(): Promise<void>
 	launchApp(app: Pick<AppInfo, 'id'>): Promise<void>
-	/**
-	 * Asks every window of the given apps to close, then terminates whatever ignored the request.
-	 * One call per batch, not per app: the backend enumerates once and waits out a single grace
-	 * period, so closing ten apps costs what closing one does.
-	 */
 	closeApps(ids: string[]): Promise<CloseAppsResult>
 	getAppDetails(id: string): Promise<AppDetails>
 	openAppFolder(id: string): Promise<void>

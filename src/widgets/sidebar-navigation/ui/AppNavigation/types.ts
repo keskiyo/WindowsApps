@@ -10,7 +10,6 @@ export interface AppNavigationProps {
 	categories: CategoryDefinition[]
 	counts: Map<AppCategory, number>
 	activeView: AppView
-	/** Visible primary applications: the size of the list All Apps opens. */
 	appCount: number
 	favoriteCount: number
 	onSelectView(view: AppView): void
