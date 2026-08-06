@@ -18,7 +18,7 @@ export function ScanButton({
 			onPointerMove={scanSpotlight.onPointerMove}
 			onPointerEnter={scanSpotlight.onPointerEnter}
 			onPointerLeave={scanSpotlight.onPointerLeave}
-			className={`relative grid size-11 shrink-0 place-items-center rounded-xl text-white shadow-(--shadow-accent-soft) focus-visible:outline-2 ${isRefreshing ? 'bg-red-500 hover:bg-red-400 focus-visible:outline-red-300' : 'utility-accent-button focus-visible:outline-violet-500'}`}
+			className={`icon-follows-color relative grid size-11 shrink-0 place-items-center rounded-xl text-white focus-visible:outline-2 ${isRefreshing ? 'bg-red-500 hover:bg-red-400 focus-visible:outline-red-300' : 'utility-accent-button focus-visible:outline-violet-500'}`}
 		>
 			<SpotlightLayer size={70} />
 			{isRefreshing ? <X size={18} /> : <RefreshCw size={18} />}

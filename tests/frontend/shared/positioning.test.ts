@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
 	floatingMenuPosition,
+	floatingSubmenuPosition,
 	horizontalViewportShift,
 	requiredMenuScroll,
 } from '../../../src/shared/lib/positioning'
@@ -54,5 +55,31 @@ describe('floatingMenuPosition', () => {
 				720,
 			),
 		).toEqual({ left: 200, top: 408 })
+	})
+})
+
+describe('floatingSubmenuPosition', () => {
+	it('positions the panel to the right when it fits after viewport padding', () => {
+		expect(
+			floatingSubmenuPosition(
+				{ left: 120, right: 344, top: 100, bottom: 300 },
+				200,
+				240,
+				1024,
+				768,
+			),
+		).toMatchObject({ left: 348, top: 100, side: 'right' })
+	})
+
+	it('falls back left and clamps the panel inside viewport padding', () => {
+		expect(
+			floatingSubmenuPosition(
+				{ left: 740, right: 964, top: 600, bottom: 760 },
+				200,
+				240,
+				1024,
+				768,
+			),
+		).toMatchObject({ left: 536, top: 516, side: 'left' })
 	})
 })

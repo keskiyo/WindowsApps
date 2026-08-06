@@ -60,6 +60,44 @@ pub(super) fn meaningful_launch_arguments(value: Option<&str>) -> Option<String>
     (!meaningful.is_empty()).then(|| meaningful.join(" "))
 }
 
+/// The executable a Squirrel updater stub is asked to start: `Update.exe --processStart App.exe`.
+///
+/// Deliberately *not* part of `meaningful_launch_arguments`: this argument does not put the product
+/// into a different mode, it names the product. Treating it as a mode would make the stub and the
+/// application disagree on `launch_mode`, which `evidence::should_merge` vetoes outright — the
+/// opposite of what recognizing it is for.
+pub(super) fn squirrel_process_start(value: Option<&str>) -> Option<String> {
+    let tokens = tokenize_quoted_arguments(value?);
+    let mut index = 0;
+    while index < tokens.len() {
+        let token = tokens[index].trim_matches('"').to_lowercase();
+        let started = match token.split_once('=') {
+            Some((key, value)) if is_process_start(key) => Some(value.to_owned()),
+            Some(_) => None,
+            None if is_process_start(&token) => tokens
+                .get(index + 1)
+                .map(|next| next.trim_matches('"').to_lowercase()),
+            None => None,
+        };
+        // A bare file name is what Squirrel writes; anything carrying a path is not this layout,
+        // so it is rejected rather than guessed at.
+        if let Some(started) = started.filter(|value| {
+            value.ends_with(".exe") && !value.contains('\\') && !value.contains('/')
+        }) {
+            return Some(started);
+        }
+        index += 1;
+    }
+    None
+}
+
+fn is_process_start(token: &str) -> bool {
+    matches!(
+        token,
+        "--processstart" | "--processstartandwait" | "-processstart"
+    )
+}
+
 fn normalize_argument_value(key: &str, value: &str) -> String {
     let value = value.trim_matches('"');
     if key == "--user-data-dir" {

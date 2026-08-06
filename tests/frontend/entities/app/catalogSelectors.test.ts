@@ -6,6 +6,7 @@ import {
 	selectCatalogCounts,
 	selectCategorizedApps,
 } from '../../../../src/app/store/selectors'
+import { selectRecentApps } from '../../../../src/entities/app'
 import type { AppInfo } from '../../../../src/entities/app'
 import type { AppCategory } from '../../../../src/entities/category'
 
@@ -32,6 +33,8 @@ function state(
 	categoryOverrides: Record<string, AppCategory> = {},
 	promotedAppIds: string[] = [],
 	categoryOverrideIdentities: Record<string, AppCategory> = {},
+	installerAppIds: string[] = [],
+	installerAppIdentities: string[] = [],
 ) {
 	return {
 		apps,
@@ -39,6 +42,8 @@ function state(
 		categoryOverrideIdentities,
 		promotedAppIds,
 		promotedAppIdentities: [] as string[],
+		installerAppIds,
+		installerAppIdentities,
 	}
 }
 
@@ -87,6 +92,67 @@ describe('categorized app identity', () => {
 	it('keeps identity when an override resolves to the current category', () => {
 		const result = selectCategorizedApps(state(catalog, { steam: 'games' }))
 		expect(result[0]).toBe(catalog[0])
+	})
+
+	it('turns a manual mark into an installer artifact', () => {
+		const result = selectCategorizedApps(
+			state(catalog, {}, [], {}, ['notepad']),
+		)
+
+		// The Installers & Docs view selects on `artifactKind`, so a category alone would leave the
+		// app invisible in the bucket the user just moved it to.
+		expect(result[2].artifactKind).toBe('installer')
+		expect(result[2].category).toBe('installers_docs')
+		expect(result[2].userInstaller).toBe(true)
+		expect(filterVisibleApps(result, 'installers_docs', [], [])).toEqual([
+			result[2],
+		])
+		expect(filterVisibleApps(result, 'all', [], [])).not.toContain(result[2])
+	})
+
+	it('follows a manual installer mark by canonical identity after a rescan', () => {
+		const rescanned = [
+			app({
+				id: 'notepad-v2',
+				name: 'Notepad',
+				category: 'utilities',
+				canonicalIdentity: 'ci:notepad',
+			}),
+		]
+
+		const result = selectCategorizedApps(
+			state(rescanned, {}, [], {}, [], ['ci:notepad']),
+		)
+
+		expect(result[0].artifactKind).toBe('installer')
+	})
+
+	it('previews the highest-ranked entries of an area', () => {
+		const rank = new Map([
+			['steam', 30],
+			['code', 10],
+			['notepad', 20],
+		])
+
+		expect(
+			selectRecentApps(catalog, app => rank.get(app.id) ?? 0, 2).map(
+				app => app.id,
+			),
+		).toEqual(['steam', 'notepad'])
+	})
+
+	it('falls back to alphabetical order when nothing is newer', () => {
+		// A first run stamps the whole catalog at once, so every rank ties; scan order would make
+		// the preview look arbitrary and reshuffle on the next scan.
+		expect(
+			selectRecentApps(catalog, () => 0, 3).map(app => app.name),
+		).toEqual(['Notepad', 'Steam', 'Visual Studio Code'])
+	})
+
+	it('leaves the source array alone', () => {
+		const source = [...catalog]
+		selectRecentApps(source, app => (app.id === 'notepad' ? 1 : 0), 3)
+		expect(source).toEqual(catalog)
 	})
 
 	it('leaves untouched records stable when a hydration patch arrives', () => {

@@ -7,17 +7,6 @@ import type {
 	CategoryDefinition,
 } from '../../../../src/entities/category'
 
-vi.mock('@dnd-kit/core', () => ({
-	useDraggable: () => ({
-		attributes: {},
-		listeners: {},
-		setActivatorNodeRef: vi.fn(),
-		setNodeRef: vi.fn(),
-		transform: { x: 240, y: 32, scaleX: 1, scaleY: 1 },
-		isDragging: true,
-	}),
-}))
-
 vi.mock('../../../../src/features/launch-app/model/useIsLaunching', () => ({
 	useIsLaunching: () => false,
 }))
@@ -44,7 +33,7 @@ const app: AppInfo = {
 }
 
 describe('CatalogAppCard', () => {
-	it('keeps an active source in the grid without a transform', () => {
+	it('renders non-draggable card actions', () => {
 		render(
 			<CatalogAppCard
 				app={app}
@@ -62,8 +51,38 @@ describe('CatalogAppCard', () => {
 			/>,
 		)
 
-		const source = screen.getByRole('button', { name: 'Launch Claude' })
-			.parentElement
-		expect(source?.style.transform).toBe('')
+		expect(screen.getByRole('button', { name: 'Manage Claude' })).toContainHTML(
+			'lucide-ellipsis-vertical',
+		)
+		const favorite = screen.getByRole('button', {
+			name: 'Add Claude to favorites',
+		})
+		expect(favorite).toHaveAttribute('aria-pressed', 'false')
+		expect(favorite).not.toHaveClass('border')
+	})
+
+	it('keeps the selected favorite as a star without a colored button surface', () => {
+		render(
+			<CatalogAppCard
+				app={app}
+				isFavorite
+				categories={[development]}
+				categoryOrder={['development'] as AppCategory[]}
+				onToggleFavorite={vi.fn()}
+				onLaunch={vi.fn().mockResolvedValue(undefined)}
+				onMove={vi.fn()}
+				onInfo={vi.fn()}
+				onUninstall={vi.fn()}
+				onHide={vi.fn()}
+				onRestore={vi.fn()}
+				onDemote={vi.fn()}
+			/>,
+		)
+
+		const favorite = screen.getByRole('button', {
+			name: 'Remove Claude from favorites',
+		})
+		expect(favorite).toHaveAttribute('aria-pressed', 'true')
+		expect(favorite).not.toHaveClass('bg-yellow-300/20')
 	})
 })

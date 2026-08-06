@@ -6,6 +6,7 @@ import type {
 	CatalogChangeSummary,
 	CatalogDelta,
 	CatalogSnapshot,
+	CloseAppsResult,
 	LaunchStatus,
 	ScanProgress,
 	UninstallPreview,
@@ -49,6 +50,7 @@ export const tauriAppsClient: AppsClient = {
 	cancelScan: () =>
 		isTauriRuntime() ? invokeTauri<void>('cancel_scan') : Promise.resolve(),
 	launchApp: app => invokeIfTauri<void>('launch_app', { id: app.id }),
+	closeApps: ids => invokeIfTauri<CloseAppsResult>('close_apps', { ids }),
 	getAppDetails: id => invokeIfTauri<AppDetails>('get_app_details', { id }),
 	openAppFolder: id => invokeIfTauri<void>('open_app_folder', { id }),
 	getUninstallPreview: id =>

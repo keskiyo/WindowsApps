@@ -8,6 +8,7 @@
 use crate::error::AppError;
 
 pub(crate) mod catalog;
+pub(crate) mod close;
 pub(crate) mod details;
 pub(crate) mod launch;
 pub(crate) mod links;

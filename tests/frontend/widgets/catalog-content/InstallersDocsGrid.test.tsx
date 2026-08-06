@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { InstallersDocsGrid } from '../../../../src/widgets/catalog-content/ui/InstallersDocsGrid/InstallersDocsGrid'
 import type { AppInfo } from '../../../../src/entities/app'
@@ -35,6 +36,7 @@ const callbacks = {
 		},
 	],
 	favoriteAppIds: [],
+	onBack: vi.fn(),
 	onToggleFavorite: vi.fn(),
 	onLaunch: vi.fn().mockResolvedValue(undefined),
 	onMoveApp: vi.fn(),
@@ -72,11 +74,40 @@ describe('InstallersDocsGrid', () => {
 				hasQuery={false}
 			/>,
 		)
-		expect(screen.queryByRole('heading', { name: /Docs/ })).not.toBeInTheDocument()
+		// Anchored: the page title is "Installers & Docs" and must not be mistaken for the group.
+		expect(
+			screen.queryByRole('heading', { name: /^Docs/ }),
+		).not.toBeInTheDocument()
 
 		rerender(
 			<InstallersDocsGrid {...callbacks} apps={[]} hasQuery={true} />,
 		)
 		expect(screen.getByText('No matching installers or docs')).toBeVisible()
+	})
+
+	it('keeps the title and the way back while the view is empty', async () => {
+		const onBack = vi.fn()
+		render(
+			<InstallersDocsGrid
+				{...callbacks}
+				onBack={onBack}
+				apps={[]}
+				hasQuery={false}
+			/>,
+		)
+
+		// Entering a view you cannot leave is worse than an empty one, so the header outlives
+		// the list it titles.
+		expect(
+			screen.getByRole('heading', {
+				level: 1,
+				name: 'Installers & Docs',
+			}),
+		).toBeVisible()
+		expect(
+			screen.getByRole('region', { name: 'Installers & Docs' }),
+		).toHaveTextContent('0 items')
+		await userEvent.click(screen.getByRole('button', { name: 'Back to More' }))
+		expect(onBack).toHaveBeenCalled()
 	})
 })

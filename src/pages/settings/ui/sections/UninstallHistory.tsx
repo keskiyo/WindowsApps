@@ -146,7 +146,7 @@ export function UninstallHistory({ client }: Props) {
 							type='button'
 							disabled={clearing}
 							onClick={() => void clearHistory()}
-							className='inline-flex items-center gap-2 rounded-lg bg-red-500 px-3 py-2 text-sm font-medium text-white hover:bg-red-400 disabled:opacity-50'
+							className='icon-follows-color inline-flex items-center gap-2 rounded-lg bg-red-500 px-3 py-2 text-sm font-medium text-white hover:bg-red-400 disabled:opacity-50'
 						>
 							<Trash2 size={14} aria-hidden='true' />
 							{clearing ? 'Clearing…' : 'Confirm clear'}

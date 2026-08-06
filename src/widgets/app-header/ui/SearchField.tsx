@@ -36,8 +36,20 @@ export function SearchField({
 					onChange={event => onQueryChange(event.target.value)}
 					placeholder='Search apps…'
 					aria-describedby='search-hint'
-					className='search-input h-11 w-full rounded-xl border border-white/90 bg-slate-100/75 pl-11 pr-11 text-sm text-slate-800 outline-none placeholder:text-slate-500'
+					className={`search-input h-11 w-full rounded-xl border border-white/90 bg-slate-100/75 pl-11 text-sm text-slate-800 outline-none placeholder:text-slate-500 ${query.length > 0 ? 'pr-11' : 'pr-11 sm:pr-[4.75rem]'}`}
 				/>
+				{/* Advertises the quick-launch palette, not this field. Hidden from assistive
+				    technology (the shortcut is global, not a control here) and click-through, so
+				    the label still focuses the input. It yields the slot to Clear once typing
+				    starts, and stays off narrow windows where the field needs the width. */}
+				{query.length === 0 && (
+					<kbd
+						aria-hidden='true'
+						className='pointer-events-none absolute right-3 hidden rounded-md border border-(--border-neutral) bg-(--surface-raised) px-1.5 py-0.5 font-sans text-[0.7rem] font-medium text-(--text-muted) sm:block'
+					>
+						Ctrl+K
+					</kbd>
+				)}
 				{query.length > 0 && (
 					<button
 						type='button'

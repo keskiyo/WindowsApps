@@ -55,7 +55,11 @@ pub(super) fn merge_app(left: AppInfo, right: AppInfo) -> AppInfo {
     } else {
         (left, right)
     };
-    let secondary_is_side_action = is_side_action(&secondary.visibility_reasons);
+    // A Squirrel stub counts here for the same reason a maintenance shortcut does: its
+    // `--processStart App.exe` describes how *the updater* reaches the product, and copying it onto
+    // a card that already launches the product directly would pass the flag to the product itself.
+    let secondary_is_side_action = is_side_action(&secondary.visibility_reasons)
+        || super::target::is_squirrel_stub(&secondary);
     // Read before any field moves out of `secondary`, and before `primary` inherits its target.
     let same_target = describes_same_target(&primary, &secondary);
     if primary.description.is_none() {

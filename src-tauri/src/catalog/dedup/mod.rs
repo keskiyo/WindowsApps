@@ -630,6 +630,66 @@ mod tests {
         assert_eq!(resolve(vec![shortcut, aumid]).len(), 1);
     }
 
+    fn squirrel_pair(root: &str, executable: &str, version: &str) -> (AppInfo, AppInfo) {
+        let mut application = app(executable, &format!(r"C:\Menu\{executable}.lnk"));
+        application.launch_kind = LaunchKind::Shortcut;
+        application.source_kind = SourceKind::StartMenu;
+        application.resolved_path = Some(format!(r"{root}\app-{version}\{executable}.exe"));
+        application.version = Some(version.into());
+        application.publisher = Some(format!("{executable} Inc."));
+
+        // The updater stub Squirrel registers beside it: same product name, different target,
+        // different version, and signed by GitHub rather than the vendor.
+        let mut stub = app(
+            executable,
+            &format!(r"C:\Menu\{executable} Inc\{executable}.lnk"),
+        );
+        stub.launch_kind = LaunchKind::Shortcut;
+        stub.source_kind = SourceKind::StartMenu;
+        stub.resolved_path = Some(format!(r"{root}\Update.exe"));
+        stub.launch_arguments = Some(format!("--processStart {executable}.exe"));
+        stub.version = Some("1.1.1.0".into());
+        stub.publisher = Some("GitHub".into());
+        (application, stub)
+    }
+
+    // Real corpus: Discord occupied two cards, one launching `app-1.0.9250\Discord.exe` and one
+    // launching `Update.exe --processStart Discord.exe`. Nothing tied them together — different
+    // targets, versions 1.0.9250 vs 1.1.1.0, publishers "Discord Inc." vs "GitHub" — so the
+    // name-level evidence was vetoed twice over and the duplicate reached the quick-launch palette.
+    #[test]
+    fn a_squirrel_updater_stub_merges_into_its_application_card() {
+        let (application, stub) = squirrel_pair(
+            r"C:\Users\Maks\AppData\Local\Discord",
+            "Discord",
+            "1.0.9250",
+        );
+
+        let resolved = resolve(vec![application, stub]);
+
+        assert_eq!(resolved.len(), 1);
+        // The card must keep the application's own target, not the stub's updater.
+        assert_eq!(
+            resolved[0].resolved_path.as_deref(),
+            Some(r"C:\Users\Maks\AppData\Local\Discord\app-1.0.9250\Discord.exe"),
+        );
+        assert!(resolved[0].launch_arguments.is_none());
+    }
+
+    // The key is the package root plus the executable that ends up running, so a stub pointing at a
+    // different program in the same folder is not evidence of anything.
+    #[test]
+    fn a_squirrel_stub_for_another_program_does_not_merge() {
+        let root = r"C:\Users\Maks\AppData\Local\Vendor";
+        let (application, mut stub) = squirrel_pair(root, "Alpha", "2.0.0");
+        // Same product name and the same package root, but the stub starts a different executable:
+        // the identity match must not fire, leaving only the name-level evidence the version veto
+        // rejects.
+        stub.launch_arguments = Some("--processStart Beta.exe".into());
+
+        assert_eq!(resolve(vec![application, stub]).len(), 2);
+    }
+
     // Two portable copies of the same product in different folders: merge when the version is
     // identical, keep separate when it differs (a different version is a different program).
     #[test]

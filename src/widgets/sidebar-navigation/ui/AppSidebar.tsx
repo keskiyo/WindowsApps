@@ -1,16 +1,18 @@
 import type { ComponentProps } from 'react'
 import { AppNavigation } from './AppNavigation/AppNavigation'
+import { NavigationIdentity } from './NavigationIdentity'
 
-export function AppSidebar(props: ComponentProps<typeof AppNavigation>) {
+type Props = ComponentProps<typeof AppNavigation> & {
+	onGoHome(): void
+}
+
+export function AppSidebar({ onGoHome, ...navigation }: Props) {
 	return (
 		<aside className='app-panel z-350 flex w-70 shrink-0 flex-col overflow-hidden rounded-2xl'>
-			<div className='border-b border-slate-300/65 px-5 py-5'>
-				<p className='text-sm font-semibold text-slate-800'>Library</p>
-				<p className='mt-1 text-xs text-slate-500'>
-					Navigate your applications
-				</p>
+			<div className='border-b border-slate-300/65 px-4 py-4'>
+				<NavigationIdentity onGoHome={onGoHome} />
 			</div>
-			<AppNavigation {...props} />
+			<AppNavigation {...navigation} />
 		</aside>
 	)
 }

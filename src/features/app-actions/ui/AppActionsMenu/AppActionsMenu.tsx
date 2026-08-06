@@ -1,5 +1,5 @@
 import {
-	ChevronRight,
+	ArrowRight,
 	EyeOff,
 	Info,
 	RotateCcw,
@@ -30,14 +30,23 @@ export function AppActionsMenu({
 	anchorRef,
 }: AppActionsMenuProps) {
 	const [showCategories, setShowCategories] = useState(false)
-	const artifact = isCatalogArtifact(app)
-	const { menuRef, position, onMenuKeyDown } = useActionsMenu({
+	// A scan-detected installer or doc is locked to its bucket; one the user filed there by hand
+	// keeps "Move to category", which is the only way back out of Installers & Docs.
+	const artifact = isCatalogArtifact(app) && !app.userInstaller
+	const {
+		menuRef,
+		categoryMenuRef,
+		position,
+		categoryPosition,
+		onMenuKeyDown,
+	} = useActionsMenu({
 		anchorRef,
 		onClose,
 		showCategories,
 	})
 	return createPortal(
-		<div
+		<>
+			<div
 			ref={menuRef}
 			onKeyDown={onMenuKeyDown}
 			style={
@@ -51,30 +60,23 @@ export function AppActionsMenu({
 			}
 			role='menu'
 			aria-label={`${app.name} actions`}
-			className='motion-panel fixed z-[600] flex max-h-[calc(100vh-1.5rem)] w-56 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 overflow-y-auto rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-[var(--shadow-menu)]'
-		>
+			className='motion-panel fixed z-[600] flex max-h-[calc(100vh-1.5rem)] w-56 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 overflow-y-auto rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-(--shadow-menu)'
+			>
 			{!isHidden && !artifact && (
-				<MenuItem
-					icon={ChevronRight}
-					iconClassName={`text-slate-400 transition-transform ${showCategories ? 'rotate-90' : ''}`}
-					label='Move to category'
-					onClick={() => setShowCategories(value => !value)}
-				/>
-			)}
-			{!isHidden && !artifact && showCategories && (
-				<CategorySubmenu
-					categories={categories}
-					categoryOrder={categoryOrder}
-					activeCategory={app.category}
-					onSelect={category => {
-						onMove(app.id, category)
-						onClose()
-					}}
-				/>
+				<>
+					<MenuItem
+						trailingIcon={ArrowRight}
+						label='Move to category'
+						onClick={() => setShowCategories(value => !value)}
+					/>
+					<div
+						role='separator'
+						className='mx-1 my-1 border-t border-slate-200/55'
+					/>
+				</>
 			)}
 			<MenuItem
 				icon={Info}
-				iconClassName='text-slate-400'
 				label='App info'
 				onClick={() => {
 					onClose()
@@ -83,7 +85,6 @@ export function AppActionsMenu({
 			/>
 			<MenuItem
 				icon={isHidden ? RotateCcw : isUserPromoted ? Wrench : EyeOff}
-				iconClassName='text-slate-400'
 				label={
 					isHidden
 						? 'Restore to catalog'
@@ -121,7 +122,23 @@ export function AppActionsMenu({
 					label='Uninstall unavailable'
 				/>
 			)}
-		</div>,
+			</div>
+			{!isHidden && !artifact && showCategories && (
+				<CategorySubmenu
+					categories={categories}
+					categoryOrder={categoryOrder}
+					activeCategory={app.category}
+					menuRef={categoryMenuRef}
+					position={categoryPosition}
+					onKeyDown={onMenuKeyDown}
+					label={`Move ${app.name} to category`}
+					onSelect={category => {
+						onMove(app.id, category)
+						onClose()
+					}}
+				/>
+			)}
+		</>,
 		document.querySelector<HTMLElement>('.app-shell') ?? document.body,
 	)
 }

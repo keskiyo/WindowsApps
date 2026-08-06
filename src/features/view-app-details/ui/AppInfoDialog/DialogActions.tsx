@@ -18,7 +18,7 @@ export function DialogActions({
 	onOpenFolder,
 }: DialogActionsProps) {
 	const actionClass =
-		'flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-[var(--border-neutral)] bg-[var(--surface-raised)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[color-mix(in_oklab,var(--accent)_16%,var(--surface-raised))] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-55 sm:flex-row'
+		'flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-(--border-neutral) bg-(--surface-raised) px-3 py-2 text-sm font-medium text-(--text-primary) transition-colors hover:bg-[color-mix(in_oklab,var(--accent)_16%,var(--surface-raised))] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong) disabled:cursor-not-allowed disabled:opacity-55 sm:flex-row'
 	return (
 		<div>
 			<div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
@@ -30,9 +30,9 @@ export function DialogActions({
 					className={actionClass}
 				>
 					{isOpeningFolder ? (
-						<Loader2 size={18} className='animate-spin text-[var(--accent-strong)]' aria-hidden='true' />
+						<Loader2 size={18} className='animate-spin' aria-hidden='true' />
 					) : (
-						<FolderOpen size={18} className='text-[var(--accent-strong)]' aria-hidden='true' />
+						<FolderOpen size={18} aria-hidden='true' />
 					)}
 					Open folder
 				</button>
@@ -42,7 +42,7 @@ export function DialogActions({
 					onClick={() => void onCopyPath()}
 					className={actionClass}
 				>
-					<Copy size={18} className='text-[var(--accent-strong)]' aria-hidden='true' />
+					<Copy size={18} aria-hidden='true' />
 					Copy path
 				</button>
 				<button
@@ -51,12 +51,12 @@ export function DialogActions({
 					onClick={() => void onCopyReport()}
 					className={actionClass}
 				>
-					<FileText size={18} className='text-[var(--accent-strong)]' aria-hidden='true' />
+					<FileText size={18} aria-hidden='true' />
 					Copy report
 				</button>
 			</div>
 			{message && (
-				<p role='status' className='mt-2 text-sm text-[var(--text-muted)]'>
+				<p role='status' className='mt-2 text-sm text-(--text-muted)'>
 					{message}
 				</p>
 			)}

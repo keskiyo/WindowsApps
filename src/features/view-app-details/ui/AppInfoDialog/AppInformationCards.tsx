@@ -43,8 +43,8 @@ function DetailRows({ rows }: { rows: [string, string][] }) {
 		<dl className='grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm leading-5'>
 			{rows.map(([label, value]) => (
 				<div key={label} className='contents'>
-					<dt className='text-[var(--text-subtle)]'>{label}</dt>
-					<dd className='min-w-0 break-words text-[var(--text-primary)]'>
+					<dt className='text-(--text-subtle)'>{label}</dt>
+					<dd className='min-w-0 break-words text-(--text-primary)'>
 						{value}
 					</dd>
 				</div>

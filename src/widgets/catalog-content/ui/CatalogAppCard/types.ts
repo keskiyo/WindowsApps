@@ -19,5 +19,4 @@ export interface CatalogAppCardProps {
 	onHide(id: string): void
 	onRestore(id: string): void
 	onDemote(id: string): void
-	isDragPreviewActive?: boolean
 }

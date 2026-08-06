@@ -1,4 +1,5 @@
 import { deduplicateVisibleApps } from '../lib/appDeduplication'
+import { appIdentity } from '../lib/appIdentity'
 import {
 	INSTALLERS_DOCS_CATEGORY,
 	isCatalogArtifact,
@@ -12,7 +13,14 @@ export function filterVisibleApps(
 	hiddenAppIds: string[],
 	favoriteAppIds: string[],
 ): AppInfo[] {
-	if (activeView === 'settings') return []
+	// None of these render the grid, so nothing downstream (icon hydration included) should pay
+	// for a catalog-wide filter while the user sits on Settings, More or Scenarios.
+	if (
+		activeView === 'settings' ||
+		activeView === 'more' ||
+		activeView === 'scenarios'
+	)
+		return []
 	// Set lookups, not Array.includes: this runs over the whole catalog on every
 	// hydration patch, so a linear scan per app makes it O(apps × hidden).
 	const hidden = new Set(hiddenAppIds)
@@ -38,6 +46,31 @@ export function filterVisibleApps(
 	if (activeView !== 'favorites') return visible
 	const favorites = new Set(favoriteAppIds)
 	return visible.filter(app => favorites.has(app.id))
+}
+
+/**
+ * The newest entries of one catalog area, for a preview that points at the full view.
+ *
+ * "Newest" is per-area, not global: what counts as recent for Hidden is when the user hid the
+ * app, while for the scanner-owned areas it is when the catalog first reported the app at all.
+ * The caller supplies that rank, so no area has to pretend it has a timestamp it does not.
+ * Ties keep alphabetical order, so a first run — where every stamp is the same — still reads
+ * as a list rather than as scan order.
+ */
+export function selectRecentApps(
+	apps: AppInfo[],
+	rankOf: (app: AppInfo) => number,
+	limit: number,
+): AppInfo[] {
+	if (apps.length <= 1) return apps.slice(0, limit)
+	return [...apps]
+		.sort((left, right) => {
+			const difference = rankOf(right) - rankOf(left)
+			return difference === 0
+				? left.name.localeCompare(right.name)
+				: difference
+		})
+		.slice(0, limit)
 }
 
 export interface CatalogCounts {
@@ -125,6 +158,8 @@ export interface CategorizedAppsState {
 	categoryOverrideIdentities: Record<string, AppCategory>
 	promotedAppIds: string[]
 	promotedAppIdentities: string[]
+	installerAppIds: string[]
+	installerAppIdentities: string[]
 }
 
 /**
@@ -137,6 +172,8 @@ export interface CategorizedAppsState {
 export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 	const promotedIds = new Set(state.promotedAppIds)
 	const promotedIdentities = new Set(state.promotedAppIdentities)
+	const installerIds = new Set(state.installerAppIds)
+	const installerIdentities = new Set(state.installerAppIdentities)
 	return deduplicateVisibleApps(
 		state.apps.map(app => {
 			if (isCatalogArtifact(app)) {
@@ -144,12 +181,22 @@ export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 					? app
 					: { ...app, category: INSTALLERS_DOCS_CATEGORY }
 			}
+			// A manual mark makes the record an installer artifact, which is what puts it in the
+			// Installers & Docs view: that view selects on `artifactKind`, not on the category.
+			if (
+				installerIds.has(app.id) ||
+				installerIdentities.has(appIdentity(app))
+			)
+				return {
+					...app,
+					artifactKind: 'installer' as const,
+					category: INSTALLERS_DOCS_CATEGORY,
+					userInstaller: true,
+				}
 			// Identity-first: the durable override (keyed by canonicalIdentity) wins so a manual
 			// category survives a Force full scan / Reset cache / dedup change that renamed the id.
 			const category =
-				state.categoryOverrideIdentities[
-					app.preferenceIdentity ?? app.canonicalIdentity ?? app.id
-				] ??
+				state.categoryOverrideIdentities[appIdentity(app)] ??
 				state.categoryOverrides[app.id] ??
 				app.category
 			const safeCategory =
@@ -157,11 +204,7 @@ export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 			const promote =
 				app.visibilityClass === 'auxiliary' &&
 				(promotedIds.has(app.id) ||
-					promotedIdentities.has(
-						app.preferenceIdentity ??
-							app.canonicalIdentity ??
-							app.id,
-					))
+					promotedIdentities.has(appIdentity(app)))
 			if (safeCategory === app.category && !promote) return app
 			const categorized = { ...app, category: safeCategory }
 			return promote

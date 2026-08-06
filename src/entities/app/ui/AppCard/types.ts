@@ -1,11 +1,11 @@
 import type { ReactNode, RefObject } from 'react'
 import type { AppInfo } from '../../model/app.types'
 
-/** What the card hands to whoever renders the grip menu, so the entity owns no action. */
+/** What the card hands to whoever renders the menu, so the entity owns no action. */
 export interface AppCardActions {
-	/** Closes the menu and restores focus to the grip trigger. */
+	/** Closes the menu and restores focus to the menu trigger. */
 	close(): void
-	/** The grip button the menu positions itself against. */
+	/** The menu button the menu positions itself against. */
 	anchorRef: RefObject<HTMLButtonElement | null>
 }
 
@@ -17,8 +17,7 @@ export interface AppCardProps {
 	onToggleFavorite(id: string): void
 	onLaunch(app: AppInfo): Promise<void>
 	isAuxiliary?: boolean
-	isDragPreviewActive?: boolean
-	/** Rendered only while the grip menu is open. Returning `null` keeps the card actionless. */
+	/** Rendered only while the menu is open. Returning `null` keeps the card actionless. */
 	renderActions(actions: AppCardActions): ReactNode
 }
 

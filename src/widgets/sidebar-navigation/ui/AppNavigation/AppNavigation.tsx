@@ -11,8 +11,9 @@ import {
 	sortableKeyboardCoordinates,
 	verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { EyeOff, Grid2X2, Plus, Settings, Star, Wrench } from 'lucide-react'
+import { Grid2X2, Plus, Settings, Star, WandSparkles } from 'lucide-react'
 import { useRef, useState } from 'react'
+import { INSTALLERS_DOCS_CATEGORY } from '../../../../entities/app'
 import { categoryLabel } from '../../../../entities/category'
 import { CategoryNameEditor } from '../../../../features/manage-category'
 import { SortableNavigationCategory } from '../SortableNavigationCategory/SortableNavigationCategory'
@@ -31,6 +32,9 @@ export function AppNavigation(props: AppNavigationProps) {
 		}),
 	)
 	const visibleCategories = props.categoryOrder.filter(category => {
+		// Installers & Docs is reachable from the More page, not from the category list: it holds
+		// scan artifacts rather than applications the user organizes.
+		if (category === INSTALLERS_DOCS_CATEGORY) return false
 		const definition = props.categories.find(item => item.id === category)
 		return definition && (props.counts.has(category) || !definition.builtIn)
 	})
@@ -55,6 +59,7 @@ export function AppNavigation(props: AppNavigationProps) {
 					icon={Grid2X2}
 					label='All Apps'
 					active={props.activeView === 'all'}
+					count={props.appCount}
 					onClick={() => props.onSelectView('all')}
 				/>
 				<NavItem
@@ -65,6 +70,12 @@ export function AppNavigation(props: AppNavigationProps) {
 					onClick={() => props.onSelectView('favorites')}
 				/>
 				<NavItem
+					icon={WandSparkles}
+					label='More'
+					active={props.activeView === 'more'}
+					onClick={() => props.onSelectView('more')}
+				/>
+				<NavItem
 					icon={Settings}
 					label='Settings'
 					active={props.activeView === 'settings'}
@@ -73,14 +84,14 @@ export function AppNavigation(props: AppNavigationProps) {
 			</div>
 			<div className='min-h-0 flex-1 overflow-y-auto px-4 pb-4'>
 				<div className='mb-2 mt-4 flex items-center justify-between px-1'>
-					<p className='text-[.68rem] font-semibold uppercase tracking-[.16em] text-[var(--text-subtle)]'>
+					<p className='text-[.68rem] font-semibold uppercase tracking-[.16em] text-(--text-subtle)'>
 						Categories
 					</p>
 					<button
 						type='button'
 						aria-label='Add category'
 						onClick={() => setAdding(true)}
-						className='grid size-7 place-items-center rounded-lg border border-[var(--border-neutral)] bg-[var(--surface-raised)] text-[var(--text-muted)] transition-colors hover:bg-[var(--utility-accent)] hover:text-[var(--text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)]'
+						className='grid size-7 place-items-center rounded-lg border border-(--border-neutral) bg-(--surface-raised) text-(--text-muted) transition-colors hover:bg-(--utility-accent) hover:text-(--text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong)'
 					>
 						<Plus size={16} />
 					</button>
@@ -143,30 +154,6 @@ export function AppNavigation(props: AppNavigationProps) {
 						)}
 					</DragOverlay>
 				</DndContext>
-			</div>
-			<div className='border-t border-[var(--border-neutral)] p-4'>
-				<div
-					role='group'
-					aria-label='Utility views'
-					className='grid grid-cols-[3fr_2fr] gap-2'
-				>
-					<NavItem
-						icon={Wrench}
-						label='Auxiliary tools'
-						active={props.activeView === 'auxiliary'}
-						count={props.auxiliaryCount ?? 0}
-						className='min-w-0 gap-1.5! px-2! py-2! text-xs! [&>span:last-child]:px-1!'
-						onClick={() => props.onSelectView('auxiliary')}
-					/>
-					<NavItem
-						icon={EyeOff}
-						label='Hidden'
-						active={props.activeView === 'hidden'}
-						count={props.hiddenCount}
-						className='min-w-0 gap-1.5! px-2! py-2! text-xs! [&>span:last-child]:px-1!'
-						onClick={() => props.onSelectView('hidden')}
-					/>
-				</div>
 			</div>
 		</nav>
 	)

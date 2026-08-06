@@ -31,10 +31,10 @@ export function DeleteCategoryDialog({
 				role='alertdialog'
 				aria-modal='true'
 				aria-label={`Delete ${name} category`}
-				className='motion-panel w-full max-w-md rounded-2xl border border-red-300/55 bg-slate-50 p-5 text-slate-800 shadow-[var(--shadow-dialog)]'
+				className='motion-panel w-full max-w-md rounded-2xl border border-red-300/55 bg-slate-50 p-5 text-slate-800 shadow-(--shadow-dialog)'
 			>
 				<div className='flex items-start gap-3'>
-					<Trash2 className='mt-0.5 text-red-600' size={20} />
+					<Trash2 className='mt-0.5' size={20} />
 					<div className='flex-1'>
 						<h2 className='font-semibold'>Delete {name}?</h2>
 						<p className='mt-2 text-sm leading-6 text-slate-600'>

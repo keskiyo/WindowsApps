@@ -4,7 +4,7 @@ import {
 	filterVisibleApps,
 	selectCategorizedApps,
 } from '../../entities/app'
-import type { AppState } from './appStore'
+import type { AppState } from './types'
 
 // The catalog derivations themselves belong to the App entity, so every layer can reuse them
 // without reaching up into the root store. Only the two store-shaped selectors below live here.

@@ -1,5 +1,6 @@
 import { RefreshCw, RotateCcw, ScanSearch } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import type { MaintenanceConfirmation } from '../../../../features/edit-settings'
 import { ScanDiagnostics } from './ScanDiagnostics'
 import type { CatalogMaintenanceProps } from '../../types'
 
@@ -39,30 +40,26 @@ const ACTION_ROW = 'grid gap-2 sm:flex sm:flex-wrap sm:justify-end'
 export function CatalogMaintenance({
 	forcing,
 	resetting,
-	confirmForce,
-	confirmReset,
+	confirming,
 	canReset,
 	catalogDiagnostics,
 	visibilityCounts,
-	setConfirmForce,
-	setConfirmReset,
+	setConfirming,
 	onForceFullScan,
 	onResetCatalogCache,
 }: CatalogMaintenanceProps) {
 	const forceTriggerRef = useRef<HTMLButtonElement>(null)
 	const resetTriggerRef = useRef<HTMLButtonElement>(null)
-	const previousConfirmForce = useRef(false)
-	const previousConfirmReset = useRef(false)
+	const previousConfirming = useRef<MaintenanceConfirmation>(null)
+	// Focus returns to the trigger whose confirmation just went away — including when it went away
+	// because the other one opened, which would otherwise strand the keyboard on a removed button.
 	useEffect(() => {
-		if (previousConfirmForce.current && !confirmForce)
-			forceTriggerRef.current?.focus()
-		previousConfirmForce.current = confirmForce
-	}, [confirmForce])
-	useEffect(() => {
-		if (previousConfirmReset.current && !confirmReset)
-			resetTriggerRef.current?.focus()
-		previousConfirmReset.current = confirmReset
-	}, [confirmReset])
+		const dismissed = previousConfirming.current
+		previousConfirming.current = confirming
+		if (!dismissed || dismissed === confirming) return
+		if (confirming === null)
+			(dismissed === 'force' ? forceTriggerRef : resetTriggerRef).current?.focus()
+	}, [confirming])
 
 	return (
 		<div className='settings-surface mt-5 rounded-2xl border border-white/85 bg-white/58 p-5'>
@@ -86,8 +83,8 @@ export function CatalogMaintenance({
 					ref={forceTriggerRef}
 					type='button'
 					disabled={forcing || resetting}
-					onClick={() => setConfirmForce(true)}
-					className={`${ACTION_BUTTON} utility-accent-button text-white shadow-[var(--shadow-accent-soft)] focus-visible:outline-violet-400`}
+					onClick={() => setConfirming('force')}
+					className={`${ACTION_BUTTON} utility-accent-button text-white focus-visible:outline-violet-400`}
 				>
 					<ScanSearch size={16} aria-hidden='true' />
 					Force full scan
@@ -97,7 +94,7 @@ export function CatalogMaintenance({
 						ref={resetTriggerRef}
 						type='button'
 						disabled={forcing || resetting}
-						onClick={() => setConfirmReset(true)}
+						onClick={() => setConfirming('reset')}
 						className={`${ACTION_BUTTON} ${DANGER_VARIANT}`}
 					>
 						<RotateCcw size={16} aria-hidden='true' />
@@ -105,7 +102,7 @@ export function CatalogMaintenance({
 					</button>
 				)}
 			</div>
-			{confirmForce && (
+			{confirming === 'force' && (
 				<div
 					role='dialog'
 					aria-label='Confirm full scan'
@@ -119,7 +116,7 @@ export function CatalogMaintenance({
 						<button
 							type='button'
 							disabled={forcing}
-							onClick={() => setConfirmForce(false)}
+							onClick={() => setConfirming(null)}
 							className={CANCEL_BUTTON}
 						>
 							Cancel
@@ -128,14 +125,14 @@ export function CatalogMaintenance({
 							type='button'
 							disabled={forcing}
 							onClick={() => void onForceFullScan()}
-							className={`${CONFIRM_BUTTON} utility-accent-button text-white shadow-[var(--shadow-accent-vivid)] focus-visible:outline-violet-300`}
+							className={`${CONFIRM_BUTTON} utility-accent-button text-white focus-visible:outline-violet-300`}
 						>
 							{forcing ? 'Scanning…' : 'Confirm full scan'}
 						</button>
 					</div>
 				</div>
 			)}
-			{confirmReset && (
+			{confirming === 'reset' && (
 				<div
 					role='dialog'
 					aria-label='Confirm catalog cache reset'
@@ -150,7 +147,7 @@ export function CatalogMaintenance({
 						<button
 							type='button'
 							disabled={resetting}
-							onClick={() => setConfirmReset(false)}
+							onClick={() => setConfirming(null)}
 							className={CANCEL_BUTTON}
 						>
 							Cancel

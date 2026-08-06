@@ -162,6 +162,43 @@
 		"expected": "productivity"
 	},
 	{
+		"_comment": "Office desktop apps reached through Start Apps: an AppUserModelId, no resolved executable. Only the display name and that id are available, so Word used to fall to Other.",
+		"name": "Word",
+		"path": "Microsoft.Office.WINWORD.EXE.15",
+		"source": "start_apps",
+		"expected": "productivity"
+	},
+	{
+		"name": "Excel",
+		"path": "Microsoft.Office.EXCEL.EXE.15",
+		"source": "start_apps",
+		"expected": "productivity"
+	},
+	{
+		"name": "PowerPoint",
+		"path": "Microsoft.Office.POWERPNT.EXE.15",
+		"source": "start_apps",
+		"expected": "productivity"
+	},
+	{
+		"name": "Access",
+		"path": "Microsoft.Office.MSACCESS.EXE.15",
+		"source": "start_apps",
+		"expected": "productivity"
+	},
+	{
+		"name": "Word",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Word.lnk",
+		"resolvedPath": "C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE",
+		"expected": "productivity"
+	},
+	{
+		"_comment": "A versioned Office install root: the install-tree needle must not depend on a trailing separator.",
+		"name": "Excel",
+		"path": "C:\\Program Files (x86)\\Microsoft Office 15\\root\\office15\\EXCEL.EXE",
+		"expected": "productivity"
+	},
+	{
 		"name": "Notion",
 		"path": "C:\\Users\\Maks\\Notion\\Notion.exe",
 		"expected": "productivity"

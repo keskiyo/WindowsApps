@@ -1,3 +1,4 @@
+import { SettingsToggle } from '../components/SettingsToggle'
 import { FolderPlus, FolderX, HardDrive } from 'lucide-react'
 import { useState } from 'react'
 import type { ScanSettings, SystemSettings } from '../../../../entities/system'
@@ -39,15 +40,11 @@ export function SettingsDiscoveryControls({
 						Removable and network drives are ignored.
 					</p>
 				</div>
-				<button
-					type='button'
-					role='switch'
-					aria-label='Scan all fixed local drives'
-					aria-checked={
-						settings?.scanSettings.autoScanFixedDrives ?? false
-					}
+				<SettingsToggle
+					label='Scan all fixed local drives'
+					checked={settings?.scanSettings.autoScanFixedDrives ?? false}
 					disabled={disabled}
-					onClick={() =>
+					onToggle={() =>
 						settings &&
 						void onSaveScanSettings({
 							...settings.scanSettings,
@@ -55,12 +52,7 @@ export function SettingsDiscoveryControls({
 								!settings.scanSettings.autoScanFixedDrives,
 						})
 					}
-					className={`relative h-7 w-12 shrink-0 rounded-full transition focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50 ${settings?.scanSettings.autoScanFixedDrives ? 'utility-accent-button' : 'bg-slate-300'}`}
-				>
-					<span
-						className={`absolute left-1 top-1 size-5 rounded-full bg-slate-50 shadow transition-transform ${settings?.scanSettings.autoScanFixedDrives ? 'translate-x-5' : 'translate-x-0'}`}
-					/>
-				</button>
+				/>
 			</div>
 
 			<div className='mt-5'>

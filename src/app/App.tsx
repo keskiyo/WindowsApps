@@ -16,13 +16,16 @@ import {
 	useDesktopNavigation,
 } from '../widgets/sidebar-navigation'
 import { CatalogPage } from '../pages/catalog'
+import { MorePage } from '../pages/more'
+import { ScenariosPage } from '../pages/scenarios'
 import { SettingsPage } from '../pages/settings'
+import { useScenarioRunner } from '../features/run-scenario'
 import { AppShellChrome } from './layout/AppShellChrome'
 import { CommandPalette } from '../features/command-palette'
 import { Header } from '../widgets/app-header'
 import { useAppFeedback } from './model/useAppFeedback'
 
-import { useIconRecovery } from '../entities/app'
+import { INSTALLERS_DOCS_CATEGORY, useIconRecovery } from '../entities/app'
 import { useGlobalShortcuts } from './model/useGlobalShortcuts'
 import { useStaleCopy } from '../features/stale-copy'
 import { useUpdater } from '../features/update-app'
@@ -53,9 +56,11 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		preferencesPersisted,
 	} = state
 	const {
+		catalogApps,
 		counts,
 		deferredQuery,
 		filteredApps,
+		morePreview,
 		paletteApps,
 		visibleHydrationIds,
 	} = useCatalogView(state)
@@ -154,11 +159,35 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		if (drawerOpen) setDrawerMounted(true)
 	}, [drawerOpen])
 
+	// These pages render no catalog grid of their own.
+	const isCatalogView =
+		activeView !== 'settings' &&
+		activeView !== 'more' &&
+		activeView !== 'scenarios'
+	const scenarioRunner = useScenarioRunner({
+		apps: catalogApps,
+		scenarios: state.scenarios,
+		// The store action, not `feedback.launch`: a scenario is one action to the user, and the
+		// per-app launch toasts would report it as five. The run reports itself once, below.
+		launch: state.launch,
+		closeApps: state.closeApps,
+		onFinished: useCallback((scenario, summary) => {
+			// Keyed by the scenario so a re-run replaces its own notice instead of stacking one.
+			const notice = { id: `scenario-${scenario.id}` }
+			// An app the scenario could not act on is the whole run failing to do what it says;
+			// one that was simply not running already is the outcome the close list wanted.
+			if (summary.unavailable > 0)
+				toast.error(`Scenario “${scenario.name}” failed`, notice)
+			else toast.success(`Scenario “${scenario.name}” started`, notice)
+		}, []),
+	})
+
+	// The view decides what is on screen to hydrate; a page with nothing to show reports no ids.
 	useEffect(() => {
-		if (activeView === 'settings' || isLoading) return
+		if (isLoading) return
 		const ids = visibleHydrationIds.split('|').filter(Boolean)
 		if (ids.length) void hydrateVisibleIcons(ids)
-	}, [activeView, hydrateVisibleIcons, isLoading, visibleHydrationIds])
+	}, [hydrateVisibleIcons, isLoading, visibleHydrationIds])
 
 	const {
 		auxiliaryCount,
@@ -173,9 +202,11 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		categories: state.categories,
 		counts: navigationCounts,
 		activeView: state.activeView,
+		// The grid shows the visible primary cards, so the All Apps badge counts the same set.
+		// `primaryCount` includes apps the user hid, which made the count disagree with what is
+		// on screen right after a Hide.
+		appCount: visibleCategorizedApps.length,
 		favoriteCount,
-		hiddenCount,
-		auxiliaryCount,
 		onSelectView: navigation.selectView,
 		onSelectCategory: navigation.selectCategory,
 		onReorderCategory: state.reorderCategory,
@@ -212,16 +243,17 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 					onDismissStaleCopy={dismissStaleCopy}
 				/>
 				<div className='flex min-h-0 flex-1 gap-2 px-2 pb-2'>
-					{desktopNavigation && <AppSidebar {...navigationProps} />}
+					{desktopNavigation && (
+						<AppSidebar
+							{...navigationProps}
+							onGoHome={navigation.goHome}
+						/>
+					)}
 					<div
 						id='catalog-scroll'
 						className='app-panel flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto rounded-2xl'
 					>
 						<Header
-							// The grid shows the visible primary cards, so the header counts the
-							// same set. `primaryCount` includes apps the user hid, which made the
-							// count disagree with what is on screen right after a Hide.
-							appCount={visibleCategorizedApps.length}
 							visibleCount={filteredApps.length}
 							query={state.query}
 							isRefreshing={state.isRefreshing}
@@ -232,11 +264,44 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 							menuButtonRef={menuButtonRef}
 							searchInputRef={searchInputRef}
 							onOpenNavigation={() => setDrawerOpen(true)}
-							onGoHome={navigation.goHome}
 							showMenu={!desktopNavigation}
 						/>
 						<main className='mx-auto w-full max-w-375 px-5 pb-12 pt-7 sm:px-8'>
-							{state.activeView === 'settings' ? (
+							{state.activeView === 'more' && (
+								<MorePage
+									auxiliaryCount={auxiliaryCount}
+									hiddenCount={hiddenCount}
+									installersDocsCount={
+										navigationCounts.get(
+											INSTALLERS_DOCS_CATEGORY,
+										) ?? 0
+									}
+									scenarioCount={state.scenarios.length}
+									preview={morePreview}
+									scenarioRun={{
+										scenarios: state.scenarios,
+										apps: catalogApps,
+										runningId: scenarioRunner.runningId,
+										onRun: scenarioRunner.runById,
+									}}
+									onSelectView={navigation.selectView}
+								/>
+							)}
+							{state.activeView === 'scenarios' && (
+								<ScenariosPage
+									scenarios={state.scenarios}
+									apps={catalogApps}
+									runningId={scenarioRunner.runningId}
+									onBack={() => navigation.selectView('more')}
+									onCreate={state.createScenario}
+									onRename={state.renameScenario}
+									onDelete={state.deleteScenario}
+									onAddApp={state.addScenarioApp}
+									onRemoveApp={state.removeScenarioApp}
+									onRun={scenarioRunner.run}
+								/>
+							)}
+							{state.activeView === 'settings' && (
 								<SettingsPage
 									client={systemClient}
 									onForceFullScan={state.forceFullScan}
@@ -253,7 +318,8 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									}}
 									updater={updater}
 								/>
-							) : (
+							)}
+							{isCatalogView && (
 								<CatalogPage
 									showScanPrompt={
 										!state.isLoading &&
@@ -267,19 +333,13 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 											setScanPromptDismissed(true),
 										onScan: feedback.refresh,
 									}}
-									summary={{
-										activeView: state.activeView,
-										allCount: visibleCategorizedApps.length,
-										favoriteCount,
-										hiddenCount,
-										auxiliaryCount,
-										onSelectView: navigation.selectView,
-									}}
 									grid={{
 										apps: filteredApps,
 										isLoading: state.isLoading,
 										hasQuery,
 										activeView: state.activeView,
+										onBack: () =>
+											navigation.selectView('more'),
 										categoryOrder: state.categoryOrder,
 										categories: state.categories,
 										collapsedCategories: state.collapsedCategories,
@@ -309,10 +369,10 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 						categoryOrder={state.categoryOrder}
 						categories={state.categories}
 						activeView={state.activeView}
+						appCount={visibleCategorizedApps.length}
 						favoriteCount={favoriteCount}
-						hiddenCount={hiddenCount}
-						auxiliaryCount={auxiliaryCount}
 						triggerRef={menuButtonRef}
+						onGoHome={navigation.goHome}
 						onSelectView={navigation.selectView}
 						onSelectCategory={navigation.selectCategory}
 						onReorderCategory={state.reorderCategory}

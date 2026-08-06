@@ -16,6 +16,7 @@ export type {
 	CatalogDelta,
 	CatalogDiagnostics,
 	CatalogSnapshot,
+	CloseAppsResult,
 	LaunchStatus,
 	ScanProgress,
 	UninstallMechanism,
@@ -27,7 +28,9 @@ export {
 	filterVisibleApps,
 	selectCatalogCounts,
 	selectCategorizedApps,
+	selectRecentApps,
 } from './model/catalogSelectors'
+export { appIdentity } from './lib/appIdentity'
 export { useIconRecovery } from './model/useIconRecovery'
 export { deduplicateVisibleApps } from './lib/appDeduplication'
 export {
@@ -58,5 +61,4 @@ export {
 	rankAppsByQueryTop,
 } from './lib/catalogSearch'
 export { AppCard } from './ui/AppCard/AppCard'
-export { AppDragOverlay } from './ui/AppCard/AppDragOverlay'
 export { CardIcon } from './ui/AppCard/CardIcon'

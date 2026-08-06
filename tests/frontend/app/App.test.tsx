@@ -1,5 +1,6 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../../src/app/App'
 import { PREFERENCES_KEY } from '../../../src/app/store/preferences'
@@ -58,6 +59,9 @@ function renderApp(
 		refreshApps: vi.fn().mockResolvedValue(apps),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
+		closeApps: vi
+			.fn()
+			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0 }),
 		getUninstallPreview: vi.fn().mockResolvedValue({
 			appName: 'Visual Studio Code',
 			publisher: 'Microsoft',
@@ -219,24 +223,28 @@ describe('App', () => {
 		expect(steamButton).toHaveTextContent(/^Steam$/)
 	})
 
-	it('renders catalog filters and navigates without opening the drawer', async () => {
+	it('keeps view switching in the navigation instead of repeating it above the grid', async () => {
 		const { store } = renderApp()
-		const filters = await screen.findByRole('region', {
-			name: 'Catalog filters',
-		})
+		await screen.findByRole('button', { name: 'Launch Steam' })
+		// The catalog screen is the grid alone; a second copy of the view filters used to sit
+		// above it and duplicate both the sidebar and the header count.
 		expect(
-			within(filters).getByRole('button', {
-				name: 'All applications 3',
-			}),
-		).toHaveAttribute('aria-current', 'page')
+			screen.queryByRole('region', { name: 'Catalog filters' }),
+		).not.toBeInTheDocument()
 
 		await userEvent.click(
-			within(filters).getByRole('button', { name: 'Favorites 0' }),
+			screen.getByRole('button', { name: 'Open navigation' }),
+		)
+		const navigation = screen.getByRole('dialog', {
+			name: 'App navigation',
+		})
+		expect(
+			within(navigation).getByRole('button', { name: /^All Apps/ }),
+		).toHaveAttribute('aria-current', 'page')
+		await userEvent.click(
+			within(navigation).getByRole('button', { name: 'Favorites 0' }),
 		)
 		expect(store.getState().activeView).toBe('favorites')
-		expect(
-			within(filters).getByRole('button', { name: 'Favorites 0' }),
-		).toHaveAttribute('aria-current', 'page')
 	})
 
 	it('updates the header count to show search matches', async () => {
@@ -404,7 +412,11 @@ describe('App', () => {
 			screen.getByRole('menuitem', { name: 'Move to category' }),
 		)
 		await userEvent.click(
-			screen.getByRole('menuitem', { name: 'AI & Agents' }),
+			within(
+				screen.getByRole('menu', {
+					name: 'Move Visual Studio Code to category',
+				}),
+			).getByRole('menuitem', { name: 'AI & Agents' }),
 		)
 		expect(store.getState().categoryOverrides.code).toBe('ai')
 		expect(client.launchApp).not.toHaveBeenCalled()
@@ -414,6 +426,29 @@ describe('App', () => {
 		expect(
 			screen.getByRole('button', { name: 'AI & Agents' }),
 		).toHaveTextContent('1')
+	})
+
+	it('closes the category cascade with Escape and restores the menu trigger focus', async () => {
+		renderApp()
+		const manage = await screen.findByRole('button', {
+			name: 'Manage Visual Studio Code',
+		})
+		await userEvent.click(manage)
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Move to category' }),
+		)
+		expect(
+			screen.getByRole('menu', {
+				name: 'Move Visual Studio Code to category',
+			}),
+		).toBeInTheDocument()
+
+		await userEvent.keyboard('{Escape}')
+
+		expect(
+			screen.queryByRole('menu', { name: 'Visual Studio Code actions' }),
+		).not.toBeInTheDocument()
+		expect(manage).toHaveFocus()
 	})
 
 	it('allows moving an app even when direct uninstall is unavailable', async () => {
@@ -428,6 +463,47 @@ describe('App', () => {
 			screen.getByRole('menuitem', { name: 'Browsers' }),
 		)
 		expect(store.getState().categoryOverrides.steam).toBe('browsers')
+	})
+
+	it('files an app into Installers & Docs and moves it back out', async () => {
+		const { store } = renderApp()
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Manage Steam' }),
+		)
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Move to category' }),
+		)
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Installers & Docs' }),
+		)
+
+		// It leaves the catalog and shows up under Installers — never under Docs, which stays the
+		// scanner's own verdict.
+		expect(
+			screen.queryByRole('button', { name: 'Launch Steam' }),
+		).not.toBeInTheDocument()
+		store.getState().setActiveView('installers_docs')
+		const installers = await screen.findByRole('region', {
+			name: 'Installers 1',
+		})
+		expect(
+			within(installers).getByRole('button', { name: 'Launch Steam' }),
+		).toBeInTheDocument()
+		expect(
+			screen.queryByRole('region', { name: /^Docs/ }),
+		).not.toBeInTheDocument()
+
+		// A hand-filed artifact keeps "Move to category", which is the only way back out.
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Manage Steam' }),
+		)
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Move to category' }),
+		)
+		await userEvent.click(screen.getByRole('menuitem', { name: 'Games' }))
+
+		expect(store.getState().installerAppIds).toEqual([])
+		expect(store.getState().categoryOverrides.steam).toBe('games')
 	})
 
 	it('hides an app and restores it from the Hidden view', async () => {
@@ -445,9 +521,12 @@ describe('App', () => {
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Open navigation' }),
 		)
-		const hidden = within(
-			screen.getByRole('dialog', { name: 'App navigation' }),
-		).getByRole('button', { name: /Hidden/ })
+		await userEvent.click(
+			within(
+				screen.getByRole('dialog', { name: 'App navigation' }),
+			).getByRole('button', { name: 'More' }),
+		)
+		const hidden = await screen.findByRole('button', { name: 'Hidden 1' })
 		expect(hidden).toHaveTextContent('1')
 		await userEvent.click(hidden)
 		expect(
@@ -481,8 +560,11 @@ describe('App', () => {
 		await userEvent.click(
 			within(screen.getByRole('dialog', { name: 'App navigation' })).getByRole(
 				'button',
-				{ name: /Auxiliary tools/ },
+				{ name: 'More' },
 			),
+		)
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Auxiliary tools 1' }),
 		)
 
 		expect(
@@ -510,7 +592,10 @@ describe('App', () => {
 		).toBeInTheDocument()
 	})
 
-	it('includes auxiliary tools in command palette but excludes hidden apps', async () => {
+	// Quick launch offers what the grid shows. An auxiliary entry is an updater stub, a command
+	// environment or a product component, and it carries the product's own name and icon — Discord's
+	// Squirrel stub sat beside Discord itself, so the palette listed two identical rows.
+	it('excludes auxiliary tools and hidden apps from the command palette', async () => {
 		const helper = app({
 			id: 'helper',
 			name: 'Runtime Helper',
@@ -540,13 +625,16 @@ describe('App', () => {
 			name: 'Quick launch search',
 		})
 		await userEvent.type(input, 'Runtime Helper')
-		expect(
-			screen.getByRole('option', { name: 'Runtime Helper' }),
-		).toBeInTheDocument()
+		expect(screen.getByText(/No apps match/)).toBeInTheDocument()
 
 		await userEvent.clear(input)
 		await userEvent.type(input, 'Hidden Helper')
 		expect(screen.getByText(/No apps match/)).toBeInTheDocument()
+
+		// The palette still offers the catalog it is for, so the two misses above mean something.
+		await userEvent.clear(input)
+		await userEvent.type(input, 'Steam')
+		expect(screen.getByRole('option', { name: 'Steam' })).toBeInTheDocument()
 	})
 
 	it.each(['p', 'з'])(
@@ -603,10 +691,18 @@ describe('App', () => {
 		expect(within(dialog).getByText('Microsoft')).toBeInTheDocument()
 		expect(within(dialog).getByText('1.99')).toBeInTheDocument()
 		expect(document.body.style.overflow).toBe('hidden')
+		// The shell scrolls its own panel, not the document, so a body-only lock left the catalog
+		// scrolling behind every dialog.
+		expect(
+			document.getElementById('catalog-scroll')?.style.overflowY,
+		).toBe('hidden')
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Close app information' }),
 		)
 		expect(document.body.style.overflow).toBe('')
+		expect(document.getElementById('catalog-scroll')?.style.overflowY).toBe(
+			'',
+		)
 		expect(manage).toHaveFocus()
 	})
 
@@ -847,6 +943,60 @@ describe('App', () => {
 		expect(Element.prototype.scrollTo).toHaveBeenCalledWith({
 			top: 0,
 			behavior: 'smooth',
+		})
+	})
+
+	describe('running a scenario', () => {
+		async function withScenario(
+			launchIds: string[],
+			overrides: Partial<AppsClient> = {},
+		) {
+			setDesktopNavigation(true)
+			const rendered = renderApp(overrides)
+			await screen.findByText('Steam')
+			act(() => {
+				const created = rendered.store.getState().createScenario('Gaming')
+				if (!created.ok) throw new Error(created.error)
+				for (const id of launchIds)
+					rendered.store.getState().addScenarioApp(created.id, 'launch', id)
+			})
+			await userEvent.click(screen.getByRole('button', { name: /^More/ }))
+			return rendered
+		}
+
+		// A scenario is one action to the user. Launching through the per-app feedback made a
+		// two-app scenario raise three notices: one per launch, then the run's own.
+		it('reports the whole run as a single notice', async () => {
+			const success = vi.spyOn(toast, 'success').mockClear()
+			const { client } = await withScenario(['steam', 'code'])
+
+			await userEvent.click(screen.getByRole('button', { name: 'Run Gaming' }))
+
+			await waitFor(() => expect(client.launchApp).toHaveBeenCalledTimes(2))
+			expect(success).toHaveBeenCalledOnce()
+			expect(success).toHaveBeenCalledWith(
+				'Scenario “Gaming” started',
+				expect.anything(),
+			)
+		})
+
+		// One failed app is the whole run failing to do what it says, and it is still one notice —
+		// not a per-app error with its own Retry, which would retry that app outside the scenario.
+		it('reports a run that could not do what it says as one failure', async () => {
+			const errors = vi.spyOn(toast, 'error').mockClear()
+			const success = vi.spyOn(toast, 'success').mockClear()
+			await withScenario(['steam', 'code'], {
+				launchApp: vi.fn().mockRejectedValue(new Error('access denied')),
+			})
+
+			await userEvent.click(screen.getByRole('button', { name: 'Run Gaming' }))
+
+			await waitFor(() => expect(errors).toHaveBeenCalledOnce())
+			expect(errors).toHaveBeenCalledWith(
+				'Scenario “Gaming” failed',
+				expect.anything(),
+			)
+			expect(success).not.toHaveBeenCalled()
 		})
 	})
 })

@@ -7,6 +7,7 @@ const BASE =
 
 export function MenuItem({
 	icon: Icon,
+	trailingIcon: TrailingIcon,
 	label,
 	onClick,
 	tone = 'default',
@@ -17,7 +18,7 @@ export function MenuItem({
 	const spotlight = useSpotlight()
 	const toneClass =
 		tone === 'danger'
-			? 'text-rose-300 hover:bg-rose-400/15 hover:text-rose-200 focus-visible:outline-rose-300/70'
+			? 'icon-follows-color text-rose-300 hover:bg-rose-400/15 hover:text-rose-200 focus-visible:outline-rose-300/70'
 			: disabled
 				? 'cursor-not-allowed text-slate-500'
 				: 'text-slate-700 hover:bg-slate-500/15 focus-visible:outline-violet-500'
@@ -30,10 +31,11 @@ export function MenuItem({
 			onClick={onClick}
 			{...(withSpotlight ? spotlight : {})}
 			className={`${BASE} ${toneClass}`}
-		>
+	>
 			{withSpotlight && <SpotlightLayer size={70} />}
-			<Icon size={15} className={iconClassName} aria-hidden='true' />
-			{label}
+			{Icon && <Icon size={15} className={iconClassName} aria-hidden='true' />}
+			{TrailingIcon ? <span className='min-w-0 flex-1'>{label}</span> : label}
+			{TrailingIcon && <TrailingIcon size={15} className='shrink-0' aria-hidden='true' />}
 		</button>
 	)
 }

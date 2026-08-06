@@ -13,6 +13,9 @@ function emptyClient(): AppsClient {
 		refreshApps: vi.fn().mockResolvedValue([]),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
+		closeApps: vi
+			.fn()
+			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0 }),
 		getAppDetails: vi.fn().mockResolvedValue({
 			fileSizeBytes: null,
 			fileCreatedAt: null,
@@ -68,6 +71,7 @@ function renderGrid(size: number) {
 			categories={categories}
 			collapsedCategories={[]}
 			favoriteAppIds={[]}
+			onBack={vi.fn()}
 			onToggleCategory={vi.fn()}
 			onToggleFavorite={vi.fn()}
 			onMoveApp={vi.fn()}

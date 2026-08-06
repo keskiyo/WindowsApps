@@ -49,6 +49,11 @@ pub(crate) enum AppError {
     LaunchDataUnavailable,
     /// No trusted launch target exists for the requested id.
     LaunchUnavailable,
+    /// The close target map is unavailable (poisoned).
+    ///
+    /// An id with no trusted executable is not an error: `close_apps` closes a batch and counts
+    /// the ids it cannot match, so "this one cannot be closed" is part of a successful answer.
+    CloseDataUnavailable,
     /// No trusted details target exists for the requested id.
     AppDetailsUnavailable,
     /// No trusted local folder exists for the requested id.
@@ -88,6 +93,7 @@ impl AppError {
             Self::InvalidHydrationRequest => "INVALID_HYDRATION_REQUEST",
             Self::LaunchDataUnavailable => "LAUNCH_DATA_UNAVAILABLE",
             Self::LaunchUnavailable => "LAUNCH_UNAVAILABLE",
+            Self::CloseDataUnavailable => "CLOSE_DATA_UNAVAILABLE",
             Self::AppDetailsUnavailable => "APP_DETAILS_UNAVAILABLE",
             Self::OpenFolderUnavailable => "OPEN_FOLDER_UNAVAILABLE",
             Self::UninstallDataUnavailable => "UNINSTALL_DATA_UNAVAILABLE",
@@ -117,6 +123,7 @@ impl AppError {
             Self::InvalidHydrationRequest => "The icon hydration request is invalid.",
             Self::LaunchDataUnavailable => "Launch data is temporarily unavailable.",
             Self::LaunchUnavailable => "This application is not available for launch.",
+            Self::CloseDataUnavailable => "Close data is temporarily unavailable.",
             Self::AppDetailsUnavailable => "Application details are unavailable.",
             Self::OpenFolderUnavailable => "The application folder is unavailable.",
             Self::UninstallDataUnavailable => "Uninstall data is temporarily unavailable.",
@@ -198,6 +205,7 @@ mod tests {
             AppError::InvalidHydrationRequest,
             AppError::LaunchDataUnavailable,
             AppError::LaunchUnavailable,
+            AppError::CloseDataUnavailable,
             AppError::AppDetailsUnavailable,
             AppError::OpenFolderUnavailable,
             AppError::UninstallDataUnavailable,
@@ -228,6 +236,7 @@ mod tests {
                 "APP_DETAILS_UNAVAILABLE",
                 "CLEAR_ICON_CACHE_FAILED",
                 "CLEAR_UNINSTALL_HISTORY_FAILED",
+                "CLOSE_DATA_UNAVAILABLE",
                 "INVALID_HYDRATION_REQUEST",
                 "INVALID_RELEASE_VERSION",
                 "LAUNCH_DATA_UNAVAILABLE",

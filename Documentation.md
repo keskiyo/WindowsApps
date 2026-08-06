@@ -37,7 +37,19 @@ auto-updates the third-party applications it catalogs.
 | Tests            | Vitest/Testing Library and Rust unit tests   |
 | Package target   | NSIS setup executable                        |
 
-The main window uses custom decorations, supports resizing, and has a minimum size of `560 × 520`. At minimum width, application grids retain two columns and the header keeps navigation, search, and Refresh on one row while hiding the application identity. The catalog summary cards navigate directly to All applications, Favorites, Hidden, and Auxiliary tools.
+The main window uses custom decorations, supports resizing, and has a minimum size of `560 × 520`. The application tile is a fixed `140 × 138` px, and every catalog grid lays out as many fixed columns as the available width holds, so the tile keeps one size from the minimum window to a maximised one and only the column count changes — three columns at minimum width, more as the window grows. The product identity sits at the top of the sidebar (and of the drawer below the sidebar's breakpoint), where it doubles as the way back to All Apps with the catalog scrolled to the top. The catalog total is the badge on the **All Apps** entry, counting the same visible primary cards the grid shows. The header keeps navigation, search, and Refresh on one row, and reports the match count only while a query is typed. The catalog screen is the grid alone: view switching lives in the sidebar (and in the drawer below the sidebar's breakpoint), so nothing above the grid repeats it. The sidebar lists All Apps, Favorites, More, Settings, and the user's categories; **More** is the hub for what is kept out of everyday browsing — Auxiliary tools, Scenarios, Hidden, and Installers & Docs, in a two-column grid. Each is a card whose whole header opens the view, and which previews the three most recent entries of that area: for Hidden the order the user hid them, for the two scanner-owned areas the first-seen stamp, and for Scenarios the most recently created ones, each with the button that runs it. That card previews one row fewer than the others, because it also carries a **View all** row and would otherwise stand taller than the card beside it in the two-column grid. The Scenarios card alone carries that **View all** row, because the rest of that list is something to run rather than a view to browse: it opens every scenario in a dialog over the page, each collapsed to its name and list sizes until the name is clicked, and each with its own run button. The dialog never edits — that is what keeps it safe to open from a preview row. A preview row shows what the record actually carries — the scanner's artifact verdict or the publisher, and the first-seen date where there is one — never an invented detail. Favorites and the four More views open under a title row carrying the view's icon, its name, and the size of the list below it (which is not the catalog total the app header shows). Because More is their only entry point, those four also carry a back control there, and it stays on screen when the list is empty. Installers & Docs holds scan artifacts rather than organizable applications, so it is reached from More instead of appearing in the category list.
+
+A **scenario** is a named pair of app lists. Running it starts everything in the launch list, then closes everything in the close list, and reports itself once — a scenario is one action to the user, so the individual launches raise no notices of their own. The run says it started, or that it failed when there was an entry it could not act on; an app that was already closed is the outcome the close list wanted, not a failure. Scenarios are listed newest first everywhere, ordered by creation date, with ones stored before that date existed last. Each list is picked from a modal over the catalog, holds at most 20 apps, and stores card identities rather than catalog ids, so a scenario survives a Force full scan. A list shows its apps as icon tiles with the name underneath and in full on hover; the scenarios page hydrates those icons itself, since it renders no catalog grid. A second run is refused while the first is still starting apps. A scenario runs from its own card and from its row on the More card, so the common case costs no navigation.
+
+Every modal locks the page behind it: only the dialog scrolls while it is open. The lock covers the shell's own scroll panel, not just `document.body` — the window is a fixed-height layout in which the document never overflows, so a body-only lock held nothing and the catalog kept scrolling under the backdrop.
+
+Closing works from the process list, not from the desktop: a Store app's window belongs to `ApplicationFrameHost.exe`, an app minimised to the tray has no visible window, and a multi-process application keeps helpers that never had one. Every process running the app's executable is asked to close with `WM_CLOSE` — the same request the title-bar button makes, so the application can still prompt to save, and a packaged app is asked through the frame that hosts its core window — and whatever ignores the request after a five-second grace period is terminated, so nothing of the program is left behind. The application's own process is never a candidate, and a survivor's image is re-checked before it is terminated so a recycled process id cannot be killed in its place. A whole list is closed in one request: one process snapshot, one window enumeration and a single grace period for the batch, so closing ten apps takes what closing one takes. Entries that name no image on disk — a `steam://` target, a Store package whose manifest resolved no executable — have no close target and are reported as unavailable rather than having a process guessed for them.
+
+The dark theme rewrites the light-palette Tailwind background utilities through compatibility rules in `src/app/styles/index.css` that match on the class *string*. The violet highlight is therefore scoped to `:hover`: every use of it in the application is a `hover:` variant, and without that scope the rule painted those controls in their resting state — the Telegram row sat lit as a solid band rather than highlighting under the pointer. It is a tint over the surface, not a fill replacing it. `tests/frontend/styles/settings-highlight.test.mjs` pins both.
+
+**Catalog maintenance** confirms before it acts, and only one confirmation is open at a time: the two actions touch the same catalog, so opening one answers the other rather than stacking a second question. The state is a single value rather than a flag per action, which makes "both at once" unrepresentable. Dismissing a confirmation returns focus to the trigger that opened it; swapping to the other action leaves focus on the trigger just pressed.
+
+Lucide icons take their colour from a semantic palette defined in `src/app/styles/index.css`: a role owns a hue (destructive is red, confirmation green, warnings orange, scanning cyan), and the remaining icons draw from the same `--category-*` tokens as the category rows. Controls that encode state through colour — the window buttons, solid accent/danger buttons, the favorite toggle, and any disabled control — opt out and keep their own colour. `tests/frontend/styles/icon-tones.test.mjs` fails when an icon reaches the UI without a tone.
 
 The header search remains scoped to the currently open view or category. Both it and the `Ctrl+K` quick-launch palette correct queries typed with the Russian/English keyboard layout reversed and allow one insertion, deletion, substitution, or adjacent transposition in name and product-name words of at least four characters. Literal matches rank above corrected and fuzzy matches. The exact one-token queries `cmd` and `сьв` are reserved aliases for the genuine `Microsoft.WindowsTerminal` package and exclude Command Prompt, Git CMD, and internal `OpenConsole.exe` candidates; full queries such as `command prompt` retain normal matching. `Ctrl+P` is reserved and consumed by the application, including when the same physical key reports `Ctrl+З`, so WebView2 never opens its print dialog.
 
@@ -105,6 +117,7 @@ physical folder layout.
 | `start_background_sync`   | Start background validation after the cached catalog is displayed.           |
 | `cancel_scan`             | Cancel active and queued work; refresh reports `SCAN_CANCELLED`.              |
 | `launch_app`              | Launch a trusted catalog entry by ID.                                        |
+| `close_apps`              | Close every process of a bounded batch of trusted catalog entries by ID.     |
 | `get_app_details`         | Return bounded file metadata, or explicit unavailable fields, by trusted ID. |
 | `open_app_folder`         | Open the trusted local installation folder for a catalog entry by ID.        |
 | `get_uninstall_preview`   | Return application identity, publisher, source, and safe removal mechanism.  |
@@ -227,7 +240,7 @@ The quick-launch palette shows at most 50 rows and selects them with a bounded t
 
 Category cards mount in batches rather than all at once, extended by an `IntersectionObserver` sentinel after the last mounted card. `content-visibility` already skips layout and paint for off-screen cards, but not the cost of the mount itself — a DOM subtree and a drag registration per card — which is what an auto-scan of fixed drives can multiply into thousands. Category headings keep reporting the full category size, not the mounted batch.
 
-Normal categories, view-scoped search, and Favorites exclude `auxiliary` entries. The `Ctrl+K` quick-launch palette searches both primary and auxiliary applications but excludes explicitly hidden entries and all installer/documentation artifacts. The **Auxiliary tools** view keeps uncertain runtime and maintenance components inspectable. A user can restore an entry to the main catalog; its canonical identity is persisted in local preferences and survives incremental refresh, full scan, and cache reset.
+Normal categories, view-scoped search, and Favorites exclude `auxiliary` entries. The `Ctrl+K` quick-launch palette offers the same set the grid does: it excludes auxiliary entries, explicitly hidden entries, and all installer/documentation artifacts. An auxiliary record carries the product's own name and icon — an updater stub, a command environment, a component — so listing it beside the application asked the user to choose between two rows that look identical. Scenarios keep resolving against the wider set, because a scenario stores what the user picked, auxiliary or not. The **Auxiliary tools** view keeps uncertain runtime and maintenance components inspectable. A user can restore an entry to the main catalog; its canonical identity is persisted in local preferences and survives incremental refresh, full scan, and cache reset.
 
 The reserved **Installers & Docs** view is the only normal navigation surface for non-hidden artifacts. It partitions one result set into **Installers** and **Docs**, omits empty sections, and excludes those records from All Apps, Favorites, Auxiliary tools, ordinary category counts, and quick launch. Hidden remains the administrative superset. Artifacts cannot be favorited or moved across the reserved-category boundary. Documentation launches immediately; an installer requires an explicit confirmation dialog that shows its name and publisher before the backend receives the existing catalog ID launch request.
 
@@ -275,6 +288,7 @@ Duplicate matching considers:
 - exact version: two copies of the same product at the same version merge across install roots (a portable copy beside its installed shortcut, or the same portable in two folders) — a **different** version is treated as a different program and stays separate;
 - shortcut/executable pairs in the same product folder;
 - **package identity** — the package-family part of an AppUserModelId, the text before `!`. Two AUMIDs that share it are two entry points of one installed package and merge. Two that differ are different packages regardless of how alike their display names are: a matching display name alone is weak evidence and stays subject to the publisher and install-root checks below, so two unrelated packaged applications that happen to share a name keep their separate launch and uninstall identities;
+- **Squirrel packages** — an install laid out as `<root>\Update.exe` beside `<root>\app-<version>\App.exe` registers both halves in the Start Menu under the product name. The two records share no target, no version and not even a publisher (the stub is signed by GitHub, not the vendor), so every weaker signal was vetoed and Discord, Slack or GitHub Desktop occupied two cards. Both collapse to the package root plus the executable that ends up running, which is identity-level evidence; the version folder changes with every update and is deliberately not part of it. The application's own record always represents the merged card, and the stub's `--processStart` argument is never copied onto it;
 - publishers when both are available. An X.500 certificate subject (`CN=…`) is not a publisher for this purpose: a packaged entry reports its signing certificate while the desktop entry of the same product reports the marketing name, so comparing them as strings would invent a conflict between two records of one vendor.
 
 Candidate priority is:
@@ -313,6 +327,8 @@ Built-in categories:
 
 Category assignment runs after deduplication on the merged record and weighs several signals, not the name alone: the Steam source and a game-store install path (`\steamapps\`, `\Battle.net\`, `\Epic Games\`, …) or an unambiguous game publisher (Blizzard, Valve, Riot, …) map to Games; a few distinctive publishers pin a category (Adobe/Blackmagic → Editors, JetBrains → Development, anti-virus vendors → Security, VideoLAN/Spotify → Media, Mozilla → Browsers); a known product install tree pins a category even when the shortcut name is cryptic (`\Microsoft Office\`, `\LibreOffice\` → Office & Productivity; `\Mozilla Firefox\`, `\Google\Chrome\` → Browsers); everything else falls back to curated keyword lists matched over the name, resolved target executable, PE product name, file description, and install directory (so `Happ Proxy Client`, a neutrally named shortcut to `SotaVPN.exe`, or an antivirus identified by product metadata still reads correctly). A Start Apps AUMID backed by `wsl.exe` is classified structurally as Development without relying on distribution names or locale. Office suites, note-takers, and PDF readers map to Office & Productivity; anti-virus, antimalware, endpoint-security, password-manager, VPN, and proxy clients to Security & Privacy; archivers, cloud sync, and file managers to File & Cloud. Keyword matching is anchored to avoid false hits (for example "Logitech" is not read as Git). A user override always wins.
 
+Classification is a curated table, so an application matching no rule is **Other** by design rather than by failure; which applications those are differs from machine to machine. Microsoft Office is the case that showed the gap: a classic install is caught by its install tree, but the same apps reached through Start Apps carry an AppUserModelId (`Microsoft.Office.WINWORD.EXE.15`) and resolve to no executable, leaving only the display name — and "Word" was in no list while "Excel" and "PowerPoint" were. That AUMID prefix now pins Office & Productivity for the whole suite, and the install-tree needle no longer depends on a trailing separator, so a versioned root (`\Microsoft Office 15\`) matches too.
+
 Windows Features is based on known names, targets, and package identities. A generic Microsoft publisher/name is not enough to classify an application as a Windows component.
 
 Users can:
@@ -329,12 +345,25 @@ All Apps does not reorder categories: category ordering is available only from t
 
 Deleting a custom category moves its applications to Other. Hidden is a separate navigation view and does not uninstall or modify the application.
 
+Move to category also accepts **Installers & Docs**. Filing an application there marks it as an installer, so it leaves the catalog and appears under Installers in that view; documentation is never assigned by hand, because the scan detects it on its own. The mark clears the application's Favorite, mirrors the durable card identity like every other manual choice, and is reversed by moving the entry to any ordinary category — which the actions menu keeps offering for a hand-filed entry. An installer or documentation entry the scan itself classified stays locked to its bucket and cannot be moved.
+
 At widths of `1024px` and above, navigation uses a persistent sidebar. Below `1024px`, the same navigation is presented as an overlay drawer.
 
-Frontend preferences use schema version 8. Each launch card has a `preferenceIdentity`
+Frontend preferences use schema version 12. Each launch card has a `preferenceIdentity`
 derived from its product identity, launch role, and meaningful arguments. Favorites, hidden
-state, auxiliary promotion, and category overrides use this card identity, so distinct launch
-modes of one product do not inherit each other's settings. Version 6 canonical identities are
+state, auxiliary promotion, manual installer marks, first-seen stamps, and category overrides use
+this card identity, so distinct launch modes of one product do not inherit each other's settings.
+Version 9 added the manual installer marks, version 10 the first-seen stamps, version 11 the
+scenarios and version 12 their creation date, which orders the More preview; an earlier document
+upgrades to an empty or undated value and keeps every other field it carried. A scenario stored
+before the date existed stays undated rather than being stamped with the migration's own clock, and
+sorts after the dated ones.
+
+The catalog itself carries no timestamps, so the first-seen stamp is the only record of when an
+application appeared: every scan result and every background snapshot stamps the cards it reports
+for the first time, leaves existing stamps alone, and drops the stamps of cards the catalog no
+longer contains — which bounds the map to the size of the catalog. A storage write happens only
+when that map actually changes. Version 6 canonical identities are
 retained separately during migration: an exact saved catalog ID or a single catalog match
 resolves them, while ambiguous matches remain preserved and unapplied instead of fanning out.
 Reads preserve unknown root fields, recover from the previous valid backup when the primary
@@ -485,19 +514,22 @@ client-side ceiling clears it. A top activity bar reflects any in-flight launch 
 public/                          Static assets and application icon
 src/app/                         Composition root: App, main, app shell, global shortcuts
 src/app/layout/                  Title bar, activity bar, shell chrome, persistence banner
-src/app/store/                   Zustand root store, store-shaped selectors, persisted preferences
+src/app/store/                   Zustand root store: state contract, focused action modules,
+                                 reconciliation, store-shaped selectors, persisted preferences
 src/pages/catalog/               Catalog screen: scan prompt, summary and grid composition
+src/pages/more/                  More screen: Auxiliary tools, Scenarios, Hidden and Installers & Docs
+src/pages/scenarios/             Scenarios screen: launch/close lists and the run button
 src/pages/settings/              Settings screen and its sections
 src/widgets/                     Large self-contained interface areas, each with a public index.ts
   app-header/                   Search field, scan button, header bar
   catalog-content/              Grids, category sections, catalog view derivation
   sidebar-navigation/           Sidebar, drawer, navigation state and category drag
-  workspace-summary/            View filter tiles
 src/features/                    User scenarios, each with a public index.ts
   app-actions, command-palette, edit-settings, launch-app, manage-category,
   stale-copy, uninstall-app, update-app, view-app-details
 src/entities/app/                App entity: contracts, card UI, catalog selectors, metadata, IPC client
 src/entities/category/           Category entity: contracts, labels, accents
+src/entities/scenario/           Scenario entity: contracts, entry caps, identity resolution
 src/entities/system/             System entity: settings contracts and IPC client
 src/shared/api/tauri/            Generic Tauri transport and error normalization
 src/shared/                      Domain-agnostic UI, hooks, platform access, and utilities
@@ -521,11 +553,11 @@ tests/frontend/                  Frontend tests, mirroring src/ layout by layer
 scripts/                         Release version/source/workflow/asset checks, manifest prep, boundary verifiers
 ```
 
-A component that holds a private subcomponent or local static data lives in its own folder
-`components/<layer>/<ComponentName>/`: the main component in `<ComponentName>.tsx`, each private
-subcomponent in its own file, local types in `types.ts`, and static data or item-builders in
-`data.ts`. No `index.ts` barrels — components are imported by their explicit file path. Single-file
-components stay flat. Reference: `components/shared/WorkspaceSummary/`.
+A component that holds a private subcomponent or local static data lives in its own folder under
+the owning slice's `ui/`: the main component in `<ComponentName>.tsx`, each private subcomponent in
+its own file, local types in `types.ts`, and static data or item-builders in `data.ts`. The only
+`index.ts` files are the public API of a slice — inside a slice, components are imported by their
+explicit file path. Single-file components stay flat. Reference: `pages/more/ui/MorePage/`.
 
 ## 15. Development workflow
 

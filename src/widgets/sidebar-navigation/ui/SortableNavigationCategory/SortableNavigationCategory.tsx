@@ -59,7 +59,7 @@ export function SortableNavigationCategory({
 			onPointerLeave={spotlight.onPointerLeave}
 			style={style}
 			data-category-accent={accent}
-			className={`${navigationCategoryRowClass} cursor-grab touch-none transition-[background-color,border-color,box-shadow,transform] hover:bg-[var(--surface-raised)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)] motion-reduce:transition-none active:cursor-grabbing ${isDragPreviewActive ? 'opacity-0' : ''}`}
+			className={`${navigationCategoryRowClass} cursor-grab touch-none transition-[background-color,border-color,box-shadow,transform] hover:bg-(--surface-raised) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong) motion-reduce:transition-none active:cursor-grabbing ${isDragPreviewActive ? 'opacity-0' : ''}`}
 			{...attributes}
 			{...listeners}
 			ref={node => {

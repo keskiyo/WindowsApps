@@ -8,14 +8,12 @@ describe('Header', () => {
 	it('keeps navigation, search, and scan controls available together', () => {
 		render(
 			<Header
-				appCount={12}
 				visibleCount={12}
 				query=''
 				isRefreshing={false}
 				scanProgress={null}
 				menuButtonRef={createRef()}
 				onOpenNavigation={vi.fn()}
-				onGoHome={vi.fn()}
 				onQueryChange={vi.fn()}
 				onRefresh={vi.fn().mockResolvedValue(undefined)}
 				onCancelScan={vi.fn().mockResolvedValue(undefined)}
@@ -27,21 +25,51 @@ describe('Header', () => {
 			screen.getByRole('button', { name: 'Open navigation' }),
 		).toBeInTheDocument()
 		expect(
-			screen.getByRole('button', { name: 'Go to All Apps' }),
-		).toBeInTheDocument()
-		expect(
 			screen.getByRole('textbox', { name: 'Search applications' }),
 		).toBeInTheDocument()
 		expect(
 			screen.getByRole('button', { name: 'Scan for apps' }),
 		).toBeInTheDocument()
+		// The identity and the catalog total live in the navigation now; an idle header says
+		// nothing about counts.
+		expect(screen.queryByText(/apps?$/)).not.toBeInTheDocument()
+	})
+
+	it('reports the match count only while a query is typed', () => {
+		function header(query: string, visibleCount: number) {
+			return (
+				<Header
+					visibleCount={visibleCount}
+					query={query}
+					isRefreshing={false}
+					scanProgress={null}
+					menuButtonRef={createRef()}
+					onOpenNavigation={vi.fn()}
+					onQueryChange={vi.fn()}
+					onRefresh={vi.fn().mockResolvedValue(undefined)}
+					onCancelScan={vi.fn().mockResolvedValue(undefined)}
+					showMenu={false}
+				/>
+			)
+		}
+		const { rerender } = render(header('', 12))
+		expect(screen.queryByText(/match/)).not.toBeInTheDocument()
+
+		rerender(header('code', 3))
+		expect(screen.getByText('3 matches')).toBeInTheDocument()
+
+		rerender(header('code', 1))
+		expect(screen.getByText('1 match')).toBeInTheDocument()
+
+		// Whitespace is not a query; the count must not appear for it.
+		rerender(header('   ', 12))
+		expect(screen.queryByText(/match/)).not.toBeInTheDocument()
 	})
 
 	it('shows scan progress and cancels an active scan', async () => {
 		const onCancelScan = vi.fn().mockResolvedValue(undefined)
 		render(
 			<Header
-				appCount={12}
 				visibleCount={12}
 				query=''
 				isRefreshing
@@ -53,7 +81,6 @@ describe('Header', () => {
 				}}
 				menuButtonRef={createRef()}
 				onOpenNavigation={vi.fn()}
-				onGoHome={vi.fn()}
 				onQueryChange={vi.fn()}
 				onRefresh={vi.fn().mockResolvedValue(undefined)}
 				onCancelScan={onCancelScan}
@@ -67,17 +94,47 @@ describe('Header', () => {
 		expect(onCancelScan).toHaveBeenCalledOnce()
 	})
 
+	it('hints the palette shortcut until the field is in use', () => {
+		function header(query: string) {
+			return (
+				<Header
+					visibleCount={12}
+					query={query}
+					isRefreshing={false}
+					scanProgress={null}
+					menuButtonRef={createRef()}
+					onOpenNavigation={vi.fn()}
+					onQueryChange={vi.fn()}
+					onRefresh={vi.fn().mockResolvedValue(undefined)}
+					onCancelScan={vi.fn().mockResolvedValue(undefined)}
+					showMenu={false}
+				/>
+			)
+		}
+		const { rerender } = render(header(''))
+		const hint = screen.getByText('Ctrl+K')
+		expect(hint.tagName).toBe('KBD')
+		// The shortcut is global, not a control in the field: announcing it here would put a
+		// phantom label next to the input.
+		expect(hint).toHaveAttribute('aria-hidden', 'true')
+
+		// Clear takes the same slot once there is something to clear.
+		rerender(header('code'))
+		expect(screen.queryByText('Ctrl+K')).not.toBeInTheDocument()
+		expect(
+			screen.getByRole('button', { name: 'Clear search' }),
+		).toBeInTheDocument()
+	})
+
 	it('uses the graphite search border treatment', () => {
 		render(
 			<Header
-				appCount={12}
 				visibleCount={12}
 				query=''
 				isRefreshing={false}
 				scanProgress={null}
 				menuButtonRef={createRef()}
 				onOpenNavigation={vi.fn()}
-				onGoHome={vi.fn()}
 				onQueryChange={vi.fn()}
 				onRefresh={vi.fn().mockResolvedValue(undefined)}
 				onCancelScan={vi.fn().mockResolvedValue(undefined)}

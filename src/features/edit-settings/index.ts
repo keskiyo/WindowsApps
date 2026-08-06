@@ -1,2 +1,5 @@
 // Public API of the edit-settings feature.
-export { useSystemSettings } from './model/useSystemSettings'
+export {
+	type MaintenanceConfirmation,
+	useSystemSettings,
+} from './model/useSystemSettings'

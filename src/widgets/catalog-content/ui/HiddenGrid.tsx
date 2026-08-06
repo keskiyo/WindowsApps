@@ -2,6 +2,7 @@ import { EyeOff } from 'lucide-react'
 import { type AppInfo, sortFavoritesFirst } from '../../../entities/app'
 import type { AppCategory, CategoryDefinition } from '../../../entities/category'
 import { CatalogAppCard } from './CatalogAppCard/CatalogAppCard'
+import { CatalogViewHeader } from './CatalogViewHeader'
 
 interface Props {
 	apps: AppInfo[]
@@ -9,6 +10,7 @@ interface Props {
 	favoriteAppIds: string[]
 	categories: CategoryDefinition[]
 	categoryOrder: AppCategory[]
+	onBack(): void
 	onToggleFavorite(id: string): void
 	onLaunch(app: AppInfo): Promise<void>
 	onMoveApp(id: string, category: AppCategory): void
@@ -20,51 +22,53 @@ interface Props {
 }
 
 export function HiddenGrid(props: Props) {
-	if (!props.apps.length)
-		return (
-			<section className='grid min-h-[55vh] place-items-center text-center'>
-				<div>
-					<EyeOff
-						className='mx-auto mb-4 text-slate-400'
-						size={38}
-						aria-hidden='true'
-					/>
-					<h2 className='text-lg font-semibold'>
-						{props.hasQuery
-							? 'No matching hidden apps'
-							: 'No hidden apps'}
-					</h2>
-					<p className='mt-2 text-sm text-slate-600'>
-						{props.hasQuery
-							? 'Try a different search.'
-							: 'Apps hidden from the catalog will appear here.'}
-					</p>
-				</div>
-			</section>
-		)
+	const apps = sortFavoritesFirst(props.apps, props.favoriteAppIds)
 	return (
-		<section
-			aria-label='Hidden applications'
-			className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
-		>
-			{sortFavoritesFirst(props.apps, props.favoriteAppIds).map(app => (
-				<CatalogAppCard
-					key={app.id}
-					app={app}
-					isHidden
-					isFavorite={props.favoriteAppIds.includes(app.id)}
-					categories={props.categories}
-					categoryOrder={props.categoryOrder}
-					onToggleFavorite={props.onToggleFavorite}
-					onLaunch={props.onLaunch}
-					onMove={props.onMoveApp}
-					onInfo={props.onInfo}
-					onUninstall={props.onUninstall}
-					onHide={props.onHide}
-					onRestore={props.onRestore}
-					onDemote={props.onDemote}
-				/>
-			))}
+		<section aria-labelledby='hidden-title'>
+			<CatalogViewHeader
+				icon={EyeOff}
+				title='Hidden'
+				titleId='hidden-title'
+				count={apps.length}
+				back={{ label: 'Back to More', onBack: props.onBack }}
+			/>
+			{apps.length ? (
+				<div className='app-card-grid'>
+					{apps.map(app => (
+						<CatalogAppCard
+							key={app.id}
+							app={app}
+							isHidden
+							isFavorite={props.favoriteAppIds.includes(app.id)}
+							categories={props.categories}
+							categoryOrder={props.categoryOrder}
+							onToggleFavorite={props.onToggleFavorite}
+							onLaunch={props.onLaunch}
+							onMove={props.onMoveApp}
+							onInfo={props.onInfo}
+							onUninstall={props.onUninstall}
+							onHide={props.onHide}
+							onRestore={props.onRestore}
+							onDemote={props.onDemote}
+						/>
+					))}
+				</div>
+			) : (
+				<div className='grid min-h-[45vh] place-items-center text-center'>
+					<div>
+						<h2 className='text-lg font-semibold'>
+							{props.hasQuery
+								? 'No matching hidden apps'
+								: 'No hidden apps'}
+						</h2>
+						<p className='mt-2 text-sm text-slate-600'>
+							{props.hasQuery
+								? 'Try a different search.'
+								: 'Apps hidden from the catalog will appear here.'}
+						</p>
+					</div>
+				</div>
+			)}
 		</section>
 	)
 }

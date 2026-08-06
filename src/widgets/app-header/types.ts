@@ -2,7 +2,7 @@ import type { RefObject } from 'react'
 import type { ScanProgress } from '../../entities/app'
 
 export interface HeaderProps {
-	appCount: number
+	/** Matches for the current query; shown only while one is typed. */
 	visibleCount: number
 	query: string
 	isRefreshing: boolean
@@ -10,7 +10,6 @@ export interface HeaderProps {
 	menuButtonRef: RefObject<HTMLButtonElement>
 	searchInputRef?: RefObject<HTMLInputElement>
 	onOpenNavigation(): void
-	onGoHome(): void
 	onQueryChange(query: string): void
 	onRefresh(): Promise<void>
 	onCancelScan(): Promise<void>

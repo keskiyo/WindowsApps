@@ -10,6 +10,7 @@ export interface InstallersDocsGridProps {
 	favoriteAppIds: string[]
 	categories: CategoryDefinition[]
 	categoryOrder: AppCategory[]
+	onBack(): void
 	onToggleFavorite(id: string): void
 	onLaunch(app: AppInfo): Promise<void>
 	onMoveApp(id: string, category: AppCategory): void
@@ -21,7 +22,7 @@ export interface InstallersDocsGridProps {
 }
 
 export interface ArtifactSectionProps
-	extends Omit<InstallersDocsGridProps, 'apps' | 'hasQuery'> {
+	extends Omit<InstallersDocsGridProps, 'apps' | 'hasQuery' | 'onBack'> {
 	title: string
 	apps: AppInfo[]
 }

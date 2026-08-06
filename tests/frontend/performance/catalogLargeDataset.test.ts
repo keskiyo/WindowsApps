@@ -54,6 +54,8 @@ describe('large catalog selector behavior', () => {
 			categoryOverrideIdentities: {},
 			promotedAppIds: [],
 			promotedAppIdentities: [],
+			installerAppIds: [],
+			installerAppIdentities: [],
 		})
 		expect(before[0]).toBe(apps[0])
 
@@ -68,6 +70,8 @@ describe('large catalog selector behavior', () => {
 			categoryOverrideIdentities: {},
 			promotedAppIds: [],
 			promotedAppIdentities: [],
+			installerAppIds: [],
+			installerAppIdentities: [],
 		})
 		const changed = after.filter((entry, index) => entry !== before[index])
 		expect(changed).toHaveLength(1)

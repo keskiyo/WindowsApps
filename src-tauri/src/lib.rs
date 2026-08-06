@@ -102,6 +102,7 @@ pub fn run() {
             commands::catalog::start_background_sync,
             commands::settings::cancel_scan,
             commands::launch::launch_app,
+            commands::close::close_apps,
             commands::details::get_app_details,
             commands::details::open_app_folder,
             commands::uninstall::get_uninstall_preview,

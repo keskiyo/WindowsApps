@@ -1,3 +1,4 @@
+import type { MaintenanceConfirmation } from '../../features/edit-settings'
 import type { UpdaterState } from '../../features/update-app'
 import type { CatalogDiagnostics } from '../../entities/app'
 import type { SystemClient, SystemSettings } from '../../entities/system'
@@ -29,13 +30,12 @@ export interface GeneralSettingsProps {
 export interface CatalogMaintenanceProps {
 	forcing: boolean
 	resetting: boolean
-	confirmForce: boolean
-	confirmReset: boolean
+	/** Which action is waiting for an answer; only one ever is. */
+	confirming: MaintenanceConfirmation
 	canReset: boolean
 	catalogDiagnostics?: CatalogDiagnostics | null
 	visibilityCounts?: { primary: number; auxiliary: number }
-	setConfirmForce(value: boolean): void
-	setConfirmReset(value: boolean): void
+	setConfirming(value: MaintenanceConfirmation): void
 	onForceFullScan(): Promise<void>
 	onResetCatalogCache(): Promise<void>
 }

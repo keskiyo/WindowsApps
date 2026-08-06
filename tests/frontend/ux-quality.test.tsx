@@ -50,6 +50,9 @@ function renderApp(
 		refreshApps: vi.fn().mockResolvedValue(apps),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
+		closeApps: vi
+			.fn()
+			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0 }),
 		getUninstallPreview: vi.fn().mockResolvedValue({
 			appName: 'Visual Studio Code',
 			publisher: 'Microsoft',
@@ -328,7 +331,7 @@ describe('UX quality — keyboard & native (round 3)', () => {
 			name: 'App navigation',
 		})
 		const allApps = within(navigation).getByRole('button', {
-			name: 'All Apps',
+			name: /^All Apps/,
 		})
 		expect(allApps).toHaveAttribute('aria-current', 'page')
 		const favorites = within(navigation).getByRole('button', {
@@ -472,12 +475,26 @@ describe('UX quality — keyboard & native (round 3)', () => {
 		expect(errorToast).toHaveBeenCalledTimes(1)
 	})
 
-	// The header counted every primary app including the ones the user had hidden, so the number
-	// disagreed with the cards on screen the moment anything was hidden.
+	// The All Apps badge counted every primary app including the ones the user had hidden, so the
+	// number disagreed with the cards on screen the moment anything was hidden.
 	it('counts only the cards the grid actually shows', async () => {
 		renderApp()
-		const header = await screen.findByRole('banner')
-		expect(within(header).getByText('2 apps')).toBeInTheDocument()
+		await screen.findByText('Steam')
+		async function allAppsLabel() {
+			await userEvent.click(
+				screen.getByRole('button', { name: 'Open navigation' }),
+			)
+			const navigation = screen.getByRole('dialog', {
+				name: 'App navigation',
+			})
+			const label = within(navigation)
+				.getByRole('button', { name: /^All Apps/ })
+				.getAttribute('aria-label')
+			await userEvent.keyboard('{Escape}')
+			return label
+		}
+
+		expect(await allAppsLabel()).toBe('All Apps 2')
 
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Manage Steam' }),
@@ -486,6 +503,6 @@ describe('UX quality — keyboard & native (round 3)', () => {
 			await screen.findByRole('menuitem', { name: /Hide/i }),
 		)
 
-		expect(within(header).getByText('1 app')).toBeInTheDocument()
+		expect(await allAppsLabel()).toBe('All Apps 1')
 	})
 })

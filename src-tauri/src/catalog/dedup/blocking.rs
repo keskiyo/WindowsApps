@@ -51,6 +51,9 @@ pub(super) fn equality_keys(candidate: &AppCandidate) -> Vec<String> {
     if let Some(value) = identity.aumid.as_deref() {
         keys.push(format!("aumid:{value}"));
     }
+    if let Some(value) = candidate.squirrel_package.as_deref() {
+        keys.push(format!("squirrel:{value}"));
+    }
     if let Some(value) = system_tool_alias(&candidate.app) {
         keys.push(format!("alias:{value}"));
     }

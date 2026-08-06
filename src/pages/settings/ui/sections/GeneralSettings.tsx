@@ -1,3 +1,4 @@
+import { SettingsToggle } from '../components/SettingsToggle'
 import { AppWindow, Keyboard, Power } from 'lucide-react'
 import { SettingsUpdateControls } from './SettingsUpdateControls'
 import type { GeneralSettingsProps } from '../../types'
@@ -24,19 +25,12 @@ export function GeneralSettings({
 							Open Windows Apps automatically after you sign in.
 						</p>
 					</div>
-					<button
-						type='button'
-						role='switch'
-						aria-label='Launch when Windows starts'
-						aria-checked={settings?.autostartEnabled ?? false}
+					<SettingsToggle
+						label='Launch when Windows starts'
+						checked={settings?.autostartEnabled ?? false}
 						disabled={!settings || saving}
-						onClick={() => void onToggleAutostart()}
-						className={`relative h-7 w-12 rounded-full transition focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50 ${settings?.autostartEnabled ? 'utility-accent-button' : 'bg-slate-300'}`}
-					>
-						<span
-							className={`absolute left-1 top-1 size-5 rounded-full bg-slate-50 shadow transition-transform ${settings?.autostartEnabled ? 'translate-x-5' : 'translate-x-0'}`}
-						/>
-					</button>
+						onToggle={() => void onToggleAutostart()}
+					/>
 				</div>
 				<div className='flex items-center gap-4 border-b border-slate-200 p-5'>
 					<span className='grid size-10 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner'>

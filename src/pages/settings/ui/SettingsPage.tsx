@@ -18,11 +18,9 @@ export function SettingsPage({
 		settings,
 		error,
 		saving,
-		confirmForce,
-		setConfirmForce,
+		confirming,
+		setConfirming,
 		forcing,
-		confirmReset,
-		setConfirmReset,
 		resetting,
 		toggleAutostart,
 		saveScanSettings,
@@ -75,13 +73,11 @@ export function SettingsPage({
 				<CatalogMaintenance
 					forcing={forcing}
 					resetting={resetting}
-					confirmForce={confirmForce}
-					confirmReset={confirmReset}
+					confirming={confirming}
 					canReset={Boolean(onResetCatalogCache)}
 					catalogDiagnostics={catalogDiagnostics}
 					visibilityCounts={visibilityCounts}
-					setConfirmForce={setConfirmForce}
-					setConfirmReset={setConfirmReset}
+					setConfirming={setConfirming}
 					onForceFullScan={forceFullScan}
 					onResetCatalogCache={resetCatalogCache}
 				/>

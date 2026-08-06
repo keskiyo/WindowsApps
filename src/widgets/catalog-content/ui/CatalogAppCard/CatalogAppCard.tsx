@@ -23,7 +23,6 @@ function CatalogAppCardComponent({
 	onHide,
 	onRestore,
 	onDemote,
-	isDragPreviewActive = false,
 }: CatalogAppCardProps) {
 	// Per-card subscription: a launch must not re-render the whole grid.
 	const launching = useIsLaunching(app.id)
@@ -35,7 +34,6 @@ function CatalogAppCardComponent({
 			onToggleFavorite={onToggleFavorite}
 			onLaunch={onLaunch}
 			isAuxiliary={isAuxiliary}
-			isDragPreviewActive={isDragPreviewActive}
 			renderActions={({ close, anchorRef }) => (
 				<AppActionsMenu
 					app={app}

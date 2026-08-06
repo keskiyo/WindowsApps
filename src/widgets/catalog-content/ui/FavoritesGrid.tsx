@@ -2,6 +2,7 @@ import { Star } from 'lucide-react'
 import { type AppInfo, sortFavoritesFirst } from '../../../entities/app'
 import type { AppCategory, CategoryDefinition } from '../../../entities/category'
 import { CatalogAppCard } from './CatalogAppCard/CatalogAppCard'
+import { CatalogViewHeader } from './CatalogViewHeader'
 
 interface Props {
 	apps: AppInfo[]
@@ -33,18 +34,15 @@ export function FavoritesGrid({
 	onRestore,
 	onDemote,
 }: Props) {
+	// Favorites is reached from the navigation, not from another page, so it carries no back
+	// control — and its empty state already names itself, so the title row would only repeat it.
 	if (!apps.length)
 		return (
 			<section className='grid min-h-[55vh] place-items-center text-center'>
 				<div>
-					<Star
-						className='mx-auto mb-4 text-yellow-300/80'
-						size={38}
-					/>
+					<Star className='mx-auto mb-4' size={38} aria-hidden='true' />
 					<h2 className='text-lg font-semibold'>
-						{hasQuery
-							? 'No matching favorites'
-							: 'No favorites yet'}
+						{hasQuery ? 'No matching favorites' : 'No favorites yet'}
 					</h2>
 					<p className='mt-2 text-sm text-slate-600'>
 						{hasQuery
@@ -55,27 +53,32 @@ export function FavoritesGrid({
 			</section>
 		)
 	return (
-		<section
-			aria-label='Favorite applications'
-			className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
-		>
-			{sortFavoritesFirst(apps, favoriteAppIds).map(app => (
-				<CatalogAppCard
-					key={app.id}
-					app={app}
-					isFavorite={favoriteAppIds.includes(app.id)}
-					categories={categories}
-					categoryOrder={categoryOrder}
-					onToggleFavorite={onToggleFavorite}
-					onLaunch={onLaunch}
-					onMove={onMoveApp}
-					onInfo={onInfo}
-					onUninstall={onUninstall}
-					onHide={onHide}
-					onRestore={onRestore}
-					onDemote={onDemote}
-				/>
-			))}
+		<section aria-labelledby='favorites-title'>
+			<CatalogViewHeader
+				icon={Star}
+				title='Favorites'
+				titleId='favorites-title'
+				count={apps.length}
+			/>
+			<div className='app-card-grid'>
+				{sortFavoritesFirst(apps, favoriteAppIds).map(app => (
+					<CatalogAppCard
+						key={app.id}
+						app={app}
+						isFavorite={favoriteAppIds.includes(app.id)}
+						categories={categories}
+						categoryOrder={categoryOrder}
+						onToggleFavorite={onToggleFavorite}
+						onLaunch={onLaunch}
+						onMove={onMoveApp}
+						onInfo={onInfo}
+						onUninstall={onUninstall}
+						onHide={onHide}
+						onRestore={onRestore}
+						onDemote={onDemote}
+					/>
+				))}
+			</div>
 		</section>
 	)
 }

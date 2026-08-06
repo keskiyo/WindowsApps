@@ -1,4 +1,3 @@
-import { useDroppable } from '@dnd-kit/core'
 import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { CatalogAppCard } from '../CatalogAppCard/CatalogAppCard'
@@ -18,7 +17,6 @@ export function CategorySection({
 	apps,
 	collapsed,
 	favoriteAppIds,
-	activeAppId,
 	onToggle,
 	onToggleFavorite,
 	onLaunch,
@@ -37,16 +35,11 @@ export function CategorySection({
 	// The heading still reports `apps.length`: the count is the size of the category, not of the
 	// batch currently mounted.
 	const cards = useProgressiveCards(apps)
-	const drop = useDroppable({
-		id: `category-drop:${category}`,
-		data: { type: 'category', category },
-	})
 	return (
 		<section
-			ref={drop.setNodeRef}
 			aria-labelledby={`category-${category}`}
 			data-category={category}
-			className={`relative scroll-mt-40 rounded-2xl transition-colors duration-200 focus-within:z-90 lg:scroll-mt-24 ${drop.isOver ? 'bg-violet-100/55 ring-1 ring-violet-400/35' : ''}`}
+			className='relative scroll-mt-40 rounded-2xl transition-colors duration-200 focus-within:z-90 lg:scroll-mt-24'
 		>
 			<div className='mb-3 flex items-center gap-2'>
 				{editing ? (
@@ -83,13 +76,12 @@ export function CategorySection({
 			</div>
 			{!collapsed && (
 				<>
-					<div className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'>
+					<div className='app-card-grid'>
 						{cards.visible.map(app => (
 							<CatalogAppCard
 								key={app.id}
 								app={app}
 								isFavorite={favoriteAppIds.includes(app.id)}
-								isDragPreviewActive={activeAppId === app.id}
 								categories={categories}
 								categoryOrder={categoryOrder}
 								onToggleFavorite={onToggleFavorite}

@@ -32,7 +32,7 @@ export function SettingsUpdateControls({
 						type='button'
 						disabled={updater.status === 'checking'}
 						onClick={() => void updater.checkNow()}
-						className='utility-accent-button inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium text-white shadow-[var(--shadow-accent-soft)] focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50'
+						className='utility-accent-button inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium text-white focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-50'
 					>
 						<RefreshCw
 							size={16}

@@ -28,6 +28,7 @@ pub(super) enum EvidenceReason {
     ShortcutTargetsExecutable,
     SameSteamAppId,
     SameAumid,
+    SameSquirrelPackage,
     SameFolderAndFamily,
     SameInstallRootAndFamily,
     NestedInstallRootAndFamily,
@@ -117,6 +118,7 @@ fn summarize_evidence(left: &AppCandidate, right: &AppCandidate) -> EvidenceSumm
                 | EvidenceReason::ShortcutTargetsExecutable
                 | EvidenceReason::SameSteamAppId
                 | EvidenceReason::SameAumid
+                | EvidenceReason::SameSquirrelPackage
         );
     });
     summary
@@ -166,6 +168,12 @@ fn collect_evidence(
     }
     if shared(left.identity.aumid.as_ref(), right.identity.aumid.as_ref()) {
         add(EvidenceReason::SameAumid, 100);
+    }
+    if shared(
+        left.squirrel_package.as_ref(),
+        right.squirrel_package.as_ref(),
+    ) {
+        add(EvidenceReason::SameSquirrelPackage, 100);
     }
     if left.family == right.family
         && shared(

@@ -1,5 +1,10 @@
 import type { LucideIcon } from 'lucide-react'
-import type { ReactNode, RefObject } from 'react'
+import type {
+	CSSProperties,
+	KeyboardEvent as ReactKeyboardEvent,
+	ReactNode,
+	RefObject,
+} from 'react'
 import type { AppInfo } from '../../../../entities/app'
 import type {
 	AppCategory,
@@ -23,7 +28,8 @@ export interface AppActionsMenuProps {
 }
 
 export interface MenuItemProps {
-	icon: LucideIcon
+	icon?: LucideIcon
+	trailingIcon?: LucideIcon
 	label: ReactNode
 	onClick?(): void
 	tone?: 'default' | 'danger'
@@ -37,4 +43,8 @@ export interface CategorySubmenuProps {
 	categoryOrder: AppCategory[]
 	activeCategory: AppCategory
 	onSelect(category: AppCategory): void
+	menuRef: RefObject<HTMLDivElement>
+	position: Pick<CSSProperties, 'left' | 'top'>
+	onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>): void
+	label: string
 }

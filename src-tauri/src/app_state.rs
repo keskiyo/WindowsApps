@@ -77,6 +77,9 @@ pub(crate) struct AppState {
     pub(crate) uninstall_targets: Mutex<HashMap<String, UninstallRecord>>,
     /// Trusted launch targets (kind + path) keyed by catalog id.
     pub(crate) launch_targets: Mutex<HashMap<String, (LaunchKind, String)>>,
+    /// Trusted executable paths for closing, keyed by catalog id. Only entries whose running
+    /// image can be identified appear here; see `remember_close_targets`.
+    pub(crate) close_targets: Mutex<HashMap<String, String>>,
     /// Trusted local metadata inputs keyed by catalog id.
     pub(crate) app_details_targets: Mutex<HashMap<String, AppDetailsTarget>>,
     /// Details read during this run, merged into the next synchronized cache document.
@@ -103,6 +106,7 @@ pub(crate) fn remember_catalog(state: &AppState, apps: &[AppInfo]) {
     remember_catalog_ids(state, apps);
     remember_uninstall_targets(state, apps);
     remember_launch_targets(state, apps);
+    remember_close_targets(state, apps);
     remember_app_details_targets(state, apps);
     retain_app_details_cache(state, apps);
 }
@@ -155,6 +159,37 @@ pub(crate) fn remember_launch_targets(state: &AppState, apps: &[AppInfo]) {
         .map(|app| (app.id.clone(), (app.launch_kind, app.path.clone())))
         .collect();
     if let Ok(mut stored) = state.launch_targets.lock() {
+        *stored = targets;
+    }
+}
+
+/// Record the executable a catalog entry actually runs as, so `close_apps` can match it against
+/// the running processes without the webview ever naming a path.
+///
+/// The question is only ever "which image ends up running": a shortcut contributes its resolved
+/// target rather than the `.lnk` that never runs, and a Store entry contributes the executable its
+/// package manifest declares — already validated to live inside the package directory by the
+/// Start-Apps source. An AppUserModelId or a `steam://` string is not that image, so it is never
+/// used as a fallback; entries that resolve nothing stay out of the map and the command reports
+/// the close as unavailable instead of guessing at a process.
+pub(crate) fn remember_close_targets(state: &AppState, apps: &[AppInfo]) {
+    let targets = apps
+        .iter()
+        .filter_map(|app| {
+            let path = app.resolved_path.clone().or_else(|| {
+                matches!(
+                    app.launch_kind,
+                    LaunchKind::Executable | LaunchKind::Shortcut
+                )
+                .then(|| app.path.clone())
+            })?;
+            Path::new(&path)
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
+                .then(|| (app.id.clone(), path))
+        })
+        .collect();
+    if let Ok(mut stored) = state.close_targets.lock() {
         *stored = targets;
     }
 }
@@ -329,6 +364,71 @@ mod tests {
             Some((LaunchKind::Executable, r"C:\Code.exe".to_string()))
         );
         assert!(stored.get("unknown-id").is_none());
+    }
+
+    // A close matches a running image, so only entries that name one get a target. A `steam://`
+    // handler names no image, and closing "whatever steam.exe is running" would be a guess at a
+    // process the user never chose.
+    #[test]
+    fn close_targets_cover_only_entries_that_name_a_running_executable() {
+        let mut executable = cached_app("Editor", r"C:\Editor\editor.exe");
+        executable.id = "editor".into();
+        let mut shortcut = cached_app("Game", r"C:\Menu\game.lnk");
+        shortcut.id = "game".into();
+        shortcut.launch_kind = LaunchKind::Shortcut;
+        shortcut.resolved_path = Some(r"C:\Games\game.exe".into());
+        let mut package = cached_app("Camera", "Microsoft.WindowsCamera_8wekyb3d8bbwe!App");
+        package.id = "camera".into();
+        package.launch_kind = LaunchKind::AppUserModelId;
+        let mut steam = cached_app("Steam game", "steam://rungameid/1");
+        steam.id = "steam-game".into();
+        let state = AppState::default();
+
+        remember_close_targets(&state, &[executable, shortcut, package, steam]);
+
+        let stored = state.close_targets.lock().unwrap();
+        assert_eq!(
+            stored.get("editor").map(String::as_str),
+            Some(r"C:\Editor\editor.exe")
+        );
+        // A shortcut contributes the image it resolves to, not the .lnk that is never running.
+        assert_eq!(
+            stored.get("game").map(String::as_str),
+            Some(r"C:\Games\game.exe")
+        );
+        // No manifest executable was resolved, so there is nothing to match a process against.
+        assert!(stored.get("camera").is_none());
+        assert!(stored.get("steam-game").is_none());
+    }
+
+    // The reported bug: a scenario could not close Калькулятор. Store entries launch by
+    // AppUserModelId, and the filter dropped every one of them — including the ones whose package
+    // manifest already resolved a real executable inside the package directory. That resolved
+    // image is exactly what a close has to match, so those entries get a target; the AUMID string
+    // in `path` never does, because it names no file.
+    #[test]
+    fn close_targets_include_a_store_app_that_resolved_a_package_executable() {
+        let mut calculator = cached_app("Калькулятор", "Microsoft.WindowsCalculator_8wek!App");
+        calculator.id = "calculator".into();
+        calculator.launch_kind = LaunchKind::AppUserModelId;
+        calculator.resolved_path =
+            Some(r"C:\Program Files\WindowsApps\Microsoft.WindowsCalculator_11.0_x64__8wek\CalculatorApp.exe".into());
+        let mut documentation = cached_app("Node.js website", "https://nodejs.org/");
+        documentation.id = "docs".into();
+        documentation.launch_kind = LaunchKind::AppUserModelId;
+        documentation.resolved_path = Some("https://nodejs.org/".into());
+        let state = AppState::default();
+
+        remember_close_targets(&state, &[calculator, documentation]);
+
+        let stored = state.close_targets.lock().unwrap();
+        assert_eq!(
+            stored.get("calculator").map(String::as_str),
+            Some(
+                r"C:\Program Files\WindowsApps\Microsoft.WindowsCalculator_11.0_x64__8wek\CalculatorApp.exe"
+            )
+        );
+        assert!(stored.get("docs").is_none());
     }
 
     #[test]

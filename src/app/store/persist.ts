@@ -1,0 +1,46 @@
+import { writePreferences } from './preferences'
+import type { GetAppState, PersistPreferences, SetAppState } from './types'
+
+interface PersistOptions {
+	set: SetAppState
+	get: GetAppState
+	storage: Storage
+	/** Root fields written by a newer build, carried through untouched. */
+	unknownFields?: Record<string, unknown>
+}
+
+export function createPersist({
+	set,
+	get,
+	storage,
+	unknownFields,
+}: PersistOptions): PersistPreferences {
+	return () => {
+		const state = get()
+		const persisted = writePreferences(storage, {
+			version: 12,
+			categories: state.categories,
+			categoryOrder: state.categoryOrder,
+			favoriteAppIds: state.favoriteAppIds,
+			favoriteAppIdentities: state.favoriteAppIdentities,
+			collapsedCategories: state.collapsedCategories,
+			categoryOverrides: state.categoryOverrides,
+			categoryOverrideIdentities: state.categoryOverrideIdentities,
+			hiddenAppIds: state.hiddenAppIds,
+			hiddenAppIdentities: state.hiddenAppIdentities,
+			promotedAppIds: state.promotedAppIds,
+			promotedAppIdentities: state.promotedAppIdentities,
+			installerAppIds: state.installerAppIds,
+			installerAppIdentities: state.installerAppIdentities,
+			scenarios: state.scenarios,
+			firstSeenAt: state.firstSeenAt,
+			legacyCanonicalPreferences: state.legacyCanonicalPreferences,
+			unknownFields,
+		})
+		// A refused write leaves the UI showing changes that will not survive a restart,
+		// so the condition is surfaced instead of being swallowed.
+		if (persisted !== state.preferencesPersisted) {
+			set({ preferencesPersisted: persisted })
+		}
+	}
+}

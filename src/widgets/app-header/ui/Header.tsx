@@ -5,7 +5,6 @@ import { SearchField } from './SearchField'
 import type { HeaderProps } from '../types'
 
 export function Header({
-	appCount,
 	visibleCount,
 	query,
 	isRefreshing,
@@ -13,7 +12,6 @@ export function Header({
 	menuButtonRef,
 	searchInputRef,
 	onOpenNavigation,
-	onGoHome,
 	onQueryChange,
 	onRefresh,
 	onCancelScan,
@@ -21,11 +19,7 @@ export function Header({
 }: HeaderProps) {
 	const fallbackRef = useRef<HTMLInputElement>(null)
 	const searchRef = searchInputRef ?? fallbackRef
-	const trimmedQuery = query.trim()
-	const countLabel =
-		trimmedQuery.length > 0
-			? `${visibleCount} ${visibleCount === 1 ? 'match' : 'matches'}`
-			: `${appCount} ${appCount === 1 ? 'app' : 'apps'}`
+	const searching = query.trim().length > 0
 	return (
 		<header className='app-header-glass sticky top-0 z-300 border-b border-slate-300/65 shadow-(--shadow-header)'>
 			<div className='mx-auto flex w-full max-w-375 items-start gap-3 px-5 pt-4.75 pb-4 sm:px-8 md:items-center'>
@@ -40,26 +34,13 @@ export function Header({
 						<Menu size={19} />
 					</button>
 				)}
-				<button
-					type='button'
-					aria-label='Go to All Apps'
-					onClick={onGoHome}
-					className='hidden shrink-0 items-center gap-3 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-violet-500 md:flex'
-				>
-					<img
-						src='/app-icon.png'
-						alt=''
-						className='size-10 rounded-xl object-cover ring-1 ring-inset ring-violet-400/25'
-					/>
-					<span>
-						<span className='block text-[1.05rem] font-semibold tracking-tight'>
-							Windows Apps
-						</span>
-						<span className='block text-xs text-slate-500'>
-							{countLabel}
-						</span>
-					</span>
-				</button>
+				{/* The catalog total moved to the All Apps entry; what only the header can say is
+				    how much of it the current query leaves. */}
+				{searching && (
+					<p className='shrink-0 self-center text-sm text-(--text-muted)'>
+						{visibleCount} {visibleCount === 1 ? 'match' : 'matches'}
+					</p>
+				)}
 				<div className='flex min-w-0 flex-1 items-start gap-3 md:items-center'>
 					<SearchField
 						query={query}

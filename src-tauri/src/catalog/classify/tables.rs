@@ -327,8 +327,14 @@ pub(super) static RULES: &[Rule] = &[
         Path,
         INSTALL_TREE,
         &[
-            r"\microsoft office\",
+            // Without the trailing separator so a versioned install root ("Microsoft Office 15")
+            // matches too, and with the AppUserModelId prefix Office desktop apps carry when they
+            // reach the catalog through Start Apps: those records resolve to no executable at all,
+            // so the install tree and the executable stem are both unavailable and only the display
+            // name would be left — which is how "Word" ended up in Other.
+            r"\microsoft office",
             r"\microsoft\office\",
+            "microsoft.office.",
             r"\libreoffice\",
             r"\onlyoffice\",
             r"\wps office\",
@@ -352,6 +358,10 @@ pub(super) static RULES: &[Rule] = &[
         NAME,
         &[
             "microsoft office",
+            // The display name, next to the executable stem below it: Office registers its apps as
+            // "Word", never as "WINWORD". Its siblings ("excel", "powerpoint", "onenote", "outlook",
+            // "visio") were already listed; this one was the gap.
+            "word",
             "winword",
             "excel",
             "powerpnt",

@@ -11,7 +11,7 @@ mod shortcuts;
 mod uninstall;
 
 pub(crate) use execution::{
-    exec_target, executable_metadata, is_console_subsystem, launcher, open_trusted_folder,
+    closer, exec_target, executable_metadata, is_console_subsystem, launcher, open_trusted_folder,
     read_architecture, verify_signature, AppArchitecture, AppSignatureStatus,
 };
 pub(crate) use locale::{os_ui_script, NameScript};

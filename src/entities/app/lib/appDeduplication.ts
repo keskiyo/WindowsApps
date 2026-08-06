@@ -60,6 +60,8 @@ function mergeVisibleApp(primary: AppInfo, secondary: AppInfo): AppInfo {
 			primary.canonicalIdentity ?? secondary.canonicalIdentity,
 		userPromoted:
 			primary.userPromoted || secondary.userPromoted || undefined,
+		userInstaller:
+			primary.userInstaller || secondary.userInstaller || undefined,
 		visibilityClass:
 			primary.userPromoted || secondary.userPromoted
 				? 'primary'

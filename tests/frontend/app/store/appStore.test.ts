@@ -60,6 +60,9 @@ function client(overrides: Partial<AppsClient> = {}): AppsClient {
 		hydrateVisibleIcons: vi.fn().mockResolvedValue(undefined),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
+		closeApps: vi
+			.fn()
+			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0 }),
 		getUninstallPreview: vi.fn().mockResolvedValue({
 			appName: 'Visual Studio Code',
 			publisher: 'Microsoft',
@@ -87,7 +90,7 @@ function client(overrides: Partial<AppsClient> = {}): AppsClient {
 }
 
 describe('app store', () => {
-	it('blocks favorites and category moves across the artifact boundary', () => {
+	it('keeps a scanner-detected artifact locked to its bucket', () => {
 		const installer = app({
 			id: 'setup',
 			name: 'Editor Setup',
@@ -100,11 +103,102 @@ describe('app store', () => {
 
 		store.getState().toggleFavorite(installer.id)
 		store.getState().moveApp(installer.id, 'games')
-		store.getState().moveApp('code', 'installers_docs')
 
 		expect(store.getState().favoriteAppIds).toEqual([])
 		expect(store.getState().categoryOverrides).toEqual({})
 		expect(store.getState().categoryOverrideIdentities).toEqual({})
+	})
+
+	it('files an application into Installers & Docs and lets it back out', () => {
+		const store = createAppStore(client())
+		store.setState({ apps })
+		store.getState().toggleFavorite('code')
+
+		store.getState().moveApp('code', 'installers_docs')
+
+		expect(store.getState().installerAppIds).toEqual(['code'])
+		expect(store.getState().installerAppIdentities).toEqual(['code'])
+		// An artifact is never a favorite, so filing one has to drop the star with it.
+		expect(store.getState().favoriteAppIds).toEqual([])
+		expect(store.getState().categoryOverrides).toEqual({})
+
+		store.getState().moveApp('code', 'utilities')
+
+		expect(store.getState().installerAppIds).toEqual([])
+		expect(store.getState().installerAppIdentities).toEqual([])
+		expect(store.getState().categoryOverrides).toEqual({ code: 'utilities' })
+	})
+
+	it('persists a manual installer mark and reloads it', () => {
+		const values = new Map<string, string>()
+		const storage = {
+			getItem: (key: string) => values.get(key) ?? null,
+			setItem: (key: string, value: string) => void values.set(key, value),
+		} as unknown as Storage
+		const store = createAppStore(client(), storage)
+		store.setState({ apps })
+
+		store.getState().moveApp('code', 'installers_docs')
+
+		expect(
+			JSON.parse(values.get(PREFERENCES_KEY) ?? '{}').installerAppIds,
+		).toEqual(['code'])
+		expect(createAppStore(client(), storage).getState().installerAppIds).toEqual(
+			['code'],
+		)
+	})
+
+	it('stamps a newly discovered app and prunes what the catalog dropped', async () => {
+		const getApps = vi
+			.fn()
+			.mockResolvedValueOnce({ apps: [apps[0]], hasCache: true })
+			.mockResolvedValueOnce({ apps: [apps[0], apps[1]], hasCache: true })
+			.mockResolvedValueOnce({ apps: [apps[1]], hasCache: true })
+		const store = createAppStore(client({ getApps }))
+		// A real clock resolves the three loads to the same millisecond, which would let a stamp
+		// that is rewritten on every load pass as one that was kept.
+		const clock = vi
+			.spyOn(Date, 'now')
+			.mockReturnValueOnce(1_000)
+			.mockReturnValueOnce(2_000)
+			.mockReturnValueOnce(3_000)
+
+		try {
+			await store.getState().load()
+			expect(store.getState().firstSeenAt).toEqual({ code: 1_000 })
+
+			await store.getState().load()
+			// The app that was already there keeps its first stamp, or nothing ever looks old.
+			expect(store.getState().firstSeenAt).toEqual({
+				code: 1_000,
+				chrome: 2_000,
+			})
+
+			await store.getState().load()
+			// Pruned to the catalog, so the map cannot grow without bound.
+			expect(store.getState().firstSeenAt).toEqual({ chrome: 2_000 })
+		} finally {
+			clock.mockRestore()
+		}
+	})
+
+	it('persists first-seen stamps and reads them back', async () => {
+		const values = new Map<string, string>()
+		const storage = {
+			getItem: (key: string) => values.get(key) ?? null,
+			setItem: (key: string, value: string) => void values.set(key, value),
+		} as unknown as Storage
+
+		await createAppStore(client(), storage).getState().load()
+		const stored = JSON.parse(values.get(PREFERENCES_KEY) ?? '{}')
+			.firstSeenAt as Record<string, number>
+		expect(Object.keys(stored).sort()).toEqual(['chrome', 'code', 'codex'])
+
+		// Survives a restart: a stamp re-derived on every start would make the whole catalog
+		// look brand new after each launch.
+		expect(createAppStore(client(), storage).getState().firstSeenAt).toEqual(
+			stored,
+		)
 	})
 
 	it('keeps auxiliary tools out of the normal catalog and search', () => {

@@ -27,6 +27,9 @@ function client(): AppsClient {
 		refreshApps: vi.fn().mockResolvedValue([code]),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
+		closeApps: vi
+			.fn()
+			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0 }),
 		getAppDetails: vi.fn().mockResolvedValue({
 			fileSizeBytes: null,
 			fileCreatedAt: null,

@@ -8,11 +8,22 @@ export function CategorySubmenu({
 	categoryOrder,
 	activeCategory,
 	onSelect,
+	menuRef,
+	position,
+	onKeyDown,
+	label,
 }: CategorySubmenuProps) {
 	const spotlight = useSpotlight()
 
 	return (
-		<div className='my-1 flex max-h-56 flex-col gap-0.5 overflow-y-auto overscroll-contain rounded-lg bg-slate-500/8 p-1'>
+		<div
+			ref={menuRef}
+			onKeyDown={onKeyDown}
+			style={position}
+			role='menu'
+			aria-label={label}
+			className='motion-panel fixed z-[600] flex w-56 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-(--shadow-menu)'
+		>
 			{categoryOrder.map(category => (
 				<button
 					key={category}

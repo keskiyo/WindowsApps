@@ -49,7 +49,7 @@ export function AppInfoDialog({
 				role='dialog'
 				aria-modal='true'
 				aria-label={`${app.name} information`}
-				className='motion-panel max-h-[calc(100vh-1.5rem)] w-full max-w-6xl overflow-y-auto rounded-3xl border border-[var(--border-neutral)] bg-[var(--surface-panel)] p-4 text-[var(--text-primary)] shadow-[var(--shadow-dialog)] sm:max-h-[calc(100vh-2.5rem)] sm:p-6'
+				className='motion-panel max-h-[calc(100vh-1.5rem)] w-full max-w-6xl overflow-y-auto rounded-3xl border border-(--border-neutral) bg-(--surface-panel) p-4 text-(--text-primary) shadow-(--shadow-dialog) sm:max-h-[calc(100vh-2.5rem)] sm:p-6'
 			>
 				<AppIdentityHeader
 					app={app}
@@ -68,18 +68,18 @@ export function AppInfoDialog({
 						onOpenFolder={actions.openFolder}
 					/>
 					{error ? (
-						<div className='flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-neutral)] bg-[var(--surface-inset)] px-4 py-3 text-sm text-[var(--text-muted)]'>
+						<div className='flex flex-wrap items-center justify-between gap-3 rounded-xl border border-(--border-neutral) bg-(--surface-inset) px-4 py-3 text-sm text-(--text-muted)'>
 							<p role='alert'>{error}</p>
 							<button
 								type='button'
 								onClick={retry}
-								className='min-h-10 rounded-lg px-3 text-[var(--accent-strong)] hover:bg-[var(--surface-raised)] focus-visible:outline-2 focus-visible:outline-[var(--accent-strong)]'
+								className='min-h-10 rounded-lg px-3 text-(--accent-strong) hover:bg-(--surface-raised) focus-visible:outline-2 focus-visible:outline-(--accent-strong)'
 							>
 								Retry
 							</button>
 						</div>
 					) : isLoading ? (
-						<p className='text-sm text-[var(--text-muted)]'>Loading application details…</p>
+						<p className='text-sm text-(--text-muted)'>Loading application details…</p>
 					) : null}
 					<AppInformationCards
 						app={app}

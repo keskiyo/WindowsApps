@@ -76,8 +76,8 @@ function renderNavigation() {
 			categories={categories}
 			counts={new Map<AppCategory, number>([['games', 2]])}
 			activeView='all'
+			appCount={3}
 			favoriteCount={0}
-			hiddenCount={0}
 			onSelectView={vi.fn()}
 			onSelectCategory={vi.fn()}
 			onCreateCategory={() => ({ ok: true, id: 'custom' })}

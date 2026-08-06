@@ -5,6 +5,7 @@ import { useFocusTrap } from '../../../shared/hooks/useFocusTrap'
 import type { AppView } from '../../../entities/app'
 import type { AppCategory, CategoryDefinition } from '../../../entities/category'
 import { AppNavigation } from './AppNavigation/AppNavigation'
+import { NavigationIdentity } from './NavigationIdentity'
 
 interface Props {
 	open: boolean
@@ -12,10 +13,10 @@ interface Props {
 	categoryOrder: AppCategory[]
 	categories: CategoryDefinition[]
 	activeView: AppView
+	appCount: number
 	favoriteCount: number
-	hiddenCount?: number
-	auxiliaryCount?: number
 	triggerRef: RefObject<HTMLButtonElement>
+	onGoHome(): void
 	onSelectView(view: AppView): void
 	onSelectCategory(category: AppCategory): void
 	onReorderCategory(active: AppCategory, over: AppCategory): void
@@ -63,17 +64,10 @@ export function AppDrawer(props: Props) {
 				role='dialog'
 				aria-modal='true'
 				aria-label='App navigation'
-				className='drawer-panel absolute inset-y-0 left-0 flex w-[min(22rem,88vw)] flex-col border-r border-slate-300/70 bg-slate-50 shadow-[var(--shadow-drawer)]'
+				className='drawer-panel absolute inset-y-0 left-0 flex w-[min(22rem,88vw)] flex-col border-r border-slate-300/70 bg-slate-50 shadow-(--shadow-drawer)'
 			>
-				<div className='flex items-center justify-between border-b border-slate-300/65 px-5 py-5'>
-					<div>
-						<p className='text-sm font-semibold text-slate-800'>
-							Library
-						</p>
-						<p className='mt-1 text-xs text-slate-500'>
-							Navigate your applications
-						</p>
-					</div>
+				<div className='flex items-center justify-between gap-3 border-b border-slate-300/65 px-4 py-4'>
+					<NavigationIdentity onGoHome={props.onGoHome} />
 					<button
 						type='button'
 						aria-label='Close navigation'
@@ -88,9 +82,8 @@ export function AppDrawer(props: Props) {
 					categories={props.categories}
 					counts={props.counts}
 					activeView={props.activeView}
+					appCount={props.appCount}
 					favoriteCount={props.favoriteCount}
-					hiddenCount={props.hiddenCount ?? 0}
-					auxiliaryCount={props.auxiliaryCount ?? 0}
 					onSelectView={props.onSelectView}
 					onSelectCategory={props.onSelectCategory}
 					onReorderCategory={props.onReorderCategory}

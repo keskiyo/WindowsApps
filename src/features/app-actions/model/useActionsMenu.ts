@@ -8,6 +8,7 @@ import {
 } from 'react'
 import {
 	floatingMenuPosition,
+	floatingSubmenuPosition,
 	requiredMenuScroll,
 } from '../../../shared/lib/positioning'
 
@@ -27,7 +28,12 @@ export function useActionsMenu({
 	showCategories,
 }: Options) {
 	const [position, setPosition] = useState({ left: 12, top: 48 })
+	const [categoryPosition, setCategoryPosition] = useState({
+		left: 12,
+		top: 48,
+	})
 	const menuRef = useRef<HTMLDivElement>(null)
+	const categoryMenuRef = useRef<HTMLDivElement>(null)
 	const adjustedHeightRef = useRef(0)
 
 	useLayoutEffect(() => {
@@ -36,15 +42,36 @@ export function useActionsMenu({
 			const menu = menuRef.current?.getBoundingClientRect()
 			if (!anchor || !menu || (menu.width === 0 && menu.height === 0))
 				return
-			setPosition(
-				floatingMenuPosition(
-					anchor,
-					menu.width,
-					menu.height,
-					window.innerWidth,
-					window.innerHeight,
-				),
+			const nextPosition = floatingMenuPosition(
+				anchor,
+				menu.width,
+				menu.height,
+				window.innerWidth,
+				window.innerHeight,
 			)
+			setPosition(nextPosition)
+			const nextMenuBounds = {
+				left: nextPosition.left,
+				right: nextPosition.left + menu.width,
+				top: nextPosition.top,
+				bottom: nextPosition.top + menu.height,
+			}
+			const categoryMenu = categoryMenuRef.current?.getBoundingClientRect()
+			if (
+				showCategories &&
+				categoryMenu &&
+				(categoryMenu.width !== 0 || categoryMenu.height !== 0)
+			) {
+				setCategoryPosition(
+					floatingSubmenuPosition(
+						nextMenuBounds,
+						categoryMenu.width,
+						categoryMenu.height,
+						window.innerWidth,
+						window.innerHeight,
+					),
+				)
+			}
 			const menuHeight = Math.round(menu.height)
 			const scrollAmount = requiredMenuScroll(
 				anchor.bottom,
@@ -92,6 +119,7 @@ export function useActionsMenu({
 			// this, a click on the grip while open fires pointerdown (closing) then click
 			// (re-toggling open), so the menu never closes on a repeat press.
 			if (menuRef.current?.contains(target)) return
+			if (categoryMenuRef.current?.contains(target)) return
 			if (anchorRef.current?.contains(target)) return
 			onClose()
 		}
@@ -113,11 +141,19 @@ export function useActionsMenu({
 
 	function onMenuKeyDown(event: ReactKeyboardEvent) {
 		if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-		const items = Array.from(
+		const menuItems = Array.from(
 			menuRef.current?.querySelectorAll<HTMLElement>(
 				'[role="menuitem"]:not([disabled])',
 			) ?? [],
 		)
+		const categoryItems = Array.from(
+			categoryMenuRef.current?.querySelectorAll<HTMLElement>(
+				'[role="menuitem"]:not([disabled])',
+			) ?? [],
+		)
+		const items = categoryItems.length
+			? [menuItems[0]!, ...categoryItems, ...menuItems.slice(1)]
+			: menuItems
 		if (items.length === 0) return
 		event.preventDefault()
 		const current = items.indexOf(document.activeElement as HTMLElement)
@@ -126,5 +162,11 @@ export function useActionsMenu({
 		items[next].focus()
 	}
 
-	return { menuRef, position, onMenuKeyDown }
+	return {
+		menuRef,
+		categoryMenuRef,
+		position,
+		categoryPosition,
+		onMenuKeyDown,
+	}
 }

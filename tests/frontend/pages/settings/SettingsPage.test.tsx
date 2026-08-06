@@ -222,6 +222,66 @@ describe('SettingsPage', () => {
 		expect(onResetCatalogCache).toHaveBeenCalledOnce()
 	})
 
+	// Both confirmations used to stack, asking two questions about the same catalog at once.
+	it('replaces the open confirmation instead of stacking a second one', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+				onResetCatalogCache={vi.fn().mockResolvedValue(undefined)}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Force full scan' }),
+		)
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Reset catalog cache' }),
+		)
+
+		expect(
+			screen.getByRole('dialog', { name: 'Confirm catalog cache reset' }),
+		).toBeInTheDocument()
+		expect(
+			screen.queryByRole('dialog', { name: 'Confirm full scan' }),
+		).not.toBeInTheDocument()
+
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Force full scan' }),
+		)
+
+		expect(
+			screen.getByRole('dialog', { name: 'Confirm full scan' }),
+		).toBeInTheDocument()
+		expect(
+			screen.queryByRole('dialog', { name: 'Confirm catalog cache reset' }),
+		).not.toBeInTheDocument()
+		// One question, one answer: never two Cancel buttons on screen.
+		expect(screen.getAllByRole('button', { name: 'Cancel' })).toHaveLength(1)
+	})
+
+	// Swapping confirmations is not a dismissal — pulling focus back to the other trigger would
+	// move the keyboard away from the panel the user just opened.
+	it('keeps focus on the trigger that opened the confirmation when swapping', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+				onResetCatalogCache={vi.fn().mockResolvedValue(undefined)}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Force full scan' }),
+		)
+		const reset = screen.getByRole('button', { name: 'Reset catalog cache' })
+		await userEvent.click(reset)
+
+		expect(reset).toHaveFocus()
+	})
+
 	it('uses dark-theme-safe settings surfaces and danger controls', async () => {
 		render(
 			<SettingsPage

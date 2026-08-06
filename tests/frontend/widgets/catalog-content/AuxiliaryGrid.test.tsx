@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AuxiliaryGrid } from '../../../../src/widgets/catalog-content/ui/AuxiliaryGrid'
 import type { AppInfo } from '../../../../src/entities/app'
@@ -51,6 +52,7 @@ function props() {
 		favoriteAppIds: [],
 		categories: [development],
 		categoryOrder: ['development'] as AppCategory[],
+		onBack: vi.fn(),
 		onLaunch: vi.fn().mockResolvedValue(undefined),
 		onMoveApp: vi.fn(),
 		onInfo: vi.fn(),
@@ -75,5 +77,31 @@ describe('AuxiliaryGrid', () => {
 		expect(
 			screen.queryByRole('region', { name: 'Devsense' }),
 		).not.toBeInTheDocument()
+	})
+
+	it('titles the view, counts its tools and returns to More', async () => {
+		const onBack = vi.fn()
+		render(<AuxiliaryGrid {...props()} onBack={onBack} />)
+
+		const view = screen.getByRole('region', { name: 'Auxiliary tools' })
+		expect(view).toHaveTextContent('2 tools')
+		await userEvent.click(screen.getByRole('button', { name: 'Back to More' }))
+		expect(onBack).toHaveBeenCalled()
+	})
+
+	it('keeps the way back when no tool matches the search', async () => {
+		const onBack = vi.fn()
+		render(
+			<AuxiliaryGrid
+				{...props()}
+				apps={[]}
+				hasQuery
+				onBack={onBack}
+			/>,
+		)
+
+		expect(screen.getByText('No matching auxiliary tools')).toBeVisible()
+		await userEvent.click(screen.getByRole('button', { name: 'Back to More' }))
+		expect(onBack).toHaveBeenCalled()
 	})
 })

@@ -4,6 +4,7 @@
 //! asking the same question — "do these point at the same thing on disk" — and the answer has to
 //! be identical for the blocking index, the evidence rules and the id derivation alike.
 
+use super::arguments::squirrel_process_start;
 use super::family::normalize_name;
 use crate::catalog::{AppInfo, LaunchKind, SourceKind};
 use std::path::{Component, Path};
@@ -65,6 +66,42 @@ pub(super) fn launch_target(app: &AppInfo) -> Option<&str> {
     // Fall back to the shortcut's own path for those. Self-contained targets (`.msc`, `.cpl`,
     // real application exes) are unaffected.
     (!is_generic_interpreter_host(target)).then_some(target)
+}
+
+/// The application a Squirrel package launches, as `<package root>\<executable>`.
+///
+/// Squirrel installs put the program in a versioned folder beside their updater stub —
+/// `<root>\Update.exe` and `<root>\app-1.0.9250\Discord.exe` — and register *both* in the Start
+/// Menu under the product name. The two records share nothing the other evidence rules can use:
+/// different targets, different versions, and not even a publisher (the stub is signed "GitHub",
+/// not by the vendor), so Discord, Slack and GitHub Desktop each occupied two catalog cards. Both
+/// records collapse to the same key here, which is an identity match — the version folder changes
+/// with every update, so it must not be part of it.
+pub(super) fn squirrel_package(app: &AppInfo) -> Option<String> {
+    let target = normalize_path(app.resolved_path.as_deref()?);
+    let (parent, file) = target.rsplit_once('\\')?;
+    if file == "update.exe" {
+        let started = squirrel_process_start(app.launch_arguments.as_deref())?;
+        return Some(format!("{parent}\\{started}"));
+    }
+    let (root, folder) = parent.rsplit_once('\\')?;
+    is_squirrel_version_folder(folder).then(|| format!("{root}\\{file}"))
+}
+
+/// The stub half of the pair above. It launches the application correctly and stays a usable card
+/// on its own, but once it merges with the application's own record that record is the better
+/// representative: the stub's target, version, publisher and command line all describe the updater.
+pub(super) fn is_squirrel_stub(app: &AppInfo) -> bool {
+    app.resolved_path
+        .as_deref()
+        .is_some_and(|target| normalize_path(target).ends_with("\\update.exe"))
+        && squirrel_process_start(app.launch_arguments.as_deref()).is_some()
+}
+
+fn is_squirrel_version_folder(folder: &str) -> bool {
+    folder
+        .strip_prefix("app-")
+        .is_some_and(|version| version.starts_with(|value: char| value.is_ascii_digit()))
 }
 
 /// Interpreter/host executables whose behaviour is defined by their arguments, so the host path

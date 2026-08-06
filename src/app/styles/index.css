@@ -26,6 +26,11 @@
 	--category-red: oklch(0.7 0.14 25);
 	--category-slate: var(--text-muted);
 	--category-neutral: var(--accent);
+	/* One tile size for the whole catalog. The grid track below is the same value, so a card can
+	   never disagree with the column it sits in. */
+	--app-card-width: 8.75rem;
+	--app-card-height: 8.625rem;
+	--app-card-gap: 0.625rem;
 	--color-telegram: #229ed9;
 	--color-telegram-text: #5cc8f5;
 	--color-update-surface: #363940;
@@ -36,13 +41,14 @@
 	--color-palette-selected-text: #ffffff;
 	--shadow-summary: 0 10px 22px rgba(74, 82, 105, 0.07);
 	--shadow-header: 0 10px 30px rgba(74, 82, 105, 0.08);
-	--shadow-accent: 0 8px 18px rgba(104, 69, 216, 0.22);
+	/*
+	 * Lifts a raised surface, not a control: accent buttons carry their colour and nothing else,
+	 * so a violet cast never reads as a glow around them.
+	 */
 	--shadow-accent-soft: 0 8px 18px rgba(104, 69, 216, 0.18);
-	--shadow-accent-vivid: 0 8px 18px rgba(124, 58, 237, 0.22);
 	--shadow-dialog: 0 24px 70px rgba(48, 56, 76, 0.28);
 	--shadow-update-dialog:
-		0 24px 70px rgba(0, 0, 0, 0.45),
-		0 0 38px rgba(167, 139, 250, 0.18);
+		0 24px 70px rgba(0, 0, 0, 0.45), 0 0 38px rgba(167, 139, 250, 0.18);
 	--shadow-palette: 0 28px 80px rgba(48, 56, 76, 0.34);
 	--shadow-menu: 0 18px 45px rgba(53, 61, 82, 0.2);
 	--shadow-drawer: 24px 0 70px rgba(50, 58, 78, 0.24);
@@ -72,6 +78,22 @@
 	background: var(--utility-accent);
 }
 
+/*
+ * Settings switch. Deliberately outside the Tailwind slate scale: the `.theme-graphite-surface`
+ * compatibility rules below rewrite every `bg-white`/`bg-slate-50…200` to `--surface-raised`, and
+ * the knob used one — so an enabled switch showed a near-black dot on a violet track. An off track
+ * is the inset surface rather than a light slate, which keeps the same near-white knob readable in
+ * both states.
+ */
+.settings-toggle-track {
+	background: var(--surface-inset);
+	border: 1px solid var(--border-neutral);
+}
+
+.settings-toggle-knob {
+	background: oklch(0.97 0.004 270);
+}
+
 .utility-accent-button:hover {
 	background: var(--utility-accent-hover);
 }
@@ -83,7 +105,10 @@
 }
 
 .navigation-category-row {
-	border-left-color: var(--navigation-category-accent, var(--category-neutral));
+	border-left-color: var(
+		--navigation-category-accent,
+		var(--category-neutral)
+	);
 }
 
 .navigation-category-row[data-category-accent='yellow'] {
@@ -124,6 +149,125 @@
 
 .navigation-category-row[data-category-accent='neutral'] {
 	--navigation-category-accent: var(--category-neutral);
+}
+
+/*
+ * Icon tones.
+ *
+ * Every lucide icon renders as `<svg class="lucide lucide-<kebab-name>">` with
+ * `stroke="currentColor"`, so setting `color` here paints the glyph. The mapping is semantic —
+ * a role owns a hue (destructive is red everywhere, confirmation is green everywhere) — and
+ * everything else takes a stable colour from the same --category-* palette the category rows use.
+ *
+ * These rules live in the `components` layer so a Tailwind text-colour utility written directly
+ * on an icon still wins; `tests/frontend/styles/icon-tones.test.tsx` fails the build when an icon
+ * reaches the UI without a tone.
+ */
+@layer components {
+	/* Destructive and terminal actions. */
+	.lucide-trash2,
+	.lucide-folder-x,
+	.lucide-power,
+	.lucide-x {
+		color: var(--category-red);
+	}
+
+	/* Warnings and dead ends. */
+	.lucide-triangle-alert,
+	.lucide-search-x {
+		color: var(--category-orange);
+	}
+
+	/* Favorites and folder targets. */
+	.lucide-star,
+	.lucide-folder-open {
+		color: var(--category-yellow);
+	}
+
+	/* Confirmation, trust and additive actions. */
+	.lucide-play,
+	.lucide-list-checks,
+	.lucide-check,
+	.lucide-badge-check,
+	.lucide-shield-check,
+	.lucide-plus,
+	.lucide-folder-plus,
+	.lucide-circle-arrow-right {
+		color: var(--category-green);
+	}
+
+	/* Scanning, searching and in-flight work. */
+	.lucide-refresh-cw,
+	.lucide-scan-search,
+	.lucide-folder-search,
+	.lucide-rotate-ccw,
+	.lucide-loader-circle,
+	.lucide-search,
+	.lucide-send {
+		color: var(--category-cyan);
+	}
+
+	/* Information, files and catalog overviews. */
+	.lucide-info,
+	.lucide-file-text,
+	.lucide-external-link,
+	.lucide-download,
+	.lucide-hard-drive,
+	.lucide-table-properties,
+	.lucide-grid2x2,
+	.lucide-corner-down-left {
+		color: var(--category-blue);
+	}
+
+	/* App chrome: settings, tools, windows, navigation, disclosure. */
+	.lucide-arrow-left,
+	.lucide-arrow-right,
+	.lucide-settings,
+	.lucide-wrench,
+	.lucide-app-window,
+	.lucide-keyboard,
+	.lucide-menu,
+	.lucide-box,
+	.lucide-copy,
+	.lucide-square,
+	.lucide-chevron-down,
+	.lucide-chevron-right {
+		color: var(--category-purple);
+	}
+
+	/* Editing and the "extras" hub. */
+	.lucide-sparkles,
+	.lucide-wand-sparkles,
+	.lucide-pencil,
+	.lucide-eye-off {
+		color: var(--category-pink);
+	}
+
+	/*
+	 * Deliberately muted: a drag handle sits on every card and the window buttons are OS chrome,
+	 * so a hue there reads as noise rather than meaning.
+	 */
+	.lucide-grip,
+	.lucide-minus {
+		color: var(--category-slate);
+	}
+
+	.lucide-ellipsis-vertical {
+		color: inherit;
+	}
+
+	/*
+	 * Opt-outs. A tone must not override a control that already encodes state or severity through
+	 * its own colour: the window buttons (grey, white on hover), a solid accent/danger button, a
+	 * destructive control (its glyph reads as part of the label, not as a second signal), the
+	 * favorite toggle (grey when off, yellow when on), and any disabled control.
+	 */
+	.app-titlebar .lucide,
+	.icon-follows-color .lucide,
+	.danger-button .lucide,
+	button:disabled .lucide {
+		color: inherit;
+	}
 }
 
 .navigation-category-count {
@@ -223,11 +367,7 @@ button {
 			oklch(0.48 0.04 250 / 0.18),
 			transparent 28rem
 		),
-		linear-gradient(
-			145deg,
-			oklch(0.32 0.013 270),
-			var(--surface-canvas)
-		);
+		linear-gradient(145deg, oklch(0.32 0.013 270), var(--surface-canvas));
 }
 
 .theme-soft-surface,
@@ -257,12 +397,11 @@ button {
 }
 
 .app-card-glass {
-	background:
-		linear-gradient(
-			145deg,
-			oklch(0.43 0.014 274 / 0.86),
-			oklch(0.34 0.016 282 / 0.76)
-		);
+	background: linear-gradient(
+		145deg,
+		oklch(0.43 0.014 274 / 0.86),
+		oklch(0.34 0.016 282 / 0.76)
+	);
 	-webkit-backdrop-filter: blur(16px) saturate(118%);
 	backdrop-filter: blur(16px) saturate(118%);
 	box-shadow:
@@ -300,6 +439,16 @@ button {
 	pointer-events: none;
 }
 
+.app-card-tile.app-card-glass {
+	box-shadow:
+		0 16px 34px oklch(0.14 0.014 270 / 0.34),
+		0 8px 22px oklch(0.58 0.14 292 / 0.06);
+}
+
+.app-card-tile.app-card-glass::after {
+	opacity: 0.25;
+}
+
 .theme-graphite-surface [class*='bg-white'],
 .theme-graphite-surface [class*='bg-slate-50'],
 .theme-graphite-surface [class*='bg-slate-100'],
@@ -307,8 +456,14 @@ button {
 	background-color: var(--surface-raised) !important;
 }
 
-.theme-graphite-surface [class*='bg-violet-100'] {
-	background-color: oklch(0.45 0.06 292 / 0.72) !important;
+/*
+ * Every `bg-violet-100` in the app is a `hover:` variant, but the attribute selector matches the
+ * class *string*, so without `:hover` the compatibility rule painted those controls permanently —
+ * the Telegram row sat lit as a solid violet band instead of highlighting under the pointer. The
+ * tint is also a highlight rather than a fill: it lifts the surface, it does not replace it.
+ */
+.theme-graphite-surface [class*='bg-violet-100']:hover {
+	background-color: oklch(0.45 0.06 292 / 0.26) !important;
 }
 
 .theme-graphite-surface [class*='bg-amber-50'],
@@ -322,7 +477,10 @@ button {
 	border-color: var(--border-neutral) !important;
 }
 
-.theme-graphite-surface [class*='divide-slate-200'] > :not([hidden]) ~ :not([hidden]) {
+.theme-graphite-surface
+	[class*='divide-slate-200']
+	> :not([hidden])
+	~ :not([hidden]) {
 	border-color: var(--border-neutral) !important;
 }
 
@@ -357,12 +515,11 @@ button {
 .theme-graphite-surface .search-input {
 	color: oklch(0.99 0.003 270) !important;
 	font-weight: 500;
-	background:
-		linear-gradient(
-			180deg,
-			oklch(0.42 0.012 274 / 0.88),
-			oklch(0.34 0.012 274 / 0.9)
-		) !important;
+	background: linear-gradient(
+		180deg,
+		oklch(0.42 0.012 274 / 0.88),
+		oklch(0.34 0.012 274 / 0.9)
+	) !important;
 	border-color: oklch(0.55 0.045 292 / 0.72) !important;
 	box-shadow:
 		inset 0 1px 0 oklch(0.76 0.04 292 / 0.12),
@@ -398,12 +555,11 @@ button {
 }
 
 .theme-graphite-surface .settings-surface {
-	background:
-		linear-gradient(
-			145deg,
-			oklch(0.38 0.012 274 / 0.9),
-			oklch(0.33 0.012 274 / 0.88)
-		) !important;
+	background: linear-gradient(
+		145deg,
+		oklch(0.38 0.012 274 / 0.9),
+		oklch(0.33 0.012 274 / 0.88)
+	) !important;
 	border-color: oklch(0.62 0.018 274 / 0.3) !important;
 	box-shadow:
 		0 16px 38px oklch(0.15 0.014 270 / 0.28),
@@ -445,6 +601,26 @@ button {
 	border: 1px solid oklch(0.74 0.1 24 / 0.5);
 }
 
+/*
+ * Fixed tiles, fluid column count. Breakpoint-pinned column counts (`sm:grid-cols-3 …`) made the
+ * card width a function of the window, so the same catalog looked cramped at 1024px and stretched
+ * at 1600px. `auto-fill` over a fixed track keeps the tile at exactly one size at every width and
+ * lets the number of columns fall out of the space available — including inside the drawer
+ * breakpoint, where the sidebar is gone and the row simply fits one more tile.
+ */
+.app-card-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, var(--app-card-width));
+	gap: var(--app-card-gap);
+	justify-content: center;
+}
+
+/* The tile size. `.app-card` alone would also catch AuxiliaryToolRow, which is a full-width row. */
+.app-card-tile {
+	width: var(--app-card-width);
+	height: var(--app-card-height);
+}
+
 .app-card {
 	animation: card-enter 280ms var(--motion-ease-out) both;
 }
@@ -454,12 +630,12 @@ button {
  * virtualization. Containment lives on the card (not the category section): a section with paint
  * containment would clip a card's open actions menu, the very bug the [data-menu-open] rule below
  * fixes. contain-intrinsic-size is the placeholder height used only until an element renders once
- * (the `auto` keyword then remembers the real size); ~10rem matches a typical card with its label,
- * so the scrollbar barely shifts as cards stream in.
+ * (the `auto` keyword then remembers the real size); the card height is now a fixed token, so the
+ * placeholder is exact and the scrollbar does not shift as cards stream in.
  */
 .cv-card {
 	content-visibility: auto;
-	contain-intrinsic-size: auto 10rem;
+	contain-intrinsic-size: auto var(--app-card-height);
 }
 
 /*
@@ -525,7 +701,8 @@ button {
 	padding: 2.4px;
 	border-radius: inherit;
 	background: radial-gradient(
-		var(--spotlight-size, 110px) circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+		var(--spotlight-size, 110px) circle at var(--mouse-x, 50%)
+			var(--mouse-y, 50%),
 		rgba(90, 230, 255, 0.95),
 		rgba(170, 80, 255, 0.62) 32%,
 		rgba(255, 70, 220, 0.28) 48%,
@@ -539,6 +716,10 @@ button {
 	mask-composite: exclude;
 	transition: opacity 160ms ease;
 	content: '';
+}
+
+.app-card-tile .spotlight::before {
+	padding: 1.4px;
 }
 
 .spotlight::after {

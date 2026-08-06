@@ -13,7 +13,7 @@ import { CATEGORY_ORDER } from '../../../../src/entities/category'
 describe('preferences', () => {
 	it('uses complete defaults', () => {
 		expect(DEFAULT_PREFERENCES).toMatchObject({
-			version: 8,
+			version: 12,
 			categoryOrder: CATEGORY_ORDER,
 			favoriteAppIds: [],
 			collapsedCategories: [],
@@ -59,7 +59,7 @@ describe('preferences', () => {
 		})
 
 		expect(migrated).toMatchObject({
-			version: 8,
+			version: 12,
 			favoriteAppIdentities: ['identity:codex'],
 		})
 		expect(migrated.categories).toContainEqual(
@@ -82,7 +82,7 @@ describe('preferences', () => {
 				collapsedCategories: ['other'],
 			}),
 		).toMatchObject({
-			version: 8,
+			version: 12,
 			favoriteAppIds: ['codex'],
 			collapsedCategories: ['other'],
 			categoryOverrides: {},
@@ -100,7 +100,7 @@ describe('preferences', () => {
 		})
 
 		expect(normalized).toMatchObject({
-			version: 8,
+			version: 12,
 			favoriteAppIds: ['code'],
 			unknownFields: {
 				experimentalLayout: { density: 'compact' },
@@ -133,7 +133,7 @@ describe('preferences', () => {
 		).toBe(true)
 
 		expect(JSON.parse(values.get(PREFERENCES_KEY) ?? '{}')).toMatchObject({
-			version: 8,
+			version: 12,
 			favoriteAppIds: ['code', 'editor'],
 			experimentalLayout: { density: 'compact' },
 		})
@@ -163,7 +163,7 @@ describe('preferences', () => {
 		})
 		// The id-keyed map is preserved (the store folds it into identities on the next catalog
 		// load); the new identity map defaults to empty so nothing is lost on upgrade.
-		expect(normalized.version).toBe(8)
+		expect(normalized.version).toBe(12)
 		expect(normalized.categoryOverrides).toEqual({ codex: 'ai' })
 		expect(normalized.categoryOverrideIdentities).toEqual({})
 	})
@@ -184,7 +184,7 @@ describe('preferences', () => {
 		})
 
 		expect(normalized).toMatchObject({
-			version: 8,
+			version: 12,
 			favoriteAppIds: ['cmd-shortcut'],
 			favoriteAppIdentities: [],
 			hiddenAppIds: ['cmd-shortcut'],
@@ -221,6 +221,183 @@ describe('preferences', () => {
 		])
 	})
 
+	it('upgrades a v8 document to empty manual installer marks without touching the rest', () => {
+		const normalized = normalizePreferences({
+			version: 8,
+			favoriteAppIds: ['code'],
+			favoriteAppIdentities: ['preference:code'],
+			hiddenAppIdentities: ['preference:helper'],
+			promotedAppIdentities: ['preference:tool'],
+			categoryOverrideIdentities: { 'preference:code': 'utilities' },
+		})
+
+		// v8 could not carry the marks, so the upgrade must default them rather than invent any,
+		// and every field the older document did carry has to survive untouched.
+		expect(normalized.version).toBe(12)
+		expect(normalized.installerAppIds).toEqual([])
+		expect(normalized.installerAppIdentities).toEqual([])
+		expect(normalized.legacyCanonicalPreferences.installer).toEqual([])
+		expect(normalized.favoriteAppIdentities).toEqual(['preference:code'])
+		expect(normalized.hiddenAppIdentities).toEqual(['preference:helper'])
+		expect(normalized.promotedAppIdentities).toEqual(['preference:tool'])
+		expect(normalized.categoryOverrideIdentities).toEqual({
+			'preference:code': 'utilities',
+		})
+	})
+
+	it('reads back the manual installer marks a v9 document carries', () => {
+		const normalized = normalizePreferences({
+			version: 9,
+			installerAppIds: ['setup', 'setup', '', 42],
+			installerAppIdentities: ['preference:setup'],
+			legacyCanonicalPreferences: { installer: ['product:unresolved'] },
+		})
+
+		expect(normalized.installerAppIds).toEqual(['setup'])
+		expect(normalized.installerAppIdentities).toEqual(['preference:setup'])
+		expect(normalized.legacyCanonicalPreferences.installer).toEqual([
+			'product:unresolved',
+		])
+	})
+
+	it('upgrades a v9 document to empty first-seen stamps', () => {
+		const normalized = normalizePreferences({
+			version: 9,
+			installerAppIdentities: ['preference:setup'],
+			firstSeenAt: { 'preference:setup': 1 },
+		})
+
+		// v9 could not carry stamps, so a value under that key is not ours to trust; the store
+		// refills the map from the next catalog load.
+		expect(normalized.version).toBe(12)
+		expect(normalized.firstSeenAt).toEqual({})
+		expect(normalized.installerAppIdentities).toEqual(['preference:setup'])
+	})
+
+	it('keeps only usable first-seen stamps from a v10 document', () => {
+		const normalized = normalizePreferences({
+			version: 10,
+			firstSeenAt: {
+				'preference:code': 1700000000000,
+				'preference:broken': 'yesterday',
+				'preference:zero': 0,
+				'preference:infinite': Number.POSITIVE_INFINITY,
+				'': 1700000000000,
+			},
+		})
+
+		expect(normalized.firstSeenAt).toEqual({
+			'preference:code': 1700000000000,
+		})
+	})
+
+	it('upgrades a v10 document to no scenarios and keeps its stamps', () => {
+		const normalized = normalizePreferences({
+			version: 10,
+			firstSeenAt: { 'preference:code': 1700000000000 },
+			scenarios: [{ id: 's1', name: 'Work', launchIdentities: ['x'] }],
+		})
+
+		// v10 could not carry scenarios, so a value under that key is not ours to trust.
+		expect(normalized.version).toBe(12)
+		expect(normalized.scenarios).toEqual([])
+		expect(normalized.firstSeenAt).toEqual({
+			'preference:code': 1700000000000,
+		})
+	})
+
+	it('keeps only scenarios a stored document can act on', () => {
+		const normalized = normalizePreferences({
+			version: 12,
+			scenarios: [
+				{
+					id: 'work',
+					name: '  Work  ',
+					launchIdentities: ['a', 'a', '', 42, 'b'],
+					closeIdentities: ['c'],
+					createdAt: 1700000000000,
+				},
+				// A duplicate id would make rename and delete ambiguous.
+				{ id: 'work', name: 'Work again', launchIdentities: [] },
+				{ id: '', name: 'No id' },
+				{ id: 'unnamed', name: '   ' },
+				'not an object',
+			],
+		})
+
+		expect(normalized.scenarios).toEqual([
+			{
+				id: 'work',
+				name: 'Work',
+				launchIdentities: ['a', 'b'],
+				closeIdentities: ['c'],
+				createdAt: 1700000000000,
+			},
+		])
+	})
+
+	// v11 stored scenarios without a creation date. Stamping them during the migration would
+	// claim they were made today, so they stay undated and the row simply omits it.
+	it('upgrades a v11 scenario to an undated one and keeps the rest of it', () => {
+		const normalized = normalizePreferences({
+			version: 11,
+			scenarios: [
+				{
+					id: 'work',
+					name: 'Work',
+					launchIdentities: ['a'],
+					closeIdentities: ['b'],
+				},
+			],
+		})
+
+		expect(normalized.version).toBe(12)
+		expect(normalized.scenarios).toEqual([
+			{
+				id: 'work',
+				name: 'Work',
+				launchIdentities: ['a'],
+				closeIdentities: ['b'],
+				createdAt: null,
+			},
+		])
+	})
+
+	it('rejects a malformed creation date instead of showing it', () => {
+		const normalized = normalizePreferences({
+			version: 12,
+			scenarios: [
+				{ id: 'a', name: 'Zero', createdAt: 0 },
+				{ id: 'b', name: 'Text', createdAt: 'yesterday' },
+				{ id: 'c', name: 'Infinite', createdAt: Number.POSITIVE_INFINITY },
+			],
+		})
+
+		expect(
+			normalized.scenarios.map(scenario => scenario.createdAt),
+		).toEqual([null, null, null])
+	})
+
+	it('caps the scenario list and each scenario list', () => {
+		const normalized = normalizePreferences({
+			version: 12,
+			scenarios: Array.from({ length: 80 }, (_, index) => ({
+				id: `s${index}`,
+				name: `Scenario ${index}`,
+				launchIdentities: Array.from(
+					{ length: 40 },
+					(_, entry) => `app-${entry}`,
+				),
+				closeIdentities: [],
+			})),
+		})
+
+		// One click runs the whole scenario, so the work it can start is bounded on read too —
+		// a hand-edited document cannot smuggle in an unbounded batch.
+		expect(normalized.scenarios).toHaveLength(50)
+		expect(normalized.scenarios[0]?.launchIdentities).toHaveLength(20)
+	})
+
 	it('keeps only valid durable override identities', () => {
 		expect(
 			normalizePreferences({
@@ -244,7 +421,7 @@ describe('preferences', () => {
 				collapsedCategories: ['games', 'invalid'],
 			}),
 		).toEqual({
-			version: 8,
+			version: 12,
 			categories: DEFAULT_PREFERENCES.categories,
 			categoryOrder: [
 				'browsers',
@@ -262,10 +439,15 @@ describe('preferences', () => {
 			hiddenAppIdentities: [],
 			promotedAppIds: [],
 			promotedAppIdentities: [],
+			installerAppIds: [],
+			installerAppIdentities: [],
+			scenarios: [],
+			firstSeenAt: {},
 			legacyCanonicalPreferences: {
 				favorite: [],
 				hidden: [],
 				promoted: [],
+				installer: [],
 				categoryOverrides: {},
 			},
 		})
@@ -320,11 +502,11 @@ describe('preferences', () => {
 		).toEqual(['a'])
 	})
 
-	// A newer build may have written a version 9 document; this build (v8) must not overwrite it
+	// A newer build may have written a version 13 document; this build (v12) must not overwrite it
 	// with the older shape and strip the fields it does not know about.
 	it('does not overwrite a document written by a newer version', () => {
 		const future = JSON.stringify({
-			version: 9,
+			version: 13,
 			favoriteAppIds: ['keep'],
 			futureField: 'preserved',
 		})

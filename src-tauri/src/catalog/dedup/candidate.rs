@@ -7,8 +7,8 @@ use super::family::{
 };
 use super::signals::is_helper_candidate;
 use super::target::{
-    is_system_tool_target, launch_target, normalize_path, parent_path, steam_app_id,
-    system_tool_alias,
+    is_squirrel_stub, is_system_tool_target, launch_target, normalize_path, parent_path,
+    squirrel_package, steam_app_id, system_tool_alias,
 };
 use crate::catalog::{AppInfo, LaunchKind, SourceKind, VisibilityReason};
 use std::path::Path;
@@ -24,6 +24,7 @@ pub(super) struct AppCandidate {
     pub(super) helper_family: String,
     pub(super) publisher_key: String,
     pub(super) parent: Option<String>,
+    pub(super) squirrel_package: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -47,6 +48,7 @@ impl From<AppInfo> for AppCandidate {
             helper_family: helper_variant_family(&family),
             publisher_key: normalized_publisher(app.publisher.as_deref()),
             parent: parent_path(&identity.path),
+            squirrel_package: squirrel_package(&app),
             family,
             identity,
             app,
@@ -99,7 +101,7 @@ fn is_side_action(app: &AppInfo) -> bool {
 }
 
 pub(super) fn candidate_score(app: &AppInfo) -> u8 {
-    if is_helper_candidate(app) || is_side_action(app) {
+    if is_helper_candidate(app) || is_side_action(app) || is_squirrel_stub(app) {
         return 1;
     }
     if app.source_kind == SourceKind::Steam {

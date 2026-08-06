@@ -34,7 +34,7 @@ export function ScanPrompt({ isScanning, onScan, onDismiss }: Props) {
 					type='button'
 					disabled={isScanning}
 					onClick={() => void onScan()}
-					className='utility-accent-button mt-6 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-(--shadow-accent) focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-60'
+					className='utility-accent-button mt-6 rounded-xl px-5 py-2.5 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-violet-500 disabled:opacity-60'
 				>
 					{isScanning ? 'Scanning applications…' : 'Scan for apps'}
 				</button>

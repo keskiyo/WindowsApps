@@ -6,12 +6,17 @@ import {
 	isCustomCategoryAccent,
 	stableCustomCategoryAccent,
 } from '../../entities/category'
+import {
+	MAX_SCENARIO_ENTRIES,
+	MAX_SCENARIOS,
+	type Scenario,
+} from '../../entities/scenario'
 
 export const PREFERENCES_KEY = 'windows-apps.preferences.v1'
 
 /** The schema version this build understands. `version` in the stored document is independent
  * of the key name; see `AGENTS_frontend.md` §3. */
-export const CURRENT_PREFERENCES_VERSION = 8
+export const CURRENT_PREFERENCES_VERSION = 12
 
 /**
  * Previous known-good copy. The backend cache has kept a `.bak` and recovered from it since the
@@ -25,11 +30,12 @@ export interface LegacyCanonicalPreferences {
 	favorite: string[]
 	hidden: string[]
 	promoted: string[]
+	installer: string[]
 	categoryOverrides: Record<string, AppCategory>
 }
 
-export interface AppPreferencesV8 {
-	version: 8
+export interface AppPreferencesV12 {
+	version: 12
 	categories: CategoryDefinition[]
 	categoryOrder: AppCategory[]
 	// `*AppIds` are catalog ids: durable within a version, but an id is a function of the
@@ -50,12 +56,25 @@ export interface AppPreferencesV8 {
 	hiddenAppIdentities: string[]
 	promotedAppIds: string[]
 	promotedAppIdentities: string[]
+	// Applications the user filed into Installers & Docs by hand. The scanner's own verdict lives
+	// on `AppInfo.artifactKind` and is not stored here: only the manual marks are user data.
+	// There is no documentation counterpart on purpose — the scanner detects docs reliably, and a
+	// manual mark always means "this is an installer".
+	installerAppIds: string[]
+	installerAppIdentities: string[]
+	// Named launch/close lists. Their entries are card identities for the same reason the sets
+	// above are: a scenario keyed by catalog id would quietly empty itself after a Force full scan.
+	scenarios: Scenario[]
+	// When each card was first seen in the catalog, keyed by the durable card identity. The
+	// catalog itself carries no timestamp, so this is the only source for "recently added"; it is
+	// pruned to the current catalog on every load, which bounds it to the catalog's size.
+	firstSeenAt: Record<string, number>
 	legacyCanonicalPreferences: LegacyCanonicalPreferences
 	unknownFields?: Record<string, unknown>
 }
 
-export const DEFAULT_PREFERENCES: AppPreferencesV8 = {
-	version: 8,
+export const DEFAULT_PREFERENCES: AppPreferencesV12 = {
+	version: 12,
 	categories: DEFAULT_CATEGORIES.map(category => ({ ...category })),
 	categoryOrder: [...CATEGORY_ORDER],
 	favoriteAppIds: [],
@@ -67,10 +86,15 @@ export const DEFAULT_PREFERENCES: AppPreferencesV8 = {
 	hiddenAppIdentities: [],
 	promotedAppIds: [],
 	promotedAppIdentities: [],
+	installerAppIds: [],
+	installerAppIdentities: [],
+	scenarios: [],
+	firstSeenAt: {},
 	legacyCanonicalPreferences: {
 		favorite: [],
 		hidden: [],
 		promoted: [],
+		installer: [],
 		categoryOverrides: {},
 	},
 }
@@ -158,10 +182,66 @@ const KNOWN_PREFERENCE_FIELDS = new Set([
 	'hiddenAppIdentities',
 	'promotedAppIds',
 	'promotedAppIdentities',
+	'installerAppIds',
+	'installerAppIdentities',
+	'scenarios',
+	'firstSeenAt',
 	'legacyCanonicalPreferences',
 ])
 
-export function normalizePreferences(value: unknown): AppPreferencesV8 {
+/**
+ * Scenarios as the store may use them: named, bounded, and free of entries it cannot act on.
+ * A malformed record is dropped rather than repaired — a scenario with half its list missing
+ * would run something the user never chose.
+ */
+function normalizeScenarios(value: unknown): Scenario[] {
+	if (!Array.isArray(value)) return []
+	const seenIds = new Set<string>()
+	const scenarios: Scenario[] = []
+	for (const item of value.slice(0, MAX_SCENARIOS)) {
+		if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+		const raw = item as Record<string, unknown>
+		const id = typeof raw.id === 'string' ? raw.id.trim() : ''
+		const name = typeof raw.name === 'string' ? raw.name.trim() : ''
+		if (!id || !name || seenIds.has(id)) continue
+		seenIds.add(id)
+		// v11 scenarios carry no creation date. Stamping them with the migration's own clock
+		// would say "created today" about a scenario made weeks ago, so they stay undated.
+		const createdAt = raw.createdAt
+		scenarios.push({
+			id,
+			name,
+			launchIdentities: uniqueStrings(raw.launchIdentities).slice(
+				0,
+				MAX_SCENARIO_ENTRIES,
+			),
+			closeIdentities: uniqueStrings(raw.closeIdentities).slice(
+				0,
+				MAX_SCENARIO_ENTRIES,
+			),
+			createdAt:
+				typeof createdAt === 'number' &&
+				Number.isFinite(createdAt) &&
+				createdAt > 0
+					? createdAt
+					: null,
+		})
+	}
+	return scenarios
+}
+
+/** A `{ identity -> epoch millis }` map, keeping only usable keys and finite positive times. */
+function normalizeTimestampMap(value: unknown): Record<string, number> {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+	return Object.fromEntries(
+		Object.entries(value as Record<string, unknown>).filter(
+			([key, at]) =>
+				key.trim() && typeof at === 'number' && Number.isFinite(at) && at > 0,
+		),
+	) as Record<string, number>
+}
+
+export function normalizePreferences(value: unknown): AppPreferencesV12 {
 	if (!value || typeof value !== 'object')
 		return structuredClone(DEFAULT_PREFERENCES)
 	const raw = value as Record<string, unknown>
@@ -181,7 +261,16 @@ export function normalizePreferences(value: unknown): AppPreferencesV8 {
 		raw.categoryOverrideIdentities,
 		known,
 	)
-	const hasDurableIdentities = raw.version === 7 || raw.version === 8
+	const version = typeof raw.version === 'number' ? raw.version : 0
+	// Durable identities landed in v7 and every later version keeps them; a `>=` test upgrades a
+	// document written by a newer build without wiping the identities it does carry.
+	const hasDurableIdentities = version >= 7
+	// v9 added the manual installer marks, v10 the first-seen stamps, v11 the scenarios. Nothing
+	// older can carry them, so an earlier document upgrades to an empty value rather than to a
+	// guess — and the stamps refill themselves from the next catalog load.
+	const hasInstallerMarks = version >= 9
+	const hasFirstSeen = version >= 10
+	const hasScenarios = version >= 11
 	const rawLegacy =
 		hasDurableIdentities &&
 		raw.legacyCanonicalPreferences &&
@@ -203,6 +292,7 @@ export function normalizePreferences(value: unknown): AppPreferencesV8 {
 				? rawLegacy.promoted
 				: raw.promotedAppIdentities,
 		),
+		installer: uniqueStrings(hasInstallerMarks ? rawLegacy.installer : []),
 		categoryOverrides: normalizeOverrideMap(
 			hasDurableIdentities
 				? rawLegacy.categoryOverrides
@@ -216,7 +306,7 @@ export function normalizePreferences(value: unknown): AppPreferencesV8 {
 		),
 	)
 	return {
-		version: 8,
+		version: 12,
 		categories,
 		categoryOrder,
 		favoriteAppIds: uniqueStrings(raw.favoriteAppIds),
@@ -238,12 +328,20 @@ export function normalizePreferences(value: unknown): AppPreferencesV8 {
 		promotedAppIdentities: hasDurableIdentities
 			? uniqueStrings(raw.promotedAppIdentities)
 			: [],
+		installerAppIds: hasInstallerMarks
+			? uniqueStrings(raw.installerAppIds)
+			: [],
+		installerAppIdentities: hasInstallerMarks
+			? uniqueStrings(raw.installerAppIdentities)
+			: [],
+		scenarios: hasScenarios ? normalizeScenarios(raw.scenarios) : [],
+		firstSeenAt: hasFirstSeen ? normalizeTimestampMap(raw.firstSeenAt) : {},
 		legacyCanonicalPreferences,
 		...(Object.keys(unknownFields).length > 0 ? { unknownFields } : {}),
 	}
 }
 
-export function readPreferences(storage: Storage): AppPreferencesV8 {
+export function readPreferences(storage: Storage): AppPreferencesV12 {
 	return (
 		readSlot(storage, PREFERENCES_KEY) ??
 		readSlot(storage, PREFERENCES_BACKUP_KEY) ??
@@ -252,7 +350,7 @@ export function readPreferences(storage: Storage): AppPreferencesV8 {
 }
 
 /** `null` means "nothing usable here", so the caller can fall through to the next source. */
-function readSlot(storage: Storage, key: string): AppPreferencesV8 | null {
+function readSlot(storage: Storage, key: string): AppPreferencesV12 | null {
 	try {
 		const value = storage.getItem(key)
 		return value ? normalizePreferences(JSON.parse(value)) : null
@@ -270,10 +368,10 @@ function readSlot(storage: Storage, key: string): AppPreferencesV8 | null {
  */
 export function writePreferences(
 	storage: Storage,
-	preferences: AppPreferencesV8,
+	preferences: AppPreferencesV12,
 ): boolean {
 	// If the stored document was written by a newer version than this build understands, leave
-	// it untouched: overwriting it with the older v5 shape would strip fields the newer build
+	// it untouched: overwriting it with the older shape would strip fields the newer build
 	// added, silently losing settings the moment the user downgrades. The runtime still reflects
 	// the change this session; it simply is not persisted over the newer format. Reported as a
 	// success because it is a deliberate protection, not a storage failure.

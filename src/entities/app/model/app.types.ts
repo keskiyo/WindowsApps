@@ -60,6 +60,8 @@ export interface AppInfo {
 	canonicalIdentity?: string | null
 	preferenceIdentity?: string | null
 	userPromoted?: boolean
+	/** Derived, never from the backend: the user filed this application into Installers & Docs. */
+	userInstaller?: boolean
 	visibilityClass?: AppVisibilityClass
 	visibilityScore?: number
 	visibilityReasons?: AppVisibilityReason[]
@@ -79,6 +81,8 @@ export interface AppDetails {
 export type AppView =
 	| 'all'
 	| 'favorites'
+	| 'more'
+	| 'scenarios'
 	| 'settings'
 	| 'hidden'
 	| 'auxiliary'
@@ -152,6 +156,17 @@ export interface LaunchStatus {
 	state: 'ready' | 'failed'
 }
 
+/**
+ * What one close request achieved, counted across the batch it was given. Three outcomes stay
+ * distinguishable: the app was stopped, it was not running, or nothing identifies the program it
+ * runs as — a `steam://` target, a Store package whose manifest resolved no executable.
+ */
+export interface CloseAppsResult {
+	closed: number
+	notRunning: number
+	unavailable: number
+}
+
 export interface AppsClient {
 	getApps(): Promise<CatalogSnapshot>
 	refreshApps(): Promise<AppInfo[]>
@@ -162,6 +177,12 @@ export interface AppsClient {
 	startBackgroundSync?(): Promise<void>
 	cancelScan(): Promise<void>
 	launchApp(app: Pick<AppInfo, 'id'>): Promise<void>
+	/**
+	 * Asks every window of the given apps to close, then terminates whatever ignored the request.
+	 * One call per batch, not per app: the backend enumerates once and waits out a single grace
+	 * period, so closing ten apps costs what closing one does.
+	 */
+	closeApps(ids: string[]): Promise<CloseAppsResult>
 	getAppDetails(id: string): Promise<AppDetails>
 	openAppFolder(id: string): Promise<void>
 	getUninstallPreview(id: string): Promise<UninstallPreview>

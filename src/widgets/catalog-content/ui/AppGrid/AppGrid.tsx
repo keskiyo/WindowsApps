@@ -12,7 +12,7 @@ export function AppGrid(props: AppGridProps) {
 		return (
 			<section
 				aria-label='Loading applications'
-				className='grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+				className='app-card-grid'
 			>
 				{Array.from({ length: 12 }, (_, index) => (
 					<Skeleton key={index} />
@@ -42,6 +42,7 @@ export function AppGrid(props: AppGridProps) {
 			<HiddenGrid
 				apps={props.apps}
 				hasQuery={props.hasQuery}
+				onBack={props.onBack}
 				favoriteAppIds={props.favoriteAppIds}
 				categories={props.categories}
 				categoryOrder={props.categoryOrder}
@@ -60,6 +61,7 @@ export function AppGrid(props: AppGridProps) {
 			<AuxiliaryGrid
 				apps={props.apps}
 				hasQuery={props.hasQuery}
+				onBack={props.onBack}
 				favoriteAppIds={props.favoriteAppIds}
 				categories={props.categories}
 				categoryOrder={props.categoryOrder}

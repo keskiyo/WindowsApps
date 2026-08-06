@@ -36,6 +36,31 @@ export function floatingMenuPosition(
 	return { left, top }
 }
 
+export function floatingSubmenuPosition(
+	menu: AnchorBounds,
+	panelWidth: number,
+	panelHeight: number,
+	viewportWidth: number,
+	viewportHeight: number,
+	padding = 12,
+	gap = 4,
+): { left: number; top: number; side: 'left' | 'right' } {
+	const fitsRight = menu.right + gap + panelWidth <= viewportWidth - padding
+	const left = fitsRight ? menu.right + gap : menu.left - gap - panelWidth
+
+	return {
+		left: Math.min(
+			Math.max(left, padding),
+			Math.max(padding, viewportWidth - panelWidth - padding),
+		),
+		top: Math.min(
+			Math.max(menu.top, padding),
+			Math.max(padding, viewportHeight - panelHeight - padding),
+		),
+		side: fitsRight ? 'right' : 'left',
+	}
+}
+
 export function requiredMenuScroll(
 	anchorBottom: number,
 	menuHeight: number,
