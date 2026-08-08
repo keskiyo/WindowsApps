@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import type { AppInfo } from '../../entities/app'
 import type { AppCategory, CategoryDefinition } from '../../entities/category'
+import type { Scenario } from '../../entities/scenario'
 
 export interface CatalogViewHeaderProps {
 	icon: LucideIcon
@@ -26,7 +27,7 @@ export interface AuxiliaryGridProps {
 	onDemote(id: string): void
 }
 
-export interface FavoritesGridProps {
+export interface CatalogGridProps {
 	apps: AppInfo[]
 	hasQuery: boolean
 	favoriteAppIds: string[]
@@ -42,7 +43,19 @@ export interface FavoritesGridProps {
 	onDemote(id: string): void
 }
 
-export interface HiddenGridProps extends FavoritesGridProps {
+export interface FavoriteScenariosPanel {
+	scenarios: Scenario[]
+	apps: AppInfo[]
+	runningId: string | null
+	onRun(id: string): void
+	onToggleFavorite(id: string): void
+}
+
+export interface FavoritesGridProps extends CatalogGridProps {
+	favoriteScenarios: FavoriteScenariosPanel
+}
+
+export interface HiddenGridProps extends CatalogGridProps {
 	onBack(): void
 }
 

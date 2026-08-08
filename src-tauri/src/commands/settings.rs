@@ -20,6 +20,7 @@ pub(crate) struct SystemSettings {
 
 fn normalize_scan_settings(
     settings: catalog::scan_settings::ScanSettings,
+    stored: &catalog::scan_settings::ScanSettings,
 ) -> Result<catalog::scan_settings::ScanSettings, AppError> {
     let normalize = |values: Vec<String>| -> Result<Vec<String>, AppError> {
         let mut normalized = Vec::<String>::new();
@@ -44,6 +45,8 @@ fn normalize_scan_settings(
         auto_scan_fixed_drives: settings.auto_scan_fixed_drives,
         included_paths: normalize(settings.included_paths)?,
         excluded_paths: normalize(settings.excluded_paths)?,
+        catalog_target_availability_v1: stored.catalog_target_availability_v1,
+        catalog_portable_fingerprint_v1: stored.catalog_portable_fingerprint_v1,
     })
 }
 
@@ -84,11 +87,11 @@ pub(crate) async fn set_scan_settings(
     app: tauri::AppHandle,
     settings: catalog::scan_settings::ScanSettings,
 ) -> Result<catalog::scan_settings::ScanSettings, AppError> {
-    let settings = normalize_scan_settings(settings)?;
     let app_data_dir = app
         .path()
         .app_data_dir()
         .map_err(|error| AppError::AppDataDir(error.to_string()))?;
+    let settings = normalize_scan_settings(settings, &catalog::scan_settings::read(&app_data_dir))?;
     let watcher_settings = settings.clone();
     run_blocking("Scan settings update", move || {
         catalog::scan_settings::write(&app_data_dir, &watcher_settings)
@@ -130,8 +133,11 @@ mod tests {
                 r"F:\Stick\Tools".into(),
             ],
             excluded_paths: vec![r"\\Server\Share".into()],
+            catalog_target_availability_v1: true,
+            catalog_portable_fingerprint_v1: true,
         };
-        let normalized = normalize_scan_settings(settings).unwrap();
+        let stored = catalog::scan_settings::ScanSettings::default();
+        let normalized = normalize_scan_settings(settings, &stored).unwrap();
         assert_eq!(
             normalized.included_paths,
             vec![r"D:\Portable", r"F:\Stick\Tools"]
@@ -142,7 +148,27 @@ mod tests {
             auto_scan_fixed_drives: true,
             included_paths: vec![r"relative\path".into()],
             excluded_paths: Vec::new(),
+            catalog_target_availability_v1: true,
+            catalog_portable_fingerprint_v1: true,
         };
-        assert!(normalize_scan_settings(invalid).is_err());
+        assert!(normalize_scan_settings(invalid, &stored).is_err());
+    }
+
+    #[test]
+    fn the_availability_rollback_flag_comes_from_disk_not_from_the_window() {
+        let rolled_back = catalog::scan_settings::ScanSettings {
+            catalog_target_availability_v1: false,
+            catalog_portable_fingerprint_v1: false,
+            ..catalog::scan_settings::ScanSettings::default()
+        };
+        let from_window = catalog::scan_settings::ScanSettings {
+            catalog_target_availability_v1: true,
+            catalog_portable_fingerprint_v1: true,
+            ..catalog::scan_settings::ScanSettings::default()
+        };
+
+        let normalized = normalize_scan_settings(from_window, &rolled_back).unwrap();
+
+        assert!(!normalized.catalog_target_availability_v1);
     }
 }

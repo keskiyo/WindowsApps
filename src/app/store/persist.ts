@@ -17,7 +17,7 @@ export function createPersist({
 	return () => {
 		const state = get()
 		const persisted = writePreferences(storage, {
-			version: 12,
+			version: 13,
 			categories: state.categories,
 			categoryOrder: state.categoryOrder,
 			favoriteAppIds: state.favoriteAppIds,
@@ -32,6 +32,7 @@ export function createPersist({
 			installerAppIds: state.installerAppIds,
 			installerAppIdentities: state.installerAppIdentities,
 			scenarios: state.scenarios,
+			favoriteScenarioIds: state.favoriteScenarioIds,
 			firstSeenAt: state.firstSeenAt,
 			legacyCanonicalPreferences: state.legacyCanonicalPreferences,
 			unknownFields,

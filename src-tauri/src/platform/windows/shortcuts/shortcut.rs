@@ -10,15 +10,11 @@ use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
 pub(crate) struct ShortcutDetails {
     pub target: Option<PathBuf>,
     pub icon_location: Option<PathBuf>,
-    /// Command-line arguments stored in the shortcut. A non-empty value usually marks a
-    /// "command" shortcut (e.g. `pg_ctl ... reload`) rather than a plain application.
-    /// Read for the upcoming command-like filtering diagnostics; not consumed yet.
     #[allow(dead_code)]
     pub arguments: Option<String>,
 }
 
 pub(crate) fn resolve(path: &Path) -> ShortcutDetails {
-    // One apartment per worker thread, not one per shortcut — see `platform::windows::com`.
     crate::platform::windows::com::ensure_initialized();
     // SAFETY: `resolve_inner`'s only precondition is a COM apartment on the calling thread, which
     // the line above establishes and which lives as long as the thread does. A shortcut that
@@ -26,9 +22,6 @@ pub(crate) fn resolve(path: &Path) -> ShortcutDetails {
     unsafe { resolve_inner(path) }.unwrap_or_default()
 }
 
-/// # Safety
-///
-/// The calling thread must have an initialized COM apartment; call `resolve` rather than this.
 unsafe fn resolve_inner(path: &Path) -> windows::core::Result<ShortcutDetails> {
     // SAFETY: the caller guarantees an initialized apartment. `CoCreateInstance` is given the
     // static `ShellLink` CLSID, no aggregation, and an in-process context; the returned interface
@@ -42,9 +35,6 @@ unsafe fn resolve_inner(path: &Path) -> windows::core::Result<ShortcutDetails> {
     // HRESULT, which `?` propagates before any buffer below is read.
     unsafe { persist.Load(PCWSTR(path_wide.as_ptr()), STGM_READ)? };
 
-    // Reused across shortcuts instead of allocating and zeroing three 64 KB buffers per `.lnk`
-    // — a Start Menu with a few hundred entries otherwise churned ~100 MB per scan. Capacity is
-    // unchanged (the Windows maximum path length), so nothing is truncated that was not before.
     BUFFERS.with(|buffers| {
         let buffers = &mut *buffers.borrow_mut();
         for buffer in [
@@ -68,8 +58,6 @@ unsafe fn resolve_inner(path: &Path) -> windows::core::Result<ShortcutDetails> {
         let _ = unsafe { link.GetArguments(&mut buffers.arguments) };
         Ok(ShortcutDetails {
             target: path_from_buffer(&buffers.target),
-            // Installers write icon locations with forward slashes and 8.3 names
-            // (C:/PROGRA~1/...). Normalize separators so cache keys stay consistent.
             icon_location: path_from_buffer(&buffers.icon)
                 .map(|path| PathBuf::from(path.to_string_lossy().replace('/', r"\"))),
             arguments: string_from_buffer(&buffers.arguments),

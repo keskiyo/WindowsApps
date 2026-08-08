@@ -12,6 +12,7 @@ export interface ScenarioRunSummary {
 	closed: number
 	notRunning: number
 	unavailable: number
+	blocked: number
 }
 
 interface RunnerOptions {
@@ -26,6 +27,7 @@ const NOTHING_CLOSED: CloseAppsResult = {
 	closed: 0,
 	notRunning: 0,
 	unavailable: 0,
+	blocked: 0,
 }
 
 export function useScenarioRunner({
@@ -80,6 +82,7 @@ export function useScenarioRunner({
 				closed: closeResult.closed,
 				notRunning: closeResult.notRunning,
 				unavailable: unavailable + closeResult.unavailable,
+				blocked: closeResult.blocked ?? 0,
 			})
 		},
 		[apps, closeApps, launch, onFinished, runningId],

@@ -59,3 +59,28 @@ fn entries_from(hive: winreg::HKEY, subkey: &str) -> Vec<RegistryEntry> {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_registry_root_that_cannot_be_opened_yields_no_entries_instead_of_failing() {
+        let entries = entries_from(
+            HKEY_CURRENT_USER,
+            r"Software\WindowsAppsLauncher\NoSuchUninstallRoot",
+        );
+
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn a_reachable_root_is_still_enumerated() {
+        let entries = entries_from(
+            HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+        );
+
+        assert!(!entries.is_empty());
+    }
+}

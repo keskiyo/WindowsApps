@@ -1,10 +1,3 @@
-//! Launch arguments that change what a shortcut actually starts.
-//!
-//! Separate from `identity` because this is command-line parsing, not identity derivation:
-//! `identity` asks "which application is this", this file answers "were these two started in
-//! different modes" — the distinction that keeps a browser profile shortcut from merging with
-//! the browser itself.
-
 use super::target::normalize_path;
 
 pub(super) fn meaningful_launch_arguments(value: Option<&str>) -> Option<String> {
@@ -60,12 +53,6 @@ pub(super) fn meaningful_launch_arguments(value: Option<&str>) -> Option<String>
     (!meaningful.is_empty()).then(|| meaningful.join(" "))
 }
 
-/// The executable a Squirrel updater stub is asked to start: `Update.exe --processStart App.exe`.
-///
-/// Deliberately *not* part of `meaningful_launch_arguments`: this argument does not put the product
-/// into a different mode, it names the product. Treating it as a mode would make the stub and the
-/// application disagree on `launch_mode`, which `evidence::should_merge` vetoes outright — the
-/// opposite of what recognizing it is for.
 pub(super) fn squirrel_process_start(value: Option<&str>) -> Option<String> {
     let tokens = tokenize_quoted_arguments(value?);
     let mut index = 0;
@@ -79,8 +66,6 @@ pub(super) fn squirrel_process_start(value: Option<&str>) -> Option<String> {
                 .map(|next| next.trim_matches('"').to_lowercase()),
             None => None,
         };
-        // A bare file name is what Squirrel writes; anything carrying a path is not this layout,
-        // so it is rejected rather than guessed at.
         if let Some(started) = started.filter(|value| {
             value.ends_with(".exe") && !value.contains('\\') && !value.contains('/')
         }) {

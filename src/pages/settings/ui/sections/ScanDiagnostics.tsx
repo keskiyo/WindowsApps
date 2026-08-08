@@ -1,6 +1,8 @@
-import { Wrench } from 'lucide-react'
+import { ChevronDown, Wrench } from 'lucide-react'
 import { useState } from 'react'
 import type { ScanDiagnosticsProps } from '../../types'
+import { SourceHealthTable } from './SourceHealthTable'
+import { TargetAvailabilityPanel } from './TargetAvailabilityPanel'
 
 export function ScanDiagnostics({ diagnostics }: ScanDiagnosticsProps) {
 	const [expanded, setExpanded] = useState(false)
@@ -11,10 +13,15 @@ export function ScanDiagnostics({ diagnostics }: ScanDiagnosticsProps) {
 				aria-expanded={expanded}
 				aria-controls="catalog-diagnostics"
 				onClick={() => setExpanded(value => !value)}
-				className="flex items-center gap-2 text-sm font-medium text-slate-800 focus-visible:outline-2 focus-visible:outline-violet-500"
+				className="-mx-2 flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-(--surface-raised) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--accent-strong)"
 			>
 				<Wrench size={16} aria-hidden="true" />
-				Last scan diagnostics
+				<span className="flex-1">Last scan diagnostics</span>
+				<ChevronDown
+					size={16}
+					aria-hidden="true"
+					className={`transition-transform duration-(--motion-fast) motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
+				/>
 			</button>
 			{expanded && (
 				<div id="catalog-diagnostics">
@@ -46,6 +53,10 @@ export function ScanDiagnostics({ diagnostics }: ScanDiagnosticsProps) {
 								.join(' · ')}
 						</p>
 					)}
+					<SourceHealthTable sources={diagnostics.sources ?? []} />
+					<TargetAvailabilityPanel
+						diff={diagnostics.targetAvailability}
+					/>
 				</div>
 			)}
 		</div>

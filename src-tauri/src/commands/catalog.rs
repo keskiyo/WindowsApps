@@ -92,9 +92,6 @@ pub(crate) async fn reset_catalog_cache(app: tauri::AppHandle) -> Result<Vec<App
         {
             let state = app.state::<AppState>();
             state.scan_coordinator.cancel_all();
-            // `cancel_all` only raises the flag. Acquiring the cache lock waits for any scan
-            // still finishing to release it, so the files are deleted with no scan mid-write.
-            // The guard is dropped here — the fresh scan below takes the same lock.
             let _guard = state.sync_lock.lock().map_err(|_| {
                 AppError::ResetCatalogCache("catalog synchronization is unavailable".into())
             })?;

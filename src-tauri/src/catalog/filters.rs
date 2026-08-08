@@ -1,6 +1,3 @@
-//! Structural source filtering. Vocabulary-based maintenance and documentation decisions belong
-//! to `catalog::visibility`, where a false positive remains recoverable in Auxiliary tools.
-
 use std::path::{Path, PathBuf};
 pub(super) fn clean_display_icon(value: &str) -> Option<PathBuf> {
     let trimmed = value.trim().trim_start_matches('\\').trim();
@@ -111,12 +108,8 @@ pub(super) fn is_runtime_internal_path(path: &str) -> bool {
     .any(|marker| normalized.contains(marker))
 }
 
-/// Junk-detection for installer/updater executables by file name (stem, no extension).
-/// Splits the stem into alphanumeric tokens to catch `setup-app`, `app-installer`,
-/// `setup_x64`, and also matches glued names like `AppSetup` via prefix/suffix.
 pub(crate) fn is_installer_file_name(stem: &str) -> bool {
     let lower = stem.to_lowercase();
-    // 7-Zip installers are named like `7z2501-x64`; the real app is `7zFM`/`7zG`/`7z`.
     if lower.starts_with("7z")
         && lower[2..]
             .chars()
@@ -138,8 +131,6 @@ pub(crate) fn is_installer_file_name(stem: &str) -> bool {
     let has_token = lower
         .split(|character: char| !character.is_alphanumeric())
         .filter(|token| !token.is_empty())
-        // `contains` catches install/installer/instaler/installation, uninstall, and
-        // vcredist2005_x64 / vc_redist / redistributables, including misspellings.
         .any(|token| {
             token.contains("instal")
                 || token.contains("redist")

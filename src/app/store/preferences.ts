@@ -14,7 +14,7 @@ import {
 
 export const PREFERENCES_KEY = 'windows-apps.preferences.v1'
 
-export const CURRENT_PREFERENCES_VERSION = 12
+export const CURRENT_PREFERENCES_VERSION = 13
 
 export const PREFERENCES_BACKUP_KEY = 'windows-apps.preferences.v1.bak'
 
@@ -26,8 +26,8 @@ export interface LegacyCanonicalPreferences {
 	categoryOverrides: Record<string, AppCategory>
 }
 
-export interface AppPreferencesV12 {
-	version: 12
+export interface AppPreferencesV13 {
+	version: 13
 	categories: CategoryDefinition[]
 	categoryOrder: AppCategory[]
 	favoriteAppIds: string[]
@@ -42,13 +42,14 @@ export interface AppPreferencesV12 {
 	installerAppIds: string[]
 	installerAppIdentities: string[]
 	scenarios: Scenario[]
+	favoriteScenarioIds: string[]
 	firstSeenAt: Record<string, number>
 	legacyCanonicalPreferences: LegacyCanonicalPreferences
 	unknownFields?: Record<string, unknown>
 }
 
-export const DEFAULT_PREFERENCES: AppPreferencesV12 = {
-	version: 12,
+export const DEFAULT_PREFERENCES: AppPreferencesV13 = {
+	version: 13,
 	categories: DEFAULT_CATEGORIES.map(category => ({ ...category })),
 	categoryOrder: [...CATEGORY_ORDER],
 	favoriteAppIds: [],
@@ -63,6 +64,7 @@ export const DEFAULT_PREFERENCES: AppPreferencesV12 = {
 	installerAppIds: [],
 	installerAppIdentities: [],
 	scenarios: [],
+	favoriteScenarioIds: [],
 	firstSeenAt: {},
 	legacyCanonicalPreferences: {
 		favorite: [],
@@ -158,6 +160,7 @@ const KNOWN_PREFERENCE_FIELDS = new Set([
 	'installerAppIds',
 	'installerAppIdentities',
 	'scenarios',
+	'favoriteScenarioIds',
 	'firstSeenAt',
 	'legacyCanonicalPreferences',
 ])
@@ -209,7 +212,7 @@ function normalizeTimestampMap(value: unknown): Record<string, number> {
 	) as Record<string, number>
 }
 
-export function normalizePreferences(value: unknown): AppPreferencesV12 {
+export function normalizePreferences(value: unknown): AppPreferencesV13 {
 	if (!value || typeof value !== 'object')
 		return structuredClone(DEFAULT_PREFERENCES)
 	const raw = value as Record<string, unknown>
@@ -263,13 +266,14 @@ export function normalizePreferences(value: unknown): AppPreferencesV12 {
 			known,
 		),
 	}
+	const scenarios = hasScenarios ? normalizeScenarios(raw.scenarios) : []
 	const unknownFields = Object.fromEntries(
 		Object.entries(raw).filter(
 			([key]) => !KNOWN_PREFERENCE_FIELDS.has(key),
 		),
 	)
 	return {
-		version: 12,
+		version: 13,
 		categories,
 		categoryOrder,
 		favoriteAppIds: uniqueStrings(raw.favoriteAppIds),
@@ -297,14 +301,17 @@ export function normalizePreferences(value: unknown): AppPreferencesV12 {
 		installerAppIdentities: hasInstallerMarks
 			? uniqueStrings(raw.installerAppIdentities)
 			: [],
-		scenarios: hasScenarios ? normalizeScenarios(raw.scenarios) : [],
+		scenarios,
+		favoriteScenarioIds: uniqueStrings(raw.favoriteScenarioIds).filter(id =>
+			scenarios.some(scenario => scenario.id === id),
+		),
 		firstSeenAt: hasFirstSeen ? normalizeTimestampMap(raw.firstSeenAt) : {},
 		legacyCanonicalPreferences,
 		...(Object.keys(unknownFields).length > 0 ? { unknownFields } : {}),
 	}
 }
 
-export function readPreferences(storage: Storage): AppPreferencesV12 {
+export function readPreferences(storage: Storage): AppPreferencesV13 {
 	return (
 		readSlot(storage, PREFERENCES_KEY) ??
 		readSlot(storage, PREFERENCES_BACKUP_KEY) ??
@@ -312,7 +319,7 @@ export function readPreferences(storage: Storage): AppPreferencesV12 {
 	)
 }
 
-function readSlot(storage: Storage, key: string): AppPreferencesV12 | null {
+function readSlot(storage: Storage, key: string): AppPreferencesV13 | null {
 	try {
 		const value = storage.getItem(key)
 		return value ? normalizePreferences(JSON.parse(value)) : null
@@ -323,7 +330,7 @@ function readSlot(storage: Storage, key: string): AppPreferencesV12 | null {
 
 export function writePreferences(
 	storage: Storage,
-	preferences: AppPreferencesV12,
+	preferences: AppPreferencesV13,
 ): boolean {
 	if (storedVersionIsNewer(storage)) {
 		return true

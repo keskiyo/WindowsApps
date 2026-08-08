@@ -97,6 +97,9 @@ mod tests {
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
+            target_availability: None,
+            category_reasons: Vec::new(),
+            close_risk: None,
         }
     }
 

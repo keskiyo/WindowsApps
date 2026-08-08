@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { FavoritesGrid } from '../../../../src/widgets/catalog-content/ui/FavoritesGrid'
 import type { AppInfo } from '../../../../src/entities/app'
@@ -6,6 +7,7 @@ import type {
 	AppCategory,
 	CategoryDefinition,
 } from '../../../../src/entities/category'
+import type { Scenario } from '../../../../src/entities/scenario'
 
 vi.mock(
 	'../../../../src/widgets/catalog-content/ui/CatalogAppCard/CatalogAppCard',
@@ -22,6 +24,14 @@ const games: CategoryDefinition = {
 	id: 'games',
 	label: 'Games',
 	builtIn: true,
+}
+
+const gaming: Scenario = {
+	id: 'gaming',
+	name: 'Gaming',
+	launchIdentities: ['steam'],
+	closeIdentities: [],
+	createdAt: null,
 }
 
 function favorite(id: string, name: string): AppInfo {
@@ -41,13 +51,20 @@ function favorite(id: string, name: string): AppInfo {
 	}
 }
 
-function props(apps: AppInfo[]) {
+function props(apps: AppInfo[], scenarios: Scenario[] = []) {
 	return {
 		apps,
 		hasQuery: false,
 		favoriteAppIds: apps.map(app => app.id),
 		categories: [games],
 		categoryOrder: ['games'] as AppCategory[],
+		favoriteScenarios: {
+			scenarios,
+			apps,
+			runningId: null,
+			onRun: vi.fn(),
+			onToggleFavorite: vi.fn(),
+		},
 		onToggleFavorite: vi.fn(),
 		onLaunch: vi.fn().mockResolvedValue(undefined),
 		onMoveApp: vi.fn(),
@@ -77,6 +94,23 @@ describe('FavoritesGrid', () => {
 		expect(within(view).getAllByRole('button')).toHaveLength(2)
 	})
 
+	it('names both blocks of the view and what each one holds', () => {
+		render(<FavoritesGrid {...props([favorite('steam', 'Steam')], [gaming])} />)
+
+		const scenarios = screen.getByRole('region', { name: 'Scenarios' })
+		expect(scenarios).toHaveTextContent('1 scenario')
+		expect(scenarios).toHaveTextContent('Run your configured scenarios')
+		expect(
+			screen.getByRole('heading', { level: 2, name: 'Applications' }),
+		).toBeInTheDocument()
+		expect(
+			screen.getByText('Your installed applications'),
+		).toBeInTheDocument()
+		expect(
+			screen.getByRole('region', { name: 'Favorites' }),
+		).toHaveTextContent('1 application')
+	})
+
 	it('says application in the singular for one favorite', () => {
 		render(<FavoritesGrid {...props([favorite('steam', 'Steam')])} />)
 
@@ -92,5 +126,40 @@ describe('FavoritesGrid', () => {
 		expect(
 			screen.queryByRole('heading', { level: 1, name: 'Favorites' }),
 		).not.toBeInTheDocument()
+	})
+
+	it('lists favorite scenarios collapsed and expands one on its name', async () => {
+		const steam = favorite('steam', 'Steam')
+		render(<FavoritesGrid {...props([steam], [gaming])} />)
+
+		const section = screen.getByRole('region', { name: 'Scenarios' })
+		expect(section).toHaveTextContent('1 scenario')
+		expect(
+			screen.queryByRole('list', { name: 'Launch list of Gaming' }),
+		).not.toBeInTheDocument()
+
+		await userEvent.click(within(section).getByText('Gaming'))
+
+		expect(
+			screen.getByRole('list', { name: 'Launch list of Gaming' }),
+		).toHaveTextContent('Steam')
+	})
+
+	it('shows the scenarios section even when no app is starred', () => {
+		render(<FavoritesGrid {...props([], [gaming])} />)
+
+		expect(screen.getByRole('region', { name: 'Scenarios' })).toBeInTheDocument()
+		expect(screen.queryByText('No favorites yet')).not.toBeInTheDocument()
+	})
+
+	it('unstars a scenario from its own card', async () => {
+		const view = props([], [gaming])
+		render(<FavoritesGrid {...view} />)
+
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Remove Gaming from favorites' }),
+		)
+
+		expect(view.favoriteScenarios.onToggleFavorite).toHaveBeenCalledWith('gaming')
 	})
 })

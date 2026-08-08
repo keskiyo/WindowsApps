@@ -39,17 +39,10 @@ pub(in crate::catalog) fn parse_manifest(value: &str, library: &Path) -> Option<
     })
 }
 
-/// The application id ends up in the `steam://rungameid/<id>` launch target, which the shell
-/// hands to Steam's protocol handler. It comes from a user-writable `.acf` file, so anything
-/// other than the digits Steam actually uses is refused rather than passed through into a URI.
 fn is_app_id(value: &str) -> bool {
     !value.is_empty() && value.chars().all(|character| character.is_ascii_digit())
 }
 
-/// `installdir` names a folder directly under `steamapps\common`. It comes from an `.acf` file
-/// that any process running as the user can write, and `Path::join` discards the base entirely
-/// when handed an absolute path — so `C:\Windows\System32` or `..\..` would silently move the
-/// game's directory outside the library. Accept a plain folder name and nothing else.
 fn safe_install_dir(value: &str) -> Option<&str> {
     let value = value.trim();
     let rejected = value.is_empty()
@@ -147,8 +140,6 @@ mod tests {
         );
     }
 
-    // `.acf` files live in Steam's own directory, which is writable by any process running as
-    // the user, so `installdir` is untrusted input.
     #[test]
     fn a_manifest_cannot_move_a_game_outside_the_library() {
         for hostile in [
@@ -168,8 +159,6 @@ mod tests {
         }
     }
 
-    // `appid` is interpolated into the `steam://rungameid/<id>` launch target, so a manifest
-    // must not be able to put anything but digits there.
     #[test]
     fn a_manifest_with_a_non_numeric_app_id_is_refused() {
         for hostile in ["1/../install/999", "abc", "1 2", "", "rungameid/1\" \"x"] {

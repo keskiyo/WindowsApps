@@ -1,7 +1,3 @@
-//! Core catalog domain types shared across the backend and mirrored by the frontend `types/`.
-//! Pure data with serde derives — no behavior. Re-exported from `catalog` so existing
-//! `crate::catalog::AppInfo` paths stay unchanged.
-
 use super::visibility::{VisibilityClass, VisibilityReason};
 use crate::platform::windows::{AppArchitecture, AppSignatureStatus};
 use serde::{Deserialize, Serialize};
@@ -23,8 +19,6 @@ pub(crate) enum AppCategory {
     System,
     WindowsFeatures,
     InstallersDocs,
-    // `serde(other)` makes an unrecognized category from a newer cache degrade to Other instead of
-    // failing the whole document — an older build must not discard a cache a newer build wrote.
     #[default]
     #[serde(other)]
     Other,
@@ -119,6 +113,12 @@ pub(crate) struct AppInfo {
     pub visibility_score: i16,
     #[serde(default)]
     pub visibility_reasons: Vec<VisibilityReason>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_availability: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub category_reasons: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub close_risk: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
@@ -148,9 +148,6 @@ pub(crate) struct ScanProgress {
 mod tests {
     use super::*;
 
-    // A cache written by a newer build may carry category/reason values this build does not know.
-    // They must degrade (category -> Other, reason -> Unknown) rather than fail the whole document,
-    // otherwise an older build discards a valid newer cache and rescans on every cold start.
     #[test]
     fn unknown_persisted_enum_values_degrade_instead_of_failing() {
         let json = serde_json::json!({

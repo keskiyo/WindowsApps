@@ -1,6 +1,6 @@
 import { Box, FolderOpen, Search, ShieldCheck } from 'lucide-react'
-import { SOURCE_LABELS } from '../../../../entities/app'
 import { categoryLabel } from '../../../../entities/category'
+import { buildDetectionRows } from './data'
 import { DetailRows } from './DetailRows'
 import { availability, signature, valueOrUnavailable } from './detailValues'
 import { InfoCard } from './InfoCard'
@@ -65,21 +65,7 @@ export function AppInformationCards({
 				/>
 			</InfoCard>
 			<InfoCard icon={Search} title="Detection">
-				<DetailRows
-					rows={[
-						['Source', SOURCE_LABELS[app.sourceKind]],
-						[
-							'Original filename',
-							valueOrUnavailable(app.originalFilename),
-						],
-						[
-							'Catalog state',
-							app.visibilityClass === 'auxiliary'
-								? 'Auxiliary tool'
-								: 'Primary application',
-						],
-					]}
-				/>
+				<DetailRows rows={buildDetectionRows(app)} />
 			</InfoCard>
 		</div>
 	)

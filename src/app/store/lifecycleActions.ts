@@ -50,6 +50,11 @@ export function createLifecycleActions({
 						await subscribe(client.onCatalogChanged, summary =>
 							set({ catalogChange: summary }),
 						)
+						await subscribe(
+							client.onCatalogDiagnostics,
+							diagnostics =>
+								set({ catalogDiagnostics: diagnostics }),
+						)
 						disposers.push(
 							await client.onAppsUpdated(get().replaceApps),
 						)

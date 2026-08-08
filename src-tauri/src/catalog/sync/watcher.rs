@@ -1,6 +1,3 @@
-//! Filesystem-change watcher lifecycle. The watcher guard lives in `AppState`; a change fires a
-//! non-interactive coordinated scan so the catalog stays fresh without user action.
-
 use super::scan::run_coordinated_scan;
 use crate::app_state::AppState;
 use crate::catalog;

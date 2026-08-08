@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "input_record_count": 8,
+  "output_app_count": 6,
+  "records": [
+    {
+      "canonical_id": "aumid:openai.codex_2p2nqsd0c76g0!app",
+      "preference_identity": "preference:1c39503da4301d5a26502a3029359e6cc8c94986a4518876bdaf498abe1beafa",
+      "canonical_identity": "identity:af86a02a55d9a69354150fb4530a8650d08df7231339e8fbe484d994f492ac24",
+      "launch": "AppUserModelId|c:\\program files\\windowsapps\\openai.codex_26.727.4816.0_x64__2p2nqsd0c76g0\\app\\chatgpt.exe|",
+      "source_kind": "Msix",
+      "artifact_kind": "Application",
+      "visibility_class": "Primary",
+      "category": "Ai",
+      "display_name": "Codex"
+    },
+    {
+      "canonical_id": "portable:d:\\downloads|filezilla",
+      "preference_identity": "preference:9997921dbf482c85beb102d470e657dc607bc5447f28e808f58bbd7b33c9d978",
+      "canonical_identity": "identity:835863a635cd3d0871333ee3f34094b00ac18455ccbafb096f8e3be360f96c55",
+      "launch": "Executable|d:\\downloads\\filezilla_3.67.0_win64-setup.exe|",
+      "source_kind": "Portable",
+      "artifact_kind": "Installer",
+      "visibility_class": "Primary",
+      "category": "InstallersDocs",
+      "display_name": "FileZilla"
+    },
+    {
+      "canonical_id": "portable:d:\\tools\\victoria537|hsp victoria",
+      "preference_identity": "preference:f99d40d1db0e4076c4328944755a27df38da6cc945135b7209d6e48dfd9a58c4",
+      "canonical_identity": "identity:11d7c5ea7c29b893090f3d8beaaa097e481e5e959893b2bcfd754b6f944c6be0",
+      "launch": "Executable|d:\\tools\\victoria537\\victoria.exe|",
+      "source_kind": "Portable",
+      "artifact_kind": "Application",
+      "visibility_class": "Primary",
+      "category": "Utilities",
+      "display_name": "HSP Victoria"
+    },
+    {
+      "canonical_id": "portable:e:\\portable\\victoria6|hsp victoria",
+      "preference_identity": "preference:ed2205ef10b567970406ca7e993f4a732e1266cd7636af6becd5bccfbb6e57d9",
+      "canonical_identity": "identity:0c5b6f757bd28c6dd01c5342c3e678b51d10e0bb9243dab5b910e477334966a3",
+      "launch": "Executable|e:\\portable\\victoria6\\victoria.exe|",
+      "source_kind": "Portable",
+      "artifact_kind": "Application",
+      "visibility_class": "Primary",
+      "category": "Utilities",
+      "display_name": "HSP Victoria"
+    },
+    {
+      "canonical_id": "steam:220",
+      "preference_identity": "preference:2328a84ddda054c56ebe9050b668599964d71c65e8a8e172cee6d3b4e93c8010",
+      "canonical_identity": "identity:f9346e1304a6688b86488067d208850d2e99a7377faabedf66cdbdf815d4aa17",
+      "launch": "Executable|d:\\steamlibrary\\steamapps\\common\\half-life 2\\hl2.exe|",
+      "source_kind": "Steam",
+      "artifact_kind": "Application",
+      "visibility_class": "Primary",
+      "category": "Games",
+      "display_name": "Half-Life 2"
+    },
+    {
+      "canonical_id": "steam:228980",
+      "preference_identity": "preference:f1a23e90a3c11355a2b439203c27dda1c4d1f73311e947e308176934324d2202",
+      "canonical_identity": "identity:2918467d4d2452effbc20d632a593c718c616b94f1fc00b6659ce7acc6c6cf7c",
+      "launch": "Executable|steam:\\rungameid\\228980|",
+      "source_kind": "Steam",
+      "artifact_kind": "Application",
+      "visibility_class": "Auxiliary",
+      "category": "Games",
+      "display_name": "Steamworks Common Redistributables"
+    }
+  ],
+  "dedup_groups": [
+    {
+      "canonical_id": "aumid:openai.codex_2p2nqsd0c76g0!app",
+      "members": [
+        "openai.codex_2p2nqsd0c76g0!app",
+        "openai.codex_2p2nqsd0c76g0!app"
+      ]
+    },
+    {
+      "canonical_id": "portable:d:\\downloads|filezilla",
+      "members": [
+        "d:\\downloads\\filezilla_3.67.0_win64-setup.exe"
+      ]
+    },
+    {
+      "canonical_id": "portable:d:\\tools\\victoria537|hsp victoria",
+      "members": [
+        "d:\\tools\\victoria537\\victoria.exe",
+        "e:\\portable\\victoria537\\victoria.exe"
+      ]
+    },
+    {
+      "canonical_id": "portable:e:\\portable\\victoria6|hsp victoria",
+      "members": [
+        "e:\\portable\\victoria6\\victoria.exe"
+      ]
+    },
+    {
+      "canonical_id": "steam:220",
+      "members": [
+        "steam:\\rungameid\\220"
+      ]
+    },
+    {
+      "canonical_id": "steam:228980",
+      "members": [
+        "steam:\\rungameid\\228980"
+      ]
+    }
+  ],
+  "source_counts": {
+    "Msix": 1,
+    "Portable": 3,
+    "Steam": 2
+  },
+  "visibility_counts": {
+    "Auxiliary": 1,
+    "Primary": 5
+  },
+  "category_counts": {
+    "Ai": 1,
+    "Games": 2,
+    "InstallersDocs": 1,
+    "Utilities": 2
+  },
+  "diagnostics": {
+    "dev_reports": "disabled",
+    "os_script": "latin",
+    "registrations": "empty"
+  }
+}

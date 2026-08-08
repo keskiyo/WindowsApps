@@ -1,11 +1,3 @@
-//! The windows to ask before anything is terminated.
-//!
-//! A Store application does not own its own frame: `ApplicationFrameHost.exe` owns the visible
-//! `ApplicationFrameWindow`, and the app's `Windows.UI.Core.CoreWindow` sits inside it. Closing
-//! one therefore means recognising the frame that hosts it and asking *that* window, which is what
-//! the title-bar button does. A desktop application is the simple case — the window's own process
-//! is the target.
-
 use std::collections::HashSet;
 use windows::core::BOOL;
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
@@ -14,9 +6,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     PostMessageW, WM_CLOSE,
 };
 
-/// The frame `ApplicationFrameHost.exe` puts around a packaged application.
 const APPLICATION_FRAME_CLASS: &str = "ApplicationFrameWindow";
-/// The packaged application's own window, hosted inside that frame.
 const CORE_WINDOW_CLASS: &str = "Windows.UI.Core.CoreWindow";
 
 fn class_name(window: HWND) -> String {
@@ -39,11 +29,6 @@ fn process_of(window: HWND) -> u32 {
     process
 }
 
-/// Callback for `EnumChildWindows`, collecting the processes of the hosted core windows.
-///
-/// # Safety
-/// Called only by `EnumChildWindows` from `core_window_processes`, which passes a pointer to a
-/// live `Vec<u32>` as `lparam` for the duration of the call.
 unsafe extern "system" fn collect_core_window(window: HWND, lparam: LPARAM) -> BOOL {
     // SAFETY: `lparam` is the `&mut Vec<u32>` that `core_window_processes` passed to
     // `EnumChildWindows`, which borrows it for the whole synchronous enumeration; the callback
@@ -82,8 +67,6 @@ impl Enumeration {
         if self.targets.contains(&process_of(window)) {
             return true;
         }
-        // Only a packaged application's frame is worth searching; every other window already
-        // answered for itself above, and walking their children would cost one enumeration each.
         class_name(window) == APPLICATION_FRAME_CLASS
             && core_window_processes(window)
                 .iter()
@@ -91,11 +74,6 @@ impl Enumeration {
     }
 }
 
-/// Callback for `EnumWindows`, collecting the visible windows that belong to a target process.
-///
-/// # Safety
-/// Called only by `EnumWindows` from `windows_of`, which passes a pointer to a live `Enumeration`
-/// as `lparam` for the duration of the call.
 unsafe extern "system" fn collect_window(window: HWND, lparam: LPARAM) -> BOOL {
     // SAFETY: `lparam` is the `&mut Enumeration` that `windows_of` passed to `EnumWindows`, which
     // borrows it for the whole synchronous enumeration; `EnumWindows` calls back on the calling
@@ -111,7 +89,6 @@ unsafe extern "system" fn collect_window(window: HWND, lparam: LPARAM) -> BOOL {
     BOOL(1)
 }
 
-/// Every visible top-level window through which one of `targets` can be asked to close.
 pub(super) fn windows_of(targets: HashSet<u32>) -> Vec<HWND> {
     if targets.is_empty() {
         return Vec::new();
@@ -133,7 +110,6 @@ pub(super) fn windows_of(targets: HashSet<u32>) -> Vec<HWND> {
     state.windows
 }
 
-/// Asks one window to close, the way its title-bar button does.
 pub(super) fn ask_to_close(window: HWND) {
     // SAFETY: `PostMessageW` copies the message into the target thread's queue and returns
     // immediately; it borrows nothing and the payload is two zero values. A window that closed
@@ -151,8 +127,6 @@ mod tests {
         assert!(windows_of(HashSet::new()).is_empty());
     }
 
-    // The desktop has top-level windows on any machine running this test, and none of them may be
-    // collected for a process id that cannot exist.
     #[test]
     fn collects_nothing_for_an_unknown_process() {
         assert!(windows_of(HashSet::from([u32::MAX])).is_empty());

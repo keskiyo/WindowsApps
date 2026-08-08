@@ -1,6 +1,3 @@
-//! The merge decision: what counts as evidence that two candidates are one application, how
-//! strong each signal is, and the vetoes that outrank a weak signal.
-
 use super::candidate::AppCandidate;
 
 use super::signals::{
@@ -43,7 +40,6 @@ pub(super) enum EvidenceReason {
     NamePrefixOnly,
 }
 
-/// The strongest signals, which merge a pair even when the numeric score alone would not.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(super) struct EvidenceSummary {
     pub(super) score: u16,
@@ -82,12 +78,6 @@ pub(super) fn should_merge(existing: &ResolvedApp, candidate: &AppCandidate) -> 
     let Some(summary) = best else {
         return false;
     };
-    // Weak, name-only evidence (score < 75) must not merge across a conflicting install root or a
-    // conflicting version: those are two different installs, or two different releases the user
-    // treats as different applications (7-Zip 22 vs 24, an old and new portable copy). Strong
-    // structural evidence (>= 75: same or nested install root, same product folder, identity)
-    // overrides — a launcher and its game exe in one install tree carry different versions but are
-    // one application, so they still merge.
     if summary.score < 75
         && existing.candidates.iter().any(|left| {
             conflicting_install_roots(left, candidate) || conflicting_versions(left, candidate)
@@ -104,9 +94,6 @@ pub(super) fn should_merge(existing: &ResolvedApp, candidate: &AppCandidate) -> 
     summary.has_identity_match
 }
 
-/// Score without building an evidence list. `should_merge` runs this for every candidate pair,
-/// so allocating a `Vec` per comparison cost one allocation per pair across the whole catalog;
-/// only the pair that actually wins a merge needs the itemized evidence.
 fn summarize_evidence(left: &AppCandidate, right: &AppCandidate) -> EvidenceSummary {
     let mut summary = EvidenceSummary::default();
     collect_evidence(left, right, |reason, score| {
@@ -133,8 +120,6 @@ pub(super) fn score_evidence(left: &AppCandidate, right: &AppCandidate) -> (Vec<
     (evidence, score)
 }
 
-/// Single source of truth for what counts as evidence. Both the allocating and the
-/// non-allocating consumers above feed off this, so the two can never drift apart.
 fn collect_evidence(
     left: &AppCandidate,
     right: &AppCandidate,
@@ -207,9 +192,6 @@ fn collect_evidence(
     if versioned_portable_copy(left, right) {
         add(EvidenceReason::VersionedPortableCopy, 60);
     }
-    // Same product, same exact version, with a portable copy involved: one program in two places.
-    // Score 80 so it merges outright — past the install-root veto (roots differ by definition) and
-    // past a vendor-name variant. Different versions are different programs and never reach here.
     if same_version_portable_copy(left, right) {
         add(EvidenceReason::SameVersionPortableCopy, 80);
     }

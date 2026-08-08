@@ -1,6 +1,3 @@
-//! Process-wide catalog state owned by the Tauri app instance, plus the trusted
-//! id-keyed target maps that keep launch/uninstall resolution server-side.
-
 use crate::catalog::cache::CachedAppDetails;
 use crate::catalog::scan_coordinator::ScanCoordinator;
 use crate::catalog::{self, AppDetailsTarget, AppInfo, LaunchKind, SourceKind, UninstallTarget};
@@ -65,40 +62,28 @@ pub(crate) struct UninstallPreview {
     pub(crate) mechanism: uninstaller::UninstallMechanism,
 }
 
-/// All process-wide mutable catalog state, owned by the Tauri app instance through
-/// `manage`/`State` instead of module-level statics. Commands and app-scoped helpers
-/// reach it via `app.state::<AppState>()`; tests construct `AppState::default()`
-/// directly, so shared state never leaks across test cases.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CloseTarget {
+    pub(crate) path: String,
+    pub(crate) blocked: bool,
+}
+
 #[derive(Default)]
 pub(crate) struct AppState {
-    /// Catalog ids accepted from trusted backend scans/cache reads.
     pub(crate) catalog_ids: Mutex<HashSet<String>>,
-    /// Trusted uninstall records keyed by catalog id (resolved server-side, never from IPC).
     pub(crate) uninstall_targets: Mutex<HashMap<String, UninstallRecord>>,
-    /// Trusted launch targets (kind + path) keyed by catalog id.
     pub(crate) launch_targets: Mutex<HashMap<String, (LaunchKind, String)>>,
-    /// Trusted executable paths for closing, keyed by catalog id. Only entries whose running
-    /// image can be identified appear here; see `remember_close_targets`.
-    pub(crate) close_targets: Mutex<HashMap<String, String>>,
-    /// Trusted local metadata inputs keyed by catalog id.
+    pub(crate) close_targets: Mutex<HashMap<String, CloseTarget>>,
     pub(crate) app_details_targets: Mutex<HashMap<String, AppDetailsTarget>>,
-    /// Details read during this run, merged into the next synchronized cache document.
     pub(crate) app_details_cache: Mutex<HashMap<String, CachedAppDetails>>,
-    /// Bounds process readiness waits for this application instance.
     pub(crate) launch_waits: Arc<LaunchWaitLimiter>,
-    /// Serializes catalog synchronization so scans never write the cache concurrently.
     pub(crate) sync_lock: Mutex<()>,
-    /// Coalesces overlapping scan requests into a single in-flight job.
     pub(crate) scan_coordinator: ScanCoordinator<Vec<AppInfo>>,
-    /// Pending icon/metadata hydration work.
     pub(crate) hydration_queue: Mutex<catalog::hydration::HydrationQueue>,
-    /// Active filesystem-change watcher guard (dropped to stop watching).
     pub(crate) change_watcher:
         Mutex<Option<crate::platform::windows::change_watcher::WatcherGuard>>,
-    /// Global hotkey registration and its message-loop thread (dropped to unregister).
     pub(crate) global_shortcut:
         Mutex<Option<crate::platform::windows::global_shortcut::ShortcutGuard>>,
-    /// Last known registration status of the global hotkey, shown on the settings page.
     pub(crate) shortcut_status: Mutex<crate::platform::windows::global_shortcut::Status>,
 }
 
@@ -150,9 +135,6 @@ pub(crate) fn remember_uninstall_targets(state: &AppState, apps: &[AppInfo]) {
     }
 }
 
-/// Record the trusted launch target (kind + path) for every catalog entry, keyed by
-/// id. `launch_app` resolves through this map so the webview can only launch apps the
-/// scanner actually found — never an arbitrary path supplied over IPC.
 pub(crate) fn remember_launch_targets(state: &AppState, apps: &[AppInfo]) {
     let targets = apps
         .iter()
@@ -163,30 +145,14 @@ pub(crate) fn remember_launch_targets(state: &AppState, apps: &[AppInfo]) {
     }
 }
 
-/// Record the executable a catalog entry actually runs as, so `close_apps` can match it against
-/// the running processes without the webview ever naming a path.
-///
-/// The question is only ever "which image ends up running": a shortcut contributes its resolved
-/// target rather than the `.lnk` that never runs, and a Store entry contributes the executable its
-/// package manifest declares — already validated to live inside the package directory by the
-/// Start-Apps source. An AppUserModelId or a `steam://` string is not that image, so it is never
-/// used as a fallback; entries that resolve nothing stay out of the map and the command reports
-/// the close as unavailable instead of guessing at a process.
 pub(crate) fn remember_close_targets(state: &AppState, apps: &[AppInfo]) {
     let targets = apps
         .iter()
         .filter_map(|app| {
-            let path = app.resolved_path.clone().or_else(|| {
-                matches!(
-                    app.launch_kind,
-                    LaunchKind::Executable | LaunchKind::Shortcut
-                )
-                .then(|| app.path.clone())
-            })?;
-            Path::new(&path)
-                .extension()
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
-                .then(|| (app.id.clone(), path))
+            let path = catalog::close_target_of(app)?;
+            let blocked = crate::platform::windows::close_risk(Path::new(&path))
+                == crate::platform::windows::CloseRisk::Critical;
+            Some((app.id.clone(), CloseTarget { path, blocked }))
         })
         .collect();
     if let Ok(mut stored) = state.close_targets.lock() {
@@ -249,8 +215,6 @@ pub(crate) fn remember_app_details(
     }
 }
 
-/// Detail requests update only memory. The next cache synchronization merges that small map
-/// before its existing serialized write, so no command mutex spans filesystem work.
 pub(crate) fn cached_details_for_catalog(
     state: &AppState,
     apps: &[AppInfo],
@@ -315,8 +279,6 @@ pub(crate) fn execute_and_record(
     result
 }
 
-/// Shared test builder for a minimal cached [`AppInfo`]; used by unit tests across the
-/// app-layer modules.
 #[cfg(test)]
 pub(crate) fn cached_app(name: &str, path: &str) -> AppInfo {
     AppInfo {
@@ -344,6 +306,9 @@ pub(crate) fn cached_app(name: &str, path: &str) -> AppInfo {
         visibility_class: Default::default(),
         visibility_score: 0,
         visibility_reasons: Vec::new(),
+        target_availability: None,
+        category_reasons: Vec::new(),
+        close_risk: None,
     }
 }
 
@@ -366,9 +331,6 @@ mod tests {
         assert!(stored.get("unknown-id").is_none());
     }
 
-    // A close matches a running image, so only entries that name one get a target. A `steam://`
-    // handler names no image, and closing "whatever steam.exe is running" would be a guess at a
-    // process the user never chose.
     #[test]
     fn close_targets_cover_only_entries_that_name_a_running_executable() {
         let mut executable = cached_app("Editor", r"C:\Editor\editor.exe");
@@ -388,24 +350,35 @@ mod tests {
 
         let stored = state.close_targets.lock().unwrap();
         assert_eq!(
-            stored.get("editor").map(String::as_str),
+            stored.get("editor").map(|target| target.path.as_str()),
             Some(r"C:\Editor\editor.exe")
         );
-        // A shortcut contributes the image it resolves to, not the .lnk that is never running.
         assert_eq!(
-            stored.get("game").map(String::as_str),
+            stored.get("game").map(|target| target.path.as_str()),
             Some(r"C:\Games\game.exe")
         );
-        // No manifest executable was resolved, so there is nothing to match a process against.
         assert!(stored.get("camera").is_none());
         assert!(stored.get("steam-game").is_none());
     }
 
-    // The reported bug: a scenario could not close Калькулятор. Store entries launch by
-    // AppUserModelId, and the filter dropped every one of them — including the ones whose package
-    // manifest already resolved a real executable inside the package directory. That resolved
-    // image is exactly what a close has to match, so those entries get a target; the AUMID string
-    // in `path` never does, because it names no file.
+    #[test]
+    fn a_process_that_would_end_windows_is_remembered_as_blocked() {
+        let mut security = cached_app("Local Security Authority", r"C:\Windows\System32\lsass.exe");
+        security.id = "lsass".into();
+        let mut explorer = cached_app("Проводник", r"C:\Windows\explorer.exe");
+        explorer.id = "explorer".into();
+        let mut editor = cached_app("Editor", r"C:\Editor\editor.exe");
+        editor.id = "editor".into();
+        let state = AppState::default();
+
+        remember_close_targets(&state, &[security, explorer, editor]);
+
+        let stored = state.close_targets.lock().unwrap();
+        assert!(stored.get("lsass").unwrap().blocked);
+        assert!(!stored.get("explorer").unwrap().blocked);
+        assert!(!stored.get("editor").unwrap().blocked);
+    }
+
     #[test]
     fn close_targets_include_a_store_app_that_resolved_a_package_executable() {
         let mut calculator = cached_app("Калькулятор", "Microsoft.WindowsCalculator_8wek!App");
@@ -423,7 +396,7 @@ mod tests {
 
         let stored = state.close_targets.lock().unwrap();
         assert_eq!(
-            stored.get("calculator").map(String::as_str),
+            stored.get("calculator").map(|target| target.path.as_str()),
             Some(
                 r"C:\Program Files\WindowsApps\Microsoft.WindowsCalculator_11.0_x64__8wek\CalculatorApp.exe"
             )

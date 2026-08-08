@@ -28,10 +28,6 @@ pub(crate) struct AppHydrationPatch {
     pub can_uninstall: Option<bool>,
 }
 
-/// One hydrated application, plus the icon file it wrote if it extracted a fresh one.
-///
-/// The written `(id, fingerprint)` is reported so the batch worker can sweep every superseded icon
-/// in a single directory pass. Sweeping inside the write was quadratic across a full hydration.
 pub(crate) struct HydrationOutcome {
     pub patch: AppHydrationPatch,
     pub written_icon: Option<(String, String)>,
@@ -164,15 +160,10 @@ fn hydrate_app(app_data_dir: &Path, app: &AppInfo, generation: u64) -> Hydration
 #[derive(Default)]
 struct HydratedIcon {
     data_url: Option<String>,
-    /// Set only when a fresh icon was extracted and cached, so the batch sweep knows which
-    /// application's earlier fingerprints are now superseded.
     written_fingerprint: Option<String>,
 }
 
 fn hydrate_icon(app_data_dir: &Path, app: &AppInfo) -> HydratedIcon {
-    // Walk the icon-source candidates (shortcut icon file → resolved target → path) until
-    // one yields an icon; a shortcut whose declared .ico fails should still get the icon
-    // embedded in its target executable.
     let mut candidates = icon_source_candidates(app);
     if candidates.is_empty() {
         candidates.push(app.path.clone());
@@ -180,10 +171,16 @@ fn hydrate_icon(app_data_dir: &Path, app: &AppInfo) -> HydratedIcon {
     for source in candidates {
         let fingerprint = icon_cache::source_fingerprint(&source);
         if let Some(bytes) = icon_cache::read_icon(app_data_dir, &app.id, &fingerprint) {
-            return HydratedIcon {
-                data_url: Some(format!("data:image/png;base64,{}", STANDARD.encode(bytes))),
-                written_fingerprint: None,
-            };
+            let data_url = format!("data:image/png;base64,{}", STANDARD.encode(bytes));
+            if !crate::platform::windows::icon_extractor::is_provably_not_this_files_icon(
+                Path::new(&source),
+                &data_url,
+            ) {
+                return HydratedIcon {
+                    data_url: Some(data_url),
+                    written_fingerprint: None,
+                };
+            }
         }
         let Some(data_url) = extract_icon_from_source(app, &source) else {
             continue;
@@ -209,16 +206,11 @@ fn extract_icon_from_source(app: &AppInfo, source: &str) -> Option<String> {
         return crate::platform::windows::icon_extractor::extract_app_id_icon(&app.path);
     }
     if app.source_kind == SourceKind::Steam {
-        // Steam game executables often lack an embedded icon; prefer Steam's own
-        // library-cache icon and only fall back to the resolved executable.
         if let Some(icon) = steam_library_icon(app) {
             return Some(icon);
         }
     }
     let path = Path::new(source);
-    // Shortcut icon locations frequently point at loose image files (.ico and friends).
-    // SHGetFileInfoW returns the file-class icon for those, not their content — decode
-    // the image directly instead.
     if is_image_file(path) {
         if let Some(icon) =
             crate::platform::windows::icon_extractor::image_file_to_png_data_url(path)
@@ -229,7 +221,6 @@ fn extract_icon_from_source(app: &AppInfo, source: &str) -> Option<String> {
     crate::platform::windows::icon_extractor::extract_icon(path)
 }
 
-/// Image formats the bundled `image` crate can decode (see Cargo.toml features).
 fn is_image_file(path: &Path) -> bool {
     path.extension().is_some_and(|extension| {
         ["ico", "png", "jpg", "jpeg"]
@@ -238,7 +229,6 @@ fn is_image_file(path: &Path) -> bool {
     })
 }
 
-/// Resolve a Steam game's icon from `<SteamPath>/appcache/librarycache`.
 fn steam_library_icon(app: &AppInfo) -> Option<String> {
     let app_id = app.path.strip_prefix("steam://rungameid/")?;
     let cache = crate::platform::windows::steam_registry::install_root()?
@@ -248,10 +238,6 @@ fn steam_library_icon(app: &AppInfo) -> Option<String> {
     crate::platform::windows::icon_extractor::image_file_to_png_data_url(&candidate)
 }
 
-/// Locate the icon image for a Steam app inside `librarycache`.
-/// Legacy Steam stored `<appid>_icon.jpg` directly; modern Steam stores per-app folders
-/// `<appid>/<sha1hash>.jpg`, where the SHA1-named image is the client icon (the descriptive
-/// `library_*.jpg`/`header.jpg`/`logo.png` files are large store art, not the icon).
 fn steam_icon_file(librarycache: &Path, app_id: &str) -> Option<PathBuf> {
     let legacy = librarycache.join(format!("{app_id}_icon.jpg"));
     if legacy.is_file() {
@@ -267,7 +253,6 @@ fn steam_icon_file(librarycache: &Path, app_id: &str) -> Option<PathBuf> {
     hashed.into_iter().next()
 }
 
-/// True for SHA1-hash-named image files (`<40 hex>.jpg|jpeg|png`) — Steam's icon naming.
 fn is_hashed_image(path: &Path) -> bool {
     let extension_ok = path.extension().is_some_and(|extension| {
         ["jpg", "jpeg", "png"]
@@ -286,6 +271,37 @@ fn is_hashed_image(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_cached_icon_the_shell_never_read_is_not_served_again() {
+        let Some(placeholder) = crate::platform::windows::icon_extractor::unknown_type_icon()
+        else {
+            return;
+        };
+        for name in ["Editor.exe", "Editor.lnk"] {
+            let dir = tempfile::tempdir().unwrap();
+            let file = dir.path().join(name);
+            std::fs::write(&file, b"a launch target that does exist").unwrap();
+            let mut app = crate::app_state::cached_app("Editor", &file.to_string_lossy());
+            app.id = "editor".into();
+            let encoded = placeholder.split_once(',').expect("a data url").1;
+            icon_cache::write_icon(
+                dir.path(),
+                &app.id,
+                &icon_cache::source_fingerprint(&app.path),
+                &STANDARD.decode(encoded).expect("the placeholder decodes"),
+            )
+            .expect("the icon cache is writable");
+
+            let hydrated = hydrate_icon(dir.path(), &app);
+
+            assert_ne!(
+                hydrated.data_url.as_deref(),
+                Some(placeholder.as_str()),
+                "{name}"
+            );
+        }
+    }
 
     #[test]
     fn picks_sha1_named_icon_from_modern_steam_layout() {

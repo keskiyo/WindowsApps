@@ -44,8 +44,15 @@ jobs:
               run: npm run build
 
     backend:
-        name: Backend
-        runs-on: windows-latest
+        # The catalog reads the registry, walks the filesystem and drives PowerShell and COM, so a
+        # green run on one Windows build is not evidence for the other supported one. Formatting and
+        # Clippy are image-independent and stay on the rolling label alone; the suite runs on both.
+        name: Backend (${{ matrix.os }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [windows-latest, windows-2022]
         steps:
             - name: Checkout
               uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -58,13 +65,23 @@ jobs:
                   components: clippy, rustfmt
 
             - name: Check formatting
+              if: matrix.os == 'windows-latest'
               run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
 
             - name: Lint
+              if: matrix.os == 'windows-latest'
               run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
-            - name: Test
-              run: cargo test --manifest-path src-tauri/Cargo.toml
+            # Split so a failure names its own cause. The first covers the pure decision layers and
+            # the filesystem walks; the second is the only module that starts an external process,
+            # and its failures mean something different from a catalog rule breaking. Both are
+            # required: the hosted Windows images do ship PowerShell, so these are not flaky tests
+            # to be excused with `continue-on-error`.
+            - name: Test catalog and platform
+              run: cargo test --manifest-path src-tauri/Cargo.toml -- --skip catalog::sources::start_apps::tests
+
+            - name: Test PowerShell-backed source
+              run: cargo test --manifest-path src-tauri/Cargo.toml catalog::sources::start_apps::tests
 
     msrv:
         name: MSRV

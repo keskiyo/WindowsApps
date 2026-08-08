@@ -1,10 +1,3 @@
-//! Dev-only deduplication diagnostics (never surfaced to end users). Debug builds only; writes
-//! %LOCALAPPDATA%\WindowsApps\dedup-report.json so the developer can see what merged (and why)
-//! and which same-family entries stayed separate (potential confusion), to tune the rules.
-//!
-//! A child module of `dedup`, so it reaches the resolver's private items (`resolve_apps`,
-//! `ResolvedApp` fields, вЂ¦) directly without widening their visibility.
-
 use super::family::{launcher_product_family, normalized_product_family};
 use super::identity::resolved_canonical_id;
 use super::merge::ResolverReport;
@@ -13,12 +6,6 @@ use crate::catalog::AppInfo;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
-// ---------------------------------------------------------------------------
-// Dev-only deduplication diagnostics (never surfaced to end users). Debug builds only; writes
-// %LOCALAPPDATA%\WindowsApps\dedup-report.json
-// so the developer can see what merged (and why) and which same-family entries stayed
-// separate (potential confusion) to tune the rules.
-// ---------------------------------------------------------------------------
 
 #[derive(Serialize)]
 struct DedupMember {
@@ -49,19 +36,11 @@ struct DedupReport {
     possible_confusions: Vec<PossibleConfusion>,
 }
 
-/// Debug builds only. This used to be `|| env::var("WINAPPS_DEDUP_REPORT").is_ok()`, which also
-/// armed it in shipped builds: merely *setting* a variable — something any process running as
-/// the user can arrange, e.g. through `HKCU\Environment` — made the application write the full
-/// list of installed software, with paths, to a predictable file. A diagnostic is not worth an
-/// inventory dump, and `AGENTS_backend.md` §9 asks even debug output to leave out unnecessary
-/// personal paths.
 pub(crate) fn dev_report_enabled() -> bool {
     cfg!(debug_assertions)
 }
 
 pub(crate) fn write_dev_report(apps: &[AppInfo]) {
-    // Skip tiny incremental sub-lists so a full-catalog report isn't clobbered by a
-    // background single-source sync. Dev diagnostic only.
     if apps.len() < 30 {
         return;
     }
@@ -78,6 +57,26 @@ pub(crate) fn write_dev_report(apps: &[AppInfo]) {
     if let Ok(json) = serde_json::to_string_pretty(&report) {
         let _ = std::fs::write(path, json);
     }
+}
+
+#[cfg(test)]
+pub(in crate::catalog) fn resolved_groups(mut apps: Vec<AppInfo>) -> Vec<(String, Vec<String>)> {
+    apps.sort_by_cached_key(super::canonical_order_key);
+    let mut report = ResolverReport::default();
+    let mut groups = resolve_apps(apps, &mut report)
+        .iter()
+        .map(|group| {
+            let mut members = group
+                .candidates
+                .iter()
+                .map(|candidate| candidate.app.path.clone())
+                .collect::<Vec<_>>();
+            members.sort();
+            (resolved_canonical_id(group), members)
+        })
+        .collect::<Vec<_>>();
+    groups.sort();
+    groups
 }
 
 fn analyze(apps: Vec<AppInfo>) -> DedupReport {

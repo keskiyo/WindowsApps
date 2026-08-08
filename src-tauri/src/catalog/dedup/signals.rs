@@ -1,10 +1,3 @@
-//! The individual relations `evidence::collect_evidence` weighs.
-//!
-//! Kept apart from the scoring table so each rule can be read and tested as a claim about two
-//! applications ("these are two entry points of one package"), independently of how strongly that
-//! claim counts. Conflating the two is what let a display-name match score 80 and silently
-//! outrank the publisher check.
-
 use super::arguments::meaningful_launch_arguments;
 use super::candidate::AppCandidate;
 use super::family::normalize_name;
@@ -13,8 +6,6 @@ use super::target::normalize_path;
 use crate::catalog::{path_is_within, AppInfo, LaunchKind, SourceKind};
 use std::path::{Component, Path};
 
-/// Both entries carry a version and the two differ — they are distinct releases of the product,
-/// which the user treats as distinct applications, so a name-level merge must not collapse them.
 pub(super) fn conflicting_versions(left: &AppCandidate, right: &AppCandidate) -> bool {
     matches!(
         (
@@ -76,11 +67,6 @@ pub(super) fn versioned_portable_copy(left: &AppCandidate, right: &AppCandidate)
         && (left.app.version.is_some() || right.app.version.is_some())
 }
 
-/// The same product at the same exact version where at least one side is a loose portable copy:
-/// a program placed in two locations (a Desktop copy beside its installed shortcut, or the same
-/// portable in two folders). One version is one program, so merge across install roots and even
-/// a vendor-name variant ("Mozilla Corporation" vs "Mozilla Foundation"). Requires a portable
-/// side so two distinct installed products that merely share a version are never merged this way.
 pub(super) fn same_version_portable_copy(left: &AppCandidate, right: &AppCandidate) -> bool {
     (left.app.source_kind == SourceKind::Portable || right.app.source_kind == SourceKind::Portable)
         && left.family == right.family
@@ -93,8 +79,6 @@ pub(super) fn same_version_portable_copy(left: &AppCandidate, right: &AppCandida
         )
 }
 
-/// Version compared as its exact normalized string, not numerically: "5.3.7.0 Beta" and
-/// "5.3.7.0" are treated as different releases even though their digits match.
 pub(super) fn normalized_version_string(app: &AppInfo) -> Option<String> {
     app.version
         .as_deref()
@@ -163,18 +147,9 @@ pub(super) fn registry_install_contains_exe(left: &AppCandidate, right: &AppCand
         registry.app.source_kind == SourceKind::Registry
             && executable.app.path.to_lowercase().ends_with(".exe")
             && registry.launcher_family == executable.launcher_family
-            && registry
-                .identity
-                .install_root
-                .as_ref()
-                // Containment must stop at a component boundary: with a raw `starts_with` an
-                // install root of `C:\Prog` "contained" `C:\Program Files\other.exe`, and this
-                // evidence requires neither a matching name nor a matching publisher, so
-                // nothing else in the scoring would have vetoed the merge.
-                .is_some_and(|root| {
-                    is_specific_install_root(root)
-                        && path_is_within(&executable.identity.path, root)
-                })
+            && registry.identity.install_root.as_ref().is_some_and(|root| {
+                is_specific_install_root(root) && path_is_within(&executable.identity.path, root)
+            })
     })
 }
 
@@ -187,18 +162,6 @@ fn is_specific_install_root(root: &str) -> bool {
         == 2
 }
 
-/// Two entry points of one installed package.
-///
-/// The package family is the part of an AUMID before `!` — `Microsoft.WindowsTerminal_8wekyb3d8bbwe`
-/// in `Microsoft.WindowsTerminal_8wekyb3d8bbwe!App`. Sharing it means one package with several
-/// launch verbs; not sharing it means two packages, however alike their display names.
-///
-/// This replaces "either side is an AUMID and the display families match". That rule scored 80 —
-/// the threshold at which `should_merge` merges outright, ahead of the publisher-conflict check —
-/// on nothing but a matching display name, so two unrelated packaged applications that happened to
-/// share one collapsed into a single card and one launch/uninstall identity was lost. A display
-/// name is weak evidence; it still contributes through `SameFamily`, where the publisher-conflict
-/// and install-root vetoes apply.
 pub(super) fn same_package_family(left: &AppCandidate, right: &AppCandidate) -> bool {
     match (
         left.identity.aumid.as_deref(),

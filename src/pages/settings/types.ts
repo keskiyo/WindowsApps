@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react'
 import type { MaintenanceConfirmation } from '../../features/edit-settings'
 import type { UpdaterState } from '../../features/update-app'
-import type { CatalogDiagnostics } from '../../entities/app'
+import type {
+	CatalogDiagnostics,
+	SourceHealth,
+	TargetAvailabilityDiff,
+} from '../../entities/app'
 import type {
 	ScanSettings,
 	SystemClient,
@@ -43,6 +47,14 @@ export interface CatalogMaintenanceProps {
 
 export interface ScanDiagnosticsProps {
 	diagnostics: CatalogDiagnostics
+}
+
+export interface SourceHealthTableProps {
+	sources: SourceHealth[]
+}
+
+export interface TargetAvailabilityPanelProps {
+	diff?: TargetAvailabilityDiff
 }
 
 export interface SettingsDiscoveryControlsProps {

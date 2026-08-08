@@ -4,10 +4,6 @@ use crate::error::AppError;
 use crate::platform::windows::{uninstall_history, uninstaller};
 use tauri::Manager;
 
-/// Resolves the trusted uninstall record for an id coming from the webview.
-///
-/// Validation happens before the lookup: an id that cannot name a catalog entry is rejected
-/// without being used as a map key. The removal command itself is only ever read from `AppState`.
 fn resolve_uninstall_record(
     state: &AppState,
     id: &str,
@@ -105,8 +101,6 @@ mod tests {
         assert!(resolve_uninstall_record(&state, "editor").is_ok());
     }
 
-    // Uninstall is destructive, so an unbounded id from the webview is judged before it is used
-    // as a key into the trusted removal map.
     #[test]
     fn rejects_an_oversized_id_before_the_lookup() {
         let state = AppState::default();

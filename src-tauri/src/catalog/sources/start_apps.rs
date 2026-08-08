@@ -18,12 +18,7 @@ use package::enrich_packages;
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const UTF8_PREFIX: &str =
     "$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); ";
-// Enumerate the Apps folder so we can read each item's real launch target
-// (System.Link.TargetParsingPath). Get-StartApps only exposes Name/AppID; the target lets
-// deduplication merge a localized Start-App (e.g. "Просмотр событий") with the English
-// Start-Menu shortcut (Event Viewer) that resolves to the same file (eventvwr.msc).
 const START_APPS_SCRIPT: &str = "$f=(New-Object -ComObject Shell.Application).NameSpace('shell:AppsFolder'); $f.Items() | ForEach-Object { [pscustomobject]@{ Name=$_.Name; AppID=$_.ExtendedProperty('System.AppUserModel.ID'); Target=$_.ExtendedProperty('System.Link.TargetParsingPath') } } | ConvertTo-Json -Compress";
-// Fallback used only if the Apps-folder enumeration fails (returns no target).
 const START_APPS_FALLBACK_SCRIPT: &str =
     "Get-StartApps | Select-Object Name,AppID | ConvertTo-Json -Compress";
 
@@ -37,10 +32,6 @@ struct StartAppRow {
     target: Option<String>,
 }
 
-/// Returns `None` when PowerShell could not be run at all, as opposed to `Some(vec![])` for
-/// "this machine has no Start apps". The caller must not replace the stored snapshot on
-/// failure: doing so reports every Store application as removed and wipes them from the
-/// catalog until the next successful scan.
 pub(in crate::catalog) fn scan(control: &ScanControl) -> Option<Vec<AppInfo>> {
     if control.is_cancelled() {
         return None;
@@ -52,7 +43,6 @@ pub(in crate::catalog) fn scan(control: &ScanControl) -> Option<Vec<AppInfo>> {
         .and_then(|json| parse_start_apps(json).ok())
         .unwrap_or_default();
     if apps.is_empty() {
-        // Apps-folder enumeration failed; fall back to Get-StartApps (no launch target).
         let fallback = run_powershell(START_APPS_FALLBACK_SCRIPT, control);
         powershell_ran = powershell_ran || fallback.is_some();
         apps = fallback
@@ -68,23 +58,12 @@ pub(in crate::catalog) fn scan(control: &ScanControl) -> Option<Vec<AppInfo>> {
     Some(apps)
 }
 
-/// Ceiling for one PowerShell query. The Apps-folder and AppX providers are COM services that can
-/// wedge; `Command::output()` waited on them forever, which is what made a cancelled Refresh keep
-/// holding the scan lock.
 const POWERSHELL_TIMEOUT: Duration = Duration::from_secs(25);
 const POWERSHELL_POLL_INTERVAL: Duration = Duration::from_millis(50);
-/// Hard cap on captured stdout. The reader would otherwise grow without bound if the interpreter
-/// were made to emit indefinitely; the real payloads are tens of kilobytes.
 const MAX_POWERSHELL_OUTPUT_BYTES: u64 = 16 * 1024 * 1024;
 
-/// Runs one PowerShell query, returning `None` for every failure mode including cancellation and
-/// timeout — see the contract on [`scan`]: `None` means "PowerShell did not answer", never
-/// "this machine has no Start apps".
 fn run_powershell(script: &str, control: &ScanControl) -> Option<String> {
     let script = format!("{UTF8_PREFIX}{script}");
-    // Resolve the interpreter by full path: `CreateProcess` searches the directory of the
-    // running executable first, so a bare name would run a `powershell.exe` planted next to
-    // the app (its per-user install directory is writable) on every scan.
     let mut child = Command::new(crate::platform::windows::exec_target::system_powershell())
         .args([
             "-NoLogo",
@@ -100,9 +79,6 @@ fn run_powershell(script: &str, control: &ScanControl) -> Option<String> {
         .spawn()
         .ok()?;
 
-    // stdout is drained on its own thread. Polling `try_wait` while nothing reads the pipe would
-    // deadlock as soon as the payload exceeded the pipe buffer: the child blocks on write, we
-    // decide it hung, and a healthy scan gets killed at the timeout.
     let stdout = child.stdout.take();
     let reader = std::thread::spawn(move || {
         let mut buffer = Vec::new();
@@ -129,8 +105,6 @@ fn run_powershell(script: &str, control: &ScanControl) -> Option<String> {
     };
 
     if status.is_none() {
-        // Kill closes the write end, which lets the reader thread finish; `wait` then reaps the
-        // process so a timed-out scan cannot leave one behind.
         let _ = child.kill();
         let _ = child.wait();
     }
@@ -148,18 +122,12 @@ fn decode_output(bytes: Vec<u8>) -> Option<String> {
 
 pub(in crate::catalog) fn parse_start_apps(json: &str) -> Result<Vec<AppInfo>, serde_json::Error> {
     let rows: Vec<StartAppRow> = parse_rows(json)?;
-    // Resolved once for the whole batch rather than per row.
     let facts = crate::catalog::machine::MachineFacts::current();
     Ok(rows
         .into_iter()
         .filter_map(|row| {
             let name = row.name.trim().to_string();
             let app_id = row.app_id.trim().to_string();
-            // Real launch target from System.Link.TargetParsingPath — the bridge that lets
-            // dedup merge this localized Start-App with the equivalent English shortcut.
-            // Preserve the target as launch evidence. The dedup target layer separately refuses
-            // to use generic interpreter hosts (cmd/powershell/wsl/...) as application identity,
-            // so distinct host-backed Start Apps cannot collapse by this path alone.
             let resolved_path = row
                 .target
                 .as_deref()
@@ -194,6 +162,9 @@ pub(in crate::catalog) fn parse_start_apps(json: &str) -> Result<Vec<AppInfo>, s
                 visibility_class: Default::default(),
                 visibility_score: 0,
                 visibility_reasons: Vec::new(),
+                target_availability: None,
+                category_reasons: Vec::new(),
+                close_risk: None,
             };
             app.artifact_kind = crate::catalog::artifact::classify(&app, None, &facts);
             if app.artifact_kind != crate::catalog::ArtifactKind::Application {
@@ -225,11 +196,6 @@ mod tests {
         assert_eq!(decode_output(vec![0xff, 0xfe]), None);
     }
 
-    // `Command::output()` waited on the interpreter forever. A wedged Apps-folder or AppX provider
-    // therefore kept the scan lock after the user cancelled, and Refresh looked cancelled while the
-    // worker was still blocked. The supervised child observes cancellation between polls, kills the
-    // process and reaps it. The bound is deliberately loose against the 25 s timeout: it proves the
-    // loop returns on cancellation rather than on the deadline, without measuring latency.
     #[test]
     fn a_cancelled_scan_abandons_a_long_running_interpreter() {
         let cancelled = || true;
@@ -245,8 +211,6 @@ mod tests {
         );
     }
 
-    // A successful query still has to come back intact: the supervised child drains stdout on its
-    // own thread, so a payload larger than the pipe buffer must not deadlock the poll loop.
     #[test]
     fn a_completed_interpreter_returns_output_larger_than_the_pipe_buffer() {
         let never = || false;
@@ -284,8 +248,6 @@ mod tests {
 
     #[test]
     fn preserves_generic_host_targets_as_launch_evidence() {
-        // The target proves an AutoGenerated Apps Folder entry is launchable. Deduplication owns
-        // the separate rule that a shared interpreter path is not application identity.
         let apps = parse_start_apps(
             r#"[{"Name":"Ubuntu","AppID":"Microsoft.AutoGenerated.{WSL}","Target":"C:\\Program Files\\WSL\\wsl.exe"},{"Name":"Командная строка","AppID":"X\\cmd.exe","Target":"C:\\Windows\\system32\\cmd.exe"},{"Name":"Reload Configuration","AppID":"Microsoft.AutoGenerated.{F5}","Target":"C:\\Program Files\\PostgreSQL\\15\\bin\\pg_ctl.exe"}]"#,
         )

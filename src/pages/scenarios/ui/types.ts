@@ -5,6 +5,7 @@ export interface ScenariosPageProps {
 	scenarios: Scenario[]
 	apps: AppInfo[]
 	runningId: string | null
+	favoriteScenarioIds: string[]
 	onBack(): void
 	onCreate(
 		name: string,
@@ -21,4 +22,5 @@ export interface ScenariosPageProps {
 	): { ok: true } | { ok: false; error: string }
 	onRemoveApp(id: string, list: ScenarioList, identity: string): void
 	onRun(scenario: Scenario): void
+	onToggleFavorite(id: string): void
 }

@@ -10,11 +10,11 @@ import { createLifecycleActions } from './lifecycleActions'
 import { createPersist } from './persist'
 import { createScenarioActions } from './scenarioActions'
 import { readPreferences } from './preferences'
-import type { AppPreferencesV12 } from './preferences'
+import type { AppPreferencesV13 } from './preferences'
 import type { AppsClient } from '../../entities/app'
 import type { AppState } from './types'
 
-function initialState(preferences: AppPreferencesV12) {
+function initialState(preferences: AppPreferencesV13) {
 	return {
 		apps: [],
 		query: '',
@@ -40,6 +40,7 @@ function initialState(preferences: AppPreferencesV12) {
 		installerAppIds: preferences.installerAppIds,
 		installerAppIdentities: preferences.installerAppIdentities,
 		scenarios: preferences.scenarios,
+		favoriteScenarioIds: preferences.favoriteScenarioIds,
 		firstSeenAt: preferences.firstSeenAt,
 		legacyCanonicalPreferences: preferences.legacyCanonicalPreferences,
 		preferencesPersisted: true,

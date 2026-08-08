@@ -1,11 +1,3 @@
-//! The user's real Downloads, Desktop and Temp locations, asked of the shell instead of guessed
-//! from folder names.
-//!
-//! Windows creates these folders on disk under their English names in every UI language and shows
-//! a localized name from `desktop.ini`, so a literal `\downloads\` marker is not a language bug.
-//! What it does miss is *redirection*: a user who moved Downloads to `D:\Stuff` has no folder
-//! called `Downloads` at all. `SHGetKnownFolderPath` follows the redirection; nothing else does.
-
 use std::ffi::c_void;
 use std::path::PathBuf;
 use windows::core::{GUID, PWSTR};
@@ -14,9 +6,6 @@ use windows::Win32::UI::Shell::{
     FOLDERID_Desktop, FOLDERID_Downloads, SHGetKnownFolderPath, KF_FLAG_DEFAULT,
 };
 
-/// Locations a downloaded file lands in. Every field is optional: a known folder can be missing on
-/// a locked-down or roamed profile, and the catalog treats an unresolved folder as "no evidence"
-/// rather than failing the scan.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct UserFolders {
     pub downloads: Option<PathBuf>,
@@ -48,7 +37,6 @@ fn known_folder(id: &GUID) -> Option<PathBuf> {
     (!trimmed.is_empty()).then(|| PathBuf::from(trimmed))
 }
 
-/// Owns a string allocated by the COM task allocator and releases it on drop.
 struct CoTaskMem(PWSTR);
 
 impl Drop for CoTaskMem {
@@ -67,8 +55,6 @@ impl Drop for CoTaskMem {
 mod tests {
     use super::*;
 
-    /// The call must not panic and must not hand back an empty path. Which folders resolve depends
-    /// on the machine, so the assertion is on shape, never on a particular location.
     #[test]
     fn resolves_user_folders_without_panicking() {
         let folders = user_folders();

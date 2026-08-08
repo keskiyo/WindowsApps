@@ -1,4 +1,9 @@
 import {
+	appIdentity,
+	closeBlockedMessage,
+	isCloseBlocked,
+} from '../../entities/app'
+import {
 	MAX_SCENARIO_ENTRIES,
 	MAX_SCENARIOS,
 	type Scenario,
@@ -25,6 +30,7 @@ type ScenarioActions = Pick<
 	| 'deleteScenario'
 	| 'addScenarioApp'
 	| 'removeScenarioApp'
+	| 'toggleFavoriteScenario'
 >
 
 function nameTaken(
@@ -100,6 +106,18 @@ export function createScenarioActions({
 				scenarios: state.scenarios.filter(
 					scenario => scenario.id !== id,
 				),
+				favoriteScenarioIds: state.favoriteScenarioIds.filter(
+					entry => entry !== id,
+				),
+			}))
+			persist()
+		},
+		toggleFavoriteScenario(id) {
+			if (!get().scenarios.some(scenario => scenario.id === id)) return
+			set(state => ({
+				favoriteScenarioIds: state.favoriteScenarioIds.includes(id)
+					? state.favoriteScenarioIds.filter(entry => entry !== id)
+					: [...state.favoriteScenarioIds, id],
 			}))
 			persist()
 		},
@@ -114,6 +132,13 @@ export function createScenarioActions({
 					ok: false,
 					error: `A list holds at most ${MAX_SCENARIO_ENTRIES} apps`,
 				}
+			if (list === 'close') {
+				const app = get().apps.find(
+					entry => appIdentity(entry) === identity,
+				)
+				if (app && isCloseBlocked(app))
+					return { ok: false, error: closeBlockedMessage(app) }
+			}
 			updateScenario(id, entry => ({
 				...entry,
 				[key]: [...entry[key], identity],

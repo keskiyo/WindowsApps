@@ -3,6 +3,7 @@ import type {
 	AppCategory,
 	CategoryDefinition,
 } from '../../../../entities/category'
+import type { FavoriteScenariosPanel } from '../../types'
 
 export interface AppGridProps {
 	apps: AppInfo[]
@@ -13,6 +14,7 @@ export interface AppGridProps {
 	categories: CategoryDefinition[]
 	collapsedCategories: AppCategory[]
 	favoriteAppIds: string[]
+	favoriteScenarios: FavoriteScenariosPanel
 	onBack(): void
 	onToggleCategory(category: AppCategory): void
 	onToggleFavorite(id: string): void

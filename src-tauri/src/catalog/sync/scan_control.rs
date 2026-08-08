@@ -1,28 +1,12 @@
-//! Cooperative bounds shared by the Windows scan stages.
-//!
-//! Registry, Start Menu and Start-Apps each ran to completion before the first cancellation check,
-//! with no time limit and no size limit. A wedged COM/AppX provider or a pathological Start Menu
-//! tree therefore left Refresh looking cancelled while the worker still held the scan lock and the
-//! external process kept running. `ScanControl` gives every stage the same three answers: has the
-//! user cancelled, has this stage run out of time, and has it seen more entries than the source
-//! can plausibly hold.
-
 use std::cell::Cell;
 use std::time::{Duration, Instant};
 
-/// Ceiling for one Windows source. Large enough that a healthy machine never reaches it, small
-/// enough that a wedged provider cannot hold the scan lock for minutes.
 pub(crate) const DEFAULT_STAGE_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// A Start Menu is a shallow tree of program folders. Depth beyond this is a junction loop or a
-/// corrupted profile, not a program layout.
 pub(crate) const START_MENU_MAX_DEPTH: usize = 8;
 
-/// Entry ceiling for one Start Menu traversal. A large developer machine reports a few thousand.
 pub(crate) const START_MENU_MAX_ENTRIES: usize = 50_000;
 
-/// Why a stage stopped early. `None` from [`StageBudget::stop`] means the stage ran to completion
-/// and its snapshot may replace the stored one.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum StageStop {
     Cancelled,
@@ -64,8 +48,6 @@ impl<'a> ScanControl<'a> {
     }
 }
 
-/// One stage's remaining allowance. Uses interior mutability so it can be consulted from inside an
-/// iterator adapter without threading a mutable borrow through the traversal.
 pub(crate) struct StageBudget<'a> {
     cancelled: &'a (dyn Fn() -> bool + 'a),
     deadline: Instant,
@@ -80,9 +62,6 @@ impl StageBudget<'_> {
         self.max_depth
     }
 
-    /// Records and returns the first reason this stage must stop. Sticky: once a stage has stopped
-    /// it stays stopped, so a traversal cannot resume after the deadline merely because a later
-    /// clock reading was cheaper to skip.
     pub(crate) fn should_stop(&self) -> bool {
         if self.stop.get().is_some() {
             return true;
@@ -98,8 +77,6 @@ impl StageBudget<'_> {
         false
     }
 
-    /// Accounts for one visited entry. Returns `false` once the stage must stop, so a traversal can
-    /// use it directly as its loop condition.
     pub(crate) fn charge_entry(&self) -> bool {
         if self.stop.get().is_some() {
             return false;
@@ -114,9 +91,6 @@ impl StageBudget<'_> {
             self.stop.set(Some(StageStop::Cancelled));
             return false;
         }
-        // The clock is read on every entry rather than every Nth: a stage's per-entry work is a
-        // shortcut resolution or a PE metadata read, so one QPC call is noise beside it, while
-        // sampling would let a slow entry overrun the deadline by an unbounded margin.
         if Instant::now() >= self.deadline {
             self.stop.set(Some(StageStop::TimedOut));
             return false;
@@ -124,8 +98,6 @@ impl StageBudget<'_> {
         true
     }
 
-    /// `None` means the stage ran to completion and may replace its stored snapshot. An incomplete
-    /// one must not: its partial result would report every unvisited application as removed.
     pub(crate) fn stop(&self) -> Option<StageStop> {
         self.stop.get()
     }
@@ -166,8 +138,6 @@ mod tests {
         assert_eq!(stage.stop(), Some(StageStop::Cancelled));
     }
 
-    // Zero budget rather than a sleep: the deadline is already in the past when the stage starts,
-    // so the test is deterministic and costs no wall-clock time.
     #[test]
     fn an_exhausted_deadline_stops_a_stage() {
         let cancelled = never;
@@ -193,7 +163,6 @@ mod tests {
         assert_eq!(stage.max_depth(), 4);
     }
 
-    // Whichever limit fires first owns the outcome; a later check must not relabel it.
     #[test]
     fn the_first_stop_reason_wins() {
         let cancelled = never;

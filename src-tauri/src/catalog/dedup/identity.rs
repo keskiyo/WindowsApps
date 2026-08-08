@@ -1,6 +1,3 @@
-//! Stable identity: the catalog id a card keeps across scans, the preference identity that
-//! survives a dedup rule change, and the launch target that identifies what actually runs.
-
 use super::arguments::meaningful_launch_arguments;
 use super::candidate::CandidateIdentity;
 use super::family::{normalized_product_family, normalized_publisher};

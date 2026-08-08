@@ -27,20 +27,11 @@ pub(in crate::catalog) fn should_visit_directory(path: &Path, excluded: &[PathBu
             | "perflogs"
             | "documents and settings"
             | "node_modules"
-            // Python virtual environments and package trees hold project-local interpreters
-            // (`.venv\Scripts\python.exe`) and console-script shims, not user-facing apps.
-            // Without this each project's `.venv` surfaced its own "python" card.
             | ".venv"
             | "venv"
             | "env"
             | "site-packages"
-            // Driver installer staging trees (e.g. AMD chipset). Extraction folders hold service
-            // binaries duplicated across `Binaries\` and per-OS `Packages\...\W11x64`/`WTx64`
-            // subtrees — each surfaced its own driver-service "app". These are not installed
-            // applications; the real services run from system directories.
             | "chipset_software"
-            // InstallShield bundles redistributable prerequisites (Access Database Engine, VC++
-            // runtimes, …) under this folder inside a product tree — installer payload, not apps.
             | "issetupprerequisites"
             | ".cache"
             | ".codex"
@@ -83,8 +74,6 @@ pub(in crate::catalog) fn is_portable_candidate(path: &Path) -> bool {
     !is_helper_named(&name)
 }
 
-/// Specific, unambiguous fragments — matched anywhere in the name, because they do not occur
-/// inside real application names (`CefSharp.BrowserSubprocess`, `BlizzardError`, `dxsetup`).
 const HELPER_SUBSTRINGS: &[&str] = &[
     "update.exe",
     "repair.exe",
@@ -108,10 +97,6 @@ const HELPER_SUBSTRINGS: &[&str] = &[
     "blizzardbrowser",
 ];
 
-/// Generic English words — matched only as a whole token. As a substring they swallowed real
-/// applications: `ServiceDesk` matched "service", `ProxySwitcher` matched "proxy",
-/// `RuntimeEditor` matched "runtime". A component that really is one of these carries the word
-/// as its own token (`notification_helper`, `battlenet.overlay.runtime`).
 const HELPER_TOKENS: &[&str] = &[
     "helper", "service", "daemon", "watchdog", "tracing", "elevated", "proxy", "overlay", "runtime",
 ];
@@ -158,8 +143,6 @@ mod tests {
         assert!(is_portable_candidate(Path::new(r"C:\Apps\Notepad.exe")));
     }
 
-    // The helper markers used to match as substrings, so real applications whose name merely
-    // contains one of the generic words were silently dropped from discovery.
     #[test]
     fn real_applications_that_merely_contain_a_helper_word_are_kept() {
         for path in [
@@ -173,8 +156,6 @@ mod tests {
         }
     }
 
-    // Genuine helpers/components carry the word as its own token and stay rejected — the
-    // existing behaviour these markers were added for.
     #[test]
     fn genuine_helpers_are_still_rejected() {
         for path in [
@@ -188,8 +169,6 @@ mod tests {
         }
     }
 
-    // Excluding a folder must not also exclude its name-alike neighbours: with a raw prefix
-    // comparison, excluding `D:\Games` silently removed `D:\GamesBackup` from scanning too.
     #[test]
     fn an_exclusion_does_not_swallow_similarly_named_folders() {
         let excluded = vec![PathBuf::from(r"D:\Games")];
@@ -226,21 +205,18 @@ mod tests {
     #[test]
     fn skips_hidden_runtime_directories() {
         for path in [
-            Path::new(r"C:\Users\Maks\.cache"),
-            Path::new(r"C:\Users\Maks\.codex"),
+            Path::new(r"C:\Users\Example\.cache"),
+            Path::new(r"C:\Users\Example\.codex"),
             Path::new(r"C:\Apps\node_modules"),
         ] {
             assert!(!should_visit_directory(path, &[]), "{}", path.display());
         }
         assert!(should_visit_directory(
-            Path::new(r"C:\Users\Maks\.local"),
+            Path::new(r"C:\Users\Example\.local"),
             &[]
         ));
     }
 
-    // Each Python project ships its own `.venv\Scripts\python.exe`; before this every project
-    // surfaced a separate "python" card. The environment folder itself is skipped so the
-    // interpreter and console-script shims inside are never discovered.
     #[test]
     fn skips_python_virtual_environment_directories() {
         for path in [
@@ -251,7 +227,6 @@ mod tests {
         ] {
             assert!(!should_visit_directory(path, &[]), "{}", path.display());
         }
-        // A real application whose name merely starts with those letters must still be scanned.
         assert!(should_visit_directory(
             Path::new(r"D:\Apps\Environments"),
             &[]
@@ -259,13 +234,8 @@ mod tests {
         assert!(should_visit_directory(Path::new(r"D:\Apps\Venvender"), &[]));
     }
 
-    // AMD chipset drivers extract to `C:\AMD\Chipset_Software\` and duplicate every service
-    // binary across `Binaries\` and per-OS `Packages\...\W11x64`/`WTx64` folders, so each one
-    // surfaced as its own "AMD ... Service" card. The staging tree is not applications.
     #[test]
     fn skips_driver_installer_staging_directories() {
-        // The walk stops at the staging root, so its duplicated service subtrees are never
-        // entered — the leaf-name check does the pruning during recursion.
         assert!(!should_visit_directory(
             Path::new(r"C:\AMD\Chipset_Software"),
             &[]
@@ -274,10 +244,8 @@ mod tests {
             Path::new(r"D:\Drivers\AMD\chipset_software"),
             &[]
         ));
-        // The AMD root itself and unrelated AMD apps are still scanned.
         assert!(should_visit_directory(Path::new(r"C:\AMD"), &[]));
         assert!(should_visit_directory(Path::new(r"C:\AMD\Adrenalin"), &[]));
-        // InstallShield prerequisite payload (Access Database Engine, VC++ runtimes) is skipped.
         assert!(!should_visit_directory(
             Path::new(r"E:\Apps\KOMPAS-3D V19\ISSetupPrerequisites"),
             &[]

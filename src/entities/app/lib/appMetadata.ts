@@ -1,5 +1,10 @@
-import type { AppDetails, AppInfo } from '../model/app.types'
+import type {
+	AppDetails,
+	AppInfo,
+	AppVisibilityReason,
+} from '../model/app.types'
 import { type CategoryDefinition, categoryLabel } from '../../category'
+import { categoryReasonsLabel } from './categoryReason'
 
 export const SOURCE_LABELS = {
 	registry: 'Registry',
@@ -15,6 +20,36 @@ const VISIBILITY_LABELS = {
 	auxiliary: 'Auxiliary tool',
 	rejected: 'Rejected entry',
 } as const
+
+const TARGET_AVAILABILITY_LABELS: Record<string, string> = {
+	'target.present': 'Verified on disk',
+	'target.missing': 'Reported missing',
+	'target.unverifiable.unmounted_volume':
+		'Not checked — the drive is not mounted',
+	'target.unverifiable.network': 'Not checked — network location',
+	'target.unverifiable.access_denied': 'Not checked — access denied',
+	'target.unverifiable.io_error': 'Not checked — the check failed',
+	'target.unverifiable.relative_path':
+		'Not checked — no base to resolve against',
+	'target.not_applicable.aumid': 'Not a file — launched by package identity',
+	'target.not_applicable.steam_uri': 'Not a file — launched through Steam',
+	'target.not_applicable.protocol':
+		'Not a file — launched through a protocol',
+	'target.not_applicable.shell_location':
+		'Not a file — a Windows shell location',
+}
+
+export function targetAvailabilityLabel(reason: string | null | undefined) {
+	if (!reason) return null
+	return TARGET_AVAILABILITY_LABELS[reason] ?? 'Unknown'
+}
+
+export function classificationReasonsLabel(
+	reasons: AppVisibilityReason[] | undefined,
+) {
+	if (!reasons?.length) return null
+	return reasons.map(reason => VISIBILITY_REASON_LABELS[reason]).join(', ')
+}
 
 const VISIBILITY_REASON_LABELS = {
 	start_menu_registration: 'Start Menu registration',
@@ -157,6 +192,8 @@ export function metadataRows(
 		| 'visibilityClass'
 		| 'visibilityScore'
 		| 'visibilityReasons'
+		| 'targetAvailability'
+		| 'categoryReasons'
 	>,
 	categories: CategoryDefinition[],
 	includeDiagnostics = false,
@@ -184,6 +221,12 @@ export function metadataRows(
 				.map(reason => VISIBILITY_REASON_LABELS[reason])
 				.join(', '),
 		])
+	}
+	const targetLabel = targetAvailabilityLabel(app.targetAvailability)
+	if (targetLabel) rows.push(['Launch target check', targetLabel])
+	const categoryLabelReasons = categoryReasonsLabel(app.categoryReasons)
+	if (categoryLabelReasons) {
+		rows.push(['Why this category', categoryLabelReasons])
 	}
 	if (includeDiagnostics && app.visibilityScore != null) {
 		rows.push(['Classification score', String(app.visibilityScore)])

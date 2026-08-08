@@ -1,12 +1,22 @@
-import { AppWindow, X } from 'lucide-react'
+import { AppWindow, TriangleAlert, X } from 'lucide-react'
 import type { ScenarioAppTileProps } from '../types'
 
-export function ScenarioAppTile({ app, remove }: ScenarioAppTileProps) {
+export function ScenarioAppTile({ app, remove, mark }: ScenarioAppTileProps) {
+	const danger = mark?.badge.tone === 'danger'
 	return (
 		<li
-			title={app.name}
-			className="group/tile relative flex w-16 shrink-0 flex-col items-center gap-1 rounded-lg border border-(--border-neutral) bg-(--surface-panel) px-1 pt-2 pb-1"
+			title={mark ? `${app.name} — ${mark.reason}` : app.name}
+			className={`group/tile relative flex w-16 shrink-0 flex-col items-center gap-1 rounded-lg border bg-(--surface-panel) px-1 pt-2 pb-1 ${danger ? 'border-(--category-orange)' : 'border-(--border-neutral)'}`}
 		>
+			{mark && (
+				<span
+					role="img"
+					aria-label={`${app.name}: ${mark.badge.label} — ${mark.reason}`}
+					className="absolute -top-1.5 -left-1.5 grid size-5 place-items-center rounded-full border border-(--border-neutral) bg-(--surface-raised)"
+				>
+					<TriangleAlert size={11} aria-hidden="true" />
+				</span>
+			)}
 			<span className="grid size-8 place-items-center">
 				{app.iconBase64 ? (
 					<img

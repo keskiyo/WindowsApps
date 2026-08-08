@@ -2,12 +2,12 @@ Windows Apps is a fast, private application catalog and launcher for Windows 10 
 
 ## Highlights
 
-- Category navigation now opens the selected section reliably from Favorites, Settings, Auxiliary tools, Installers & Docs, and Hidden.
-- Category transitions inside All Apps are smooth and keep the selected heading below the sticky header.
-- Dragging applications and sidebar categories no longer breaks the layout or leaves a stale drag preview.
-- Category ordering is available only in the sidebar, keeping All Apps focused on moving applications.
+- **Scenarios** pair a launch list with a close list. One click starts everything in the first and fully closes everything in the second, then reports the result once.
+- **More** gathers Auxiliary tools, Scenarios, Hidden apps and Installers & Docs on one page, each card carrying its count and a preview of its newest entries.
+- Favorites now holds scenarios beside applications. Both sections are labelled, and wide windows lay them out in two columns.
+- Settings shows the health of each catalog source — up to date, serving older data, or never succeeded — together with what the launch-target check decided.
 
 ## Install
 
-1. Download `Windows.Apps_0.2.9_x64-setup.exe`.
+1. Download `Windows.Apps_0.3.0_x64-setup.exe`.
 2. Run it. The installer is not Authenticode-signed, so SmartScreen may show **Windows protected your PC**; choose **More info -> Run anyway**.

@@ -39,6 +39,7 @@ export interface AppState {
 	installerAppIds: string[]
 	installerAppIdentities: string[]
 	scenarios: Scenario[]
+	favoriteScenarioIds: string[]
 	firstSeenAt: Record<string, number>
 	legacyCanonicalPreferences: LegacyCanonicalPreferences
 	preferencesPersisted: boolean
@@ -79,6 +80,7 @@ export interface AppState {
 		identity: string,
 	): { ok: true } | { ok: false; error: string }
 	removeScenarioApp(id: string, list: ScenarioList, identity: string): void
+	toggleFavoriteScenario(id: string): void
 	getUninstallPreview(id: string): Promise<UninstallPreview>
 	uninstall(id: string): Promise<void>
 	setQuery(query: string): void

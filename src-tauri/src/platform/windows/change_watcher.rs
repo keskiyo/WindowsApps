@@ -70,10 +70,6 @@ impl Drop for WatcherGuard {
     }
 }
 
-/// Start watching. Returns `None` when the stop event cannot be created: without it the worker
-/// threads could never be woken to exit, so running unwatched is the correct degradation —
-/// freshness is lost until the next manual scan, but the app keeps working. Panicking here
-/// would take down a scan-settings save or the whole startup.
 pub(crate) fn start(
     paths: Vec<PathBuf>,
     on_change: Arc<dyn Fn() + Send + Sync>,
@@ -183,10 +179,6 @@ fn spawn_directory_watcher(
             }
         };
         let mut buffer = vec![0u8; 16 * 1024];
-        // `overlapped` and `buffer` are the kernel's write targets for the whole lifetime of a
-        // pending `ReadDirectoryChangesW`, so both must outlive every exit path of the loop —
-        // declaring `overlapped` per iteration would drop it off the stack while the I/O could
-        // still be in flight.
         let mut overlapped = OVERLAPPED {
             hEvent: change_event,
             ..Default::default()
@@ -224,9 +216,6 @@ fn spawn_directory_watcher(
             let wait =
                 unsafe { WaitForMultipleObjects(&[stop_event, change_event], false, INFINITE) };
             if wait == WAIT_OBJECT_0 {
-                // `CancelIoEx` only *requests* cancellation. Wait for the operation to actually
-                // finish before the buffer and `overlapped` go away, otherwise the kernel may
-                // still write into freed memory.
                 // SAFETY: `handle` is live and `overlapped` identifies the read queued above and
                 // is still at its original address — it is declared outside the loop precisely so
                 // the kernel's pointer stays valid until the wait below confirms completion.
@@ -345,16 +334,11 @@ mod tests {
     fn watcher_guard_stops_blocked_registry_watchers() {
         let started = Instant::now();
         let guard = start(Vec::new(), Arc::new(|| {}));
-        // `start` is fallible now; the guard must still be created here, otherwise this test
-        // would silently stop covering the shutdown path it exists for.
         assert!(guard.is_some());
         drop(guard);
         assert!(started.elapsed() < Duration::from_secs(2));
     }
 
-    // The watcher is restarted on every scan-settings save, so the stop path runs repeatedly in
-    // normal use: cancelling the pending overlapped read must complete before the buffer and
-    // OVERLAPPED are released.
     #[test]
     fn repeated_start_and_stop_cycles_stay_responsive() {
         let directory = tempfile::tempdir().unwrap();

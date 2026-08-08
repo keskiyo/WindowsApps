@@ -1,0 +1,94 @@
+[
+	{
+		"id": "vlc-player",
+		"name": "VLC media player",
+		"path": "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
+		"iconBase64": null,
+		"launchKind": "executable",
+		"sourceKind": "registry",
+		"installLocation": "C:\\Program Files\\VideoLAN\\VLC",
+		"publisher": "VideoLAN",
+		"description": "VLC media player",
+		"productName": "VLC media player",
+		"originalFilename": "vlc.exe",
+		"canUninstall": true
+	},
+	{
+		"id": "vlc-reset-shortcut",
+		"name": "VLC media player - reset preferences and cache files",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\VideoLAN\\reset.lnk",
+		"iconBase64": null,
+		"launchKind": "shortcut",
+		"sourceKind": "start_menu",
+		"resolvedPath": "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe",
+		"launchArguments": "--reset-config --reset-plugins-cache",
+		"publisher": "VideoLAN"
+	},
+	{
+		"id": "python-docs-shortcut",
+		"name": "Python 3.14 Manual",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Python\\Manual.lnk",
+		"iconBase64": null,
+		"launchKind": "shortcut",
+		"sourceKind": "start_menu",
+		"resolvedPath": "C:\\Python314\\Doc\\python3140.chm",
+		"publisher": "Python Software Foundation"
+	},
+	{
+		"id": "vs-developer-prompt",
+		"name": "x64 Native Tools Command Prompt for VS 2022",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\VS\\x64 Native Tools.lnk",
+		"iconBase64": null,
+		"launchKind": "shortcut",
+		"sourceKind": "start_menu",
+		"resolvedPath": "C:\\Windows\\System32\\cmd.exe",
+		"launchArguments": "/k \"C:\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat\"",
+		"publisher": "Microsoft Corporation"
+	},
+	{
+		"id": "vclibs-framework",
+		"name": "Microsoft.VCLibs.140.00",
+		"path": "Microsoft.VCLibs.140.00_8wekyb3d8bbwe!App",
+		"iconBase64": null,
+		"launchKind": "app_user_model_id",
+		"sourceKind": "msix",
+		"productName": "Microsoft.VCLibs.140.00",
+		"publisher": "Microsoft Corporation"
+	},
+	{
+		"id": "folder-shortcut",
+		"name": "Project files",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Project files.lnk",
+		"iconBase64": null,
+		"launchKind": "shortcut",
+		"sourceKind": "start_menu",
+		"resolvedPath": "C:\\Windows\\explorer.exe",
+		"launchArguments": "\"D:\\Projects\""
+	},
+	{
+		"id": "crystaldisk-product",
+		"name": "CrystalDiskInfo",
+		"path": "D:\\Tools\\CrystalDiskInfo\\DiskInfo64.exe",
+		"iconBase64": null,
+		"launchKind": "executable",
+		"sourceKind": "portable",
+		"installLocation": "D:\\Tools\\CrystalDiskInfo",
+		"publisher": "Crystal Dew World",
+		"productName": "CrystalDiskInfo",
+		"originalFilename": "DiskInfo64.exe",
+		"version": "9.7.1"
+	},
+	{
+		"id": "crystaldisk-component",
+		"name": "AlertMail48",
+		"path": "D:\\Tools\\CrystalDiskInfo\\CdiResource\\AlertMail48.exe",
+		"iconBase64": null,
+		"launchKind": "executable",
+		"sourceKind": "portable",
+		"installLocation": "D:\\Tools\\CrystalDiskInfo\\CdiResource",
+		"publisher": "Crystal Dew World",
+		"productName": "AlertMail",
+		"originalFilename": "AlertMail48.exe",
+		"version": "9.7.1"
+	}
+]

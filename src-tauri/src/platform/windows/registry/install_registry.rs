@@ -4,16 +4,11 @@ use winreg::RegKey;
 
 const UNINSTALL_ROOT: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall";
 
-/// A newer version of the app is registered at a different directory than the running exe —
-/// the user is launching an outdated leftover copy (e.g. after an update landed elsewhere).
 pub(crate) struct StaleCopyInfo {
     pub installed_version: String,
     pub install_location: String,
 }
 
-/// Directory of the running executable, but only when it looks like an installed copy
-/// (NSIS drops `uninstall.exe` next to the binary). Dev builds and loose portable copies
-/// have no uninstaller and must never touch the install registry.
 pub(crate) fn installed_copy_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?.to_path_buf();
@@ -24,10 +19,6 @@ fn has_uninstaller(dir: &Path) -> bool {
     dir.join("uninstall.exe").is_file()
 }
 
-/// Keep the NSIS "previous install location" key (`HKCU\Software\<publisher>\<product>`)
-/// pointed at the directory this installed copy actually runs from. The installer reads
-/// that key to reuse the user's chosen folder on update; if it was written under an older
-/// publisher name (or lost), updates would silently land in the default directory instead.
 pub(crate) fn sync_install_dir(publisher: &str, product: &str, dir: &Path) {
     if publisher.is_empty() || product.is_empty() {
         return;
@@ -43,8 +34,6 @@ pub(crate) fn sync_install_dir(publisher: &str, product: &str, dir: &Path) {
     }
 }
 
-/// Detect the "running an outdated leftover copy" situation: the uninstall registry says a
-/// newer version is installed in a different directory than the running executable.
 pub(crate) fn stale_copy_info(product: &str) -> Option<StaleCopyInfo> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
     let key = RegKey::predef(HKEY_CURRENT_USER)
@@ -64,7 +53,6 @@ pub(crate) fn stale_copy_info(product: &str) -> Option<StaleCopyInfo> {
     })
 }
 
-/// NSIS writes InstallLocation wrapped in literal quotes; strip them and whitespace.
 fn clean_location(value: &str) -> String {
     value.trim().trim_matches('"').trim().to_string()
 }
@@ -90,9 +78,6 @@ fn version_key(version: &str) -> Vec<u64> {
         .filter(|segment| !segment.is_empty())
         .filter_map(|segment| segment.parse().ok())
         .collect::<Vec<u64>>();
-    // Trailing zeros are not a different version: "0.2.0" must compare equal to "0.2", otherwise
-    // `Vec` ordering ([0,2] < [0,2,0]) reports the shorter form as older and the app decides it
-    // is an outdated leftover copy of itself.
     while key.last() == Some(&0) {
         key.pop();
     }
@@ -113,7 +98,6 @@ mod tests {
 
     #[test]
     fn trailing_zeros_do_not_change_a_version() {
-        // "0.2.0" and "0.2" are the same release; neither is newer than the other.
         assert!(!version_newer("0.2.0", "0.2"));
         assert!(!version_newer("0.2", "0.2.0"));
         assert!(!version_newer("1.0.0.0", "1"));
@@ -123,8 +107,8 @@ mod tests {
     #[test]
     fn install_location_quotes_are_stripped() {
         assert_eq!(
-            clean_location("\"C:\\Users\\Maks\\AppData\\Local\\Windows Apps\""),
-            r"C:\Users\Maks\AppData\Local\Windows Apps",
+            clean_location("\"C:\\Users\\Example\\AppData\\Local\\Windows Apps\""),
+            r"C:\Users\Example\AppData\Local\Windows Apps",
         );
         assert_eq!(clean_location("  D:\\Apps  "), r"D:\Apps");
     }

@@ -27,6 +27,29 @@ ignore = [
   # memory-exhaustion denial of service. Severity 7.5 (high). Same crate, chain, reasoning and
   # remediation as RUSTSEC-2026-0194 above.
   "RUSTSEC-2026-0195",
+  # RUSTSEC-2026-0235 — rkyv: shared-pointer validation keyed already-validated pointees by address
+  # and type without pointer metadata, so an archive holding two Rc/Arc to one address with
+  # different slice lengths could make the checked `access` API return a forged length and read out
+  # of bounds. Category memory-exposure. Fixed in rkyv >= 0.8.17; the 0.7 series is affected and no
+  # longer supported upstream, so there is no in-range fix.
+  #
+  #   chain:       rkyv 0.7.46 <- rust_decimal 1.42.1 <- byte-unit 5.2.3 <- tauri-plugin-log 2.8.0
+  #   reason:      rkyv is an *optional* dependency of rust_decimal whose feature is off, so it is
+  #                recorded in Cargo.lock but never compiled: `cargo tree -i rkyv --target all
+  #                --edges all` prints nothing, and rust_decimal builds with only `arrayvec` and
+  #                `num-traits`. `cargo audit` scans the lock file rather than the resolved feature
+  #                graph, which is why it reports a crate this application does not contain.
+  #                Exploiting it also requires feeding rkyv an untrusted archive; nothing here
+  #                creates or reads one, and rust_decimal is present only so `byte-unit` can format
+  #                sizes for `tauri-plugin-log`.
+  #   blocked by:  rust_decimal 1.42.1 declares rkyv ^0.7 for that optional feature, so 0.8 is
+  #                semver-unreachable. Removing the entry needs a rust_decimal release on rkyv 0.8,
+  #                or dropping the byte-unit chain from tauri-plugin-log.
+  #   owner:       keskiyo
+  #   reviewBy:    2026-11-30
+  #   remediation: re-run `cargo audit` after each Tauri upgrade and drop this entry as soon as the
+  #                chain resolves rkyv >= 0.8.17 or stops locking it at all.
+  "RUSTSEC-2026-0235",
 ]
 
 # The remaining findings are `unmaintained`/`unsound` warnings for the gtk-rs GTK3 bindings and

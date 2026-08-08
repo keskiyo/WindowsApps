@@ -1,11 +1,14 @@
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use image::{DynamicImage, ImageFormat, RgbaImage};
+use std::collections::HashMap;
 use std::ffi::OsStr;
+use std::fs::File;
 use std::io::Cursor;
 use std::mem::{size_of, zeroed};
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::SIZE;
 use windows::Win32::Graphics::Gdi::{
@@ -16,23 +19,14 @@ use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
 use windows::Win32::System::Com::CoTaskMemFree;
 use windows::Win32::UI::Shell::{
     FOLDERID_AppsFolder, IShellItemImageFactory, SHCreateItemFromIDList, SHCreateItemInKnownFolder,
-    SHGetFileInfoW, SHParseDisplayName, KF_FLAG_DEFAULT, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON,
-    SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY,
+    SHGetFileInfoW, SHParseDisplayName, KF_FLAG_DEFAULT, SHFILEINFOW, SHGFI_FLAGS, SHGFI_ICON,
+    SHGFI_LARGEICON, SHGFI_USEFILEATTRIBUTES, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{DestroyIcon, GetIconInfo, ICONINFO};
 
-/// Largest icon we are willing to decode. Steam library art is far below this; the bound exists
-/// so a crafted or corrupt file cannot make the decoder allocate unbounded memory.
 const MAX_ICON_DIMENSION: u32 = 4096;
 const MAX_ICON_ALLOCATION: u64 = 64 * 1024 * 1024;
 
-/// Decode an on-disk image (JPG/PNG/ICO) and re-encode it as a PNG data URL.
-/// Used for Steam library-cache icons, which are not embedded in an executable.
-///
-/// The source directory is writable by any process running as the user, so the file is
-/// untrusted: decoding runs under explicit limits. Without them a "decompression bomb" — a
-/// few kilobytes declaring enormous dimensions — would allocate gigabytes and take the
-/// application down during an ordinary scan.
 pub(crate) fn image_file_to_png_data_url(path: &Path) -> Option<String> {
     let mut reader = image::ImageReader::open(path)
         .ok()?
@@ -53,9 +47,81 @@ pub(crate) fn image_file_to_png_data_url(path: &Path) -> Option<String> {
 }
 
 pub(crate) fn extract_icon(path: &Path) -> Option<String> {
-    // `SHGetFileInfo` documents COM as a prerequisite; shell icon handlers are COM objects.
+    let icon = shell_icon(path.as_os_str(), SHGFI_ICON | SHGFI_LARGEICON)?;
+    if is_generic_answer_about_an_unreadable_file(
+        &icon,
+        unknown_type_icon().as_deref(),
+        class_icon_for(path).as_deref(),
+        cannot_be_read(path),
+    ) {
+        return None;
+    }
+    Some(icon)
+}
+
+pub(crate) fn is_provably_not_this_files_icon(path: &Path, icon: &str) -> bool {
+    is_not_this_files_icon(
+        icon,
+        unknown_type_icon().as_deref(),
+        class_icon_for(path).as_deref(),
+    )
+}
+
+fn is_generic_answer_about_an_unreadable_file(
+    icon: &str,
+    unknown: Option<&str>,
+    class: Option<&str>,
+    unreadable: bool,
+) -> bool {
+    unreadable && (unknown == Some(icon) || class == Some(icon))
+}
+
+fn is_not_this_files_icon(icon: &str, unknown: Option<&str>, class: Option<&str>) -> bool {
+    let (Some(unknown), Some(class)) = (unknown, class) else {
+        return false;
+    };
+    icon == unknown && class != unknown
+}
+
+fn cannot_be_read(path: &Path) -> bool {
+    path.metadata()
+        .is_ok_and(|metadata| metadata.is_file() && File::open(path).is_err())
+}
+
+pub(crate) fn unknown_type_icon() -> Option<String> {
+    class_icon("")
+}
+
+fn class_icon_for(path: &Path) -> Option<String> {
+    class_icon(
+        &path
+            .extension()
+            .map(|extension| extension.to_string_lossy().to_lowercase())
+            .unwrap_or_default(),
+    )
+}
+
+fn class_icon(extension: &str) -> Option<String> {
+    static ICONS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+    let icons = ICONS.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(icon) = icons.lock().ok()?.get(extension) {
+        return Some(icon.clone());
+    }
+    let separator = if extension.is_empty() { "" } else { "." };
+    let icon = shell_icon(
+        OsStr::new(&format!("windowsapps-class-probe{separator}{extension}")),
+        SHGFI_ICON | SHGFI_LARGEICON | SHGFI_USEFILEATTRIBUTES,
+    )?;
+    icons
+        .lock()
+        .ok()?
+        .insert(extension.to_owned(), icon.clone());
+    Some(icon)
+}
+
+fn shell_icon(name: &OsStr, flags: SHGFI_FLAGS) -> Option<String> {
     super::com::ensure_initialized();
-    let wide = wide(path.as_os_str());
+    let wide = wide(name);
     let mut file_info = SHFILEINFOW::default();
     // SAFETY: `wide` is a NUL-terminated UTF-16 buffer alive for the call; `file_info` is a live,
     // exclusively borrowed, fully initialized `SHFILEINFOW` whose declared size matches the value
@@ -67,7 +133,7 @@ pub(crate) fn extract_icon(path: &Path) -> Option<String> {
             FILE_ATTRIBUTE_NORMAL,
             Some(&mut file_info),
             size_of::<SHFILEINFOW>() as u32,
-            SHGFI_ICON | SHGFI_LARGEICON,
+            flags,
         )
     };
     if result == 0 || file_info.hIcon.0.is_null() {
@@ -109,9 +175,6 @@ fn extract_app_id_icon_inner(app_id: &str) -> windows::core::Result<Option<Strin
     }
 }
 
-/// # Safety
-///
-/// The calling thread must have an initialized COM apartment.
 unsafe fn apps_folder_factory(app_id: &str) -> windows::core::Result<IShellItemImageFactory> {
     let display_name = apps_folder_shell_name(app_id);
     let display_name_wide = wide(OsStr::new(&display_name));
@@ -136,9 +199,6 @@ fn apps_folder_shell_name(app_id: &str) -> String {
     format!(r"shell:AppsFolder\{app_id}")
 }
 
-/// # Safety
-///
-/// `icon` must be a live `HICON` the caller owns for the duration of the call.
 unsafe fn encode_hicon(icon: windows::Win32::UI::WindowsAndMessaging::HICON) -> Option<String> {
     // SAFETY: `ICONINFO` is a plain-old-data struct of handles and integers, so an all-zero value
     // is a valid initialized instance (null handles, which the checks below expect).
@@ -149,10 +209,6 @@ unsafe fn encode_hicon(icon: windows::Win32::UI::WindowsAndMessaging::HICON) -> 
     // handle is read, and the callee leaves them null.
     unsafe { GetIconInfo(icon, &mut info).ok()? };
 
-    // Only the colour bitmap is a plain top-down image. `hbmMask` is a 1bpp, double-height
-    // AND+XOR mask; feeding it to the 32bpp path produced a black-and-white image of twice the
-    // height. There is no icon we can honestly render from it, so skip it — the card shows its
-    // placeholder instead of garbage.
     let encoded = if info.hbmColor.0.is_null() {
         None
     } else {
@@ -164,9 +220,6 @@ unsafe fn encode_hicon(icon: windows::Win32::UI::WindowsAndMessaging::HICON) -> 
     encoded
 }
 
-/// # Safety
-///
-/// `bitmap_handle` must be a live GDI bitmap the caller owns for the duration of the call.
 unsafe fn encode_hbitmap(bitmap_handle: windows::Win32::Graphics::Gdi::HBITMAP) -> Option<String> {
     // SAFETY: `BITMAP` is plain-old-data, so an all-zero value is a valid initialized instance;
     // every field is overwritten by `GetObjectW` before being read.
@@ -187,10 +240,6 @@ unsafe fn encode_hbitmap(bitmap_handle: windows::Win32::Graphics::Gdi::HBITMAP) 
 
     let width = bitmap.bmWidth as u32;
     let height = bitmap.bmHeight.unsigned_abs();
-    // Dimensions come from a bitmap the shell produced, so they are not ours to trust. The
-    // product was computed in `u32` and wrapped: a 32768×32768 bitmap yielded a zero-length
-    // buffer that `GetDIBits` then filled with `height` rows — a heap overflow in release
-    // builds, where overflow wraps instead of panicking.
     if width > MAX_ICON_DIMENSION || height > MAX_ICON_DIMENSION {
         return None;
     }
@@ -254,10 +303,6 @@ fn bgra_to_rgba(pixels: &mut [u8]) {
     }
 }
 
-/// # Safety
-///
-/// `info` must have been filled by a successful `GetIconInfo` whose bitmaps have not been deleted
-/// yet; it transfers both bitmaps to the caller and this releases them.
 unsafe fn cleanup_icon_info(info: &ICONINFO) {
     if !info.hbmColor.0.is_null() {
         // SAFETY: non-null by the check, owned by us through `GetIconInfo`, and deleted once —
@@ -293,8 +338,84 @@ mod tests {
         );
     }
 
-    // The Steam library cache is writable by any process running as the user, so an oversized
-    // image must be refused rather than decoded into memory.
+    const UNKNOWN: &str = "data:image/png;base64,unknown-file-type";
+    const CLASS: &str = "data:image/png;base64,the-generic-application-icon";
+    const OWN: &str = "data:image/png;base64,the-editors-own-icon";
+
+    #[test]
+    fn refuses_the_unknown_type_icon_where_the_extension_has_its_own() {
+        assert!(is_not_this_files_icon(UNKNOWN, Some(UNKNOWN), Some(CLASS)));
+    }
+
+    #[test]
+    fn keeps_the_unknown_type_icon_where_the_extension_has_no_association() {
+        assert!(!is_not_this_files_icon(
+            UNKNOWN,
+            Some(UNKNOWN),
+            Some(UNKNOWN)
+        ));
+    }
+
+    #[test]
+    fn keeps_an_executables_own_icon() {
+        assert!(!is_not_this_files_icon(OWN, Some(UNKNOWN), Some(CLASS)));
+    }
+
+    #[test]
+    fn rejects_nothing_when_a_reference_is_unavailable() {
+        assert!(!is_not_this_files_icon(UNKNOWN, None, Some(CLASS)));
+        assert!(!is_not_this_files_icon(UNKNOWN, Some(UNKNOWN), None));
+    }
+
+    #[test]
+    fn refuses_any_generic_answer_about_a_file_that_will_not_open() {
+        for icon in [UNKNOWN, CLASS] {
+            assert!(is_generic_answer_about_an_unreadable_file(
+                icon,
+                Some(UNKNOWN),
+                Some(CLASS),
+                true,
+            ));
+        }
+    }
+
+    #[test]
+    fn keeps_a_generic_answer_about_a_readable_file() {
+        assert!(!is_generic_answer_about_an_unreadable_file(
+            CLASS,
+            Some(UNKNOWN),
+            Some(CLASS),
+            false,
+        ));
+    }
+
+    #[test]
+    fn keeps_a_specific_icon_even_from_a_file_that_will_not_open() {
+        assert!(!is_generic_answer_about_an_unreadable_file(
+            OWN,
+            Some(UNKNOWN),
+            Some(CLASS),
+            true,
+        ));
+    }
+
+    #[test]
+    fn a_readable_file_is_not_reported_unreadable() {
+        let dir = tempfile::tempdir().unwrap();
+        let executable = dir.path().join("Editor.exe");
+        std::fs::write(&executable, b"binary").unwrap();
+
+        assert!(!cannot_be_read(&executable));
+    }
+
+    #[test]
+    fn only_a_file_that_exists_and_will_not_open_counts_as_unreadable() {
+        let dir = tempfile::tempdir().unwrap();
+
+        assert!(!cannot_be_read(&dir.path().join("gone.exe")));
+        assert!(!cannot_be_read(dir.path()));
+    }
+
     #[test]
     fn refuses_images_beyond_the_decode_limits() {
         let dir = tempfile::tempdir().unwrap();

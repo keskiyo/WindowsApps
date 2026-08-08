@@ -1,13 +1,6 @@
-//! What this machine says about its own executables, gathered once and handed to classification.
-//!
-//! Everything here is a *registration* Windows holds, not an inference the catalog draws, so it
-//! generalizes by construction: it describes the machine being scanned rather than the machine the
-//! rules were written on.
-
 use super::place::{normalized_path, PlaceIndex};
 use std::collections::HashSet;
 
-/// Registrations that decide, in opposite directions, what an executable is.
 pub(in crate::catalog) struct Registrations {
     launchable: HashSet<String>,
     installer_bundles: HashSet<String>,
@@ -43,19 +36,15 @@ impl Registrations {
         Self::from_paths(Vec::new(), Vec::new())
     }
 
-    /// Registered under `App Paths`: a vendor declared this executable as the one users start.
     pub(in crate::catalog) fn is_launchable(&self, path: &str) -> bool {
         self.launchable.contains(&normalized_path(path))
     }
 
-    /// Registered as a product's own `BundleCachePath`: the file is that product's installer, said
-    /// by the product itself.
     pub(in crate::catalog) fn is_installer_bundle(&self, path: &str) -> bool {
         self.installer_bundles.contains(&normalized_path(path))
     }
 }
 
-/// The machine facts artifact classification reads. Built once per scan or per cache load.
 pub(in crate::catalog) struct MachineFacts {
     pub(in crate::catalog) places: PlaceIndex,
     pub(in crate::catalog) registrations: Registrations,
@@ -69,8 +58,6 @@ impl MachineFacts {
         }
     }
 
-    /// Nothing resolved and nothing registered: the conservative baseline tests classify against,
-    /// so an assertion cannot depend on the machine running the suite.
     #[cfg(test)]
     pub(in crate::catalog) fn empty() -> Self {
         Self {

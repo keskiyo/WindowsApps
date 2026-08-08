@@ -24,12 +24,21 @@ pub(crate) struct FilesystemIndex {
     pub directories: BTreeMap<String, DirectoryRecord>,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FileFingerprint {
+    pub size: u64,
+    pub modified_nanos: u128,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DirectoryRecord {
     pub modified_nanos: u128,
     pub child_directories: Vec<String>,
     pub apps: Vec<AppInfo>,
+    #[serde(default)]
+    pub executables: BTreeMap<String, FileFingerprint>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -95,6 +104,7 @@ pub(crate) fn scan_root(
         excluded,
         is_cancelled,
         ScanLimits::default(),
+        true,
     )
 }
 
@@ -105,6 +115,7 @@ pub(crate) fn scan_root_with_duration(
     excluded: &[PathBuf],
     is_cancelled: impl Fn() -> bool,
     max_duration: Duration,
+    verify_fingerprints: bool,
 ) -> IncrementalScanResult {
     scan_root_with_limits(
         root,
@@ -116,6 +127,7 @@ pub(crate) fn scan_root_with_duration(
             max_duration,
             ..ScanLimits::default()
         },
+        verify_fingerprints,
     )
 }
 
@@ -126,6 +138,7 @@ fn scan_root_with_limits(
     excluded: &[PathBuf],
     is_cancelled: impl Fn() -> bool,
     limits: ScanLimits,
+    verify_fingerprints: bool,
 ) -> IncrementalScanResult {
     let mut result = IncrementalScanResult {
         apps: Vec::new(),
@@ -133,7 +146,6 @@ fn scan_root_with_limits(
         statistics: ScanStatistics::default(),
         limit_reached: None,
     };
-    // Resolved once per root: the shell's known folders do not change during a walk.
     let facts = crate::catalog::machine::MachineFacts::current();
     let context = VisitContext {
         previous,
@@ -143,6 +155,7 @@ fn scan_root_with_limits(
         limits,
         started_at: Instant::now(),
         facts: &facts,
+        verify_fingerprints,
     };
     visit_directory(root, 0, &context, &mut result);
     result
@@ -159,6 +172,7 @@ struct VisitContext<'a, F: Fn() -> bool> {
     limits: ScanLimits,
     started_at: Instant,
     facts: &'a crate::catalog::machine::MachineFacts,
+    verify_fingerprints: bool,
 }
 
 fn visit_directory<F: Fn() -> bool>(
@@ -181,7 +195,13 @@ fn visit_directory<F: Fn() -> bool>(
         && cached.is_some_and(|record| record.modified_nanos == modified_nanos);
 
     if unchanged {
-        let record = cached.expect("checked above").clone();
+        let mut record = cached.expect("checked above").clone();
+        if context.verify_fingerprints {
+            let (apps, executables) =
+                verify_cached_executables(&record, context.facts, &mut result.statistics);
+            record.apps = apps;
+            record.executables = executables;
+        }
         result.apps.extend(record.apps.iter().cloned());
         result.index.directories.insert(key, record.clone());
         for child in record.child_directories {
@@ -251,6 +271,7 @@ fn visit_directory<F: Fn() -> bool>(
             DirectoryRecord {
                 modified_nanos,
                 child_directories: children.clone(),
+                executables: fingerprints_of(&direct_apps),
                 apps: direct_apps,
             },
         );
@@ -314,12 +335,259 @@ fn normalized_path(path: &Path) -> String {
     path.to_string_lossy().to_lowercase()
 }
 
+fn fingerprint_key(path: &str) -> String {
+    path.to_lowercase()
+}
+
+fn read_fingerprint(path: &Path) -> Result<Option<FileFingerprint>, ()> {
+    match fs::metadata(path) {
+        Ok(metadata) => {
+            let modified_nanos = metadata
+                .modified()
+                .ok()
+                .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+                .map_or(0, |duration| duration.as_nanos());
+            Ok(Some(FileFingerprint {
+                size: metadata.len(),
+                modified_nanos,
+            }))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err(()),
+    }
+}
+
+fn fingerprints_of(apps: &[AppInfo]) -> BTreeMap<String, FileFingerprint> {
+    apps.iter()
+        .filter_map(|app| {
+            let fingerprint = read_fingerprint(Path::new(&app.path)).ok().flatten()?;
+            Some((fingerprint_key(&app.path), fingerprint))
+        })
+        .collect()
+}
+
+fn verify_cached_executables(
+    record: &DirectoryRecord,
+    facts: &crate::catalog::machine::MachineFacts,
+    statistics: &mut ScanStatistics,
+) -> (Vec<AppInfo>, BTreeMap<String, FileFingerprint>) {
+    let mut apps = Vec::with_capacity(record.apps.len());
+    let mut fingerprints = BTreeMap::new();
+    for app in &record.apps {
+        let key = fingerprint_key(&app.path);
+        let path = PathBuf::from(&app.path);
+        let Ok(current) = read_fingerprint(&path) else {
+            apps.push(app.clone());
+            if let Some(stored) = record.executables.get(&key) {
+                fingerprints.insert(key, *stored);
+            }
+            continue;
+        };
+        let Some(current) = current else {
+            continue;
+        };
+        match record.executables.get(&key) {
+            Some(stored) if *stored == current => {
+                apps.push(app.clone());
+                fingerprints.insert(key, current);
+            }
+            None => {
+                apps.push(app.clone());
+                fingerprints.insert(key, current);
+            }
+            Some(_) => {
+                statistics.executables_inspected += 1;
+                if let Some(refreshed) = portable_app(path, facts) {
+                    apps.push(refreshed);
+                }
+                fingerprints.insert(key, current);
+            }
+        }
+    }
+    (apps, fingerprints)
+}
+
 fn directory_modified_nanos(path: &Path) -> u128 {
     fs::metadata(path)
         .and_then(|metadata| metadata.modified())
         .ok()
         .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
         .map_or(0, |duration| duration.as_nanos())
+}
+
+#[cfg(test)]
+mod fingerprint_tests {
+    use super::*;
+
+    fn indexed_editor() -> (tempfile::TempDir, PathBuf, FilesystemIndex) {
+        let root = tempfile::tempdir().unwrap();
+        let editor = root.path().join("Editor");
+        std::fs::create_dir_all(&editor).unwrap();
+        let executable = editor.join("Editor.exe");
+        std::fs::write(&executable, b"first build").unwrap();
+
+        let scanned = scan_root(
+            root.path(),
+            &FilesystemIndex::default(),
+            ScanMode::Force,
+            &[],
+            || false,
+        );
+
+        assert_eq!(scanned.apps.len(), 1, "the fixture must produce one card");
+        (root, executable, scanned.index)
+    }
+
+    fn pin_directory_timestamps(index: &mut FilesystemIndex) {
+        for (path, record) in &mut index.directories {
+            record.modified_nanos = directory_modified_nanos(Path::new(path));
+        }
+    }
+
+    fn rescan(root: &Path, index: &FilesystemIndex) -> IncrementalScanResult {
+        scan_root(root, index, ScanMode::Incremental, &[], || false)
+    }
+
+    #[test]
+    fn an_executable_rewritten_in_place_is_re_read() {
+        let (root, executable, mut index) = indexed_editor();
+        std::fs::write(&executable, b"second build, a different size").unwrap();
+        pin_directory_timestamps(&mut index);
+
+        let scanned = rescan(root.path(), &index);
+
+        assert_eq!(scanned.apps.len(), 1);
+        assert_eq!(
+            scanned.statistics.executables_inspected, 1,
+            "the changed file must be read again"
+        );
+        assert_eq!(
+            scanned.statistics.directories_enumerated, 0,
+            "and the unchanged tree must still not be walked"
+        );
+    }
+
+    #[test]
+    fn an_unchanged_executable_is_not_read_again() {
+        let (root, _executable, mut index) = indexed_editor();
+        pin_directory_timestamps(&mut index);
+
+        let scanned = rescan(root.path(), &index);
+
+        assert_eq!(scanned.apps.len(), 1);
+        assert_eq!(scanned.statistics.executables_inspected, 0);
+        assert_eq!(scanned.statistics.directories_enumerated, 0);
+    }
+
+    #[test]
+    fn a_deleted_executable_drops_only_its_own_record() {
+        let (root, executable, _) = indexed_editor();
+        let viewer = root.path().join("Viewer");
+        std::fs::create_dir_all(&viewer).unwrap();
+        std::fs::write(viewer.join("Viewer.exe"), b"another build").unwrap();
+
+        let mut index = scan_root(
+            root.path(),
+            &FilesystemIndex::default(),
+            ScanMode::Force,
+            &[],
+            || false,
+        )
+        .index;
+        std::fs::remove_file(&executable).unwrap();
+        pin_directory_timestamps(&mut index);
+
+        let scanned = rescan(root.path(), &index);
+
+        let remaining = scanned
+            .apps
+            .iter()
+            .map(|app| app.path.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            remaining,
+            vec![viewer.join("Viewer.exe").to_string_lossy().as_ref()]
+        );
+    }
+
+    #[test]
+    fn an_index_without_fingerprints_migrates_without_losing_anything() {
+        let (root, _executable, mut index) = indexed_editor();
+        pin_directory_timestamps(&mut index);
+        for record in index.directories.values_mut() {
+            record.executables.clear();
+        }
+
+        let scanned = rescan(root.path(), &index);
+
+        assert_eq!(scanned.apps.len(), 1);
+        assert_eq!(scanned.statistics.executables_inspected, 0);
+        assert!(
+            scanned
+                .index
+                .directories
+                .values()
+                .any(|record| !record.executables.is_empty()),
+            "the fingerprints are on file for next time"
+        );
+    }
+
+    #[test]
+    fn an_executable_that_cannot_be_checked_keeps_its_record() {
+        let (root, _executable, mut index) = indexed_editor();
+        pin_directory_timestamps(&mut index);
+        for record in index.directories.values_mut() {
+            for app in &mut record.apps {
+                app.path = format!("{}\0", app.path);
+            }
+        }
+
+        let scanned = rescan(root.path(), &index);
+
+        assert_eq!(
+            scanned.apps.len(),
+            1,
+            "an unverifiable executable keeps its card"
+        );
+    }
+
+    #[test]
+    fn an_unchanged_tree_costs_no_enumeration_and_no_metadata_reads() {
+        let root = tempfile::tempdir().unwrap();
+        for index in 0..50 {
+            let folder = root.path().join(format!("Tool{index}"));
+            std::fs::create_dir_all(&folder).unwrap();
+            std::fs::write(folder.join(format!("Tool{index}.exe")), b"build").unwrap();
+        }
+        let mut index = scan_root(
+            root.path(),
+            &FilesystemIndex::default(),
+            ScanMode::Force,
+            &[],
+            || false,
+        )
+        .index;
+        pin_directory_timestamps(&mut index);
+
+        let scanned = rescan(root.path(), &index);
+
+        assert_eq!(scanned.apps.len(), 50);
+        assert_eq!(scanned.statistics.directories_enumerated, 0);
+        assert_eq!(scanned.statistics.executables_inspected, 0);
+        assert_eq!(scanned.statistics.entries_seen, 0);
+    }
+
+    #[test]
+    fn a_force_scan_ignores_the_index_entirely() {
+        let (root, executable, mut index) = indexed_editor();
+        std::fs::remove_file(&executable).unwrap();
+        pin_directory_timestamps(&mut index);
+
+        let scanned = scan_root(root.path(), &index, ScanMode::Force, &[], || false);
+
+        assert!(scanned.apps.is_empty());
+        assert!(scanned.statistics.directories_enumerated > 0);
+    }
 }
 
 #[cfg(test)]
@@ -412,6 +680,7 @@ mod tests {
                 max_entries: 100,
                 max_duration: Duration::from_secs(10),
             },
+            true,
         );
 
         assert!(result.apps.iter().any(|app| app.name == "Allowed"));
@@ -435,6 +704,7 @@ mod tests {
                 max_entries: 0,
                 max_duration: Duration::from_secs(10),
             },
+            true,
         );
 
         assert!(result.apps.is_empty());
@@ -458,6 +728,7 @@ mod tests {
                 max_entries: 1,
                 max_duration: Duration::from_secs(10),
             },
+            true,
         );
 
         assert_eq!(result.limit_reached, Some(ScanLimit::Entries));
@@ -482,6 +753,7 @@ mod tests {
                 max_entries: 100,
                 max_duration: Duration::ZERO,
             },
+            true,
         );
 
         assert_eq!(result.limit_reached, Some(ScanLimit::Time));

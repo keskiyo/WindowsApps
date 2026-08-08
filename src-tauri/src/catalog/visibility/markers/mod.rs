@@ -1,11 +1,3 @@
-//! The marker predicates behind `classify_visibility`, split by what kind of evidence they read.
-//!
-//! `structural` inspects the shape of a record — how Windows registered it, what its shortcut
-//! targets, whether it resolves to anything. Those generalize to any machine because they depend
-//! on no vocabulary, and they are the only place rejection can come from. `rules` holds the
-//! curated needles as data, each bound to the one field where it is evidence and to the strongest
-//! outcome its tier of evidence is allowed to produce.
-
 mod rules;
 mod structural;
 
@@ -20,12 +12,9 @@ use super::VisibilityReason;
 use crate::catalog::fields::MarkerFields;
 use rules::{Outcome, RULES};
 
-/// What the needle tables have to say about a record.
 #[derive(Default)]
 pub(super) struct TextVerdict {
-    /// The first rule strong enough to settle the record into Auxiliary tools, with its score.
     pub(super) forced: Option<(VisibilityReason, i16)>,
-    /// Reasons that only add weight, deduplicated, in table order.
     pub(super) weights: Vec<(VisibilityReason, i16)>,
 }
 
@@ -41,9 +30,6 @@ pub(super) fn evaluate_text(fields: &MarkerFields) -> TextVerdict {
                     verdict.forced = Some((rule.reason, score));
                 }
             }
-            // A record can match several component needles at once — a local file name and the
-            // toolchain directory holding it. Each match is real evidence and each is counted, but
-            // the reason is recorded once so the explanation stays readable.
             Outcome::Weigh(weight) => verdict.weights.push((rule.reason, weight)),
         }
     }

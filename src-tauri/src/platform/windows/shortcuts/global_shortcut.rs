@@ -20,8 +20,6 @@ pub(crate) const LABEL: &str = "Win+Shift+Q";
 pub(crate) struct Status {
     pub available: bool,
     pub label: &'static str,
-    // A static message, not the upstream HRESULT text: only fixed, safe strings cross IPC
-    // (root §7 / `AGENTS_backend.md` §3).
     pub error: Option<&'static str>,
 }
 
@@ -35,17 +33,11 @@ impl Default for Status {
     }
 }
 
-/// Outcome of `register`: the status the settings page shows, plus the guard that owns the
-/// hotkey thread. Both live in `AppState` — there is no process-wide singleton (§8).
 pub(crate) struct RegisteredShortcut {
     pub status: Status,
     pub guard: Option<ShortcutGuard>,
 }
 
-/// Owns the hotkey thread. Dropping it unregisters the hotkey, ends the message loop and joins
-/// the thread, so the registration and the `AppHandle` the thread holds do not outlive it —
-/// `AGENTS_backend.md` §5 requires background work started at setup to have an owner and a
-/// shutdown, and this was the one piece that was simply detached.
 pub(crate) struct ShortcutGuard {
     thread: Option<JoinHandle<()>>,
     thread_id: u32,
@@ -53,7 +45,6 @@ pub(crate) struct ShortcutGuard {
 
 impl Drop for ShortcutGuard {
     fn drop(&mut self) {
-        // `WM_QUIT` ends `GetMessageW`; the thread unregisters the hotkey on its way out.
         // SAFETY: `PostThreadMessageW` takes no pointer — both parameters are integers. The
         // thread id was reported by the hotkey thread itself and a `ShortcutGuard` is only built
         // while that thread is running; the join below is what guarantees it is still alive here,
@@ -67,11 +58,6 @@ impl Drop for ShortcutGuard {
 }
 
 pub(crate) fn register(app: AppHandle) -> RegisteredShortcut {
-    // Two channels, because the thread's identity and its registration result become known at
-    // different times. The id is available immediately; `RegisterHotKey` can be slow. Reporting
-    // the id first is what lets the guard own the thread even when registration is slow or fails
-    // — previously a timeout dropped the `JoinHandle`, leaving a detached thread holding an
-    // `AppHandle`, with no way to ever stop it or release a hotkey it might still register.
     let (id_sender, id_receiver) = mpsc::channel();
     let (status_sender, status_receiver) = mpsc::channel();
     // SAFETY: every call in this block is thread-affine, and all of them run on this one spawned
@@ -95,12 +81,9 @@ pub(crate) fn register(app: AppHandle) -> RegisteredShortcut {
                 crate::lifecycle::show_main_window(&app);
             }
         }
-        // The hotkey is owned by this thread, so it must be released here.
         let _ = UnregisterHotKey(None, HOTKEY_ID);
     });
     let Ok(thread_id) = id_receiver.recv_timeout(Duration::from_secs(1)) else {
-        // The thread never even reported its id, so there is nothing to address a shutdown to.
-        // Joining is still correct: it cannot have registered anything past this point either.
         let _ = thread.join();
         return RegisteredShortcut {
             status: Status {
@@ -113,9 +96,6 @@ pub(crate) fn register(app: AppHandle) -> RegisteredShortcut {
             guard: None,
         };
     };
-    // A slow `RegisterHotKey` (past the timeout) still leaves the thread running and the key
-    // working; the status just reports unavailable — a false negative, never a false positive.
-    // The guard is built either way, so that thread is always owned and always shut down.
     let available = status_receiver
         .recv_timeout(Duration::from_secs(1))
         .unwrap_or(false);
@@ -144,13 +124,9 @@ mod tests {
         assert_eq!(LABEL, "Win+Shift+Q");
     }
 
-    // The message loop blocks in `GetMessageW` forever, so dropping the guard has to actually
-    // deliver `WM_QUIT` and join. If it did not, the thread — and the `AppHandle` it holds —
-    // would outlive the application, and the hotkey would stay registered.
     #[test]
     fn dropping_the_guard_stops_the_message_loop_promptly() {
         let Some(guard) = register_for_test() else {
-            // Another process already owns Win+Shift+Q on this machine; nothing to join.
             return;
         };
         let started = std::time::Instant::now();
@@ -160,12 +136,8 @@ mod tests {
         assert!(started.elapsed() < Duration::from_secs(2));
     }
 
-    // A hotkey another process already owns still leaves a live thread behind, and that thread
-    // has to be owned too. Registration failure used to drop the `JoinHandle`, detaching a thread
-    // that held an `AppHandle` for the rest of the process's life.
     #[test]
     fn a_thread_whose_registration_failed_is_still_owned_and_joined() {
-        // Occupy the hotkey on this thread so the spawned one cannot register it.
         let blocker = register_for_test();
         let started = std::time::Instant::now();
 
@@ -180,15 +152,10 @@ mod tests {
         drop(blocker);
     }
 
-    /// `register` needs an `AppHandle`, which a unit test cannot build, so the guard is
-    /// constructed from the same primitives the real path uses.
     fn register_for_test() -> Option<ShortcutGuard> {
         spawn_hotkey_thread(true)
     }
 
-    /// Mirrors `register`'s ownership rule: the thread reports its id before it attempts to
-    /// register, so a guard exists regardless of the outcome. `require_registration` models the
-    /// caller that only wants a guard when the hotkey is actually held.
     fn spawn_hotkey_thread(require_registration: bool) -> Option<ShortcutGuard> {
         let (id_sender, id_receiver) = mpsc::channel();
         let (status_sender, status_receiver) = mpsc::channel();

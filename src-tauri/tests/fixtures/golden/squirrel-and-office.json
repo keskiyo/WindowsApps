@@ -1,0 +1,77 @@
+[
+	{
+		"id": "discord-shortcut",
+		"name": "Discord",
+		"path": "C:\\Users\\<USER>\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Discord.lnk",
+		"iconBase64": null,
+		"launchKind": "shortcut",
+		"sourceKind": "start_menu",
+		"resolvedPath": "C:\\Users\\<USER>\\AppData\\Local\\Discord\\app-1.0.9250\\Discord.exe",
+		"installLocation": "C:\\Users\\<USER>\\AppData\\Local\\Discord",
+		"version": "1.0.9250",
+		"publisher": "Discord Inc.",
+		"description": "Discord",
+		"productName": "Discord",
+		"originalFilename": "Discord.exe"
+	},
+	{
+		"id": "discord-squirrel-stub",
+		"name": "Discord",
+		"path": "C:\\Users\\<USER>\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Discord Inc\\Discord.lnk",
+		"iconBase64": null,
+		"launchKind": "shortcut",
+		"sourceKind": "start_menu",
+		"resolvedPath": "C:\\Users\\<USER>\\AppData\\Local\\Discord\\Update.exe",
+		"launchArguments": "--processStart Discord.exe",
+		"installLocation": "C:\\Users\\<USER>\\AppData\\Local\\Discord",
+		"version": "1.1.1.0",
+		"publisher": "GitHub",
+		"description": "Update",
+		"productName": "Update",
+		"originalFilename": "Update.exe"
+	},
+	{
+		"id": "office-word-aumid",
+		"name": "Word",
+		"path": "Microsoft.Office.WINWORD.EXE.15",
+		"iconBase64": null,
+		"launchKind": "app_user_model_id",
+		"sourceKind": "start_apps"
+	},
+	{
+		"id": "office-excel-aumid",
+		"name": "Excel",
+		"path": "Microsoft.Office.EXCEL.EXE.15",
+		"iconBase64": null,
+		"launchKind": "app_user_model_id",
+		"sourceKind": "start_apps"
+	},
+	{
+		"id": "office-word-shortcut",
+		"name": "Word",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Word.lnk",
+		"iconBase64": null,
+		"launchKind": "shortcut",
+		"sourceKind": "start_menu",
+		"resolvedPath": "C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE",
+		"installLocation": "C:\\Program Files\\Microsoft Office\\root\\Office16",
+		"publisher": "Microsoft Corporation",
+		"productName": "Microsoft Word",
+		"originalFilename": "WinWord.exe"
+	},
+	{
+		"id": "seven-zip-registry",
+		"name": "7-Zip 24.08",
+		"path": "C:\\Program Files\\7-Zip\\7zFM.exe",
+		"iconBase64": null,
+		"launchKind": "executable",
+		"sourceKind": "registry",
+		"installLocation": "C:\\Program Files\\7-Zip",
+		"version": "24.08",
+		"publisher": "Igor Pavlov",
+		"description": "7-Zip File Manager",
+		"productName": "7-Zip",
+		"originalFilename": "7zFM.exe",
+		"canUninstall": true
+	}
+]

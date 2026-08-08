@@ -1,10 +1,3 @@
-//! The running-process side of a close: which processes run a given image, and how to stop one.
-//!
-//! Windows are not enough to find a program. A Store app's window belongs to
-//! `ApplicationFrameHost.exe`, an app minimised to the tray has no visible window at all, and a
-//! multi-process application keeps helpers that never had one. A close that has to leave nothing
-//! running therefore starts from the process list, not from the desktop.
-
 use std::collections::HashSet;
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::System::Diagnostics::ToolHelp::{
@@ -16,13 +9,11 @@ use windows::Win32::System::Threading::{
     PROCESS_TERMINATE,
 };
 
-/// Windows path comparison is case-insensitive, and the catalog stores separators either way.
 pub(super) fn same_executable(left: &str, right: &str) -> bool {
     let normalize = |value: &str| value.trim().replace('/', "\\");
     normalize(left).eq_ignore_ascii_case(&normalize(right))
 }
 
-/// Owns a handle for the duration of one snapshot, query or termination.
 struct OwnedHandle(HANDLE);
 
 impl Drop for OwnedHandle {
@@ -68,7 +59,6 @@ pub(super) fn image_path_of(pid: u32) -> Option<String> {
     buffer.get(..written).map(String::from_utf16_lossy)
 }
 
-/// The file name a process entry reports, lowercased for comparison against target names.
 fn entry_file_name(entry: &PROCESSENTRY32W) -> String {
     let name = entry
         .szExeFile
@@ -78,13 +68,6 @@ fn entry_file_name(entry: &PROCESSENTRY32W) -> String {
     String::from_utf16_lossy(name).to_lowercase()
 }
 
-/// Every running process whose executable is one of `file_names` (lowercased), as
-/// `(pid, full image path)`.
-///
-/// Filtering on the cheap name from the snapshot before opening anything is what keeps this
-/// bounded: a machine has hundreds of processes, and only the handful that could possibly match
-/// costs a handle. The current process is excluded here, at the single choke point, so no caller
-/// can arrange for a scenario to close Windows Apps itself.
 pub(super) fn running_images(file_names: &HashSet<String>) -> Vec<(u32, String)> {
     if file_names.is_empty() {
         return Vec::new();
@@ -99,7 +82,6 @@ pub(super) fn running_images(file_names: &HashSet<String>) -> Vec<(u32, String)>
     };
     let snapshot = OwnedHandle(snapshot);
     let mut entry = PROCESSENTRY32W {
-        // Required by the API: an entry whose size field is not set is rejected outright.
         dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
         ..Default::default()
     };
@@ -125,9 +107,6 @@ pub(super) fn running_images(file_names: &HashSet<String>) -> Vec<(u32, String)>
     processes
 }
 
-/// Terminates one process. Reports whether the request itself succeeded; whether the program is
-/// really gone is decided by the caller's re-check, because a process can also exit on its own
-/// between the snapshot and this call.
 pub(super) fn terminate(pid: u32) -> bool {
     let Some(handle) = open_process(PROCESS_TERMINATE, pid) else {
         return false;
@@ -166,8 +145,6 @@ mod tests {
         ));
     }
 
-    // The name is a fixed-width buffer padded with zeros; reading it whole would compare the
-    // padding too and match nothing.
     #[test]
     fn reads_the_executable_name_up_to_its_terminator() {
         let mut entry = PROCESSENTRY32W::default();
@@ -178,7 +155,6 @@ mod tests {
         assert_eq!(entry_file_name(&entry), "editor.exe");
     }
 
-    // Every close starts from this list, so the one process it must never contain is our own.
     #[test]
     fn never_lists_the_current_process() {
         // SAFETY: `GetCurrentProcessId` takes no arguments and cannot fail.

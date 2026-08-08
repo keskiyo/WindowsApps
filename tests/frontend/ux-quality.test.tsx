@@ -369,7 +369,7 @@ describe('UX quality — keyboard & native (round 3)', () => {
 		renderApp({
 			launchApp: vi
 				.fn()
-				.mockRejectedValue(new Error('C:\\Users\\Maks\\private-launch-detail')),
+				.mockRejectedValue(new Error('C:\\Users\\Example\\private-launch-detail')),
 		})
 		await userEvent.click(
 			await screen.findByRole('button', { name: 'Launch Steam' }),

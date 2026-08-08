@@ -10,8 +10,6 @@ fn validate_local_directory(path: &Path) -> Result<(), ()> {
     Ok(())
 }
 
-/// Opens one already-resolved local folder through the Windows Shell. It accepts no shell
-/// expression, URI, network path or caller-selected executable.
 fn folder_shell_target(path: &Path) -> Result<String, ()> {
     validate_local_directory(path)?;
     Ok(path.to_string_lossy().into_owned())

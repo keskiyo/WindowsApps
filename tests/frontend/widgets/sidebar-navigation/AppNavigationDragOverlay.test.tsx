@@ -120,6 +120,23 @@ describe('AppNavigation category drag overlay', () => {
 		)
 	})
 
+	// The sidebar carries `backdrop-filter` and the drawer panel `will-change: transform`, and
+	// either one makes its element the containing block for `position: fixed` descendants. The
+	// overlay is positioned in viewport coordinates, so rendering it inside the panel offset it by
+	// the panel's own origin: the pointer stayed at the top of the list while the dragged category
+	// floated below it. It has to leave the navigation subtree entirely.
+	it('renders the overlay outside the navigation panel', () => {
+		renderNavigation()
+
+		startGamesDrag()
+
+		const overlay = screen.getByTestId('category-drag-overlay')
+		expect(
+			screen.getByRole('navigation', { name: 'App navigation' }),
+		).not.toContainElement(overlay)
+		expect(overlay.parentElement).toBe(document.body)
+	})
+
 	it('removes the overlay after a drag ends', () => {
 		renderNavigation()
 		startGamesDrag()

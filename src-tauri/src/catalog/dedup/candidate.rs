@@ -1,6 +1,3 @@
-//! Turning a scanned `AppInfo` into a comparable candidate, plus the blocking index that keeps
-//! resolution from comparing every pair.
-
 use super::arguments::meaningful_launch_arguments;
 use super::family::{
     helper_variant_family, launcher_product_family, normalized_product_family, normalized_publisher,
@@ -18,8 +15,6 @@ pub(super) struct AppCandidate {
     pub(super) app: AppInfo,
     pub(super) family: String,
     pub(super) identity: CandidateIdentity,
-    /// Derived once per candidate. Each of these used to be recomputed inside the pairwise
-    /// predicates — that is, O(n) times per candidate — and every one of them allocates.
     pub(super) launcher_family: String,
     pub(super) helper_family: String,
     pub(super) publisher_key: String,
@@ -83,14 +78,6 @@ impl CandidateIdentity {
     }
 }
 
-/// An entry visibility demoted because it performs a side action on a product — "reset preferences
-/// and cache files", an updater, a help link — rather than opening it.
-///
-/// Such a record is never the best representative of a merged card. It matters because a shortcut
-/// outranks a plain executable on the score below, and these entries resolve to the very executable
-/// they act upon: without this, the merged VLC card inherited `--reset-config` and launching it
-/// from the catalog wiped the user's settings. They only reach deduplication at all because word-
-/// based markers demote instead of rejecting.
 fn is_side_action(app: &AppInfo) -> bool {
     app.visibility_reasons.iter().any(|reason| {
         matches!(
@@ -107,10 +94,6 @@ pub(super) fn candidate_score(app: &AppInfo) -> u8 {
     if app.source_kind == SourceKind::Steam {
         return 5;
     }
-    // A localized Start-App for a built-in Windows tool (Event Viewer / Просмотр событий,
-    // etc.) should win over its English Start-Menu shortcut so the merged card keeps the
-    // OS-language name and the working shell icon. Scoped to system targets only, so normal
-    // app merges (registry/shortcut/portable) are unaffected.
     if app.launch_kind == LaunchKind::AppUserModelId
         && app.source_kind == SourceKind::StartApps
         && (is_system_tool_target(app) || system_tool_alias(app).is_some())

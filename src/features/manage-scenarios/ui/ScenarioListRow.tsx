@@ -8,6 +8,7 @@ export function ScenarioListRow({
 	scenarioName,
 	apps,
 	missing,
+	markOf,
 	onAdd,
 	onRemove,
 	identityOf,
@@ -25,6 +26,7 @@ export function ScenarioListRow({
 					<ScenarioAppTile
 						key={app.id}
 						app={app}
+						mark={markOf?.(app) ?? null}
 						remove={{
 							label: `Remove ${app.name} from the ${label} list of ${scenarioName}`,
 							onRemove: () => onRemove(list, identityOf(app)),

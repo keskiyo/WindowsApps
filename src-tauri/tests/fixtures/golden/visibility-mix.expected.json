@@ -1,0 +1,113 @@
+{
+	"schema_version": 1,
+	"input_record_count": 8,
+	"output_app_count": 5,
+	"records": [
+		{
+			"canonical_id": "path:c:\\programdata\\microsoft\\windows\\start menu\\programs\\vs\\x64 native tools.lnk",
+			"preference_identity": "preference:abf867aa523583bf06f296b82099202d22421ac2941966be0f15dbb02d19cf4d",
+			"canonical_identity": "identity:04a235f6622e831e179bec874f0f363b333c7a66d8dcfcb0275d893b5ab5eda3",
+			"launch": "Shortcut|c:\\windows\\system32\\cmd.exe|/k \"c:\\buildtools\\vc\\auxiliary\\build\\vcvars64.bat\"",
+			"source_kind": "StartMenu",
+			"artifact_kind": "Application",
+			"visibility_class": "Auxiliary",
+			"category": "WindowsFeatures",
+			"display_name": "x64 Native Tools Command Prompt for VS 2022"
+		},
+		{
+			"canonical_id": "portable:d:\\tools\\crystaldiskinfo\\cdiresource|alertmail48",
+			"preference_identity": "preference:1fcb032dd158214b87a82d82f0ab256d981f4e0ce949f84cc2e4ef33ed714390",
+			"canonical_identity": "identity:8db8a6372ebf1e95e150c458efc9e5d23e4ceab98764a3403520cbae8af4917f",
+			"launch": "Executable|d:\\tools\\crystaldiskinfo\\cdiresource\\alertmail48.exe|",
+			"source_kind": "Portable",
+			"artifact_kind": "Application",
+			"visibility_class": "Auxiliary",
+			"category": "Utilities",
+			"display_name": "AlertMail48"
+		},
+		{
+			"canonical_id": "portable:d:\\tools\\crystaldiskinfo|crystaldiskinfo",
+			"preference_identity": "preference:69d34777bfdad475f9e62b975629555a4ed1f6e65258c455b5e3fdcb51153571",
+			"canonical_identity": "identity:5e7bc728a33fd7ccff6ef06d5081c37dbc0f7f3a92e27361ae0156449440fb2b",
+			"launch": "Executable|d:\\tools\\crystaldiskinfo\\diskinfo64.exe|",
+			"source_kind": "Portable",
+			"artifact_kind": "Application",
+			"visibility_class": "Auxiliary",
+			"category": "Utilities",
+			"display_name": "CrystalDiskInfo"
+		},
+		{
+			"canonical_id": "target:c:\\program files\\videolan\\vlc\\vlc.exe",
+			"preference_identity": "preference:469d76d888276ad62574dc4a8b341e6cdc375c0f1f30849b7804e7b2cb1d6640",
+			"canonical_identity": "identity:d68d3c4c92928b90a84f8fec2e4de70588ed36ca6c1d7529c9aa0475fef35dc3",
+			"launch": "Executable|c:\\program files\\videolan\\vlc\\vlc.exe|",
+			"source_kind": "Registry",
+			"artifact_kind": "Application",
+			"visibility_class": "Primary",
+			"category": "Media",
+			"display_name": "VLC media player"
+		},
+		{
+			"canonical_id": "target:c:\\python314\\doc\\python3140.chm",
+			"preference_identity": "preference:c54dab9724beb30349ec2493b4de90a6f6ad76d0696dff7cb1978f22af8ddabb",
+			"canonical_identity": "identity:f543377bdb8b2249c2d3f77e070653e01084111fdcda723573004aab5539fe63",
+			"launch": "Shortcut|c:\\python314\\doc\\python3140.chm|",
+			"source_kind": "StartMenu",
+			"artifact_kind": "Application",
+			"visibility_class": "Auxiliary",
+			"category": "Development",
+			"display_name": "Python 3.14 Manual"
+		}
+	],
+	"dedup_groups": [
+		{
+			"canonical_id": "path:c:\\programdata\\microsoft\\windows\\start menu\\programs\\vs\\x64 native tools.lnk",
+			"members": [
+				"c:\\programdata\\microsoft\\windows\\start menu\\programs\\vs\\x64 native tools.lnk"
+			]
+		},
+		{
+			"canonical_id": "portable:d:\\tools\\crystaldiskinfo\\cdiresource|alertmail48",
+			"members": [
+				"d:\\tools\\crystaldiskinfo\\cdiresource\\alertmail48.exe"
+			]
+		},
+		{
+			"canonical_id": "portable:d:\\tools\\crystaldiskinfo|crystaldiskinfo",
+			"members": ["d:\\tools\\crystaldiskinfo\\diskinfo64.exe"]
+		},
+		{
+			"canonical_id": "target:c:\\program files\\videolan\\vlc\\vlc.exe",
+			"members": [
+				"c:\\program files\\videolan\\vlc\\vlc.exe",
+				"c:\\programdata\\microsoft\\windows\\start menu\\programs\\videolan\\reset.lnk"
+			]
+		},
+		{
+			"canonical_id": "target:c:\\python314\\doc\\python3140.chm",
+			"members": [
+				"c:\\programdata\\microsoft\\windows\\start menu\\programs\\python\\manual.lnk"
+			]
+		}
+	],
+	"source_counts": {
+		"Portable": 2,
+		"Registry": 1,
+		"StartMenu": 2
+	},
+	"visibility_counts": {
+		"Auxiliary": 4,
+		"Primary": 1
+	},
+	"category_counts": {
+		"Development": 1,
+		"Media": 1,
+		"Utilities": 2,
+		"WindowsFeatures": 1
+	},
+	"diagnostics": {
+		"dev_reports": "disabled",
+		"os_script": "latin",
+		"registrations": "empty"
+	}
+}

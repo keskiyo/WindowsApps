@@ -54,9 +54,9 @@ describe('useUpdater', () => {
 
 		await waitFor(() => expect(check).toHaveBeenCalledTimes(2))
 		expect(second.result.current.update).toBeNull()
-		expect(localStorage.getItem('windows-apps.dismissed-update-version')).toBe(
-			'0.2.2',
-		)
+		expect(
+			localStorage.getItem('windows-apps.dismissed-update-version'),
+		).toBe('0.2.2')
 	})
 
 	it('manual checks show a dismissed version again', async () => {
@@ -82,7 +82,8 @@ describe('useUpdater', () => {
 
 	it('coalesces an automatic and manual check while preserving manual visibility', async () => {
 		localStorage.setItem('windows-apps.dismissed-update-version', '0.2.2')
-		let resolveCheck: ((value: ReturnType<typeof update>) => void) | undefined
+		let resolveCheck:
+			((value: ReturnType<typeof update>) => void) | undefined
 		check.mockImplementation(
 			() =>
 				new Promise(resolve => {
@@ -156,12 +157,16 @@ describe('useUpdater', () => {
 	})
 
 	it('does not log raw updater failures to the browser console', async () => {
-		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const consoleError = vi
+			.spyOn(console, 'error')
+			.mockImplementation(() => undefined)
 		check.mockResolvedValue({
 			...update('0.2.4'),
 			download: vi
 				.fn()
-				.mockRejectedValue(new Error('C:\\Users\\Maks\\private-updater-detail')),
+				.mockRejectedValue(
+					new Error('C:\\Users\\Example\\private-updater-detail'),
+				),
 		})
 
 		const { result } = renderHook(() => useUpdater({ autoCheck: false }))

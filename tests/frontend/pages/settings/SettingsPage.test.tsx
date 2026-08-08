@@ -122,6 +122,139 @@ describe('SettingsPage', () => {
 		expect(screen.queryByText('Duration')).not.toBeInTheDocument()
 	})
 
+	// A source that keeps failing serves months-old records and used to say nothing at all. The
+	// row has to name the state, the count it is still serving, and the failure streak.
+	it('reports a source that is serving older data', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+				catalogDiagnostics={{
+					completedAt: 1,
+					durationMs: 10,
+					mode: 'refresh',
+					totalApps: 12,
+					sourceCounts: { registry: 9 },
+					added: 0,
+					removed: 0,
+					updated: 0,
+					sources: [
+						{
+							key: 'start-apps',
+							state: 'stale',
+							lastAttemptAt: 1_700_000_000,
+							lastSuccessAt: 1_699_000_000,
+							consecutiveFailures: 8,
+							lastDurationMs: 25,
+							lastError: 'provider_failed',
+							recordCount: 41,
+						},
+					],
+				}}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Last scan diagnostics' }),
+		)
+
+		const row = screen.getByRole('row', { name: /start-apps/ })
+		expect(row).toHaveTextContent('Serving older data')
+		expect(row).toHaveTextContent('Did not answer')
+		expect(row).toHaveTextContent('41')
+		expect(row).toHaveTextContent('8')
+	})
+
+	it('shows no source table when the cache predates source health', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+				catalogDiagnostics={{
+					completedAt: 1,
+					durationMs: 10,
+					mode: 'startup',
+					totalApps: 12,
+					sourceCounts: { registry: 9 },
+					added: 0,
+					removed: 0,
+					updated: 0,
+				}}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Last scan diagnostics' }),
+		)
+
+		expect(screen.queryByRole('table')).not.toBeInTheDocument()
+	})
+
+	// The number that would expose a wrong availability verdict on a machine no fixture models:
+	// applications this rule kept that the rule it replaced would have deleted.
+	it('reports how far the launch-target rule diverged from the one it replaced', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+				catalogDiagnostics={{
+					completedAt: 1,
+					durationMs: 10,
+					mode: 'startup',
+					totalApps: 12,
+					sourceCounts: { registry: 9 },
+					added: 0,
+					removed: 0,
+					updated: 0,
+					targetAvailability: {
+						byReason: {
+							'target.present': 10,
+							'target.unverifiable.access_denied': 2,
+						},
+						keptByNewRule: 2,
+					},
+				}}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Last scan diagnostics' }),
+		)
+
+		expect(screen.getByText('Verified on disk')).toBeInTheDocument()
+		expect(
+			screen.getByText('Not checked — access denied'),
+		).toBeInTheDocument()
+		expect(
+			screen.getByText(/Kept by the current rule: 2/),
+		).toBeInTheDocument()
+	})
+
+	it('shows no launch-target panel when the cache predates the diff', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+				catalogDiagnostics={{
+					completedAt: 1,
+					durationMs: 10,
+					mode: 'startup',
+					totalApps: 12,
+					sourceCounts: { registry: 9 },
+					added: 0,
+					removed: 0,
+					updated: 0,
+				}}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Last scan diagnostics' }),
+		)
+
+		expect(screen.queryByText('Launch target check')).not.toBeInTheDocument()
+	})
+
 	it('does not render manual icon-maintenance controls', async () => {
 		render(
 			<SettingsPage

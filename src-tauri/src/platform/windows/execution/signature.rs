@@ -28,8 +28,6 @@ fn map_verify_status(status: i32) -> AppSignatureStatus {
     }
 }
 
-/// Checks Authenticode trust with the locally available policy and revocation data. The command
-/// never shows UI or downloads data, so an unreachable provider cannot block a catalog request.
 pub(crate) fn verify_signature(path: &Path) -> AppSignatureStatus {
     if !path.is_file() {
         return AppSignatureStatus::Unavailable;

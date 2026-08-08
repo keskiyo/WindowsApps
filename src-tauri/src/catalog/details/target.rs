@@ -109,9 +109,6 @@ pub(super) fn install_location_target(target: &AppDetailsTarget) -> Option<PathB
         .map(Path::to_path_buf)
 }
 
-/// The single folder rule, taking its Windows root the way `details_file_target_with_system_root`
-/// does. `read_details` reports `can_open_folder` from this and `open_app_folder` authorizes from
-/// it, so the button's enabled state and the permission check cannot drift apart.
 pub(super) fn folder_target_in(
     target: &AppDetailsTarget,
     windows_root: Option<&Path>,
@@ -204,10 +201,6 @@ mod tests {
         );
     }
 
-    // `can_open_folder` (via `read_details`) and `open_app_folder` used to be two copies of this
-    // rule that obtained the Windows root differently, so a missing `SystemRoot` made the button
-    // report "no folder" while the command would still have opened one. One implementation now
-    // answers both, and a missing root only affects the AUMID branch that actually needs it.
     #[test]
     fn a_missing_windows_root_only_withholds_the_system_start_app_folder() {
         let install = tempfile::tempdir().unwrap();

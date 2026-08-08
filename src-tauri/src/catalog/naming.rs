@@ -1,10 +1,3 @@
-//! Portable-app display-name derivation: choosing a human name from the executable stem, parent
-//! folder, and embedded product metadata, plus the version suffix split out of a versioned stem.
-
-/// Chooses a portable app's display name. When the executable name carries no product
-/// identity (`32.exe`, `x64.exe`, …) the embedded metadata is unreliable (a Yandex-derived
-/// binary inside a "Крипто 4" folder reports ProductName "Yandex"), so the parent folder
-/// wins. Otherwise use the metadata product name, falling back to the cleaned file stem.
 pub(super) fn portable_display_name(
     stem: &str,
     parent: Option<&str>,
@@ -26,9 +19,6 @@ pub(super) fn portable_display_name(
         .unwrap_or_else(|| clean_portable_name(stem))
 }
 
-/// Light cleanup for a folder used as a display name: normalize separators and whitespace,
-/// but keep trailing numbers ("Крипто 4" must not lose its "4", unlike version-suffix
-/// stripping applied to executable stems).
 fn clean_folder_name(value: &str) -> String {
     value
         .replace(['_', '-'], " ")
@@ -37,8 +27,6 @@ fn clean_folder_name(value: &str) -> String {
         .join(" ")
 }
 
-/// An executable name that identifies the platform/arch, not the product (`32.exe`,
-/// `x64.exe`, `win32.exe`, purely numeric). For these the parent folder is a better name.
 fn is_generic_executable_stem(stem: &str) -> bool {
     let normalized = stem.trim().to_lowercase();
     if normalized.is_empty() {

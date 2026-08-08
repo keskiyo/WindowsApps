@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 pub(super) struct PortableScanResult {
     pub(super) apps: Vec<AppInfo>,
     pub(super) filesystem_index: FilesystemIndex,
+    pub(super) complete: bool,
 }
 
 pub(super) struct PortableScanInput<'a> {
@@ -16,6 +17,7 @@ pub(super) struct PortableScanInput<'a> {
     pub(super) excluded: &'a [PathBuf],
     pub(super) mode: ScanMode,
     pub(super) max_duration: Duration,
+    pub(super) verify_fingerprints: bool,
 }
 
 pub(super) fn scan_roots(
@@ -26,6 +28,7 @@ pub(super) fn scan_roots(
     let started_at = Instant::now();
     let mut apps = BTreeMap::new();
     let mut filesystem_index = FilesystemIndex::default();
+    let mut complete = true;
     progress(ScanProgress {
         stage: "Portable applications".into(),
         location: None,
@@ -34,6 +37,7 @@ pub(super) fn scan_roots(
     });
     for (index, root) in input.roots.iter().enumerate() {
         if is_cancelled() {
+            complete = false;
             break;
         }
         let remaining = input.max_duration.saturating_sub(started_at.elapsed());
@@ -44,16 +48,18 @@ pub(super) fn scan_roots(
             input.excluded,
             is_cancelled,
             remaining,
+            input.verify_fingerprints,
         );
-        let complete = !matches!(
+        let complete_root = !matches!(
             scanned.limit_reached,
             Some(ScanLimit::Entries | ScanLimit::Time)
         );
-        for app in merge_root_apps(input.previous_apps, scanned.apps, root, complete) {
+        complete &= complete_root;
+        for app in merge_root_apps(input.previous_apps, scanned.apps, root, complete_root) {
             apps.insert(app.id.clone(), app);
         }
         filesystem_index.directories.extend(
-            merge_root_index(input.previous_index, scanned.index, root, complete).directories,
+            merge_root_index(input.previous_index, scanned.index, root, complete_root).directories,
         );
         progress(ScanProgress {
             stage: scanned.limit_reached.map_or_else(
@@ -68,6 +74,7 @@ pub(super) fn scan_roots(
     PortableScanResult {
         apps: apps.into_values().collect(),
         filesystem_index,
+        complete,
     }
 }
 
@@ -155,6 +162,9 @@ mod tests {
             visibility_class: VisibilityClass::Primary,
             visibility_score: 20,
             visibility_reasons: Vec::new(),
+            target_availability: None,
+            category_reasons: Vec::new(),
+            close_risk: None,
         }
     }
 
@@ -202,6 +212,7 @@ mod tests {
                 r"d:\apps\kept".into(),
                 DirectoryRecord {
                     modified_nanos: 1,
+                    executables: Default::default(),
                     child_directories: Vec::new(),
                     apps: vec![app("kept", r"D:\Apps\Kept\kept.exe")],
                 },
@@ -235,6 +246,7 @@ mod tests {
                 excluded: &[],
                 mode: ScanMode::Incremental,
                 max_duration: Duration::ZERO,
+                verify_fingerprints: true,
             },
             &|_| {},
             &|| false,

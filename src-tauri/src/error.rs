@@ -1,11 +1,3 @@
-//! Typed error model for the IPC command surface.
-//!
-//! Every variant serializes to the exact user-facing string it has always produced, so
-//! the frontend contract is unchanged — the enum only makes the error categories
-//! explicit in Rust. Failures from lower layers that already carry a finished,
-//! user-facing message bubble through [`AppError::Other`] (via `From<String>`),
-//! This legacy behavior is replaced by stable codes and safe English messages.
-
 use serde::{Serialize, Serializer};
 use std::fmt;
 
@@ -18,55 +10,32 @@ struct AppErrorPayload {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum AppError {
-    /// The per-user application data directory could not be resolved.
     AppDataDir(String),
-    /// A `spawn_blocking` task join failed before the work reported a result.
     Interrupted {
         context: &'static str,
         source: String,
     },
-    /// A scan request was coalesced into another in-flight scan and produced no result.
-    Coalesced { what: &'static str },
-    /// The user cancelled an application scan.
+    Coalesced {
+        what: &'static str,
+    },
     ScanCancelled,
-    /// Persisting scan settings failed.
     SaveScanSettings(String),
-    /// Resetting the catalog cache failed.
     ResetCatalogCache(String),
-    /// Resetting the icon cache failed.
     ResetIconCache(String),
-    /// Clearing the icon cache failed.
     ClearIconCache(String),
-    /// Clearing the uninstall history failed.
     ClearUninstallHistory(String),
-    /// A configured scan path was not absolute.
     ScanPathNotAbsolute(String),
-    /// The release-notes version argument failed validation.
     InvalidReleaseVersion,
-    /// The icon hydration request exceeded its bounded IPC contract.
     InvalidHydrationRequest,
-    /// The launch target map is unavailable (poisoned).
     LaunchDataUnavailable,
-    /// No trusted launch target exists for the requested id.
     LaunchUnavailable,
-    /// The close target map is unavailable (poisoned).
-    ///
-    /// An id with no trusted executable is not an error: `close_apps` closes a batch and counts
-    /// the ids it cannot match, so "this one cannot be closed" is part of a successful answer.
     CloseDataUnavailable,
-    /// No trusted details target exists for the requested id.
     AppDetailsUnavailable,
-    /// No trusted local folder exists for the requested id.
     OpenFolderUnavailable,
-    /// The uninstall target map is unavailable (poisoned).
     UninstallDataUnavailable,
-    /// No trusted uninstall target exists for the requested id.
     UninstallUnavailable,
-    /// The bundle product name is not configured.
     ProductNameMissing,
-    /// No newer installed copy was found in the registry.
     NoNewerCopy,
-    /// A lower-layer failure that already carries a finished, user-facing message.
     Other(String),
 }
 
@@ -180,11 +149,6 @@ mod tests {
         );
     }
 
-    // The error-code set is a cross-language contract mirrored in `src/shared/api/tauri/errors.ts`
-    // (`AppErrorCode`). This pins the Rust half: every code is a unique, non-empty
-    // SCREAMING_SNAKE value with a non-empty safe message, and the whole set is exactly the
-    // documented list. A drift here (renamed or duplicated code) fails the build; the frontend
-    // has the mirror test.
     #[test]
     fn error_codes_form_the_expected_stable_contract() {
         let all = [

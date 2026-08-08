@@ -6,7 +6,11 @@ import {
 	selectFilteredApps,
 	selectVisibleApps,
 } from '../../../../src/app/store/appStore'
-import type { AppInfo, AppsClient } from '../../../../src/entities/app'
+import type {
+	AppInfo,
+	AppsClient,
+	CatalogDiagnostics,
+} from '../../../../src/entities/app'
 
 function app(
 	value: Partial<AppInfo> &
@@ -613,6 +617,42 @@ describe('app store', () => {
 		store.getState().clearLaunching('x')
 		store.getState().clearLaunching('x')
 		expect(store.getState().launchingIds).toEqual([])
+	})
+
+	// The diagnostics panel used to be filled once, by the cache read at startup, so it always
+	// showed the previous session's scan and never the one the user had just run.
+	it('replaces the scan diagnostics when a scan reports new ones', async () => {
+		const published: ((diagnostics: CatalogDiagnostics) => void)[] = []
+		const api = client({
+			onCatalogDiagnostics: vi.fn(async handler => {
+				published.push(handler)
+				return () => undefined
+			}),
+		})
+		const store = createAppStore(api)
+		const dispose = await store.getState().initialize()
+
+		expect(published).toHaveLength(1)
+		published[0]?.({
+			completedAt: 2,
+			durationMs: 40,
+			mode: 'force',
+			totalApps: 7,
+			sourceCounts: { registry: 7 },
+			added: 0,
+			removed: 0,
+			updated: 0,
+			targetAvailability: {
+				byReason: { 'target.present': 7 },
+				keptByNewRule: 0,
+			},
+		})
+
+		expect(store.getState().catalogDiagnostics?.mode).toBe('force')
+		expect(
+			store.getState().catalogDiagnostics?.targetAvailability?.byReason,
+		).toEqual({ 'target.present': 7 })
+		dispose()
 	})
 
 	it('reuses an in-flight initialization so dev StrictMode does not start two scans', async () => {

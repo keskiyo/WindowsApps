@@ -200,7 +200,7 @@
 	},
 	{
 		"name": "Notion",
-		"path": "C:\\Users\\Maks\\Notion\\Notion.exe",
+		"path": "C:\\Users\\Example\\Notion\\Notion.exe",
 		"expected": "productivity"
 	},
 	{
@@ -273,7 +273,7 @@
 	},
 	{
 		"name": "Spotify",
-		"path": "C:\\Users\\Maks\\Spotify\\Spotify.exe",
+		"path": "C:\\Users\\Example\\Spotify\\Spotify.exe",
 		"expected": "media"
 	},
 
@@ -327,7 +327,7 @@
 
 	{
 		"name": "Bitwarden",
-		"path": "C:\\Users\\Maks\\Bitwarden\\Bitwarden.exe",
+		"path": "C:\\Users\\Example\\Bitwarden\\Bitwarden.exe",
 		"expected": "security"
 	},
 	{

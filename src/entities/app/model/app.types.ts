@@ -55,6 +55,9 @@ export interface AppInfo {
 	visibilityClass?: AppVisibilityClass
 	visibilityScore?: number
 	visibilityReasons?: AppVisibilityReason[]
+	targetAvailability?: string | null
+	categoryReasons?: string[]
+	closeRisk?: string | null
 }
 
 export interface AppDetails {
@@ -85,6 +88,33 @@ export interface CatalogSnapshot {
 	diagnostics?: CatalogDiagnostics | null
 }
 
+export type SourceHealthState =
+	| 'never_run'
+	| 'fresh'
+	| 'stale'
+	| 'incomplete'
+	| 'failed_without_snapshot'
+	| 'unknown'
+
+export type SourceErrorKind =
+	'cancelled' | 'timed_out' | 'entry_limit' | 'provider_failed' | 'unknown'
+
+export interface SourceHealth {
+	key: string
+	state: SourceHealthState
+	lastAttemptAt: number | null
+	lastSuccessAt: number | null
+	consecutiveFailures: number
+	lastDurationMs: number | null
+	lastError: SourceErrorKind | null
+	recordCount: number
+}
+
+export interface TargetAvailabilityDiff {
+	byReason: Record<string, number>
+	keptByNewRule: number
+}
+
 export interface CatalogDiagnostics {
 	completedAt: number
 	durationMs: number
@@ -95,6 +125,8 @@ export interface CatalogDiagnostics {
 	added: number
 	removed: number
 	updated: number
+	sources?: SourceHealth[]
+	targetAvailability?: TargetAvailabilityDiff
 }
 
 export interface UninstallPreview {
@@ -146,6 +178,7 @@ export interface CloseAppsResult {
 	closed: number
 	notRunning: number
 	unavailable: number
+	blocked?: number
 }
 
 export interface AppsClient {
@@ -170,6 +203,9 @@ export interface AppsClient {
 	): Promise<() => void>
 	onCatalogChanged?(
 		handler: (summary: CatalogChangeSummary) => void,
+	): Promise<() => void>
+	onCatalogDiagnostics?(
+		handler: (diagnostics: CatalogDiagnostics) => void,
 	): Promise<() => void>
 	onScanProgress(
 		handler: (progress: ScanProgress) => void,

@@ -1,6 +1,3 @@
-//! Developer-only visibility diagnostics: dumps the entries the classifier rejected so borderline
-//! rules can be inspected. Gated behind the dedup dev-report flag and never part of release flow.
-
 use super::{VisibilityClass, VisibilityReason};
 use crate::catalog::{AppInfo, SourceKind};
 use serde::Serialize;
@@ -73,9 +70,9 @@ mod tests {
 
     #[test]
     fn debug_report_redacts_the_user_profile_prefix() {
-        let profile = r"C:\Users\Maks";
+        let profile = r"C:\Users\Example";
         assert_eq!(
-            redact_path(r"C:\Users\Maks\Downloads\setup.exe", Some(profile)),
+            redact_path(r"C:\Users\Example\Downloads\setup.exe", Some(profile)),
             r"<USERPROFILE>\Downloads\setup.exe"
         );
     }

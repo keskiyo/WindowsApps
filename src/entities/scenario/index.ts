@@ -10,4 +10,5 @@ export {
 	type ResolvedScenarioList,
 	resolveScenarioApps,
 } from './lib/scenarioApps'
+export { filterFavoriteScenarios } from './lib/scenarioFavorites'
 export { sortScenariosByNewest } from './lib/scenarioOrder'

@@ -1,12 +1,12 @@
 import { Pencil, Play, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { appIdentity } from '../../../entities/app'
-import {
-	resolveScenarioApps,
-	type ScenarioList,
-} from '../../../entities/scenario'
+import { resolveScenarioApps } from '../../../entities/scenario'
+import { FavoriteStar } from '../../../shared/ui/FavoriteStar'
+import { useScenarioAppPicker } from '../model/useScenarioAppPicker'
 import type { ScenarioCardProps } from '../types'
 import { AppPickerDialog } from './AppPickerDialog'
+import { ScenarioCloseWarning } from './ScenarioCloseWarning'
 import { ScenarioListRow } from './ScenarioListRow'
 import { ScenarioNameEditor } from './ScenarioNameEditor'
 
@@ -14,6 +14,8 @@ export function ScenarioCard({
 	scenario,
 	apps,
 	running,
+	isFavorite,
+	onToggleFavorite,
 	onRename,
 	onDelete,
 	onAddApp,
@@ -21,8 +23,7 @@ export function ScenarioCard({
 	onRun,
 }: ScenarioCardProps) {
 	const [renaming, setRenaming] = useState(false)
-	const [picking, setPicking] = useState<ScenarioList | null>(null)
-	const [addError, setAddError] = useState<string | null>(null)
+	const picker = useScenarioAppPicker({ scenarioId: scenario.id, onAddApp })
 	const launch = resolveScenarioApps(scenario.launchIdentities, apps)
 	const close = resolveScenarioApps(scenario.closeIdentities, apps)
 
@@ -48,6 +49,12 @@ export function ScenarioCard({
 						<h2 className="min-w-0 flex-1 truncate text-base font-semibold text-(--text-primary)">
 							{scenario.name}
 						</h2>
+						<FavoriteStar
+							label={`${isFavorite ? 'Remove' : 'Add'} ${scenario.name} ${isFavorite ? 'from' : 'to'} favorites`}
+							pressed={isFavorite}
+							onToggle={() => onToggleFavorite(scenario.id)}
+							className="shrink-0"
+						/>
 						<button
 							type="button"
 							aria-label={`Rename ${scenario.name}`}
@@ -84,7 +91,7 @@ export function ScenarioCard({
 				apps={launch.apps}
 				missing={launch.missing}
 				identityOf={appIdentity}
-				onAdd={setPicking}
+				onAdd={picker.open}
 				onRemove={(list, identity) =>
 					onRemoveApp(scenario.id, list, identity)
 				}
@@ -95,31 +102,35 @@ export function ScenarioCard({
 				scenarioName={scenario.name}
 				apps={close.apps}
 				missing={close.missing}
+				markOf={picker.markOf}
 				identityOf={appIdentity}
-				onAdd={setPicking}
+				onAdd={picker.open}
 				onRemove={(list, identity) =>
 					onRemoveApp(scenario.id, list, identity)
 				}
 			/>
-			{addError && (
+			{picker.confirming && (
+				<ScenarioCloseWarning
+					appName={picker.confirming.name}
+					message={picker.confirmationMessage ?? ''}
+					onCancel={picker.cancelConfirmation}
+					onConfirm={picker.acceptConfirmation}
+				/>
+			)}
+			{picker.error && (
 				<p role="alert" className="text-xs text-(--category-red)">
-					{addError}
+					{picker.error}
 				</p>
 			)}
-			{picking && (
+			{picker.picking && (
 				<AppPickerDialog
 					apps={apps}
-					label={`Add an app to the ${picking} list of ${scenario.name}`}
-					onClose={() => setPicking(null)}
-					onSelect={app => {
-						const result = onAddApp(
-							scenario.id,
-							picking,
-							appIdentity(app),
-						)
-						setAddError(result.ok ? null : result.error)
-						setPicking(null)
-					}}
+					label={`Add an app to the ${picker.picking} list of ${scenario.name}`}
+					markOf={
+						picker.picking === 'close' ? picker.markOf : undefined
+					}
+					onClose={picker.dismissPicker}
+					onSelect={picker.select}
 				/>
 			)}
 		</section>

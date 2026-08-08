@@ -1,6 +1,3 @@
-//! Coordinated scanning: the single `sync_lock`-guarded synchronization pass plus the coordinator
-//! plumbing (`run_coordinated_scan`/`process_scan_chain`) that serializes and chains scan jobs.
-
 use super::document::load_sanitized_document;
 use super::hydration::enqueue_hydration;
 use crate::app_state::{cached_details_for_catalog, remember_catalog, AppState};
@@ -44,27 +41,22 @@ fn synchronize_catalog_once(
     remember_catalog(state.inner(), &document.apps);
     cache::write_document(&app_data_dir, &document)
         .map_err(|error| format!("Could not save the application cache: {error}"))?;
-    // Once per scan: applications that left the catalog would otherwise keep their cached icon
-    // on disk forever, since `write_icon` only ever cleans up after the app it is writing.
     let live_ids = document
         .apps
         .iter()
         .map(|app| app.id.clone())
         .collect::<Vec<_>>();
     catalog::icon_cache::retain_only(&app_data_dir, &live_ids);
+    if let Some(diagnostics) = &document.diagnostics {
+        let _ = app.emit("catalog://diagnostics", diagnostics);
+    }
     if delta.summary.added + delta.summary.removed + delta.summary.updated > 0 {
         let _ = app.emit("catalog://delta", &delta);
         let _ = app.emit("catalog://changed", &delta.summary);
     }
-    // Background (filesystem-watch) syncs must not replace the whole catalog on the
-    // frontend — that wipes loaded icons and re-renders the entire grid (jank). They
-    // ship only the incremental delta + patches. Interactive Refresh/Force, which show a
-    // loading state, still send the full list.
     if job.request.is_interactive() {
         let _ = app.emit("apps://updated", &document.apps);
     }
-    // Hydrate every app on first/interactive sync (icons may be on-disk cached), but only
-    // the changed apps on a watch sync — avoids re-hydrating the whole catalog repeatedly.
     let hydration_ids = if job.request == SyncRequest::Watch {
         delta.upserted.iter().map(|app| app.id.clone()).collect()
     } else {

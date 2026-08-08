@@ -22,7 +22,24 @@ export const UNINSTALL_RESULT_LABELS = {
 	failed: 'Failed',
 } as const
 
-export const uninstallDateFormatter = new Intl.DateTimeFormat(undefined, {
+export const timestampFormatter = new Intl.DateTimeFormat(undefined, {
 	dateStyle: 'medium',
 	timeStyle: 'short',
 })
+
+export const SOURCE_STATE_LABELS = {
+	never_run: 'Never run',
+	fresh: 'Up to date',
+	stale: 'Serving older data',
+	incomplete: 'Stopped early',
+	failed_without_snapshot: 'Never succeeded',
+	unknown: 'Unknown',
+} as const
+
+export const SOURCE_ERROR_LABELS = {
+	cancelled: 'Cancelled',
+	timed_out: 'Timed out',
+	entry_limit: 'Entry limit reached',
+	provider_failed: 'Did not answer',
+	unknown: 'Unknown',
+} as const

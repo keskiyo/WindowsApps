@@ -20,23 +20,15 @@ pub(in crate::catalog) struct RegistryMetadata {
 pub(in crate::catalog) struct RegistryScan {
     pub apps: Vec<AppInfo>,
     pub metadata: Vec<RegistryMetadata>,
-    /// `None` when every registry entry was inspected. An incomplete scan must not replace the
-    /// stored registry snapshot.
     pub stop: Option<StageStop>,
 }
 
-/// Enumerating the uninstall keys is cheap, but each entry then reads PE version metadata and may
-/// search an install directory for a matching executable. That per-entry filesystem work is what
-/// made a cancelled Refresh keep running, so the budget is consulted once per entry.
 pub(in crate::catalog) fn scan(budget: &StageBudget) -> RegistryScan {
     let mut result = RegistryScan::default();
-    // Checked before the hives are enumerated, and recorded, so an already-cancelled scan produces
-    // an *incomplete* result rather than an empty complete one that would wipe the stored snapshot.
     if budget.should_stop() {
         result.stop = budget.stop();
         return result;
     }
-    // Resolved once: it reads the shell's known folders, which no per-entry loop should repeat.
     let facts = crate::catalog::machine::MachineFacts::current();
     for values in uninstall_registry::entries()
         .into_iter()
@@ -121,6 +113,9 @@ pub(in crate::catalog) fn from_values(
         visibility_class: Default::default(),
         visibility_score: 0,
         visibility_reasons: Vec::new(),
+        target_availability: None,
+        category_reasons: Vec::new(),
+        close_risk: None,
     };
     app.artifact_kind = crate::catalog::artifact::classify(&app, internal_name.as_deref(), facts);
     if app.artifact_kind != crate::catalog::ArtifactKind::Application {
@@ -156,11 +151,6 @@ fn uninstall_from_values(values: &RegistryValues) -> Option<UninstallTarget> {
         })
 }
 
-/// Registry paths routinely arrive as `REG_EXPAND_SZ` (`%ProgramFiles%\App\app.exe`), which
-/// `winreg` hands back unexpanded. Nothing downstream expands them, so an unexpanded value
-/// fails `is_launchable` (`Path::is_file`) and the whole entry is dropped — the application is
-/// registered with Windows but silently absent from the catalog. Expand once, here, before any
-/// on-disk resolution is attempted.
 fn expand_registry_paths(mut values: RegistryValues) -> RegistryValues {
     values.display_icon = values
         .display_icon
@@ -209,15 +199,10 @@ mod tests {
         }
     }
 
-    /// No resolved user folders, so these assertions depend only on Windows' own path constants.
     fn from_values(values: RegistryValues) -> Option<AppInfo> {
         super::from_values(values, &crate::catalog::machine::MachineFacts::empty())
     }
 
-    // `REG_EXPAND_SZ` values arrive unexpanded. Before expansion these entries failed the
-    // `is_file` check and vanished from the catalog even though Windows had them registered.
-    // The variable name is unique to this test: the test binary is multi-threaded and the
-    // process environment is shared.
     #[test]
     fn expands_environment_variables_in_registry_paths() {
         let dir = tempfile::tempdir().unwrap();
@@ -243,7 +228,6 @@ mod tests {
             Some(r"%WINAPPS_TEST_REG_ENTRY_ROOT%\Editor.exe".into()),
         );
 
-        // Unexpanded the same value resolves to nothing and the entry is dropped.
         assert!(from_values(values(
             "Editor",
             Some(r"%WINAPPS_TEST_REG_ENTRY_ROOT%\Editor.exe".into()),

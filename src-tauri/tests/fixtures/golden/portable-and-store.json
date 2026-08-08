@@ -1,0 +1,97 @@
+[
+	{
+		"id": "victoria-copy-one",
+		"name": "HSP Victoria",
+		"path": "D:\\Tools\\Victoria537\\Victoria.exe",
+		"iconBase64": null,
+		"launchKind": "executable",
+		"sourceKind": "portable",
+		"installLocation": "D:\\Tools\\Victoria537",
+		"version": "5.3.7.0",
+		"publisher": "HDD.BY",
+		"productName": "Victoria",
+		"originalFilename": "Victoria.exe"
+	},
+	{
+		"id": "victoria-copy-two",
+		"name": "HSP Victoria",
+		"path": "E:\\Portable\\Victoria537\\Victoria.exe",
+		"iconBase64": null,
+		"launchKind": "executable",
+		"sourceKind": "portable",
+		"installLocation": "E:\\Portable\\Victoria537",
+		"version": "5.3.7.0",
+		"publisher": "HDD.BY",
+		"productName": "Victoria",
+		"originalFilename": "Victoria.exe"
+	},
+	{
+		"id": "victoria-newer",
+		"name": "HSP Victoria",
+		"path": "E:\\Portable\\Victoria6\\Victoria.exe",
+		"iconBase64": null,
+		"launchKind": "executable",
+		"sourceKind": "portable",
+		"installLocation": "E:\\Portable\\Victoria6",
+		"version": "6.0.0.0",
+		"publisher": "HDD.BY",
+		"productName": "Victoria",
+		"originalFilename": "Victoria.exe"
+	},
+	{
+		"id": "steam-game",
+		"name": "Half-Life 2",
+		"path": "steam://rungameid/220",
+		"iconBase64": null,
+		"launchKind": "executable",
+		"sourceKind": "steam",
+		"installLocation": "D:\\SteamLibrary\\steamapps\\common\\Half-Life 2",
+		"resolvedPath": "D:\\SteamLibrary\\steamapps\\common\\Half-Life 2\\hl2.exe",
+		"productName": "Half-Life 2"
+	},
+	{
+		"id": "steam-redist-depot",
+		"name": "Steamworks Common Redistributables",
+		"path": "steam://rungameid/228980",
+		"iconBase64": null,
+		"launchKind": "executable",
+		"sourceKind": "steam",
+		"installLocation": "D:\\SteamLibrary\\steamapps\\common\\Steamworks Shared",
+		"productName": "Steamworks Common Redistributables"
+	},
+	{
+		"id": "store-app",
+		"name": "Codex",
+		"path": "OpenAI.Codex_2p2nqsd0c76g0!App",
+		"iconBase64": null,
+		"launchKind": "app_user_model_id",
+		"sourceKind": "msix",
+		"resolvedPath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.727.4816.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+		"installLocation": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.727.4816.0_x64__2p2nqsd0c76g0",
+		"publisher": "OpenAI",
+		"version": "26.727.4816.0"
+	},
+	{
+		"id": "store-app-start-app-twin",
+		"name": "Codex",
+		"path": "OpenAI.Codex_2p2nqsd0c76g0!App",
+		"iconBase64": null,
+		"launchKind": "app_user_model_id",
+		"sourceKind": "start_apps",
+		"resolvedPath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.727.4816.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe"
+	},
+	{
+		"id": "downloaded-installer",
+		"name": "FileZilla",
+		"path": "D:\\Downloads\\FileZilla_3.67.0_win64-setup.exe",
+		"iconBase64": null,
+		"launchKind": "executable",
+		"sourceKind": "portable",
+		"installLocation": "D:\\Downloads",
+		"version": "3.67.0",
+		"publisher": "Tim Kosse",
+		"productName": "FileZilla",
+		"originalFilename": "FileZilla_win64-setup.exe",
+		"artifactKind": "installer"
+	}
+]

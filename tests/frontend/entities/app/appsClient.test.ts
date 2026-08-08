@@ -53,7 +53,7 @@ describe('tauri app client browser fallback', () => {
 			message: 'This application is not available for launch.',
 		})
 		expect(
-			toAppClientError(new Error('C:\\Users\\Maks\\private-detail')),
+			toAppClientError(new Error('C:\\Users\\Example\\private-detail')),
 		).toMatchObject({
 			code: 'INTERNAL',
 			message: 'The operation could not be completed. Try again.',

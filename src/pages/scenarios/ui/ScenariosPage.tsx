@@ -12,6 +12,7 @@ export function ScenariosPage({
 	scenarios,
 	apps,
 	runningId,
+	favoriteScenarioIds,
 	onBack,
 	onCreate,
 	onRename,
@@ -19,6 +20,7 @@ export function ScenariosPage({
 	onAddApp,
 	onRemoveApp,
 	onRun,
+	onToggleFavorite,
 }: ScenariosPageProps) {
 	const [creating, setCreating] = useState(false)
 	const newestFirst = sortScenariosByNewest(scenarios)
@@ -26,7 +28,7 @@ export function ScenariosPage({
 	return (
 		<section
 			aria-labelledby="scenarios-title"
-			className="mx-auto max-w-3xl"
+			className="mx-auto max-w-3xl min-[1900px]:max-w-[80rem]"
 		>
 			<div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div className="min-w-0 sm:flex-1">
@@ -64,13 +66,17 @@ export function ScenariosPage({
 				</div>
 			</div>
 			{newestFirst.length ? (
-				<div className="space-y-3">
+				<div className="grid grid-cols-1 items-start gap-3 min-[1900px]:grid-cols-2">
 					{newestFirst.map(scenario => (
 						<ScenarioCard
 							key={scenario.id}
 							scenario={scenario}
 							apps={apps}
 							running={runningId === scenario.id}
+							isFavorite={favoriteScenarioIds.includes(
+								scenario.id,
+							)}
+							onToggleFavorite={onToggleFavorite}
 							onRename={onRename}
 							onDelete={onDelete}
 							onAddApp={onAddApp}

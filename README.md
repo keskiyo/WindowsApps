@@ -7,7 +7,7 @@
 
 Start Menu shortcuts, installed programs, Store apps, Steam games and portable executables — collected into a single catalog that opens instantly and stays on your machine.
 
-[![Version](https://img.shields.io/badge/version-0.2.9-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.9)
+[![Version](https://img.shields.io/badge/version-0.3.0-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.0)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
@@ -15,7 +15,7 @@ Start Menu shortcuts, installed programs, Store apps, Steam games and portable e
 
 ### [⬇ Download for Windows](https://github.com/keskiyo/WindowsApps/releases/latest)
 
-[Documentation](Documentation.md) · [Release notes](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.9) · [Telegram](https://t.me/keskiyo)
+[Documentation](Documentation.md) · [Release notes](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.0) · [Telegram](https://t.me/keskiyo)
 
 <img src=".github/images/catalog.png" alt="Windows Apps catalog" width="880">
 
@@ -25,7 +25,7 @@ Start Menu shortcuts, installed programs, Store apps, Steam games and portable e
 
 ## Contents
 
-[Why](#why) · [Screenshots](#screenshots) · [Install](#install) · [Features](#features) · [Scanning](#scanning) · [Privacy](#privacy) · [Development](#development)
+[Why](#why) · [Screenshots](#screenshots) · [Install](#install) · [Features](#features) · [Privacy](#privacy) · [Development](#development)
 
 ## Why
 
@@ -67,7 +67,7 @@ whose force scan and cache reset preserve Favorites, Hidden apps and categories.
 
 ## Install
 
-1. Download **`Windows.Apps_0.2.9_x64-setup.exe`** from the [latest release](https://github.com/keskiyo/WindowsApps/releases/latest).
+1. Download **`Windows.Apps_0.3.0_x64-setup.exe`** from the [latest release](https://github.com/keskiyo/WindowsApps/releases/latest).
 2. Run it.
 3. Start **Windows Apps** and choose **Scan for apps**.
 
@@ -82,71 +82,37 @@ whose force scan and cache reset preserve Favorites, Hidden apps and categories.
 
 ## Features
 
-### Finding and launching
+- **One app, one card** — shortcuts, registry entries, Store packages, Steam games and discovered executables are merged into a single application when they point to the same product.
 
-- **Search that forgives** — matches name, publisher, description and path; tolerates typos and finds apps even when you type in the wrong keyboard layout.
-- **Quick-launch palette** — `Ctrl+K` from anywhere, `Ctrl+F` or `/` to jump to search.
-- **Launches the way Windows intends** — shortcuts, executables, packaged apps and Steam entries each use their native mechanism, so Steam overlay, cloud saves and playtime keep working.
-- **Honest feedback** — the card stays busy until the app's window is actually ready, not just until the process spawned.
-- **Scenarios** — a named launch list and close list, up to 20 apps each. Running one starts the first set, then closes the second by stopping every process of those programs, and reports the result once. Start it from the Scenarios page or straight from the More card.
+- **Typo and layout tolerant search** — finds apps by name, publisher, description and path even with misspellings or the wrong keyboard layout.
 
-### A catalog that thinks
+- **Native launching** — Steam games launch through Steam, packaged apps through Windows, shortcuts as shortcuts, and executables directly. No generic launcher path that breaks overlays, cloud saves or playtime tracking.
 
-- **One card per application** — merging weighs resolved targets, product families, publishers and install roots. Ambiguous cases are kept, not guessed away.
-- **Auxiliary instead of deletion** — runtime components and maintenance executables leave your categories but stay inspectable, and any of them is one click from coming back.
-- **Explainable decisions** — every entry carries a visibility score and stable reason codes; `ServiceDesk` is not mistaken for a service.
-- **Choices that survive** — Favorites, Hidden items, category assignments and scenario entries are tracked by application identity, so they follow the app through a rescan, a version change or a cache reset.
+- **Real launch status** — an app is considered launched when its window is ready, not when a process merely appears.
 
-### App information
+- **Scenarios** — save a set of apps to start and another set to fully close, then run both as one action. A close list will not take a process Windows cannot survive losing, and asks before it takes one that ends the desktop shell.
 
-Open any card's details for file size and dates, CPU architecture, Authenticode signature status, and whether the install location still exists — with copy-path, copy-report and **Open folder** actions. Read locally, resolved from a catalog ID.
+- **Non-destructive filtering** — updaters, crash handlers, runtimes, documentation and other secondary entries are moved to **Auxiliary tools** instead of silently disappearing.
 
-### Fast by design
+- **Stable app identity** — Favorites, Hidden state, categories and scenarios survive executable path changes, version updates, rescans and cache resets. Scenarios can be starred too, and Favorites shows them beside the applications.
 
-- Cache-first startup: names render before any scan runs, icons stream in behind them.
-- Incremental scanning re-reads only what changed on disk.
-- Full scans are bounded and cancellable, with live progress.
-- Cards mount in batches while you scroll, so a large catalog stays smooth.
+- **Conservative detection** — ambiguous applications stay visible instead of being incorrectly merged or removed. Text matches alone cannot permanently discard an entry. A card is removed only when Windows confirms its file is gone; a check that was denied or failed keeps the application and says so.
 
-### Fits the desktop
+- **Decisions you can read** — the application dialog reports which signal chose the category, why an entry is Auxiliary, and what the launch-target check found. Settings adds the health of each catalog source.
 
-- Lives in the tray; `Win+Shift+Q` brings it back, on any keyboard layout.
-- Custom categories, drag-to-move, Favorites first, reversible Hidden items.
-- Uninstall through Windows' own registration — vendor, MSI or MSIX.
-- Signed automatic updates with full notes and byte progress. Nothing is forced.
-- Focus-trapped dialogs, arrow-key menus, reduced-motion support, and a sidebar that becomes a drawer on narrow windows.
+- **Local app inspection** — architecture, Authenticode status, file metadata and install state are resolved locally from the catalog entry.
 
-## Scanning
-
-Windows Apps scans permanent local drives. Removable, optical and network drives are excluded.
-
-Each scan root is limited to **16 directory levels**, **500,000 entries** and **three minutes**. Symbolic links and junctions are skipped, so a scan can neither loop nor run away.
-
-| Action                   | What it does                                   |
-| ------------------------ | ---------------------------------------------- |
-| **Refresh**              | Normal incremental update                      |
-| **Force full scan**      | Rebuild the filesystem index                   |
-| **Repair missing icons** | Retry extraction only where an icon is missing |
-| **Clear icon cache**     | Rebuild icons without rescanning drives        |
-| **Reset catalog cache**  | Remove generated caches and scan clean         |
-
-Favorites, Hidden items, promoted tools, custom categories, assignments and scenarios survive all of these.
-
-Visibility is conservative. Every marker is bound to the field where it is actually evidence — a helper binary is recognized by the file name its vendor gave it, a documentation shortcut by what it opens — and an application's packaged identifier is never read as text, so a vendor or packaging framework appearing in an id cannot decide anything.
-
-Dropping an entry entirely cannot be undone from the interface, so **no word can do it**. Removal is reserved for the two cases that are structurally not applications at all: framework packages, and shortcuts that merely open a folder. Setup files and redistributables are filed under **Installers & Docs**, and anything decided by vocabulary — documentation, updaters, crash handlers, uninstall entries — is demoted to **Auxiliary tools**, still listed and one click from returning via **Restore to catalog**. Needles written against one machine are capped so they can tip a borderline entry but never settle it alone, and components are recognized structurally instead: an executable nested under another from the same publisher belongs to it, and one Windows itself registers as launchable does not.
+- **Bounded scanning** — filesystem discovery has hard depth, entry and time limits; junctions and symbolic links are never followed.
 
 ## Privacy
 
-- The catalog is built and stored **on your machine**.
-- No inventory, drive list or telemetry is uploaded. No telemetry service exists.
-- Missing metadata is left unknown — nothing is invented or fetched.
-- The interface can only pass an **ID**; every launch and uninstall target is resolved inside Rust, never from a path the window supplied.
-- Processes are built from a fixed executable plus an argument vector — never a shell string. Network targets and unvalidated uninstall commands are refused.
-- Program folders are never recursively deleted as an uninstall method.
-- Uninstall history keeps the newest 100 attempts with only name, publisher, mechanism and result — no command, path, argument or error text.
+- Catalog and metadata stay on the PC.
+- No telemetry or application inventory is uploaded.
+- Launch and uninstall targets are resolved inside Rust from application IDs.
+- Shell command strings are not used.
+- Unvalidated uninstall commands and network targets are rejected.
 
-See [Documentation.md](Documentation.md#13-privacy-and-security) for the full security model.
+See [Documentation.md](Documentation.md#13-privacy-and-security) for implementation details.
 
 ## Development
 
@@ -177,7 +143,7 @@ Production build:
 npm run tauri build
 ```
 
-Local artifact: `src-tauri/target/release/bundle/nsis/Windows Apps_0.2.9_x64-setup.exe`
+Local artifact: `src-tauri/target/release/bundle/nsis/Windows Apps_0.3.0_x64-setup.exe`
 
 ## Support
 

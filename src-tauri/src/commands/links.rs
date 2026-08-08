@@ -20,9 +20,6 @@ pub(crate) async fn open_telegram() -> Result<(), AppError> {
         .map_err(AppError::from)
 }
 
-/// Opens the Windows "Installed apps" settings page (`Apps > Installed apps`). A fixed
-/// `ms-settings:` URI, resolved here rather than supplied by the webview, exactly like the other
-/// `open_*` links.
 #[tauri::command]
 pub(crate) async fn open_apps_settings() -> Result<(), AppError> {
     tauri::async_runtime::spawn_blocking(|| launcher::shell_execute("ms-settings:appsfeatures"))
@@ -69,8 +66,6 @@ pub(crate) async fn open_release(version: String) -> Result<(), AppError> {
     .map_err(AppError::from)
 }
 
-/// Reports when this process is an outdated leftover copy: the uninstall registry says a
-/// newer version is installed in a different directory (e.g. an update landed elsewhere).
 #[tauri::command]
 pub(crate) fn stale_copy_status(app: tauri::AppHandle) -> Option<StaleCopy> {
     let product = app.config().product_name.clone()?;
@@ -80,8 +75,6 @@ pub(crate) fn stale_copy_status(app: tauri::AppHandle) -> Option<StaleCopy> {
     })
 }
 
-/// Launches the registered (newer) installed copy and exits this outdated one. The target
-/// path comes from the registry, not from the webview.
 #[tauri::command]
 pub(crate) fn open_installed_copy(app: tauri::AppHandle) -> Result<(), AppError> {
     let product = app
@@ -95,13 +88,9 @@ pub(crate) fn open_installed_copy(app: tauri::AppHandle) -> Result<(), AppError>
         .and_then(|path| path.file_name().map(|name| name.to_os_string()))
         .unwrap_or_else(|| "app.exe".into());
     let target = std::path::Path::new(&info.install_location).join(binary);
-    // `InstallLocation` comes from HKCU, which any process running as the user can write.
-    // Validate it exactly like an uninstaller target before handing it to the shell, so a
-    // poisoned key cannot turn this button into "run an arbitrary executable".
     let target = exec_target::validate_executable_path(&target.to_string_lossy())
         .map_err(|_| AppError::LaunchUnavailable)?;
     launcher::shell_execute(&target.to_string_lossy())?;
-    // Give the invoke response a moment to reach the webview before exiting.
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(500));
         app.exit(0);

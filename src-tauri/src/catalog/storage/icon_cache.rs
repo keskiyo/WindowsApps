@@ -9,20 +9,12 @@ fn icons_dir(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join("icons")
 }
 
-/// Cache key for an application id. Hashing keeps it injective: the previous scheme *dropped*
-/// every character outside `[A-Za-z0-9-]`, so ids differing only in separators — and any two
-/// non-Latin paths, which lost nearly all of their characters — collapsed onto the same key.
-/// Colliding applications then evicted each other's icons through the prefix cleanup below,
-/// so their icons never survived a restart and were re-extracted on every scan.
 fn cache_key(value: &str) -> String {
     format!("{:x}", Sha256::digest(value.as_bytes()))
 }
 
-/// Hex SHA-256, used to recognize file names written under the current scheme.
 const CACHE_KEY_LENGTH: usize = 64;
 
-/// The pre-hash key, kept only so files written under it can be removed when the same
-/// application is hydrated again.
 fn legacy_cache_key(value: &str) -> String {
     value
         .chars()
@@ -34,10 +26,6 @@ fn icon_path(app_data_dir: &Path, app_id: &str, fingerprint: &str) -> PathBuf {
     icons_dir(app_data_dir).join(format!("{}-{fingerprint}.png", cache_key(app_id)))
 }
 
-/// Ceiling for one cached icon. These are small PNGs — a 256×256 RGBA icon is well under 256 KiB.
-/// The cache lives in a user-writable directory, so a corrupted or planted file is untrusted input:
-/// it is checked before it is read, not after it has been allocated. An icon above the cap is
-/// skipped and re-extracted, and the stale file is removed by the next sweep.
 const MAX_ICON_BYTES: u64 = 4 * 1024 * 1024;
 
 pub(crate) fn read_icon(app_data_dir: &Path, app_id: &str, fingerprint: &str) -> Option<Vec<u8>> {
@@ -64,13 +52,6 @@ pub(crate) fn write_icon(
     Ok(())
 }
 
-/// Remove the files superseded by a batch of freshly written icons: earlier fingerprints for the
-/// same application, plus anything it still has under the pre-hash naming scheme.
-///
-/// This used to run inside `write_icon`, enumerating the whole icons directory once per written
-/// icon — quadratic across a full hydration. It reads the directory once per hydration batch
-/// instead. Dropping the sweep entirely was never an option: without it every icon refresh leaks
-/// one orphaned file, and `retain_only` cannot collect them because their application is still live.
 pub(crate) fn sweep_superseded(app_data_dir: &Path, written: &[(String, String)]) {
     if written.is_empty() {
         return;
@@ -103,10 +84,7 @@ pub(crate) fn sweep_superseded(app_data_dir: &Path, written: &[(String, String)]
             continue;
         };
         let superseded = match current.get(key) {
-            // Same application, an earlier fingerprint.
             Some(live) => !live.contains(rest),
-            // Only a pre-hash name can collide with a hashed key here, and only for an
-            // application in this batch.
             None => legacy_prefixes
                 .iter()
                 .any(|prefix| name.starts_with(prefix.as_str())),
@@ -129,12 +107,6 @@ pub(crate) fn source_fingerprint(source: &str) -> String {
     format!("{:x}", Sha256::digest(identity.as_bytes()))
 }
 
-/// Drop icons belonging to applications that are no longer in the catalog.
-///
-/// `write_icon` only ever removes files for the application it is writing, so an application
-/// that disappears — uninstalled, or filtered out by a rules change — left its icon behind for
-/// good. Nothing bounded the directory except the user manually clearing the icon cache.
-/// Runs once per scan, not per icon.
 pub(crate) fn retain_only(app_data_dir: &Path, live_ids: &[String]) {
     let directory = icons_dir(app_data_dir);
     let Ok(entries) = fs::read_dir(&directory) else {
@@ -149,8 +121,6 @@ pub(crate) fn retain_only(app_data_dir: &Path, live_ids: &[String]) {
         let Some(name) = path.file_name().map(|name| name.to_string_lossy()) else {
             continue;
         };
-        // `{key}-{fingerprint}.png`; anything not in that shape predates the current naming and
-        // is swept by `write_icon` when its application is next hydrated.
         let Some((key, _)) = name.split_once('-') else {
             continue;
         };
@@ -185,9 +155,6 @@ mod tests {
         assert_eq!(read_icon(dir.path(), "editor", "different"), None);
     }
 
-    // Under the pre-hash key both of these collapsed to the same string (every non-ASCII
-    // character was dropped), so writing one deleted the other's icon through the prefix
-    // cleanup and neither ever survived a restart.
     #[test]
     fn applications_under_non_latin_paths_keep_separate_icons() {
         let dir = tempfile::tempdir().unwrap();
@@ -236,9 +203,6 @@ mod tests {
         );
     }
 
-    // The sweep moved out of `write_icon`, which used to re-read the whole icons directory for
-    // every written icon. It must still collect an application's earlier fingerprints, or each
-    // refresh leaks a file that `retain_only` cannot claim because the application is still live.
     #[test]
     fn one_batch_sweep_drops_every_superseded_fingerprint() {
         let dir = tempfile::tempdir().unwrap();
@@ -270,8 +234,6 @@ mod tests {
         );
     }
 
-    // The icon directory is user-writable, so its contents are untrusted: a corrupted or planted
-    // file must be rejected on its metadata, before it is allocated.
     #[test]
     fn an_oversized_cache_file_is_skipped_instead_of_being_read() {
         let dir = tempfile::tempdir().unwrap();
@@ -336,8 +298,6 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let icons = icons_dir(dir.path());
         std::fs::create_dir_all(&icons).unwrap();
-        // A name from the pre-hash scheme: swept by `write_icon`, not by this pass, so that a
-        // stray file can never take a live icon with it.
         let legacy = icons.join("CEditorexe-old.png");
         std::fs::write(&legacy, b"legacy").unwrap();
 

@@ -9,6 +9,8 @@ mod dedup;
 mod details;
 mod fields;
 mod filters;
+#[cfg(test)]
+mod golden;
 mod machine;
 mod model;
 mod naming;
@@ -17,6 +19,7 @@ mod scan;
 mod sources;
 mod storage;
 pub(crate) mod sync;
+pub(crate) mod target_availability;
 mod tree;
 mod visibility;
 
@@ -69,6 +72,9 @@ fn steam_app(game: steam::SteamGame) -> AppInfo {
         visibility_class: Default::default(),
         visibility_score: 0,
         visibility_reasons: Vec::new(),
+        target_availability: None,
+        category_reasons: Vec::new(),
+        close_risk: None,
     }
 }
 
@@ -157,9 +163,6 @@ pub(crate) fn watcher_paths(settings: &scan_settings::ScanSettings) -> Vec<PathB
         paths.push(PathBuf::from(appdata).join(r"Microsoft\Windows\Start Menu\Programs"));
     }
     paths.extend(settings.included_paths.iter().map(PathBuf::from));
-    // Intentionally NOT watching Steam `steamapps`: Steam writes there constantly
-    // (shadercache, manifests, logs), which triggered a full resync every few seconds.
-    // Newly installed Steam games are picked up on manual Refresh / next startup.
     paths.retain(|path| path.is_dir());
     paths.sort_by_cached_key(|path| path.to_string_lossy().to_lowercase());
     paths.dedup_by(|left, right| {
@@ -218,7 +221,7 @@ fn registry_metadata_matches(app: &AppInfo, record: &registry::RegistryMetadata)
     }
 }
 
-fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
+fn classify_entries(apps: Vec<AppInfo>, registrations: &machine::Registrations) -> Vec<AppInfo> {
     let mut classified = apps
         .into_iter()
         .filter(|app| !filters::is_invalid_display_name(&app.name))
@@ -227,15 +230,21 @@ fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
             app
         })
         .collect::<Vec<_>>();
-    // Runs after per-record classification because it is the one decision that needs the whole
-    // catalog: whether some *other* discovered executable sits above this one in its install tree.
-    // Pure, so it re-applies identically on the cache path, which is why it needs no persisted flag.
-    tree::demote_nested_components(&mut classified, &machine::Registrations::current());
-    visibility::write_dev_report(&classified);
+    tree::demote_nested_components(&mut classified, registrations);
+    classified
+}
+
+fn retain_visible(classified: Vec<AppInfo>) -> Vec<AppInfo> {
     classified
         .into_iter()
         .filter(|app| app.visibility_class != VisibilityClass::Rejected)
         .collect()
+}
+
+fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
+    let classified = classify_entries(apps, &machine::Registrations::current());
+    visibility::write_dev_report(&classified);
+    retain_visible(classified)
 }
 
 pub(crate) fn sanitize(apps: Vec<AppInfo>) -> Vec<AppInfo> {
@@ -246,10 +255,6 @@ pub(crate) fn sanitize(apps: Vec<AppInfo>) -> Vec<AppInfo> {
     )
 }
 
-/// Like `sanitize`, but also refreshes the dev-only dedup report. Call this from the full
-/// catalog assembly (`sync::synchronize`, after registry metadata is attached) so the report
-/// reflects every app — never a partial sub-list — and is overwritten once per scan (no
-/// accumulation).
 pub(crate) fn sanitize_reported(apps: Vec<AppInfo>) -> Vec<AppInfo> {
     let filtered = filter_maintenance(apps);
     if dedup::dev_report_enabled() {
@@ -259,6 +264,19 @@ pub(crate) fn sanitize_reported(apps: Vec<AppInfo>) -> Vec<AppInfo> {
         filtered,
         classify::classify_app,
         crate::platform::windows::os_ui_script(),
+    )
+}
+
+#[cfg(test)]
+pub(in crate::catalog) fn sanitize_pinned(
+    apps: Vec<AppInfo>,
+    registrations: &machine::Registrations,
+    os_script: crate::platform::windows::NameScript,
+) -> Vec<AppInfo> {
+    dedup::deduplicate(
+        retain_visible(classify_entries(apps, registrations)),
+        classify::classify_app,
+        os_script,
     )
 }
 
@@ -286,10 +304,6 @@ fn is_known_standalone_portable(stem: &str) -> bool {
         || normalized.starts_with("ventoy")
 }
 
-/// Ordered icon-source candidates: the shortcut's declared icon file first, then the
-/// resolved launch target, then the catalog path itself. Hydration walks the list until
-/// one source actually yields an icon (a single source is not enough — e.g. PostgreSQL
-/// shortcuts point at an `.ico` the shell can't rasterize, while the target exe can).
 pub(super) fn icon_source_candidates(app: &AppInfo) -> Vec<String> {
     let mut candidates: Vec<String> = Vec::new();
     let mut push = |value: Option<&String>| {
@@ -314,8 +328,6 @@ pub(super) fn icon_source(app: &AppInfo) -> Option<String> {
 
 pub(crate) struct StartMenuScan {
     pub apps: Vec<AppInfo>,
-    /// `None` when the traversal finished. An incomplete traversal must not replace the stored
-    /// Start Menu snapshot: its partial list would report every unvisited shortcut as removed.
     pub stop: Option<StageStop>,
 }
 
@@ -331,8 +343,6 @@ fn scan_start_menu(control: &ScanControl) -> StartMenuScan {
         START_MENU_MAX_ENTRIES,
         START_MENU_MAX_DEPTH,
     );
-    // Recorded before the walk starts, so an already-cancelled scan yields an *incomplete* result
-    // rather than an empty complete one that would replace the stored snapshot with nothing.
     if budget.should_stop() {
         return StartMenuScan {
             apps: Vec::new(),
@@ -347,16 +357,11 @@ fn scan_start_menu(control: &ScanControl) -> StartMenuScan {
     }
 }
 
-/// Roots are a parameter so the bounds can be exercised against a fixture tree; `scan_start_menu`
-/// supplies the real Start Menu locations.
 fn walk_start_menu_shortcuts(
     roots: Vec<PathBuf>,
     budget: &StageBudget,
     facts: &machine::MachineFacts,
 ) -> Vec<AppInfo> {
-    // `take_while` rather than `filter`: the traversal must end at the limit, not keep walking a
-    // pathological tree while discarding its entries. Every visited entry is charged, including
-    // directories, because directory enumeration is what an unbounded tree makes expensive.
     roots
         .into_iter()
         .flat_map(|root| {
@@ -466,6 +471,9 @@ fn make_app(name: String, path: PathBuf) -> AppInfo {
         visibility_class: Default::default(),
         visibility_score: 0,
         visibility_reasons: Vec::new(),
+        target_availability: None,
+        category_reasons: Vec::new(),
+        close_risk: None,
     }
 }
 
@@ -480,9 +488,6 @@ fn find_executable(location: &str) -> Option<PathBuf> {
     find_executable_named(location, None)
 }
 
-/// Resolve a launchable file inside an install directory. When `name` is given,
-/// prefer the executable whose file name matches the application name (e.g. pick
-/// `Docker Desktop.exe`, not the first bundled `courgette64.exe` found in the tree).
 fn find_executable_named(location: &str, name: Option<&str>) -> Option<PathBuf> {
     let root = PathBuf::from(location.trim().trim_matches('"'));
     if is_launchable(&root) {
@@ -525,12 +530,6 @@ fn find_executable_named(location: &str, name: Option<&str>) -> Option<PathBuf> 
         })
 }
 
-/// Directory containment for already-lowercased paths, stopping at a component boundary.
-///
-/// A plain `starts_with` also matches partial component names, which silently changes meaning
-/// in both directions: an excluded `d:\games` would also swallow `d:\gamesbackup`, and an
-/// install root of `c:\prog` would "contain" `c:\program files\other.exe`. Both separators are
-/// accepted because scan settings are typed by hand.
 pub(super) fn path_is_within(path: &str, root: &str) -> bool {
     let root = root.trim_end_matches(['\\', '/']);
     if root.is_empty() {
@@ -549,12 +548,56 @@ fn is_launchable(path: &Path) -> bool {
         })
 }
 
-/// Whether an app's launch target still exists. A Start-Menu shortcut or registry entry left
-/// behind by an uninstalled application points at a file that is gone; such phantoms should not
-/// appear. Non-file targets — Store AUMIDs, `steam://` URIs, UNC paths — always pass. A target on
-/// a drive that is not currently mounted is kept, so unplugging a removable or second disk does
-/// not erase its apps until it is genuinely known to be gone.
-pub(crate) fn target_is_present(app: &AppInfo) -> bool {
+pub(crate) fn retain_present_targets(
+    apps: &mut Vec<AppInfo>,
+    settings: &scan_settings::ScanSettings,
+) -> target_availability::TargetAvailabilityDiff {
+    let mut diff = target_availability::TargetAvailabilityDiff::default();
+    apps.retain_mut(|app| {
+        let availability = target_availability::availability(app);
+        app.target_availability = Some(availability.reason_id().to_owned());
+        diff.record(availability, settings.catalog_target_availability_v1);
+        if settings.catalog_target_availability_v1 {
+            availability != target_availability::TargetAvailability::Missing
+        } else {
+            legacy_target_is_present(app)
+        }
+    });
+    diff
+}
+
+pub(crate) fn attach_category_reasons(apps: &mut [AppInfo]) {
+    for app in apps {
+        app.category_reasons = classify::category_reasons(app);
+    }
+}
+
+pub(crate) fn attach_close_risk(apps: &mut [AppInfo]) {
+    for app in apps {
+        app.close_risk = match close_target_of(app) {
+            Some(target) => crate::platform::windows::close_risk(Path::new(&target))
+                .id()
+                .map(str::to_owned),
+            None => Some("close.not_closable".to_owned()),
+        };
+    }
+}
+
+pub(crate) fn close_target_of(app: &AppInfo) -> Option<String> {
+    let path = app.resolved_path.clone().or_else(|| {
+        matches!(
+            app.launch_kind,
+            LaunchKind::Executable | LaunchKind::Shortcut
+        )
+        .then(|| app.path.clone())
+    })?;
+    Path::new(&path)
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
+        .then_some(path)
+}
+
+fn legacy_target_is_present(app: &AppInfo) -> bool {
     if app.launch_kind == LaunchKind::AppUserModelId {
         return true;
     }
@@ -570,10 +613,6 @@ pub(crate) fn target_is_present(app: &AppInfo) -> bool {
     !drive_present || path.exists()
 }
 
-/// Move console (CLI) executables — a "7-Zip Console", `git.exe` — out of the primary catalog into
-/// Auxiliary. The PE subsystem is a reliable, launch-free signal that generalizes to any
-/// executable (including ones nobody can test by hand), so it beats name/description heuristics.
-/// Runs on the scan path only (it reads the target file), after classification.
 fn is_plain_windows_powershell(app: &AppInfo, target: &Path) -> bool {
     if app.source_kind != SourceKind::StartMenu
         || app.launch_kind != LaunchKind::Shortcut
@@ -621,8 +660,6 @@ pub(crate) fn demote_console_applications(apps: &mut [AppInfo]) {
 
 #[cfg(test)]
 fn deduplicate(apps: Vec<AppInfo>) -> Vec<AppInfo> {
-    // Tests assert the English-user experience by default; the locale-aware name pick keeps a Latin
-    // name over a Cyrillic one. Cases that need the Cyrillic result set the script explicitly.
     dedup::deduplicate(
         apps,
         classify::classify_app,
@@ -639,8 +676,6 @@ mod tests {
     use std::path::PathBuf;
     use std::time::Duration;
 
-    /// Nothing resolved and nothing registered, so classification here depends only on Windows'
-    /// own path constants and never on the machine running the suite.
     fn facts() -> machine::MachineFacts {
         machine::MachineFacts::empty()
     }
@@ -649,11 +684,43 @@ mod tests {
         super::portable_app(path, &facts())
     }
 
+    #[test]
+    fn each_record_carries_the_risk_of_closing_it() {
+        let mut explorer = app("Проводник", r"C:\Menu\Проводник.lnk");
+        explorer.launch_kind = LaunchKind::Shortcut;
+        explorer.resolved_path = Some(r"C:\Windows\explorer.exe".into());
+        let mut security = app("Local Security Authority", r"C:\Windows\System32\lsass.exe");
+        security.launch_kind = LaunchKind::Executable;
+        let mut editor = app("Editor", r"C:\Editor\editor.exe");
+        editor.launch_kind = LaunchKind::Executable;
+        let mut packaged = app("Camera", "Microsoft.WindowsCamera_8wek!App");
+        packaged.launch_kind = LaunchKind::AppUserModelId;
+        let mut apps = vec![explorer, security, editor, packaged];
+
+        attach_close_risk(&mut apps);
+
+        assert_eq!(apps[0].close_risk.as_deref(), Some("close.session"));
+        assert_eq!(apps[1].close_risk.as_deref(), Some("close.critical"));
+        assert_eq!(apps[2].close_risk, None);
+        assert_eq!(apps[3].close_risk.as_deref(), Some("close.not_closable"));
+    }
+
+    #[test]
+    fn a_shell_location_reports_that_there_is_nothing_to_close() {
+        let mut explorer = app("Проводник", "Microsoft.Windows.Explorer");
+        explorer.launch_kind = LaunchKind::AppUserModelId;
+        explorer.resolved_path = Some("::{52205FD8-5DFB-447D-801A-D0B52F2E83E1}".into());
+        let mut apps = vec![explorer];
+
+        attach_close_risk(&mut apps);
+
+        assert_eq!(apps[0].close_risk.as_deref(), Some("close.not_closable"));
+    }
+
     fn walk_start_menu_shortcuts(roots: Vec<PathBuf>, budget: &StageBudget) -> Vec<AppInfo> {
         super::walk_start_menu_shortcuts(roots, budget, &facts())
     }
 
-    /// Builds a Start Menu fixture: `folders` nested directories, each holding one `.lnk`.
     fn nested_shortcuts(root: &Path, folders: usize) {
         let mut current = root.to_path_buf();
         for index in 0..folders {
@@ -663,9 +730,6 @@ mod tests {
         }
     }
 
-    // A Start Menu tree used to be walked with no depth, count or time limit at all, so a junction
-    // loop or a corrupted profile could hold the scan indefinitely. Each bound is asserted through
-    // the real traversal rather than through the budget in isolation.
     #[test]
     fn the_start_menu_traversal_stops_at_its_depth_limit() {
         let dir = tempfile::tempdir().unwrap();
@@ -676,7 +740,6 @@ mod tests {
 
         let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
 
-        // Depth 1 is "Level 0", depth 2 its shortcut; nothing deeper is visited.
         assert_eq!(apps.len(), 1);
         assert_eq!(apps[0].name, "Tool 0");
         assert_eq!(budget.stop(), None);
@@ -724,7 +787,6 @@ mod tests {
         assert_eq!(budget.stop(), Some(StageStop::Cancelled));
     }
 
-    // The bounds must not change the result for a normal Start Menu.
     #[test]
     fn an_ordinary_start_menu_tree_is_walked_completely() {
         let dir = tempfile::tempdir().unwrap();
@@ -790,12 +852,14 @@ mod tests {
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
+            target_availability: None,
+            category_reasons: Vec::new(),
+            close_risk: None,
         }
     }
 
     #[test]
     fn portable_generic_exe_name_uses_parent_folder() {
-        // 32.exe inside "Крипто 4" reports Yandex metadata — trust the folder instead.
         assert_eq!(
             portable_display_name("32", Some("Крипто 4"), Some("Yandex")),
             "Крипто 4"
@@ -808,12 +872,10 @@ mod tests {
 
     #[test]
     fn portable_real_exe_name_keeps_product_name() {
-        // A properly named executable keeps its product metadata.
         assert_eq!(
             portable_display_name("Yandex 32bit", Some("Браузер"), Some("Yandex")),
             "Yandex"
         );
-        // Generic stem AND generic (arch) folder → fall back to metadata product name.
         assert_eq!(
             portable_display_name("app", Some("x64"), Some("Yandex")),
             "Yandex"
@@ -834,8 +896,6 @@ mod tests {
         assert_eq!(app.source_kind, SourceKind::Portable);
     }
 
-    // Shared by scan exclusions and by registry-install containment in deduplication, so its
-    // exact boundary behaviour is what keeps both from matching partial component names.
     #[test]
     fn path_containment_stops_at_component_boundaries() {
         assert!(path_is_within(r"c:\prog\app.exe", r"c:\prog"));
@@ -849,16 +909,45 @@ mod tests {
     }
 
     #[test]
-    fn phantom_entries_whose_target_is_gone_are_dropped() {
+    fn retaining_targets_records_why_each_one_was_accepted() {
+        let settings = scan_settings::ScanSettings::default();
         let dir = tempfile::tempdir().unwrap();
         let real = dir.path().join("app.exe");
         std::fs::write(&real, []).unwrap();
 
-        // A shortcut resolving to an existing exe is kept; one resolving to a deleted exe is not.
+        let mut present = app("App", &real.to_string_lossy());
+        present.launch_kind = LaunchKind::Executable;
+        let mut store = app("Store App", "Some.Store_App!App");
+        store.launch_kind = LaunchKind::AppUserModelId;
+        let mut gone = app("Gone", &dir.path().join("gone.exe").to_string_lossy());
+        gone.launch_kind = LaunchKind::Executable;
+        let mut apps = vec![present, store, gone];
+
+        retain_present_targets(&mut apps, &settings);
+
+        assert_eq!(
+            apps.iter().map(|app| app.name.as_str()).collect::<Vec<_>>(),
+            vec!["App", "Store App"],
+            "only the proven-missing record is dropped"
+        );
+        assert_eq!(
+            apps.iter()
+                .map(|app| app.target_availability.as_deref().unwrap_or_default())
+                .collect::<Vec<_>>(),
+            vec!["target.present", "target.not_applicable.aumid"]
+        );
+    }
+
+    #[test]
+    fn phantom_entries_whose_target_is_gone_are_dropped() {
+        let settings = scan_settings::ScanSettings::default();
+        let dir = tempfile::tempdir().unwrap();
+        let real = dir.path().join("app.exe");
+        std::fs::write(&real, []).unwrap();
+
         let mut present = app("App", &dir.path().join("App.lnk").to_string_lossy());
         present.launch_kind = LaunchKind::Shortcut;
         present.resolved_path = Some(real.to_string_lossy().into_owned());
-        assert!(target_is_present(&present));
 
         let mut gone = app(
             "uTorrent",
@@ -871,18 +960,21 @@ mod tests {
                 .to_string_lossy()
                 .into_owned(),
         );
-        assert!(!target_is_present(&gone));
 
-        // Non-file targets are never dropped.
         let mut store = app("Store App", "Some.Store_App!App");
         store.launch_kind = LaunchKind::AppUserModelId;
-        assert!(target_is_present(&store));
         let mut steam = app("Game", "steam://rungameid/12345");
         steam.launch_kind = LaunchKind::Executable;
-        assert!(target_is_present(&steam));
+
+        let mut apps = vec![present, gone, store, steam];
+        retain_present_targets(&mut apps, &settings);
+
+        assert_eq!(
+            apps.iter().map(|app| app.name.as_str()).collect::<Vec<_>>(),
+            vec!["App", "Store App", "Game"]
+        );
     }
 
-    // Minimal PE with a chosen Subsystem (3 = console, 2 = GUI).
     fn minimal_pe(subsystem: u16) -> Vec<u8> {
         let mut buffer = vec![0_u8; 64];
         buffer[0] = b'M';
@@ -954,9 +1046,6 @@ mod tests {
             .contains(&VisibilityReason::ConsoleApplication));
     }
 
-    /// Auxiliary entries stay, and an installation artifact is no longer deleted: the source that
-    /// discovered it has already classified it, and `sanitize` keeps it so Installers & Docs can
-    /// list it.
     #[test]
     fn sanitize_keeps_auxiliary_entries_and_installation_artifacts() {
         let mut helper = app("iconv", r"C:\Git\usr\bin\iconv.exe");
@@ -1400,11 +1489,6 @@ mod tests {
         );
     }
 
-    /// Documentation shortcuts are recognized by a word in their name, so they only step aside
-    /// into Auxiliary and stay restorable. Records whose *only* installer evidence is a word in
-    /// the display name stay in the catalog outright: "Installer" and "Setup" name real products
-    /// on machines this corpus never saw, and `catalog::artifact` decides installation artifacts
-    /// from file-name evidence instead.
     #[test]
     fn sanitizes_stale_maintenance_entries() {
         let apps = sanitize(vec![
@@ -1446,11 +1530,11 @@ mod tests {
         let apps = sanitize(vec![
             app(
                 "codex-windows-sandbox",
-                r"C:\Users\Maks\.codex\.sandbox-bin\codex-command-runner.exe",
+                r"C:\Users\Example\.codex\.sandbox-bin\codex-command-runner.exe",
             ),
             app(
                 "Git Large File Storage (LFS)",
-                r"C:\Users\Maks\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\git\mingw64\libexec\git-core\git-lfs.exe",
+                r"C:\Users\Example\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\git\mingw64\libexec\git-core\git-lfs.exe",
             ),
             app(
                 "git-credential-manager",
@@ -1472,7 +1556,7 @@ mod tests {
                 let mut launcher = app("Claude Code", r"C:\Menu\Claude Code.lnk");
                 launcher.source_kind = SourceKind::StartMenu;
                 launcher.launch_kind = LaunchKind::Shortcut;
-                launcher.resolved_path = Some(r"C:\Users\Maks\.local\bin\claude.exe".into());
+                launcher.resolved_path = Some(r"C:\Users\Example\.local\bin\claude.exe".into());
                 launcher
             },
         ]);
@@ -1559,14 +1643,13 @@ mod tests {
 
     #[test]
     fn classifies_new_general_categories() {
-        // Office & Productivity.
         for (name, path) in [
             (
                 "LibreOffice Calc",
                 r"C:\Program Files\LibreOffice\scalc.exe",
             ),
-            ("Notion", r"C:\Users\Maks\Notion\Notion.exe"),
-            ("Obsidian", r"C:\Users\Maks\Obsidian\Obsidian.exe"),
+            ("Notion", r"C:\Users\Example\Notion\Notion.exe"),
+            ("Obsidian", r"C:\Users\Example\Obsidian\Obsidian.exe"),
             (
                 "Foxit PDF Reader",
                 r"C:\Program Files\Foxit\FoxitReader.exe",
@@ -1574,15 +1657,13 @@ mod tests {
         ] {
             assert_eq!(classify(name, path), AppCategory::Productivity, "{name}");
         }
-        // Security & Privacy.
         for (name, path) in [
-            ("Bitwarden", r"C:\Users\Maks\Bitwarden\Bitwarden.exe"),
+            ("Bitwarden", r"C:\Users\Example\Bitwarden\Bitwarden.exe"),
             ("Malwarebytes", r"C:\Program Files\Malwarebytes\mb.exe"),
             ("WireGuard", r"C:\Program Files\WireGuard\wireguard.exe"),
         ] {
             assert_eq!(classify(name, path), AppCategory::Security, "{name}");
         }
-        // File & Cloud.
         for (name, path) in [
             ("WinRAR", r"C:\Program Files\WinRAR\WinRAR.exe"),
             ("Total Commander", r"C:\totalcmd\TOTALCMD64.EXE"),
@@ -1594,12 +1675,10 @@ mod tests {
 
     #[test]
     fn bare_git_keyword_no_longer_miscategorizes_logitech() {
-        // "Logitech" contains the substring "git"; it must not land in Development.
         assert_ne!(
             classify("Logitech G HUB", r"C:\Program Files\LGHUB\lghub.exe"),
             AppCategory::Development
         );
-        // A real Git tool still classifies as Development.
         assert_eq!(
             classify("Git Bash", r"C:\Program Files\Git\git-bash.exe"),
             AppCategory::Development
@@ -1626,12 +1705,10 @@ mod tests {
 
     #[test]
     fn install_path_pins_productivity_and_browsers_for_cryptic_names() {
-        // Neutral shortcut name, but the resolved target lives in a known product tree.
         let mut writer = app("Writer", r"C:\Menu\Writer.lnk");
         writer.resolved_path = Some(r"C:\Program Files\LibreOffice\program\swriter.exe".into());
         assert_eq!(classify_app(&writer), AppCategory::Productivity);
 
-        // A launcher exe with no browser keyword, identified purely by its install tree.
         let mut ff = app("Nightly", r"C:\Menu\Nightly.lnk");
         ff.resolved_path = Some(r"C:\Program Files\Mozilla Firefox\launcher.exe".into());
         assert_eq!(classify_app(&ff), AppCategory::Browsers);
@@ -1639,7 +1716,6 @@ mod tests {
 
     #[test]
     fn classify_app_reads_product_name_signal() {
-        // A cryptic display name and exe; the PE product name carries the category.
         let mut note = app("Notes", r"C:\Apps\notes.exe");
         note.product_name = Some("Obsidian".into());
         assert_eq!(classify_app(&note), AppCategory::Productivity);
@@ -1757,12 +1833,10 @@ mod tests {
 
     #[test]
     fn classify_app_uses_source_publisher_and_install_path() {
-        // Steam source → Games regardless of the name.
         let mut steam = app("Some Steam Title", "steam://rungameid/1");
         steam.source_kind = SourceKind::Steam;
         assert_eq!(classify_app(&steam), AppCategory::Games);
 
-        // A Blizzard game whose name carries no game word.
         let mut hearthstone = app(
             "Hearthstone",
             r"C:\Program Files\Hearthstone\Hearthstone.exe",
@@ -1770,12 +1844,10 @@ mod tests {
         hearthstone.publisher = Some("Blizzard Entertainment".into());
         assert_eq!(classify_app(&hearthstone), AppCategory::Games);
 
-        // A game reached via a store install tree.
         let mut store_game = app("Launcher Title", r"C:\Menu\Launcher Title.lnk");
         store_game.resolved_path = Some(r"D:\Games\Battle.net\Diablo IV\game.exe".into());
         assert_eq!(classify_app(&store_game), AppCategory::Games);
 
-        // Publisher pins the category.
         let mut resolve = app(
             "Untitled Project",
             r"C:\Program Files\Blackmagic Design\Resolve\Resolve.exe",
@@ -1783,13 +1855,11 @@ mod tests {
         resolve.publisher = Some("Blackmagic Design Pty. Ltd.".into());
         assert_eq!(classify_app(&resolve), AppCategory::Editors);
 
-        // A VPN client falls to Security by keyword.
         assert_eq!(
-            classify_app(&app("Hiddify", r"C:\Users\Maks\Hiddify\Hiddify.exe")),
+            classify_app(&app("Hiddify", r"C:\Users\Example\Hiddify\Hiddify.exe")),
             AppCategory::Security
         );
 
-        // A hardware vendor is NOT a game publisher (no bare "ea"/"riot" substring hit).
         let mut driver = app("Realtek Audio Console", r"C:\Program Files\Realtek\rtk.exe");
         driver.publisher = Some("Realtek Semiconductor Corp.".into());
         assert_ne!(classify_app(&driver), AppCategory::Games);
@@ -1797,27 +1867,23 @@ mod tests {
 
     #[test]
     fn classify_app_reads_the_resolved_executable_name() {
-        // Sota Connect: neutral display name and .lnk, but the real target is SotaVPN.exe.
         let mut sota = app("Sota Connect", r"C:\Menu\Sota Connect.lnk");
         sota.launch_kind = LaunchKind::Shortcut;
         sota.source_kind = SourceKind::StartMenu;
         sota.resolved_path = Some(r"D:\Apps\SotaConnect\SotaVPN.exe".into());
         assert_eq!(classify_app(&sota), AppCategory::Security);
 
-        // OpenCode → AI, even though its exe path contains "code.exe" (AI is matched before Dev).
         let mut opencode = app("OpenCode", r"C:\Menu\OpenCode.lnk");
         opencode.launch_kind = LaunchKind::Shortcut;
         opencode.resolved_path = Some(r"D:\Apps\OpenCode\OpenCode.exe".into());
         assert_eq!(classify_app(&opencode), AppCategory::Ai);
 
-        // MongoDB Compass → Development (publisher-pinned).
         let mut mongo = app("MongoDB Compass", r"C:\Menu\MongoDB Compass.lnk");
         mongo.publisher = Some("MongoDB Inc".into());
         mongo.resolved_path =
-            Some(r"C:\Users\Maks\AppData\Local\MongoDBCompass\MongoDBCompass.exe".into());
+            Some(r"C:\Users\Example\AppData\Local\MongoDBCompass\MongoDBCompass.exe".into());
         assert_eq!(classify_app(&mongo), AppCategory::Development);
 
-        // The Hiddify VPN client → Security.
         assert_eq!(
             classify_app(&app("Hiddify", r"C:\Program Files\Hiddify\Hiddify.exe")),
             AppCategory::Security
@@ -1826,8 +1892,6 @@ mod tests {
 
     #[test]
     fn tokenized_matching_ignores_substrings_of_unrelated_words() {
-        // Whole-word matching: a keyword must be a full token, never a substring. These are the
-        // false-positive classes the previous substring cascade had to hand-patch around.
         assert_eq!(
             classify("Omega Launcher", r"C:\Omega\omega.exe"),
             AppCategory::Other,
@@ -1847,8 +1911,6 @@ mod tests {
 
     #[test]
     fn file_description_signal_classifies_cryptic_names() {
-        // The PE file description often names the category outright even when the display name and
-        // executable are opaque.
         let mut browser = app("Nyxbrowse", r"C:\Apps\nyx.exe");
         browser.description = Some("Internet Browser".into());
         assert_eq!(classify_app(&browser), AppCategory::Browsers);
@@ -1860,7 +1922,6 @@ mod tests {
 
     #[test]
     fn original_filename_reveals_a_renamed_launcher() {
-        // A neutral shortcut whose PE original filename is the real browser executable.
         let mut renamed = app("Fast Start", r"C:\Menu\Fast Start.lnk");
         renamed.original_filename = Some("chrome.exe".into());
         assert_eq!(classify_app(&renamed), AppCategory::Browsers);
@@ -1868,8 +1929,6 @@ mod tests {
 
     #[test]
     fn corroborating_signals_accumulate_to_break_a_tie() {
-        // "Cursor Code" hits AI ("cursor") and Development ("code") equally by name; the AI executable
-        // adds weight so AI wins on the total, not on list order.
         let mut cursor = app("Cursor Code", r"C:\Apps\Cursor.exe");
         cursor.resolved_path = Some(r"C:\Apps\Cursor.exe".into());
         assert_eq!(classify_app(&cursor), AppCategory::Ai);
@@ -1877,8 +1936,6 @@ mod tests {
 
     #[test]
     fn game_engine_and_games_folder_classify_unknown_indie_titles() {
-        // Brotato: portable, non-Steam, its title in no keyword list. The Godot engine in the file
-        // description and the dedicated Games folder identify it structurally.
         let mut brotato = app("Brotato", r"D:\Games\Brotato\Brotato.exe");
         brotato.source_kind = SourceKind::Portable;
         brotato.publisher = Some("Blobfish Games".into());
@@ -1886,12 +1943,10 @@ mod tests {
         brotato.description = Some("Godot Engine".into());
         assert_eq!(classify_app(&brotato), AppCategory::Games);
 
-        // The engine fingerprint alone suffices, without a games folder.
         let mut indie = app("Unknowable", r"C:\Apps\Unknowable\game.exe");
         indie.description = Some("Unreal Engine".into());
         assert_eq!(classify_app(&indie), AppCategory::Games);
 
-        // A dedicated games folder alone tips an otherwise-unknown title to Games.
         assert_eq!(
             classify_app(&app("Zephyr", r"D:\Games\Zephyr\Zephyr.exe")),
             AppCategory::Games
@@ -1901,7 +1956,6 @@ mod tests {
     #[test]
     fn extended_coverage_classifies_common_apps_not_installed_here() {
         use AppCategory::*;
-        // Popular apps a typical user has, identified by distinctive name tokens.
         for (name, path, want) in [
             ("Epic Games Launcher", r"C:\Menu\Epic.lnk", Games),
             ("CurseForge", r"C:\Menu\CurseForge.lnk", Games),
@@ -1964,7 +2018,6 @@ mod tests {
             assert_eq!(classify(name, path), want, "{name}");
         }
 
-        // Publisher rules generalize across every product a vendor ships, even a neutral name.
         for (publisher, want) in [
             ("Autodesk Inc.", Editors),
             ("NVIDIA Corporation", Utilities),
@@ -2067,9 +2120,6 @@ mod tests {
 
     #[test]
     fn different_portable_versions_are_kept_as_separate_apps() {
-        // A different version is a different application: two portable Rufus builds must stay two
-        // cards rather than collapsing to the newest. (Same-version copies still merge — see
-        // dedup::tests::portable_copies_merge_on_equal_version_only.)
         let mut old = app("Rufus", r"E:\Tools\rufus-3.11p.exe");
         old.source_kind = SourceKind::Portable;
         old.version = Some("3.11.0".into());

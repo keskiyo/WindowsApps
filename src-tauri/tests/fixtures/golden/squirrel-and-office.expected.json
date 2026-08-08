@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "input_record_count": 6,
+  "output_app_count": 4,
+  "records": [
+    {
+      "canonical_id": "aumid:microsoft.office.excel.exe.15",
+      "preference_identity": "preference:c879d9a2bd6a6efc6465fd34eedd0b96e5fee55ddf5117d626bd4617a6a7314a",
+      "canonical_identity": "identity:6db19d3d383cdd5e197573410c03652814439391c718030b430319f6d5d7de5f",
+      "launch": "AppUserModelId|microsoft.office.excel.exe.15|",
+      "source_kind": "StartApps",
+      "artifact_kind": "Application",
+      "visibility_class": "Primary",
+      "category": "Productivity",
+      "display_name": "Excel"
+    },
+    {
+      "canonical_id": "registry:igorpavlov|7-zip|c:\\program files\\7-zip",
+      "preference_identity": "preference:75fa9d348ee258dc470f112c78f3324af2aff4b9fadf6b8d43a9f00fffe9fc4a",
+      "canonical_identity": "identity:d61ce41d065edc9b2933f46365638298638e1127da22dcaecc3681c20ee658e1",
+      "launch": "Executable|c:\\program files\\7-zip\\7zfm.exe|",
+      "source_kind": "Registry",
+      "artifact_kind": "Application",
+      "visibility_class": "Primary",
+      "category": "FileCloud",
+      "display_name": "7-Zip 24.08"
+    },
+    {
+      "canonical_id": "target:c:\\program files\\microsoft office\\root\\office16\\winword.exe",
+      "preference_identity": "preference:14a2995d66c1fea39f991713493a5ebcebc62d87a926ee6f3417472ee9f1d7f9",
+      "canonical_identity": "identity:0e88eabb0579dfa3654c923f5d3f6422653dd7f2e1c413a6d457847c55ed7400",
+      "launch": "Shortcut|c:\\program files\\microsoft office\\root\\office16\\winword.exe|",
+      "source_kind": "StartMenu",
+      "artifact_kind": "Application",
+      "visibility_class": "Primary",
+      "category": "Productivity",
+      "display_name": "Word"
+    },
+    {
+      "canonical_id": "target:c:\\users\\<user>\\appdata\\local\\discord\\app-1.0.9250\\discord.exe",
+      "preference_identity": "preference:6ec9043b970c7216be66ac5d2fa97f9edadd310557e5bdaba20d288801203a86",
+      "canonical_identity": "identity:c97dce93fa10909960341e0e06ab0449b564dc23ecfbc664343f4900d167dc2d",
+      "launch": "Shortcut|c:\\users\\<user>\\appdata\\local\\discord\\app-1.0.9250\\discord.exe|",
+      "source_kind": "StartMenu",
+      "artifact_kind": "Application",
+      "visibility_class": "Primary",
+      "category": "Communication",
+      "display_name": "Discord"
+    }
+  ],
+  "dedup_groups": [
+    {
+      "canonical_id": "aumid:microsoft.office.excel.exe.15",
+      "members": [
+        "microsoft.office.excel.exe.15"
+      ]
+    },
+    {
+      "canonical_id": "aumid:microsoft.office.winword.exe.15",
+      "members": [
+        "c:\\programdata\\microsoft\\windows\\start menu\\programs\\word.lnk",
+        "microsoft.office.winword.exe.15"
+      ]
+    },
+    {
+      "canonical_id": "registry:igorpavlov|7-zip|c:\\program files\\7-zip",
+      "members": [
+        "c:\\program files\\7-zip\\7zfm.exe"
+      ]
+    },
+    {
+      "canonical_id": "target:c:\\users\\<user>\\appdata\\local\\discord\\app-1.0.9250\\discord.exe",
+      "members": [
+        "c:\\users\\<user>\\appdata\\roaming\\microsoft\\windows\\start menu\\programs\\discord inc\\discord.lnk",
+        "c:\\users\\<user>\\appdata\\roaming\\microsoft\\windows\\start menu\\programs\\discord.lnk"
+      ]
+    }
+  ],
+  "source_counts": {
+    "Registry": 1,
+    "StartApps": 1,
+    "StartMenu": 2
+  },
+  "visibility_counts": {
+    "Primary": 4
+  },
+  "category_counts": {
+    "Communication": 1,
+    "FileCloud": 1,
+    "Productivity": 2
+  },
+  "diagnostics": {
+    "dev_reports": "disabled",
+    "os_script": "latin",
+    "registrations": "empty"
+  }
+}

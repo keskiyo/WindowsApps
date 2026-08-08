@@ -1,7 +1,5 @@
 #![deny(unreachable_pub)]
 
-// Custom title bar (decorations disabled) needs window drag/min/max/close permissions;
-// see src-tauri/capabilities/default.json.
 mod app_state;
 mod catalog;
 mod commands;
@@ -45,8 +43,6 @@ pub fn run() {
             }
         })
         .setup(move |app| {
-            // Held in managed state so the hotkey registration and its thread are released with
-            // the app instead of being detached for the lifetime of the process.
             let registered = global_shortcut::register(app.handle().clone());
             {
                 let state = app.state::<AppState>();
@@ -70,10 +66,6 @@ pub fn run() {
                 let settings = catalog::scan_settings::read(&app_data_dir);
                 restart_change_watcher(app.handle().clone(), &settings);
             }
-            // Installed copies self-heal their registry footprint on every start: the NSIS
-            // install-location key follows the directory the app actually runs from (so
-            // updates land in the user's chosen folder), and an enabled autostart entry is
-            // rewritten if the executable moved.
             if let Some(install_dir) = install_registry::installed_copy_dir() {
                 let config = app.config();
                 let publisher = config.bundle.publisher.clone().unwrap_or_default();

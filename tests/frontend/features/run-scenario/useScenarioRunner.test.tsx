@@ -36,7 +36,7 @@ function scenario(value: Partial<Scenario> = {}): Scenario {
 }
 
 function closed(count: number): CloseAppsResult {
-	return { closed: count, notRunning: 0, unavailable: 0 }
+	return { closed: count, notRunning: 0, unavailable: 0, blocked: 0 }
 }
 
 function setup(options: {
@@ -85,7 +85,7 @@ describe('useScenarioRunner', () => {
 		expect(order).toEqual(['launch:game', 'close:chat'])
 		expect(onFinished).toHaveBeenCalledWith(
 			expect.objectContaining({ id: 'gaming' }),
-			{ launched: 1, closed: 1, notRunning: 0, unavailable: 0 },
+			{ launched: 1, closed: 1, notRunning: 0, unavailable: 0, blocked: 0 },
 		)
 	})
 
@@ -124,6 +124,7 @@ describe('useScenarioRunner', () => {
 				closed: 0,
 				notRunning: 1,
 				unavailable: 1,
+				blocked: 0,
 			})),
 		})
 
@@ -138,6 +139,7 @@ describe('useScenarioRunner', () => {
 			closed: 0,
 			notRunning: 1,
 			unavailable: 1,
+			blocked: 0,
 		})
 	})
 
@@ -162,6 +164,7 @@ describe('useScenarioRunner', () => {
 			closed: 0,
 			notRunning: 0,
 			unavailable: 2,
+			blocked: 0,
 		})
 	})
 
@@ -185,6 +188,7 @@ describe('useScenarioRunner', () => {
 			closed: 0,
 			notRunning: 0,
 			unavailable: 1,
+			blocked: 0,
 		})
 	})
 
@@ -208,6 +212,7 @@ describe('useScenarioRunner', () => {
 			closed: 0,
 			notRunning: 0,
 			unavailable: 2,
+			blocked: 0,
 		})
 	})
 

@@ -1,15 +1,3 @@
-//! Closing the programs a catalog entry starts.
-//!
-//! The catalog never retains a PID — `launcher` hands its process handle back only long enough to
-//! wait for input idle — so a close has to find the programs again by the image they run. Every
-//! process of that image is asked to close the way the title-bar button asks (`WM_CLOSE`, which
-//! lets an application prompt to save), and whatever ignores the request is terminated, so nothing
-//! of the program is left behind.
-//!
-//! A whole batch is closed in one pass: one process snapshot, one window enumeration and a single
-//! grace period for every target together. Closing apps one at a time would make a scenario wait
-//! the grace period once per application.
-
 mod frames;
 mod processes;
 
@@ -17,20 +5,14 @@ use processes::{image_path_of, running_images, same_executable, terminate};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-/// How long a program may take to honour `WM_CLOSE` before it is terminated. Long enough for an
-/// editor to raise its "save changes?" prompt and for the user to answer it.
 const GRACE_PERIOD_MS: u64 = 5000;
 
-/// What a close attempt actually did, per requested target. Counts rather than a bare success:
-/// "it was not running" and "it was closed" are different answers and the interface reports both.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CloseOutcome {
     pub(crate) closed: usize,
     pub(crate) not_running: usize,
 }
 
-/// The executable names to look for, lowercased — the cheap filter that keeps the process
-/// enumeration from opening a handle for every process on the machine.
 fn file_names_of(targets: &[&str]) -> HashSet<String> {
     targets
         .iter()
@@ -47,9 +29,6 @@ fn processes_of(target: &str, running: &[(u32, String)]) -> Vec<u32> {
         .collect()
 }
 
-/// Ask every window of `targets` to close, then terminate whatever ignored the request.
-///
-/// Blocking: the grace period is a real sleep, so callers run this off the async runtime.
 pub(crate) fn close_processes(targets: &[PathBuf]) -> CloseOutcome {
     let targets: Vec<&str> = targets
         .iter()
@@ -77,10 +56,7 @@ pub(crate) fn close_processes(targets: &[PathBuf]) -> CloseOutcome {
     finish(&targets, &matched)
 }
 
-/// Terminates what survived the grace period and reports, per target, whether anything is left.
 fn finish(targets: &[&str], matched: &[Vec<u32>]) -> CloseOutcome {
-    // Re-read the process list rather than reusing the first snapshot: a program that honoured the
-    // request is already gone, and one that restarted itself has a pid nobody has seen yet.
     let running = running_images(&file_names_of(targets));
     let mut outcome = CloseOutcome::default();
     for (target, before) in targets.iter().zip(matched) {
@@ -92,9 +68,6 @@ fn finish(targets: &[&str], matched: &[Vec<u32>]) -> CloseOutcome {
         for pid in &survivors {
             terminate(*pid);
         }
-        // The termination result is not the answer — a process can exit on its own between the
-        // snapshot and the call, and one belonging to another user cannot be opened at all. Asking
-        // again is what distinguishes "gone" from "still there".
         if survivors.iter().all(|pid| is_gone(*pid, target)) {
             outcome.closed += 1;
         }
@@ -102,9 +75,6 @@ fn finish(targets: &[&str], matched: &[Vec<u32>]) -> CloseOutcome {
     outcome
 }
 
-/// Whether nothing of `target` runs under `pid` any more. A pid Windows already recycled for an
-/// unrelated process counts as gone, which is also why a survivor's image is re-checked before it
-/// is ever terminated by the caller above.
 fn is_gone(pid: u32, target: &str) -> bool {
     image_path_of(pid).is_none_or(|image| !same_executable(&image, target))
 }
@@ -118,8 +88,6 @@ mod tests {
         assert_eq!(close_processes(&[]), CloseOutcome::default());
     }
 
-    // Nothing runs from these paths, so the close does no window work and reports both targets as
-    // idle instead of claiming it closed them.
     #[test]
     fn reports_targets_that_are_not_running() {
         let outcome = close_processes(&[
@@ -160,8 +128,6 @@ mod tests {
         );
     }
 
-    // A target nothing was running for must not be reported as closed, and must not cost a
-    // termination attempt either.
     #[test]
     fn counts_a_target_with_no_processes_as_idle() {
         let outcome = finish(&[r"C:\Editor\editor.exe"], &[Vec::new()]);
@@ -175,8 +141,6 @@ mod tests {
         );
     }
 
-    // The process ids are long gone, so nothing of the target is left: the target counts as closed
-    // without any handle being opened on a live process.
     #[test]
     fn counts_a_target_whose_processes_are_gone_as_closed() {
         let outcome = finish(&[r"C:\Nowhere\gone.exe"], &[vec![u32::MAX]]);

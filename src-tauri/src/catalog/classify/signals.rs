@@ -1,31 +1,31 @@
-//! Signal extraction for categorization: turns a catalog record (or a bare name/path pair) into the
-//! tokenized fields the scorer weighs. Token fields match by whole-word membership so a keyword can
-//! never fire on a substring of an unrelated word (`git` in `logitech`, `mega` in `omega`); prose and
-//! path fields match by substring, which is what those signals need.
-
 use super::super::AppInfo;
 use std::collections::HashSet;
 use std::path::Path;
 
-/// Where a rule looks and how it matches. See `Signals::matches` for the exact semantics of each.
 #[derive(Clone, Copy)]
 pub(super) enum Field {
-    /// Whole-word membership over the display name (multi-word needles: every word must be present).
     Name,
-    /// Whole-word membership over the PE product name.
     Product,
-    /// Exact equality against the resolved executable stem (`chrome`, `battle.net`).
     ExeEq,
-    /// Substring of the executable stem — for names that glue a marker on (`SotaVPN` → `vpn`).
     ExeContains,
-    /// Substring of the path blob (path + resolved target + install location).
     Path,
-    /// Substring of the PE file description (`Internet Browser`, `Media Player`).
     Desc,
-    /// Substring of the publisher string.
     Publisher,
-    /// Substring of the name+path blob — for localized/AUMID inbox markers matched verbatim.
     Feature,
+}
+
+impl Field {
+    pub(super) fn id(self) -> &'static str {
+        match self {
+            Self::Name => "name",
+            Self::Product => "product",
+            Self::ExeEq | Self::ExeContains => "exe",
+            Self::Path => "path",
+            Self::Desc => "description",
+            Self::Publisher => "publisher",
+            Self::Feature => "feature",
+        }
+    }
 }
 
 pub(super) struct Signals {
@@ -43,8 +43,6 @@ impl Signals {
         let resolved = app.resolved_path.as_deref().unwrap_or_default();
         let install = app.install_location.as_deref().unwrap_or_default();
         let path_blob = format!("{} {} {}", app.path, resolved, install).to_lowercase();
-        // Prefer the real target name over a renamed shortcut: original filename, then the resolved
-        // executable, then the launch path.
         let exe_source = app
             .original_filename
             .as_deref()
@@ -69,7 +67,6 @@ impl Signals {
         }
     }
 
-    /// Reduced signals for the scan-time path where only a name and a path are known.
     pub(super) fn from_name_path(name: &str, path: &str) -> Self {
         Self {
             name_tokens: tokenize(name),
@@ -96,7 +93,6 @@ impl Signals {
     }
 }
 
-/// Lowercased alphanumeric word tokens; Unicode-aware so localized names tokenize too.
 fn tokenize(value: &str) -> HashSet<String> {
     value
         .to_lowercase()
@@ -106,8 +102,6 @@ fn tokenize(value: &str) -> HashSet<String> {
         .collect()
 }
 
-/// A needle matches a token set when every one of its alphanumeric words is present. Single-word
-/// needles are plain membership; multi-word needles (`visual studio`, `7-zip`) require all parts.
 fn all_words_present(needle: &str, tokens: &HashSet<String>) -> bool {
     let mut parts = needle
         .split(|c: char| !c.is_alphanumeric())
@@ -116,7 +110,6 @@ fn all_words_present(needle: &str, tokens: &HashSet<String>) -> bool {
     parts.peek().is_some() && parts.all(|part| tokens.contains(part))
 }
 
-/// Lowercased file stem (no extension) of an executable or shortcut target.
 fn exe_stem(value: &str) -> String {
     Path::new(value.trim().trim_matches('"'))
         .file_stem()

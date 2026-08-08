@@ -1,14 +1,3 @@
-//! Executables Windows itself has a registration for, read straight from the registry.
-//!
-//! Two registrations, two opposite meanings, and both are proof rather than inference:
-//!
-//! - **`App Paths`** — an executable a vendor registered so `start <name>` and the Run dialog find
-//!   it. That is a declaration of user-facing software, and it is what tells a portable-looking
-//!   `D:\...\7-Zip\7zFM.exe` apart from a bundled component sitting at the same depth.
-//! - **`BundleCachePath`** — the setup bundle an installed product keeps so it can repair or
-//!   uninstall itself. The file *is* an installer, said by the product that put it there, which
-//!   works for vendors no needle list mentions and wherever they chose to cache it.
-
 use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
 use winreg::RegKey;
 
@@ -42,8 +31,6 @@ const UNINSTALL: &[(winreg::HKEY, &str)] = &[
     ),
 ];
 
-/// Executable paths registered under `App Paths`. Values are untrusted registry input and are
-/// returned verbatim; the catalog compares them, it never executes them.
 pub(crate) fn launchable_executables() -> Vec<String> {
     APP_PATHS
         .iter()
@@ -51,7 +38,6 @@ pub(crate) fn launchable_executables() -> Vec<String> {
         .collect()
 }
 
-/// Setup bundles registered by the products they installed (`BundleCachePath`).
 pub(crate) fn installer_bundles() -> Vec<String> {
     UNINSTALL
         .iter()
@@ -88,8 +74,6 @@ fn for_each_subkey(
 mod tests {
     use super::*;
 
-    /// Reads the real hives, so it asserts shape rather than content: a missing key must yield an
-    /// empty list instead of failing, and no entry may be blank or quoted.
     #[test]
     fn registry_reads_are_tolerant_and_normalized() {
         for value in launchable_executables()

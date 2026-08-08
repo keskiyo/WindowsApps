@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+﻿import { describe, expect, it, vi } from 'vitest'
 import {
 	DEFAULT_PREFERENCES,
 	PREFERENCES_BACKUP_KEY,
@@ -13,7 +13,8 @@ import { CATEGORY_ORDER } from '../../../../src/entities/category'
 describe('preferences', () => {
 	it('uses complete defaults', () => {
 		expect(DEFAULT_PREFERENCES).toMatchObject({
-			version: 12,
+			version: 13,
+			favoriteScenarioIds: [],
 			categoryOrder: CATEGORY_ORDER,
 			favoriteAppIds: [],
 			collapsedCategories: [],
@@ -59,7 +60,7 @@ describe('preferences', () => {
 		})
 
 		expect(migrated).toMatchObject({
-			version: 12,
+			version: 13,
 			favoriteAppIdentities: ['identity:codex'],
 		})
 		expect(migrated.categories).toContainEqual(
@@ -82,7 +83,7 @@ describe('preferences', () => {
 				collapsedCategories: ['other'],
 			}),
 		).toMatchObject({
-			version: 12,
+			version: 13,
 			favoriteAppIds: ['codex'],
 			collapsedCategories: ['other'],
 			categoryOverrides: {},
@@ -100,7 +101,7 @@ describe('preferences', () => {
 		})
 
 		expect(normalized).toMatchObject({
-			version: 12,
+			version: 13,
 			favoriteAppIds: ['code'],
 			unknownFields: {
 				experimentalLayout: { density: 'compact' },
@@ -133,7 +134,7 @@ describe('preferences', () => {
 		).toBe(true)
 
 		expect(JSON.parse(values.get(PREFERENCES_KEY) ?? '{}')).toMatchObject({
-			version: 12,
+			version: 13,
 			favoriteAppIds: ['code', 'editor'],
 			experimentalLayout: { density: 'compact' },
 		})
@@ -163,7 +164,7 @@ describe('preferences', () => {
 		})
 		// The id-keyed map is preserved (the store folds it into identities on the next catalog
 		// load); the new identity map defaults to empty so nothing is lost on upgrade.
-		expect(normalized.version).toBe(12)
+		expect(normalized.version).toBe(13)
 		expect(normalized.categoryOverrides).toEqual({ codex: 'ai' })
 		expect(normalized.categoryOverrideIdentities).toEqual({})
 	})
@@ -184,7 +185,7 @@ describe('preferences', () => {
 		})
 
 		expect(normalized).toMatchObject({
-			version: 12,
+			version: 13,
 			favoriteAppIds: ['cmd-shortcut'],
 			favoriteAppIdentities: [],
 			hiddenAppIds: ['cmd-shortcut'],
@@ -233,7 +234,7 @@ describe('preferences', () => {
 
 		// v8 could not carry the marks, so the upgrade must default them rather than invent any,
 		// and every field the older document did carry has to survive untouched.
-		expect(normalized.version).toBe(12)
+		expect(normalized.version).toBe(13)
 		expect(normalized.installerAppIds).toEqual([])
 		expect(normalized.installerAppIdentities).toEqual([])
 		expect(normalized.legacyCanonicalPreferences.installer).toEqual([])
@@ -269,7 +270,7 @@ describe('preferences', () => {
 
 		// v9 could not carry stamps, so a value under that key is not ours to trust; the store
 		// refills the map from the next catalog load.
-		expect(normalized.version).toBe(12)
+		expect(normalized.version).toBe(13)
 		expect(normalized.firstSeenAt).toEqual({})
 		expect(normalized.installerAppIdentities).toEqual(['preference:setup'])
 	})
@@ -299,7 +300,7 @@ describe('preferences', () => {
 		})
 
 		// v10 could not carry scenarios, so a value under that key is not ours to trust.
-		expect(normalized.version).toBe(12)
+		expect(normalized.version).toBe(13)
 		expect(normalized.scenarios).toEqual([])
 		expect(normalized.firstSeenAt).toEqual({
 			'preference:code': 1700000000000,
@@ -351,7 +352,7 @@ describe('preferences', () => {
 			],
 		})
 
-		expect(normalized.version).toBe(12)
+		expect(normalized.version).toBe(13)
 		expect(normalized.scenarios).toEqual([
 			{
 				id: 'work',
@@ -361,6 +362,29 @@ describe('preferences', () => {
 				createdAt: null,
 			},
 		])
+	})
+
+	// v12 had no starred scenarios, so the upgrade defaults them and leaves the scenarios alone.
+	it('upgrades a v12 document to no starred scenarios', () => {
+		const normalized = normalizePreferences({
+			version: 12,
+			scenarios: [{ id: 'work', name: 'Work', createdAt: 1700000000000 }],
+		})
+
+		expect(normalized.version).toBe(13)
+		expect(normalized.favoriteScenarioIds).toEqual([])
+		expect(normalized.scenarios).toHaveLength(1)
+	})
+
+	// A star that names nothing would render a row with no scenario behind it.
+	it('keeps only starred scenarios the document still has', () => {
+		const normalized = normalizePreferences({
+			version: 13,
+			scenarios: [{ id: 'work', name: 'Work' }],
+			favoriteScenarioIds: ['work', 'work', 'deleted', '', 42],
+		})
+
+		expect(normalized.favoriteScenarioIds).toEqual(['work'])
 	})
 
 	it('rejects a malformed creation date instead of showing it', () => {
@@ -421,7 +445,7 @@ describe('preferences', () => {
 				collapsedCategories: ['games', 'invalid'],
 			}),
 		).toEqual({
-			version: 12,
+			version: 13,
 			categories: DEFAULT_PREFERENCES.categories,
 			categoryOrder: [
 				'browsers',
@@ -442,6 +466,7 @@ describe('preferences', () => {
 			installerAppIds: [],
 			installerAppIdentities: [],
 			scenarios: [],
+			favoriteScenarioIds: [],
 			firstSeenAt: {},
 			legacyCanonicalPreferences: {
 				favorite: [],
@@ -502,11 +527,11 @@ describe('preferences', () => {
 		).toEqual(['a'])
 	})
 
-	// A newer build may have written a version 13 document; this build (v12) must not overwrite it
+	// A newer build may have written a version 14 document; this build (v13) must not overwrite it
 	// with the older shape and strip the fields it does not know about.
 	it('does not overwrite a document written by a newer version', () => {
 		const future = JSON.stringify({
-			version: 13,
+			version: 14,
 			favoriteAppIds: ['keep'],
 			futureField: 'preserved',
 		})

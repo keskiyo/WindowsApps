@@ -1,9 +1,3 @@
-//! Declarative categorization rules. Each rule ties a curated needle list to a category, a signal
-//! field (where/how it matches — see `signals::Field`), and a weight (how strong — see `score`).
-//! This is intentionally data, not logic: adding a product means adding needles, never reordering a
-//! cascade. Keep needles lowercase; Token fields (`Name`, `Product`) match whole words, so multi-word
-//! and hyphenated needles are fine (`visual studio`, `7-zip`) and never fire on a substring.
-
 use super::super::AppCategory;
 use super::super::AppCategory::{
     Ai, Browsers, Communication, Development, Editors, FileCloud, Games, Media, Productivity,
@@ -37,7 +31,6 @@ const fn rule(
 }
 
 pub(super) static RULES: &[Rule] = &[
-    // ---- Games ----------------------------------------------------------------------------------
     rule(
         Games,
         Publisher,
@@ -88,9 +81,6 @@ pub(super) static RULES: &[Rule] = &[
         ],
     ),
     rule(Games, ExeEq, EXE, &["wow", "battle.net"]),
-    // A game built on a known engine (the engine name lands in the PE file description or product
-    // name) — a list-free way to catch the indie long tail whose title is in no keyword list. Unity
-    // is omitted deliberately: its marker is too generic to match by substring without false hits.
     rule(
         Games,
         Desc,
@@ -111,7 +101,6 @@ pub(super) static RULES: &[Rule] = &[
         PRODUCT,
         &["godot engine", "unreal engine", "gamemaker", "rpg maker"],
     ),
-    // A user's dedicated games folder is a strong hint on its own, even for an unknown title.
     rule(Games, Path, PATH, &[r"\games\"]),
     rule(
         Games,
@@ -166,7 +155,6 @@ pub(super) static RULES: &[Rule] = &[
             "clash royale",
         ],
     ),
-    // ---- AI & Agents ----------------------------------------------------------------------------
     rule(Ai, Publisher, PUBLISHER, &["openai", "anthropic"]),
     rule(
         Ai,
@@ -201,7 +189,6 @@ pub(super) static RULES: &[Rule] = &[
             "claude", "chatgpt", "codex", "ollama", "cursor", "opencode", "msty", "aider",
         ],
     ),
-    // ---- Development ----------------------------------------------------------------------------
     rule(
         Development,
         Publisher,
@@ -269,7 +256,6 @@ pub(super) static RULES: &[Rule] = &[
             "postman",
         ],
     ),
-    // ---- Editors & Design -----------------------------------------------------------------------
     rule(
         Editors,
         Publisher,
@@ -313,9 +299,6 @@ pub(super) static RULES: &[Rule] = &[
             "inkscape",
         ],
     ),
-    // ---- Office & Productivity ------------------------------------------------------------------
-    // PDF readers are Productivity even when the vendor (Adobe) would otherwise map to Editors; this
-    // decisive weight must beat the publisher rule.
     rule(
         Productivity,
         ExeContains,
@@ -327,11 +310,6 @@ pub(super) static RULES: &[Rule] = &[
         Path,
         INSTALL_TREE,
         &[
-            // Without the trailing separator so a versioned install root ("Microsoft Office 15")
-            // matches too, and with the AppUserModelId prefix Office desktop apps carry when they
-            // reach the catalog through Start Apps: those records resolve to no executable at all,
-            // so the install tree and the executable stem are both unavailable and only the display
-            // name would be left — which is how "Word" ended up in Other.
             r"\microsoft office",
             r"\microsoft\office\",
             "microsoft.office.",
@@ -358,9 +336,6 @@ pub(super) static RULES: &[Rule] = &[
         NAME,
         &[
             "microsoft office",
-            // The display name, next to the executable stem below it: Office registers its apps as
-            // "Word", never as "WINWORD". Its siblings ("excel", "powerpoint", "onenote", "outlook",
-            // "visio") were already listed; this one was the gap.
             "word",
             "winword",
             "excel",
@@ -395,7 +370,6 @@ pub(super) static RULES: &[Rule] = &[
             "winword", "excel", "powerpnt", "onenote", "outlook", "scalc", "swriter", "simpress",
         ],
     ),
-    // ---- Browsers -------------------------------------------------------------------------------
     rule(Browsers, Publisher, PUBLISHER, &["mozilla"]),
     rule(
         Browsers,
@@ -425,7 +399,6 @@ pub(super) static RULES: &[Rule] = &[
         ],
     ),
     rule(Browsers, Desc, DESC, &["internet browser", "web browser"]),
-    // ---- Media ----------------------------------------------------------------------------------
     rule(Media, Publisher, PUBLISHER, &["videolan", "spotify"]),
     rule(
         Media,
@@ -468,7 +441,6 @@ pub(super) static RULES: &[Rule] = &[
         ],
     ),
     rule(Media, Desc, DESC, &["media player"]),
-    // ---- Communication --------------------------------------------------------------------------
     rule(
         Communication,
         Publisher,
@@ -509,7 +481,6 @@ pub(super) static RULES: &[Rule] = &[
         ],
     ),
     rule(Communication, Desc, DESC, &["email client", "e-mail"]),
-    // ---- File & Cloud ---------------------------------------------------------------------------
     rule(
         FileCloud,
         Name,
@@ -550,7 +521,6 @@ pub(super) static RULES: &[Rule] = &[
             "totalcmd64",
         ],
     ),
-    // ---- Security & Privacy ---------------------------------------------------------------------
     rule(
         Security,
         Publisher,
@@ -577,7 +547,6 @@ pub(super) static RULES: &[Rule] = &[
         Name,
         NAME,
         &[
-            // Anti-virus / endpoint security.
             "antivirus",
             "anti-virus",
             "antimalware",
@@ -593,14 +562,12 @@ pub(super) static RULES: &[Rule] = &[
             "mcafee",
             "drweb",
             "dr.web",
-            // Password managers.
             "keepass",
             "bitwarden",
             "1password",
             "dashlane",
             "nordpass",
             "proton pass",
-            // VPN / proxy clients.
             "vpn",
             "proxy",
             "wireguard",
@@ -646,7 +613,6 @@ pub(super) static RULES: &[Rule] = &[
             "password manager",
         ],
     ),
-    // Executables that glue a marker onto the product name (`SotaVPN.exe`, `FooProxy.exe`).
     rule(Security, ExeContains, EXE_GLUE, &["vpn", "proxy"]),
     rule(
         Security,
@@ -664,16 +630,12 @@ pub(super) static RULES: &[Rule] = &[
             "password manager",
         ],
     ),
-    // ---- System ---------------------------------------------------------------------------------
-    // Mostly shadowed by the Windows-feature markers below (which are higher weight); kept for the
-    // rare console tool that is not an inbox feature.
     rule(
         System,
         Name,
         NAME,
         &["command prompt", "powershell", "командная строка"],
     ),
-    // ---- Utilities ------------------------------------------------------------------------------
     rule(
         Utilities,
         Name,
@@ -704,13 +666,6 @@ pub(super) static RULES: &[Rule] = &[
             "winmtr",
         ],
     ),
-    // =============================================================================================
-    // Extended common-app coverage. These broaden the population beyond what is installed on any one
-    // machine: publisher rules generalize across every product a vendor ships, and the name lists are
-    // the widely-used apps a typical Windows user is likely to have. Curated to distinctive tokens to
-    // keep whole-word matching false-positive free. Add here rather than reordering the base lists.
-    // =============================================================================================
-    // ---- Games (stores, launchers, mod tools) ---------------------------------------------------
     rule(
         Games,
         Name,
@@ -736,7 +691,6 @@ pub(super) static RULES: &[Rule] = &[
             "epic games launcher",
         ],
     ),
-    // ---- AI & Agents ----------------------------------------------------------------------------
     rule(Ai, Publisher, PUBLISHER, &["mistral ai", "perplexity"]),
     rule(
         Ai,
@@ -759,7 +713,6 @@ pub(super) static RULES: &[Rule] = &[
             "jan.ai",
         ],
     ),
-    // ---- Development (editors, runtimes, databases, terminals, VCS) -----------------------------
     rule(
         Development,
         Publisher,
@@ -840,7 +793,6 @@ pub(super) static RULES: &[Rule] = &[
             "laragon",
         ],
     ),
-    // ---- Editors & Design (image, video, CAD) ---------------------------------------------------
     rule(
         Editors,
         Publisher,
@@ -882,7 +834,6 @@ pub(super) static RULES: &[Rule] = &[
             "freecad",
         ],
     ),
-    // ---- Office & Productivity ------------------------------------------------------------------
     rule(
         Productivity,
         Publisher,
@@ -916,7 +867,6 @@ pub(super) static RULES: &[Rule] = &[
             "google keep",
         ],
     ),
-    // ---- Browsers -------------------------------------------------------------------------------
     rule(
         Browsers,
         Publisher,
@@ -940,7 +890,6 @@ pub(super) static RULES: &[Rule] = &[
             "comodo dragon",
         ],
     ),
-    // ---- Media ----------------------------------------------------------------------------------
     rule(
         Media,
         Publisher,
@@ -979,7 +928,6 @@ pub(super) static RULES: &[Rule] = &[
             "nvidia broadcast",
         ],
     ),
-    // ---- Communication --------------------------------------------------------------------------
     rule(
         Communication,
         Name,
@@ -1002,7 +950,6 @@ pub(super) static RULES: &[Rule] = &[
             "mumble",
         ],
     ),
-    // ---- File & Cloud (torrents, archivers, sync, transfer, file managers, imaging) -------------
     rule(
         FileCloud,
         Name,
@@ -1038,7 +985,6 @@ pub(super) static RULES: &[Rule] = &[
             "spacesniffer",
         ],
     ),
-    // ---- Security & Privacy ---------------------------------------------------------------------
     rule(
         Security,
         Publisher,
@@ -1071,7 +1017,6 @@ pub(super) static RULES: &[Rule] = &[
             "kleopatra",
         ],
     ),
-    // ---- Utilities (vendor control, hardware/diagnostics, remote, capture, launchers, tweaks) ---
     rule(
         Utilities,
         Publisher,
@@ -1160,13 +1105,9 @@ pub(super) static RULES: &[Rule] = &[
             "classic shell",
         ],
     ),
-    // ---- Windows Features -----------------------------------------------------------------------
-    // Verbatim inbox markers (localized names, AUMIDs, MMC snap-ins, system exes). Matched as a
-    // substring of the name+path blob so an AUMID or a localized shortcut name still lands.
     rule(WindowsFeatures, Feature, FEATURE, WINDOWS_FEATURE_MARKERS),
 ];
 
-/// Inbox Windows shell apps, accessibility tools, management consoles, and administrative utilities.
 static WINDOWS_FEATURE_MARKERS: &[&str] = &[
     "file explorer",
     "explorer.exe",

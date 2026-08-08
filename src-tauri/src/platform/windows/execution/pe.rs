@@ -26,8 +26,6 @@ pub(crate) enum AppArchitecture {
     Unknown,
 }
 
-/// Reads only the fixed PE header portions needed by the catalog. File-controlled offsets never
-/// drive allocations, and every malformed or unavailable input maps to `None`.
 fn read_pe_header(path: &Path) -> Option<[u8; PE_HEADER_LENGTH]> {
     let mut file = std::fs::File::open(path).ok()?;
     let mut dos = [0_u8; DOS_HEADER_LENGTH];
@@ -56,8 +54,6 @@ pub(crate) fn read_architecture(path: &Path) -> AppArchitecture {
     }
 }
 
-/// Whether an executable targets the console subsystem rather than a graphical one. This only
-/// reads an already-bounded PE header and never launches the inspected program.
 pub(crate) fn is_console_subsystem(path: &Path) -> bool {
     let Some(header) = read_pe_header(path) else {
         return false;

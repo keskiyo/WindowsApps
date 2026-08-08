@@ -5,7 +5,7 @@ import {
 	MAX_SCENARIO_ENTRIES,
 	MAX_SCENARIOS,
 } from '../../../../src/entities/scenario'
-import type { AppsClient } from '../../../../src/entities/app'
+import type { AppInfo, AppsClient } from '../../../../src/entities/app'
 
 function client(): AppsClient {
 	return {
@@ -55,6 +55,89 @@ describe('scenario actions', () => {
 
 		store.getState().deleteScenario(id)
 		expect(store.getState().scenarios).toEqual([])
+	})
+
+	// The backend refuses to terminate these whatever the window asks; refusing here is what tells
+	// the user why, while they are still editing the scenario.
+	it('refuses a process Windows cannot survive losing, but only in the close list', async () => {
+		const security = {
+			id: 'lsass',
+			name: 'Local Security Authority',
+			path: 'C:\\Windows\\System32\\lsass.exe',
+			category: 'system',
+			sourceKind: 'registry',
+			launchKind: 'executable',
+			closeRisk: 'close.critical',
+		} as unknown as AppInfo
+		const withApp = client()
+		withApp.getApps = vi
+			.fn()
+			.mockResolvedValue({ apps: [security], hasCache: true })
+		const store = createAppStore(withApp, memoryStorage().storage, idFactory)
+		await store.getState().load()
+		const created = store.getState().createScenario('Gaming')
+		const id = created.ok ? created.id : ''
+
+		const refused = store.getState().addScenarioApp(id, 'close', 'lsass')
+		expect(refused.ok).toBe(false)
+		expect(store.getState().scenarios[0]?.closeIdentities).toEqual([])
+
+		expect(store.getState().addScenarioApp(id, 'launch', 'lsass')).toEqual({
+			ok: true,
+		})
+	})
+
+	// The shell entries Windows ships resolve to a PIDL, not an executable, so the backend has no
+	// process to end for them. Adding one used to succeed and then quietly do nothing.
+	it('refuses an entry that has no process to close', async () => {
+		const shell = {
+			id: 'aumid:microsoft.windows.explorer',
+			name: 'Проводник',
+			path: 'Microsoft.Windows.Explorer',
+			category: 'system',
+			sourceKind: 'start_apps',
+			launchKind: 'app_user_model_id',
+			closeRisk: 'close.not_closable',
+		} as unknown as AppInfo
+		const withApp = client()
+		withApp.getApps = vi
+			.fn()
+			.mockResolvedValue({ apps: [shell], hasCache: true })
+		const store = createAppStore(withApp, memoryStorage().storage, idFactory)
+		await store.getState().load()
+		const created = store.getState().createScenario('Gaming')
+		const id = created.ok ? created.id : ''
+
+		const refused = store
+			.getState()
+			.addScenarioApp(id, 'close', 'aumid:microsoft.windows.explorer')
+		expect(refused.ok).toBe(false)
+		expect(store.getState().scenarios[0]?.closeIdentities).toEqual([])
+	})
+
+	// Ending the desktop shell is disruptive but recoverable, so it stays the user's decision.
+	it('lets the desktop shell into the close list', async () => {
+		const explorer = {
+			id: 'explorer',
+			name: 'Проводник',
+			path: 'C:\\Windows\\explorer.exe',
+			category: 'system',
+			sourceKind: 'start_menu',
+			launchKind: 'executable',
+			closeRisk: 'close.session',
+		} as unknown as AppInfo
+		const withApp = client()
+		withApp.getApps = vi
+			.fn()
+			.mockResolvedValue({ apps: [explorer], hasCache: true })
+		const store = createAppStore(withApp, memoryStorage().storage, idFactory)
+		await store.getState().load()
+		const created = store.getState().createScenario('Reset shell')
+		const id = created.ok ? created.id : ''
+
+		expect(store.getState().addScenarioApp(id, 'close', 'explorer')).toEqual({
+			ok: true,
+		})
 	})
 
 	it('refuses a blank or duplicate name', () => {
@@ -130,6 +213,39 @@ describe('scenario actions', () => {
 			error: 'Too many scenarios',
 		})
 		expect(store.getState().scenarios).toHaveLength(MAX_SCENARIOS)
+	})
+
+	it('stars a scenario, unstars it and persists the choice', () => {
+		const { storage, values } = memoryStorage()
+		const store = createAppStore(client(), storage, idFactory)
+		const created = store.getState().createScenario('Gaming')
+		const id = created.ok ? created.id : ''
+
+		store.getState().toggleFavoriteScenario(id)
+		expect(store.getState().favoriteScenarioIds).toEqual([id])
+		expect(
+			JSON.parse(values.get(PREFERENCES_KEY) ?? '{}').favoriteScenarioIds,
+		).toEqual([id])
+		expect(
+			createAppStore(client(), storage).getState().favoriteScenarioIds,
+		).toEqual([id])
+
+		store.getState().toggleFavoriteScenario(id)
+		expect(store.getState().favoriteScenarioIds).toEqual([])
+	})
+
+	// A star left behind would reappear on the scenario that later reuses the id.
+	it('drops the star with the scenario and ignores an unknown id', () => {
+		const store = createAppStore(client(), memoryStorage().storage, idFactory)
+		const created = store.getState().createScenario('Gaming')
+		const id = created.ok ? created.id : ''
+		store.getState().toggleFavoriteScenario(id)
+
+		store.getState().toggleFavoriteScenario('never-created')
+		expect(store.getState().favoriteScenarioIds).toEqual([id])
+
+		store.getState().deleteScenario(id)
+		expect(store.getState().favoriteScenarioIds).toEqual([])
 	})
 
 	it('persists a scenario and reloads it', () => {

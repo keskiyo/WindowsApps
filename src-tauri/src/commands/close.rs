@@ -7,55 +7,48 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use tauri::Manager;
 
-/// Ceiling on one close request. A scenario already caps its own lists, so this only bounds what
-/// the webview can ask for directly: the enumeration work is shared across the batch, but the
-/// terminations are not, and an unbounded list would let one call touch every process on the
-/// machine.
 const MAX_CLOSE_BATCH: usize = 32;
 
-/// What a close request achieved. Counts rather than a bare success: "it was not running", "it is
-/// closed now" and "there is nothing to close it by" are three different answers.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CloseAppsResponse {
     closed: usize,
     not_running: usize,
     unavailable: usize,
+    blocked: usize,
 }
 
-/// The trusted executables for the requested ids, plus how many of them named nothing closable.
-///
-/// Validation happens before the lookup, so an id that cannot name a catalog entry is never used
-/// as a map key. Targets always come from `AppState` — the webview passes ids and nothing else —
-/// and an entry with no identifiable running image (a `steam://` target, a Store package whose
-/// manifest resolved no executable) is simply absent and counts as unavailable. The same id twice
-/// is one program to close and is neither closed twice nor reported as a problem.
-fn resolve_close_targets(
-    state: &AppState,
-    ids: Vec<String>,
-) -> Result<(Vec<PathBuf>, usize), AppError> {
+#[derive(Debug, Default, PartialEq, Eq)]
+struct CloseRequest {
+    targets: Vec<PathBuf>,
+    unavailable: usize,
+    blocked: usize,
+}
+
+fn resolve_close_targets(state: &AppState, ids: Vec<String>) -> Result<CloseRequest, AppError> {
     let stored = state
         .close_targets
         .lock()
         .map_err(|_| AppError::CloseDataUnavailable)?;
     let mut seen = HashSet::with_capacity(ids.len());
-    let mut targets = Vec::new();
-    let mut unavailable = 0;
+    let mut request = CloseRequest::default();
     for id in ids {
         if !seen.insert(id.clone()) {
             continue;
         }
         if !is_valid_catalog_id(&id) {
-            unavailable += 1;
+            request.unavailable += 1;
             continue;
         }
         match stored.get(&id) {
-            // Past the cap the request is answered honestly rather than quietly truncated.
-            Some(path) if targets.len() < MAX_CLOSE_BATCH => targets.push(PathBuf::from(path)),
-            _ => unavailable += 1,
+            Some(target) if target.blocked => request.blocked += 1,
+            Some(target) if request.targets.len() < MAX_CLOSE_BATCH => {
+                request.targets.push(PathBuf::from(&target.path))
+            }
+            _ => request.unavailable += 1,
         }
     }
-    Ok((targets, unavailable))
+    Ok(request)
 }
 
 #[tauri::command]
@@ -63,11 +56,11 @@ pub(crate) async fn close_apps(
     app: tauri::AppHandle,
     ids: Vec<String>,
 ) -> Result<CloseAppsResponse, AppError> {
-    let (targets, unavailable) = {
+    let request = {
         let state = app.state::<AppState>();
         resolve_close_targets(&state, ids)?
     };
-    // The closer sleeps through its grace period, so it never runs on the async runtime.
+    let targets = request.targets;
     let outcome = super::run_blocking("Application close", move || {
         closer::close_processes(&targets)
     })
@@ -75,7 +68,8 @@ pub(crate) async fn close_apps(
     Ok(CloseAppsResponse {
         closed: outcome.closed,
         not_running: outcome.not_running,
-        unavailable,
+        unavailable: request.unavailable,
+        blocked: request.blocked,
     })
 }
 
@@ -103,43 +97,42 @@ mod tests {
     fn resolves_known_catalog_ids_to_their_executables() {
         let state = state_with(&["editor", "player"]);
 
-        let (targets, unavailable) =
+        let request =
             resolve_close_targets(&state, vec!["editor".into(), "player".into()]).unwrap();
 
         assert_eq!(
-            targets,
+            request.targets,
             vec![
                 PathBuf::from(r"C:\editor.exe"),
                 PathBuf::from(r"C:\player.exe")
             ]
         );
-        assert_eq!(unavailable, 0);
+        assert_eq!(request.unavailable, 0);
+        assert_eq!(request.blocked, 0);
     }
 
-    // Same rule as the launch path: an id is judged before it is used as a key into trusted state,
-    // so an oversized or blank value never reaches the map.
     #[test]
     fn counts_invalid_and_unknown_ids_as_unavailable_without_looking_them_up() {
         let state = state_with(&["editor"]);
         let oversized = "x".repeat(MAX_CATALOG_ID_LENGTH + 1);
 
-        let (targets, unavailable) =
+        let request =
             resolve_close_targets(&state, vec![oversized, "   ".into(), "missing".into()]).unwrap();
 
-        assert!(targets.is_empty());
-        assert_eq!(unavailable, 3);
+        assert!(request.targets.is_empty());
+        assert_eq!(request.unavailable, 3);
+        assert_eq!(request.blocked, 0);
     }
 
-    // The same app twice is one program to close, not two — and not a problem to report either.
     #[test]
     fn resolves_a_repeated_id_once_without_calling_it_unavailable() {
         let state = state_with(&["editor"]);
 
-        let (targets, unavailable) =
+        let request =
             resolve_close_targets(&state, vec!["editor".into(), "editor".into()]).unwrap();
 
-        assert_eq!(targets, vec![PathBuf::from(r"C:\editor.exe")]);
-        assert_eq!(unavailable, 0);
+        assert_eq!(request.targets, vec![PathBuf::from(r"C:\editor.exe")]);
+        assert_eq!(request.unavailable, 0);
     }
 
     #[test]
@@ -149,9 +142,44 @@ mod tests {
             .collect::<Vec<_>>();
         let state = state_with(&ids.iter().map(String::as_str).collect::<Vec<_>>());
 
-        let (targets, unavailable) = resolve_close_targets(&state, ids).unwrap();
+        let request = resolve_close_targets(&state, ids).unwrap();
 
-        assert_eq!(targets.len(), MAX_CLOSE_BATCH);
-        assert_eq!(unavailable, 3);
+        assert_eq!(request.targets.len(), MAX_CLOSE_BATCH);
+        assert_eq!(request.unavailable, 3);
+    }
+
+    #[test]
+    fn a_process_that_would_end_windows_is_refused_and_counted_apart() {
+        let mut editor = cached_app("Editor", r"C:\Editor\editor.exe");
+        editor.id = "editor".into();
+        let mut security = cached_app("Local Security Authority", r"C:\Windows\System32\lsass.exe");
+        security.id = "lsass".into();
+        let state = AppState::default();
+        remember_catalog(&state, &[editor, security]);
+
+        let request = resolve_close_targets(&state, vec!["lsass".into(), "editor".into()]).unwrap();
+
+        assert_eq!(request.blocked, 1);
+        assert_eq!(request.unavailable, 0);
+        assert_eq!(
+            request.targets,
+            vec![PathBuf::from(r"C:\Editor\editor.exe")]
+        );
+    }
+
+    #[test]
+    fn the_desktop_shell_is_still_closable() {
+        let mut explorer = cached_app("Проводник", r"C:\Windows\explorer.exe");
+        explorer.id = "explorer".into();
+        let state = AppState::default();
+        remember_catalog(&state, &[explorer]);
+
+        let request = resolve_close_targets(&state, vec!["explorer".into()]).unwrap();
+
+        assert_eq!(request.blocked, 0);
+        assert_eq!(
+            request.targets,
+            vec![PathBuf::from(r"C:\Windows\explorer.exe")]
+        );
     }
 }

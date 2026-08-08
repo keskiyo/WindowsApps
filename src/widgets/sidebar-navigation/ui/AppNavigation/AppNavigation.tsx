@@ -1,24 +1,17 @@
 import {
-	DragOverlay,
-	DndContext,
 	KeyboardSensor,
 	PointerSensor,
 	useSensor,
 	useSensors,
 } from '@dnd-kit/core'
-import {
-	SortableContext,
-	sortableKeyboardCoordinates,
-	verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { Grid2X2, Plus, Settings, Star, WandSparkles } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { INSTALLERS_DOCS_CATEGORY } from '../../../../entities/app'
 import { categoryLabel } from '../../../../entities/category'
 import { CategoryNameEditor } from '../../../../features/manage-category'
-import { SortableNavigationCategory } from '../SortableNavigationCategory/SortableNavigationCategory'
-import { CategoryDragOverlay } from './CategoryDragOverlay'
 import { NavItem } from './NavItem'
+import { SortableCategoryList } from './SortableCategoryList'
 import type { AppNavigationProps } from './types'
 import { useNavigationCategoryDrag } from '../../model/useNavigationCategoryDrag'
 
@@ -36,16 +29,19 @@ export function AppNavigation(props: AppNavigationProps) {
 		const definition = props.categories.find(item => item.id === category)
 		return definition && (props.counts.has(category) || !definition.builtIn)
 	})
-	const categoryAccents = new Map(
-		props.categories.map(category => [category.id, category.accent]),
+	const categoryDefinitions = new Map(
+		props.categories.map(category => [category.id, category]),
+	)
+	const categoryLabels = new Map(
+		visibleCategories.map(category => [
+			category,
+			categoryLabel(props.categories, category),
+		]),
 	)
 	const categoryDrag = useNavigationCategoryDrag({
 		navigationRef,
 		onReorderCategory: props.onReorderCategory,
 	})
-	const activeDefinition = props.categories.find(
-		category => category.id === categoryDrag.activeCategory,
-	)
 	return (
 		<nav
 			ref={navigationRef}
@@ -107,53 +103,15 @@ export function AppNavigation(props: AppNavigationProps) {
 						/>
 					</div>
 				)}
-				<DndContext
+				<SortableCategoryList
+					categories={visibleCategories}
+					counts={props.counts}
+					accents={categoryDefinitions}
+					labels={categoryLabels}
 					sensors={sensors}
-					cancelDrop={categoryDrag.cancelDrop}
-					onDragStart={categoryDrag.handleDragStart}
-					onDragEnd={categoryDrag.handleDragEnd}
-					onDragCancel={categoryDrag.handleDragCancel}
-				>
-					<SortableContext
-						items={visibleCategories.map(
-							category => `navigation-category:${category}`,
-						)}
-						strategy={verticalListSortingStrategy}
-					>
-						<div className="space-y-1">
-							{visibleCategories.map(category => (
-								<SortableNavigationCategory
-									key={category}
-									category={category}
-									count={props.counts.get(category) ?? 0}
-									label={categoryLabel(
-										props.categories,
-										category,
-									)}
-									accent={categoryAccents.get(category)}
-									isDragPreviewActive={
-										categoryDrag.activeCategory === category
-									}
-									onSelect={props.onSelectCategory}
-								/>
-							))}
-						</div>
-					</SortableContext>
-					<DragOverlay dropAnimation={null}>
-						{activeDefinition && categoryDrag.activeCategory && (
-							<CategoryDragOverlay
-								category={categoryDrag.activeCategory}
-								count={
-									props.counts.get(
-										categoryDrag.activeCategory,
-									) ?? 0
-								}
-								label={activeDefinition.label}
-								accent={activeDefinition.accent}
-							/>
-						)}
-					</DragOverlay>
-				</DndContext>
+					drag={categoryDrag}
+					onSelectCategory={props.onSelectCategory}
+				/>
 			</div>
 		</nav>
 	)

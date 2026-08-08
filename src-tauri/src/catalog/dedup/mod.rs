@@ -1,14 +1,3 @@
-//! Deduplication: turning a scanned catalog into one card per real application.
-//!
-//! `deduplicate` is the entry point and the only order-dependent part; the submodules own the
-//! decisions it composes. Splitting them apart is what lets each be reviewed on its own terms:
-//!
-//! - [`candidate`] builds a comparable candidate and narrows the search space;
-//! - [`evidence`] decides whether two candidates are the same application;
-//! - [`identity`] produces the ids a card keeps across scans;
-//! - [`family`] normalizes display names and publishers;
-//! - [`merge`] combines two records that resolved together.
-
 use crate::catalog::{AppCategory, AppInfo, ArtifactKind};
 use crate::platform::windows::NameScript;
 
@@ -31,16 +20,13 @@ use evidence::should_merge;
 use identity::{card_preference_identity, resolved_canonical_id};
 use merge::{merge_resolved, ResolvedApp, ResolverReport};
 
-pub(crate) use report::{dev_report_enabled, write_dev_report};
-// The surface `catalog` itself consumes. Everything else stays inside this module tree.
 pub(super) use family::normalized_product_family;
 pub(super) use identity::preference_identity;
+#[cfg(test)]
+pub(in crate::catalog) use report::resolved_groups;
+pub(crate) use report::{dev_report_enabled, write_dev_report};
 pub(super) use target::normalize_path;
 
-/// Total ordering key that canonicalizes the resolver's input (see `deduplicate`). Strongest
-/// candidate first (so it anchors its group), then every field that can decide whether two entries
-/// merge, so the processing order is fixed by catalog content and never by scan order. Any residual
-/// tie is between entries that share a normalized path — those merge regardless of order.
 fn canonical_order_key(app: &AppInfo) -> (u8, String) {
     let key = format!(
         "{}\u{1}{}\u{1}{:?}\u{1}{:?}\u{1}{}\u{1}{}\u{1}{}\u{1}{}\u{1}{}",
@@ -68,20 +54,6 @@ pub(super) fn deduplicate(
     classify: impl Fn(&AppInfo) -> AppCategory,
     os_script: NameScript,
 ) -> Vec<AppInfo> {
-    // Canonicalize the input order so deduplication is deterministic and idempotent. The resolver
-    // is order-sensitive ("first matching group wins") and merge relations are not transitive, so
-    // the same catalog scanned in a different source order used to merge differently; a re-dedup
-    // then reduced further. The live scan and a reload disagreed, and the frontend delta path
-    // accumulated the least-merged variant — the duplicate cards that reappeared after a background
-    // sync. The sort key must be *total*: strongest candidate first (so it anchors each group),
-    // then every field that could make two entries merge or not, so any residual tie is between
-    // entries that share a path and therefore merge anyway.
-    //
-    // Run to a fixed point. A single pass is not idempotent: "first matching group wins" lets a
-    // candidate join the first group it matches while a later group it also matched stays separate,
-    // so a second pass reduces further. In production the live scan dedups once into the cache and a
-    // reload dedups again — they must agree. A pass that does not reduce the count performed no
-    // merges, so the result is stable; that is the fixed point.
     loop {
         let before = apps.len();
         apps.sort_by_cached_key(canonical_order_key);
@@ -89,11 +61,6 @@ pub(super) fn deduplicate(
         apps = resolve_apps(apps, &mut report)
             .into_iter()
             .map(|mut resolved| {
-                // Pick the card's display name by the user's OS language. `resolved.app` already
-                // holds the highest-scored source (its launch target and icon), but its name may be
-                // in the wrong script for the user — a Russian shortcut on an English machine. The
-                // name is chosen independently so a non-Russian user reads a Latin name when one
-                // exists, without changing which source actually launches.
                 resolved.app.name = choose_display_name(
                     &resolved.app.name,
                     resolved
@@ -116,9 +83,6 @@ pub(super) fn deduplicate(
     }
     for app in &mut apps {
         app.name = app.name.split_whitespace().collect::<Vec<_>>().join(" ");
-        // Artifact classification owns the reserved category. Reclassifying here used to move an
-        // installer or a documentation shortcut into an ordinary category whenever it resolved
-        // alone — only records that happened to merge kept it, because `merge` restores it.
         app.category = if app.artifact_kind == ArtifactKind::Application {
             classify(app)
         } else {
@@ -136,21 +100,13 @@ fn resolve_apps(apps: Vec<AppInfo>, report: &mut ResolverReport) -> Vec<Resolved
     for app in apps {
         let candidate = AppCandidate::from(app);
         let keys = equality_keys(&candidate);
-        // Only groups sharing at least one blocking key can possibly merge, so the scan no
-        // longer touches every group. `candidate_groups` yields ascending indices, which keeps
-        // the original "first matching group wins" behaviour.
         let matched = index
             .candidate_groups(&candidate, &keys)
             .into_iter()
             .find(|&group| should_merge(&resolved[group], &candidate));
         match matched {
             Some(group) => {
-                // The group is matched against *all* of its candidates, so it inherits the
-                // newcomer's keys too.
                 index.insert(&candidate, &keys, group);
-                // Merge in place: `remove` + `insert` at the same index shifted the whole tail
-                // of the vector twice per merge, moving every following `ResolvedApp` for
-                // nothing.
                 merge_resolved(&mut resolved[group], candidate, report);
             }
             None => {
@@ -187,9 +143,6 @@ fn category_rank(category: AppCategory) -> u8 {
     }
 }
 
-/// Behaviour tests for the module as a whole: they drive `deduplicate`/`resolve_apps` and assert
-/// which cards come out, which is this module's responsibility. Unit tests for an individual
-/// helper live beside that helper in its own submodule.
 #[cfg(test)]
 mod tests {
     use super::arguments::meaningful_launch_arguments;
@@ -227,6 +180,9 @@ mod tests {
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
+            target_availability: None,
+            category_reasons: Vec::new(),
+            close_risk: None,
         }
     }
 
@@ -245,7 +201,6 @@ mod tests {
 
     #[test]
     fn choose_display_name_prefers_os_script_then_latin_fallback() {
-        // English machine: a Latin name wins over a Cyrillic primary.
         assert_eq!(
             choose_display_name(
                 "Касперский",
@@ -254,7 +209,6 @@ mod tests {
             ),
             "Kaspersky"
         );
-        // Russian machine: the localized name is kept.
         assert_eq!(
             choose_display_name(
                 "Kaspersky",
@@ -263,16 +217,12 @@ mod tests {
             ),
             "Касперский"
         );
-        // English machine but only a Cyrillic name exists: nothing better, keep it.
         assert_eq!(
             choose_display_name("Проводник", ["Проводник"].into_iter(), NameScript::Latin),
             "Проводник"
         );
     }
 
-    // The merged card launches via the higher-scored source but reads in the user's OS language:
-    // a Russian shortcut plus an English registry entry for one product show "Kaspersky" on an
-    // English machine and "Касперский" on a Russian one.
     #[test]
     fn merged_display_name_follows_the_os_language() {
         let candidates = || {
@@ -298,9 +248,6 @@ mod tests {
         assert_eq!(russian[0].name, "Касперский");
     }
 
-    // Legal-form suffixes are stripped as whole tokens. The old substring `.replace` mangled real
-    // names whose letters merely contained a suffix, and — worse — emptied a publisher that was
-    // only a suffix, which disables `publishers_conflict` and lets unrelated apps merge.
     #[test]
     fn normalized_publisher_strips_only_whole_suffix_tokens() {
         assert_eq!(
@@ -310,7 +257,6 @@ mod tests {
         assert_eq!(normalized_publisher(Some("Valve Inc.")), "valve");
         assert_eq!(normalized_publisher(Some("Acme, LLC")), "acme");
 
-        // Real names that merely contain the letters of a suffix must survive intact.
         assert_eq!(normalized_publisher(Some("Vincent Labs")), "vincentlabs");
         assert_eq!(
             normalized_publisher(Some("Incredible Software")),
@@ -319,29 +265,19 @@ mod tests {
         assert_eq!(normalized_publisher(Some("Sinclair")), "sinclair");
     }
 
-    // A publisher that is nothing but a legal suffix carries no identifying information, so it
-    // normalizes to empty and — as before — cannot establish a conflict on its own.
     #[test]
     fn a_bare_legal_suffix_publisher_normalizes_to_empty() {
         assert_eq!(normalized_publisher(Some("Inc.")), "");
         assert_eq!(normalized_publisher(None), "");
     }
 
-    // A signing-certificate subject and a marketing name are not comparable strings. Treating
-    // "CN=AMD" as a publisher made it conflict with "Advanced Micro Devices, Inc." — the same
-    // vendor — and kept one product in two cards.
     #[test]
     fn a_certificate_subject_is_not_treated_as_a_publisher() {
         assert_eq!(normalized_publisher(Some("CN=AMD")), "");
         assert_eq!(normalized_publisher(Some("cn=Contoso, O=Contoso Ltd")), "");
-        // A real name that merely begins with those letters is untouched.
         assert_eq!(normalized_publisher(Some("CNC Software")), "cncsoftware");
     }
 
-    // Publishers are arbitrary UTF-8 from the registry and from PE metadata. The certificate-
-    // subject check byte-sliced the first three bytes, which lands inside a code point when the
-    // name starts with a multi-byte character — a real scan on a machine with a Cyrillic vendor
-    // name panicked with "byte index 3 is not a char boundary".
     #[test]
     fn a_multibyte_publisher_name_does_not_panic() {
         assert_eq!(
@@ -353,9 +289,6 @@ mod tests {
         assert_eq!(normalized_publisher(Some("é")), "é");
     }
 
-    // Regression for the substring bug: two distinct real publishers used to collapse to the same
-    // mangled string ("Vincent" and "Vt" both became "vt") and stopped conflicting, which allowed
-    // unrelated applications to merge. Token stripping keeps them distinct.
     #[test]
     fn distinct_publishers_no_longer_collide_after_stripping() {
         let mut vincent = app("Tool", r"C:\A\tool.exe");
@@ -366,7 +299,6 @@ mod tests {
         assert!(publishers_conflict(&vincent, &vt));
     }
 
-    // Architecture is not part of a product's identity: the x86 and x64 builds are one app.
     #[test]
     fn architecture_variants_share_a_product_family() {
         assert_eq!(
@@ -377,8 +309,6 @@ mod tests {
             normalized_product_family("x64 Native Tools Command Prompt for VS 2019"),
             normalized_product_family("x86 Native Tools Command Prompt for VS 2019"),
         );
-        // But a genuinely different tool sharing the vendor suffix stays distinct: "Native Tools"
-        // and "Cross Tools" are not the same prompt.
         assert_ne!(
             normalized_product_family("x64 Native Tools Command Prompt for VS 2019"),
             normalized_product_family("x64_x86 Cross Tools Command Prompt for VS 2019"),
@@ -396,8 +326,6 @@ mod tests {
         app
     }
 
-    // The user's two "Windows PowerShell ISE" cards are the 64-bit (System32) and 32-bit
-    // (SysWOW64) builds. They must collapse into one card, keeping the 64-bit build.
     #[test]
     fn architecture_variants_merge_and_keep_the_64bit_build() {
         let x86 = aumid_ise(
@@ -411,7 +339,6 @@ mod tests {
             r"C:\Windows\system32\WindowsPowerShell\v1.0\PowerShell_ISE.exe",
         );
 
-        // 32-bit listed first, so the merge has to actively prefer the 64-bit build.
         let resolved = resolve(vec![x86, x64]);
 
         assert_eq!(resolved.len(), 1);
@@ -427,8 +354,6 @@ mod tests {
         app
     }
 
-    // Node.js prompt and a VS command prompt are both `cmd.exe /k <different>.bat`. The shared
-    // interpreter must not give them one identity (favorites/hidden would bleed) nor merge them.
     #[test]
     fn generic_host_shortcuts_neither_collide_nor_over_merge() {
         let node = cmd_shortcut(
@@ -603,8 +528,6 @@ mod tests {
         );
     }
 
-    // Real corpus: a Start-Menu shortcut and its Start-App (AUMID) that resolve to the same
-    // installed exe must be one card. These stayed as two on the user's machine.
     #[test]
     fn start_menu_shortcut_and_aumid_to_same_exe_merge() {
         let mut shortcut = app(
@@ -638,8 +561,6 @@ mod tests {
         application.version = Some(version.into());
         application.publisher = Some(format!("{executable} Inc."));
 
-        // The updater stub Squirrel registers beside it: same product name, different target,
-        // different version, and signed by GitHub rather than the vendor.
         let mut stub = app(
             executable,
             &format!(r"C:\Menu\{executable} Inc\{executable}.lnk"),
@@ -653,14 +574,10 @@ mod tests {
         (application, stub)
     }
 
-    // Real corpus: Discord occupied two cards, one launching `app-1.0.9250\Discord.exe` and one
-    // launching `Update.exe --processStart Discord.exe`. Nothing tied them together — different
-    // targets, versions 1.0.9250 vs 1.1.1.0, publishers "Discord Inc." vs "GitHub" — so the
-    // name-level evidence was vetoed twice over and the duplicate reached the quick-launch palette.
     #[test]
     fn a_squirrel_updater_stub_merges_into_its_application_card() {
         let (application, stub) = squirrel_pair(
-            r"C:\Users\Maks\AppData\Local\Discord",
+            r"C:\Users\Example\AppData\Local\Discord",
             "Discord",
             "1.0.9250",
         );
@@ -668,30 +585,22 @@ mod tests {
         let resolved = resolve(vec![application, stub]);
 
         assert_eq!(resolved.len(), 1);
-        // The card must keep the application's own target, not the stub's updater.
         assert_eq!(
             resolved[0].resolved_path.as_deref(),
-            Some(r"C:\Users\Maks\AppData\Local\Discord\app-1.0.9250\Discord.exe"),
+            Some(r"C:\Users\Example\AppData\Local\Discord\app-1.0.9250\Discord.exe"),
         );
         assert!(resolved[0].launch_arguments.is_none());
     }
 
-    // The key is the package root plus the executable that ends up running, so a stub pointing at a
-    // different program in the same folder is not evidence of anything.
     #[test]
     fn a_squirrel_stub_for_another_program_does_not_merge() {
-        let root = r"C:\Users\Maks\AppData\Local\Vendor";
+        let root = r"C:\Users\Example\AppData\Local\Vendor";
         let (application, mut stub) = squirrel_pair(root, "Alpha", "2.0.0");
-        // Same product name and the same package root, but the stub starts a different executable:
-        // the identity match must not fire, leaving only the name-level evidence the version veto
-        // rejects.
         stub.launch_arguments = Some("--processStart Beta.exe".into());
 
         assert_eq!(resolve(vec![application, stub]).len(), 2);
     }
 
-    // Two portable copies of the same product in different folders: merge when the version is
-    // identical, keep separate when it differs (a different version is a different program).
     #[test]
     fn portable_copies_merge_on_equal_version_only() {
         let make = |folder: &str, version: &str| {
@@ -719,9 +628,6 @@ mod tests {
         assert_eq!(different.len(), 2, "different versions stay separate");
     }
 
-    // An installed app (Start-Menu shortcut) and a loose portable copy on the Desktop, same
-    // product and exact version, are one program — merge, keeping the installed entry, even across
-    // a vendor-name variant (Mozilla Corporation vs Foundation).
     #[test]
     fn installed_and_portable_same_version_merge_keeping_installed() {
         let mut shortcut = app("Firefox", r"C:\Menu\Firefox.lnk");
@@ -731,9 +637,9 @@ mod tests {
         shortcut.install_location = Some(r"C:\Program Files\Mozilla Firefox".into());
         shortcut.version = Some("153.0".into());
         shortcut.publisher = Some("Mozilla Corporation".into());
-        let mut portable = app("Firefox", r"C:\Users\Maks\Desktop\Firefox.exe");
+        let mut portable = app("Firefox", r"C:\Users\Example\Desktop\Firefox.exe");
         portable.source_kind = SourceKind::Portable;
-        portable.install_location = Some(r"C:\Users\Maks\Desktop".into());
+        portable.install_location = Some(r"C:\Users\Example\Desktop".into());
         portable.version = Some("153.0".into());
         portable.publisher = Some("Mozilla Foundation".into());
 
@@ -817,8 +723,6 @@ mod tests {
         assert_eq!(merged[0].artifact_kind, ArtifactKind::Installer);
     }
 
-    // The same-version merge is scoped to one product family: two genuinely different products
-    // must never collapse just because a version string coincides.
     #[test]
     fn same_version_does_not_merge_different_products() {
         let mut alpha = app("Alpha Tool", r"D:\A\alpha.exe");
@@ -831,9 +735,6 @@ mod tests {
         assert_eq!(resolve(vec![alpha, beta]).len(), 2);
     }
 
-    // Same name, different version = different applications. Two "7-Zip" registry entries at
-    // different versions (same publisher, no install root to conflict) must stay two cards; the
-    // version mismatch alone must block the name/publisher merge.
     #[test]
     fn same_name_different_versions_stay_separate() {
         let make = |path: &str, version: &str| {
@@ -851,8 +752,6 @@ mod tests {
         assert_eq!(apps.len(), 2);
     }
 
-    // A version on only one side (a Start-Menu shortcut carries none, its registered product does)
-    // must not block the merge — the version veto needs a genuine mismatch, not a missing value.
     #[test]
     fn version_on_only_one_side_does_not_block_a_merge() {
         let mut shortcut = app("Notepad++", r"C:\Menu\Notepad++.lnk");
@@ -866,8 +765,6 @@ mod tests {
         assert_eq!(resolve(vec![shortcut, registry]).len(), 1);
     }
 
-    // An identity match wins over a version mismatch: the same executable reached two ways, with
-    // disagreeing metadata versions, is still one application.
     #[test]
     fn same_executable_merges_despite_a_version_mismatch() {
         let mut registry = app("App", r"C:\Program Files\App\app.exe");
@@ -882,9 +779,6 @@ mod tests {
         assert_eq!(resolve(vec![registry, shortcut]).len(), 1);
     }
 
-    // A launcher and its game executable live in one install tree (nested install roots) and carry
-    // different versions — the launcher's version vs the game's patch. Nested-root evidence (>= 75)
-    // overrides the version veto, so World of Warcraft stays one card, not two.
     #[test]
     fn launcher_and_game_in_one_install_tree_merge_despite_version() {
         let mut launcher = app("World of Warcraft", r"C:\Menu\World of Warcraft.lnk");
@@ -907,10 +801,6 @@ mod tests {
         assert_eq!(resolve(vec![launcher, game]).len(), 1);
     }
 
-    // The resolver is order-sensitive, so the same catalog scanned in different source orders used
-    // to merge differently and a re-dedup reduced further — the frontend then accumulated the
-    // least-merged variant across background syncs. Deduplication must be order-independent and
-    // idempotent.
     #[test]
     fn deduplication_is_order_independent_and_idempotent() {
         let mut shortcut = app("CPU-Z MSI", r"C:\Menu\CPU-Z MSI.lnk");
@@ -938,9 +828,6 @@ mod tests {
         );
     }
 
-    // A merged command environment must stay auxiliary: an AUMID sibling is Primary only by the
-    // launch-kind fast-path (it carries no arguments to reveal itself), and used to promote the
-    // whole card — the merged IDLE reappeared in the main catalog.
     #[test]
     fn merged_command_environment_stays_auxiliary() {
         use crate::catalog::visibility::apply_visibility;
@@ -955,8 +842,6 @@ mod tests {
         let mut aumid = app("IDLE (Python 3.14 64-bit)", "Microsoft.AutoGenerated.{ABC}");
         aumid.launch_kind = LaunchKind::AppUserModelId;
         aumid.source_kind = SourceKind::StartApps;
-        // A resolvable target keeps this a genuine Primary sibling (an empty one would now be
-        // demoted as a dead AutoGenerated folder entry, which is a separate case).
         aumid.resolved_path = Some(r"C:\Python314\pythonw.exe".into());
         apply_visibility(&mut aumid);
 
@@ -968,9 +853,6 @@ mod tests {
         assert_eq!(merged[0].visibility_class, VisibilityClass::Auxiliary);
     }
 
-    // The same rule for an SDK sample. `classify_visibility` treated `SdkSample` as sticky but the
-    // merge copy of that list did not, so a sample merged with an AUMID sibling was promoted back
-    // into the main catalog. Both now consult `visibility::is_sticky_auxiliary`.
     #[test]
     fn merged_sdk_sample_stays_auxiliary() {
         use crate::catalog::visibility::apply_visibility;
@@ -978,9 +860,6 @@ mod tests {
 
         use crate::catalog::VisibilityReason;
 
-        // Only the description carries the sample marker. The path deliberately avoids
-        // `\sdk\samples\`, which would also trip `is_bundled_toolchain_path` and add a
-        // `ProductComponent` reason — that one was already sticky, so it would mask the defect.
         let mut sample = app("SharedMemory Tool", r"D:\Apps\Server\Release\shmtool.exe");
         sample.source_kind = SourceKind::Portable;
         sample.description = Some("shared memory sample".into());
@@ -992,7 +871,6 @@ mod tests {
             .visibility_reasons
             .contains(&VisibilityReason::ProductComponent));
 
-        // The sibling must be a genuine Primary, or the merge is never asked to decide anything.
         let mut aumid = app("SharedMemory Tool", "Contoso.ShmTool_1!App");
         aumid.launch_kind = LaunchKind::AppUserModelId;
         aumid.source_kind = SourceKind::StartApps;
@@ -1012,11 +890,6 @@ mod tests {
         );
     }
 
-    /// Maintenance entries are demoted rather than rejected now, so for the first time they reach
-    /// deduplication. A "reset preferences" shortcut resolves to the same executable as the player
-    /// and outranks it on `candidate_score` (a `.lnk` beats an `.exe`), so a merge would hand the
-    /// card a launch target that wipes the user's settings. Its arguments are what must keep the
-    /// two apart.
     #[test]
     fn a_reset_shortcut_never_takes_over_the_application_card() {
         use crate::catalog::visibility::apply_visibility;
@@ -1054,7 +927,6 @@ mod tests {
         );
     }
 
-    // "(WOW)" is WoW64 — the 32-bit build. It merges with the "(X64)" build, keeping x64.
     #[test]
     fn wow_and_x64_variants_merge_keeping_x64() {
         let make = |name: &str, resolved: &str| {
@@ -1089,18 +961,6 @@ mod tests {
         ));
     }
 
-    // ---------------------------------------------------------------------------
-    // Differential harness.
-    //
-    // `resolve_apps` compares each candidate against every existing group. Making that
-    // near-linear means narrowing the search with an index, and the failure mode of such a
-    // change is silent: a lost merge just looks like an extra catalog entry. The reference
-    // resolver below is the straightforward scan; the test asserts the production resolver
-    // produces byte-identical groups on generated catalogs, so any narrowing has to prove
-    // itself before it can land.
-    // ---------------------------------------------------------------------------
-
-    /// The unnarrowed "compare against every group" scan, kept as the oracle.
     fn resolve_apps_reference(apps: Vec<AppInfo>, report: &mut ResolverReport) -> Vec<ResolvedApp> {
         report.candidates = apps.len();
         let mut resolved = Vec::<ResolvedApp>::new();
@@ -1122,7 +982,6 @@ mod tests {
         resolved
     }
 
-    /// Group identity plus membership — what a narrowing change must preserve exactly.
     fn grouping(groups: &[ResolvedApp]) -> Vec<(String, Vec<String>)> {
         groups
             .iter()
@@ -1138,8 +997,6 @@ mod tests {
             .collect()
     }
 
-    /// Deterministic xorshift: the corpus has to be identical on every machine and every run,
-    /// so a failure is always reproducible from its seed.
     struct Rng(u64);
 
     impl Rng {
@@ -1157,9 +1014,6 @@ mod tests {
         }
     }
 
-    /// A catalog shaped to exercise every merge relation: repeated product families, shared and
-    /// nested install roots, shortcuts resolving onto another entry's executable, packaged and
-    /// Steam entries, and publishers that are sometimes missing.
     fn generated_catalog(seed: u64, count: usize) -> Vec<AppInfo> {
         let mut rng = Rng(seed | 1);
         let mut catalog = Vec::with_capacity(count);
@@ -1193,7 +1047,6 @@ mod tests {
                 4 => {
                     entry.source_kind = SourceKind::Portable;
                     entry.version = Some(format!("1.{}", rng.pick(5)));
-                    // Nested beneath the product root, which is its own merge relation.
                     entry.path = format!(r"{root}\bin\product{family}-helper.exe");
                 }
                 _ => {
@@ -1229,7 +1082,6 @@ mod tests {
 
     #[test]
     fn the_generated_corpus_actually_exercises_merging() {
-        // A harness that never merges would pass no matter how broken the narrowing is.
         let catalog = generated_catalog(42, 240);
         let input = catalog.len();
         let mut report = ResolverReport::default();
@@ -1252,11 +1104,6 @@ mod tests {
         }
     }
 
-    // The deduplication oscillation — duplicate cards that reappeared after a background sync —
-    // came from the resolver being order-sensitive: scanners emit entries in different orders, and
-    // the frontend delta path then accumulated the least-merged variant. `deduplicate` now
-    // canonicalizes the input order, so this must hold at scale, not only on the tiny case above:
-    // every shuffle of one catalog yields the identical set of cards, and a second pass is a no-op.
     #[test]
     fn deduplication_is_order_independent_and_idempotent_at_scale() {
         for seed in [3_u64, 19, 256, 4096] {
@@ -1282,11 +1129,6 @@ mod tests {
         }
     }
 
-    /// Invariant guard for a catalog far larger than a developer's own machine. It asserts
-    /// semantics, never timings (`AGENTS_backend.md` §12): unrelated applications must survive
-    /// deduplication rather than collapse into one another. It is also the base for the
-    /// planned blocking/indexing work — the resolver currently compares every candidate
-    /// against every existing group, and that change has to keep this green.
     #[test]
     fn a_large_catalog_of_distinct_applications_is_not_collapsed() {
         const COUNT: usize = 5_000;
@@ -1305,9 +1147,6 @@ mod tests {
         assert_eq!(resolve(catalog).len(), COUNT);
     }
 
-    // `RegistryInstallContainsExecutable` scores 75 and requires neither a matching name nor a
-    // matching publisher, so a prefix match that stopped mid-component merged two unrelated
-    // applications and nothing else in the scoring would have vetoed it.
     #[test]
     fn a_registry_install_root_does_not_contain_a_similarly_named_folder() {
         let mut registry = app("Prog", r"C:\Prog\prog.exe");
@@ -1403,7 +1242,6 @@ mod tests {
 
     #[test]
     fn localized_start_app_merges_with_english_shortcut_by_target() {
-        // English Start-Menu shortcut → eventvwr.msc.
         let mut shortcut = app(
             "Event Viewer",
             r"C:\Menu\Administrative Tools\Event Viewer.lnk",
@@ -1411,14 +1249,11 @@ mod tests {
         shortcut.launch_kind = LaunchKind::Shortcut;
         shortcut.source_kind = SourceKind::StartMenu;
         shortcut.resolved_path = Some(r"C:\Windows\system32\eventvwr.msc".into());
-        // Localized Start-App (opaque AutoGenerated AUMID) → same target file.
         let mut start_app = app("Просмотр событий", "Microsoft.AutoGenerated.{BB044BFD}");
         start_app.launch_kind = LaunchKind::AppUserModelId;
         start_app.source_kind = SourceKind::StartApps;
         start_app.resolved_path = Some(r"C:\Windows\system32\eventvwr.msc".into());
 
-        // English machine: the card reads in English but still launches via the localized
-        // Start-App — its working shell icon and target are kept, only the name follows the locale.
         let merged = resolve(vec![shortcut.clone(), start_app.clone()]);
         assert_eq!(merged.len(), 1, "same target → one card");
         assert_eq!(merged[0].name, "Event Viewer");
@@ -1428,7 +1263,6 @@ mod tests {
             "keep the localized Start-App as the launch/icon source",
         );
 
-        // Russian machine: the localized name is kept.
         let localized = deduplicate(
             vec![shortcut, start_app],
             |_app| AppCategory::Other,
@@ -1465,17 +1299,14 @@ mod tests {
 
     #[test]
     fn file_explorer_and_localized_explorer_merge_via_alias() {
-        // English "File Explorer" is a PIDL-only shortcut (no readable target).
         let mut shortcut = app("File Explorer", r"C:\Menu\System Tools\File Explorer.lnk");
         shortcut.launch_kind = LaunchKind::Shortcut;
         shortcut.source_kind = SourceKind::StartMenu;
-        // Localized "Проводник" (Microsoft.Windows.Explorer) → File Explorer shell CLSID.
         let mut start_app = app("Проводник", "Microsoft.Windows.Explorer");
         start_app.launch_kind = LaunchKind::AppUserModelId;
         start_app.source_kind = SourceKind::StartApps;
         start_app.resolved_path = Some("::{52205FD8-5DFB-447D-801A-D0B52F2E83E1}".into());
 
-        // English machine: English name; the Cyrillic case is covered by the Event Viewer test.
         let merged = resolve(vec![shortcut, start_app]);
 
         assert_eq!(merged.len(), 1);
@@ -1497,7 +1328,6 @@ mod tests {
         start_app.source_kind = SourceKind::StartApps;
         start_app.resolved_path = Some(r"C:\Windows\system32\control.exe".into());
 
-        // English machine: the English shortcut name wins over the localized Start-App name.
         let merged = resolve(vec![shortcut, start_app]);
 
         assert_eq!(merged.len(), 1);
@@ -1506,11 +1336,9 @@ mod tests {
 
     #[test]
     fn run_dialog_shortcut_and_localized_start_app_merge() {
-        // English "Run" is a PIDL-only shortcut (no readable target).
         let mut shortcut = app("Run", r"C:\Menu\System Tools\Run.lnk");
         shortcut.launch_kind = LaunchKind::Shortcut;
         shortcut.source_kind = SourceKind::StartMenu;
-        // Localized "Выполнить" (Microsoft.Windows.Shell.RunDialog) → Run dialog shell CLSID.
         let mut start_app = app("Выполнить", "Microsoft.Windows.Shell.RunDialog");
         start_app.launch_kind = LaunchKind::AppUserModelId;
         start_app.source_kind = SourceKind::StartApps;
@@ -1734,11 +1562,6 @@ mod tests {
         );
     }
 
-    // A display name is not an identity. Two unrelated packaged applications can ship the same
-    // one, and the old rule scored *any* pair with an AUMID on either side and a matching display
-    // family at 80 — the threshold that merges outright, before the publisher-conflict check runs.
-    // Everything that distinguishes these two entries (package, publisher, target, install root)
-    // was ignored, and the loser's launch and uninstall identity was lost with it.
     #[test]
     fn same_named_packages_from_different_publishers_stay_separate() {
         let mut first = app("Snap Camera", "Contoso.SnapCamera_9abc!App");
@@ -1761,12 +1584,9 @@ mod tests {
         let merged = resolve(vec![first.clone(), second.clone()]);
 
         assert_eq!(merged.len(), 2, "different packages are different cards");
-        // Order invariance: the rule must not depend on which side is inspected first.
         assert_eq!(resolve(vec![second, first]).len(), 2);
     }
 
-    // The narrower rule still has to recognise a genuine package: two entry points of one
-    // installed package share the package-family part of their AUMID.
     #[test]
     fn two_entry_points_of_one_package_still_merge() {
         let mut main = app(
@@ -1785,8 +1605,6 @@ mod tests {
         assert_eq!(resolve(vec![main, preview]).len(), 1);
     }
 
-    // Name similarity must not chain through a shared middle entry: A merging with B and B with C
-    // does not make A and C the same application.
     #[test]
     fn a_shared_name_does_not_chain_unrelated_packages_together() {
         let mut left = app("Notes", "Contoso.Notes_9abc!App");

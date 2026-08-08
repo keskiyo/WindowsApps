@@ -1,9 +1,9 @@
 # Windows Apps Technical Documentation
 
-Technical reference for Windows Apps `0.2.8`.
+Technical reference for Windows Apps `0.3.0`.
 
 [README](README.md) ·
-[Release 0.2.8](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.8) ·
+[Release 0.3.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.0) ·
 [Telegram](https://t.me/keskiyo)
 
 ---
@@ -45,7 +45,7 @@ Every modal locks the page behind it: only the dialog scrolls while it is open. 
 
 Closing works from the process list, not from the desktop: a Store app's window belongs to `ApplicationFrameHost.exe`, an app minimised to the tray has no visible window, and a multi-process application keeps helpers that never had one. Every process running the app's executable is asked to close with `WM_CLOSE` — the same request the title-bar button makes, so the application can still prompt to save, and a packaged app is asked through the frame that hosts its core window — and whatever ignores the request after a five-second grace period is terminated, so nothing of the program is left behind. The application's own process is never a candidate, and a survivor's image is re-checked before it is terminated so a recycled process id cannot be killed in its place. A whole list is closed in one request: one process snapshot, one window enumeration and a single grace period for the batch, so closing ten apps takes what closing one takes. Entries that name no image on disk — a `steam://` target, a Store package whose manifest resolved no executable — have no close target and are reported as unavailable rather than having a process guessed for them.
 
-The dark theme rewrites the light-palette Tailwind background utilities through compatibility rules in `src/app/styles/index.css` that match on the class *string*. The violet highlight is therefore scoped to `:hover`: every use of it in the application is a `hover:` variant, and without that scope the rule painted those controls in their resting state — the Telegram row sat lit as a solid band rather than highlighting under the pointer. It is a tint over the surface, not a fill replacing it. `tests/frontend/styles/settings-highlight.test.mjs` pins both.
+The dark theme rewrites the light-palette Tailwind background utilities through compatibility rules in `src/app/styles/index.css` that match on the class _string_. The violet highlight is therefore scoped to `:hover`: every use of it in the application is a `hover:` variant, and without that scope the rule painted those controls in their resting state — the Telegram row sat lit as a solid band rather than highlighting under the pointer. It is a tint over the surface, not a fill replacing it. `tests/frontend/styles/settings-highlight.test.mjs` pins both.
 
 **Catalog maintenance** confirms before it acts, and only one confirmation is open at a time: the two actions touch the same catalog, so opening one answers the other rather than stacking a second question. The state is a single value rather than a flag per action, which makes "both at once" unrepresentable. Dismissing a confirmation returns focus to the trigger that opened it; swapping to the other action leaves focus on the trigger just pressed.
 
@@ -106,33 +106,44 @@ physical folder layout.
 
 ## 4. Tauri command surface
 
-| Command                   | Responsibility                                                               |
-| ------------------------- | ---------------------------------------------------------------------------- |
-| `get_apps`                | Return the sanitized cached catalog, cache status, and generation.           |
-| `refresh_apps`            | Run an interactive incremental refresh.                                      |
-| `force_full_scan`         | Rebuild configured sources without relying on the previous filesystem index. |
-| `reset_catalog_cache`     | Remove generated catalog and icon caches, then run a clean full scan.        |
-| `clear_icon_cache`        | Remove only generated icons; keep the catalog and filesystem index.          |
-| `hydrate_visible_icons`   | Promote bounded, trusted catalog IDs in the hydration queue.                  |
-| `start_background_sync`   | Start background validation after the cached catalog is displayed.           |
-| `cancel_scan`             | Cancel active and queued work; refresh reports `SCAN_CANCELLED`.              |
-| `launch_app`              | Launch a trusted catalog entry by ID.                                        |
-| `close_apps`              | Close every process of a bounded batch of trusted catalog entries by ID.     |
-| `get_app_details`         | Return bounded file metadata, or explicit unavailable fields, by trusted ID. |
-| `open_app_folder`         | Open the trusted local installation folder for a catalog entry by ID.        |
-| `get_uninstall_preview`   | Return application identity, publisher, source, and safe removal mechanism.  |
-| `uninstall_app`           | Execute the trusted uninstall target and record its result.                  |
-| `get_uninstall_history`   | Return the local uninstall history newest-first.                             |
-| `clear_uninstall_history` | Delete uninstall history without modifying applications.                     |
-| `get_system_settings`     | Return version, autostart, shortcut, scan settings, and fixed drives.        |
-| `set_autostart`           | Enable or disable startup for the current Windows account.                   |
-| `set_scan_settings`       | Save automatic fixed-drive, included-path, and excluded-path settings.       |
-| `open_telegram`           | Open the fixed project contact URL.                                          |
-| `open_github`             | Open the fixed project repository URL.                                       |
-| `open_apps_settings`      | Open the Windows "Installed apps" settings page (`ms-settings:appsfeatures`). |
-| `open_release`            | Open the GitHub release-notes page for a validated version string.           |
-| `stale_copy_status`       | Report when this process is an outdated leftover copy of a newer install.    |
-| `open_installed_copy`     | Launch the newer registered installed copy and exit this outdated one.       |
+| Command                   | Responsibility                                                                                                               |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `get_apps`                | Return the sanitized cached catalog, cache status, and generation.                                                           |
+| `refresh_apps`            | Run an interactive incremental refresh.                                                                                      |
+| `force_full_scan`         | Rebuild configured sources without relying on the previous filesystem index.                                                 |
+| `reset_catalog_cache`     | Remove generated catalog and icon caches, then run a clean full scan.                                                        |
+| `clear_icon_cache`        | Remove only generated icons; keep the catalog and filesystem index.                                                          |
+| `hydrate_visible_icons`   | Promote bounded, trusted catalog IDs in the hydration queue.                                                                 |
+| `start_background_sync`   | Start background validation after the cached catalog is displayed.                                                           |
+| `cancel_scan`             | Cancel active and queued work; refresh reports `SCAN_CANCELLED`.                                                             |
+| `launch_app`              | Launch a trusted catalog entry by ID.                                                                                        |
+| `close_apps`              | Close every process of a bounded batch of trusted catalog entries by ID, refusing the images whose termination ends Windows. |
+| `get_app_details`         | Return bounded file metadata, or explicit unavailable fields, by trusted ID.                                                 |
+| `open_app_folder`         | Open the trusted local installation folder for a catalog entry by ID.                                                        |
+| `get_uninstall_preview`   | Return application identity, publisher, source, and safe removal mechanism.                                                  |
+| `uninstall_app`           | Execute the trusted uninstall target and record its result.                                                                  |
+| `get_uninstall_history`   | Return the local uninstall history newest-first.                                                                             |
+| `clear_uninstall_history` | Delete uninstall history without modifying applications.                                                                     |
+| `get_system_settings`     | Return version, autostart, shortcut, scan settings, and fixed drives.                                                        |
+| `set_autostart`           | Enable or disable startup for the current Windows account.                                                                   |
+| `set_scan_settings`       | Save automatic fixed-drive, included-path, and excluded-path settings.                                                       |
+| `open_telegram`           | Open the fixed project contact URL.                                                                                          |
+| `open_github`             | Open the fixed project repository URL.                                                                                       |
+| `open_apps_settings`      | Open the Windows "Installed apps" settings page (`ms-settings:appsfeatures`).                                                |
+| `open_release`            | Open the GitHub release-notes page for a validated version string.                                                           |
+| `stale_copy_status`       | Report when this process is an outdated leftover copy of a newer install.                                                    |
+| `open_installed_copy`     | Launch the newer registered installed copy and exit this outdated one.                                                       |
+
+Events travel the other way, all under a `namespace://name` form. Every listener but `apps://updated` and `scan://progress` is optional on the client interface, so a window built before one existed degrades instead of failing to start.
+
+| Event                   | Payload              | Emitted                                           |
+| ----------------------- | -------------------- | ------------------------------------------------- |
+| `apps://updated`        | the full catalog     | after an interactive scan                         |
+| `catalog://delta`       | upserts and removals | after a scan that changed something               |
+| `catalog://changed`     | the change counts    | with the delta; drives the change notice          |
+| `catalog://patches`     | hydration patches    | per bounded batch of extracted icons and metadata |
+| `catalog://diagnostics` | the scan diagnostics | after every completed scan, changed or not        |
+| `scan://progress`       | stage and roots      | coarse and coalesced, never per item              |
 
 ## 5. Catalog discovery
 
@@ -149,6 +160,18 @@ The catalog combines:
 - user-configured included folders.
 
 Drive letters and user folder names are not hardcoded.
+
+Every source records its own **health** beside its snapshot: when it was last attempted, when it last completed, how many consecutive attempts have failed, how long the last one took, why it stopped, and how many records it is currently serving. A scanner that fails keeps the snapshot it already had — that has always been true, and it was completely silent, so a machine where the Start-Apps provider is blocked could serve Store applications from a months-old snapshot with nothing anywhere saying so. The states are distinct on purpose:
+
+| State                     | Meaning                                                                |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `fresh`                   | the last attempt completed and replaced the snapshot                   |
+| `stale`                   | the last attempt failed; the records shown come from an earlier one    |
+| `incomplete`              | the attempt ran but stopped early, so its partial result was discarded |
+| `failed_without_snapshot` | the source has never completed, so it serves nothing                   |
+| `never_run`               | no attempt has been recorded yet                                       |
+
+A source that answers with no applications has **succeeded** and is `fresh` with a count of zero — that is not the same as a failure. Cancelling a scan is the user's own action and never increments the failure streak, though it is recorded as the reason the attempt stopped. Health carries no path, command line or interpreter output, and nothing in it reaches an identity, a category or a visibility decision. Settings shows it under **Last scan diagnostics**.
 
 For packaged applications, discovery matches the package-family part of the AUMID and then the
 exact application id after `!` against `AppxManifest.xml`. A manifest executable becomes detail
@@ -183,10 +206,10 @@ Entries whose launch target no longer exists on a mounted drive are dropped (a S
 
 Default limits for portable discovery:
 
-| Limit            | Value          |
-| ---------------- | -------------- |
-| Maximum depth    | 16 directories |
-| Maximum entries  | 500,000        |
+| Limit            | Value                                       |
+| ---------------- | ------------------------------------------- |
+| Maximum depth    | 16 directories                              |
+| Maximum entries  | 500,000                                     |
 | Maximum duration | 3 minutes total across all configured roots |
 
 Depth and entry limits apply to each root. The duration budget applies once to the complete portable phase, so adding fixed drives cannot multiply the first scan into three minutes per drive. If an entry or time limit is reached, newly discovered results are retained, the partial directory is not recorded as fully indexed, and the previous applications and index records for that incomplete root remain in the catalog. A later scan can inspect it again without turning a bounded partial result into application removals.
@@ -199,7 +222,7 @@ Known installer-cache discovery has its own smaller global budget: depth 4, 25,0
 2. A missing cache produces the first-scan prompt instead of silently scanning all drives.
 3. Cached applications enter a background hydration queue for icons and local metadata.
 4. `start_background_sync` checks Windows sources and indexed fixed-drive directories without blocking startup.
-5. Unchanged directories reuse cached application records.
+5. Unchanged directories reuse cached application records, but each executable the record already knows is checked against a stored **fingerprint** — its size and modification time. Windows leaves a folder's timestamp alone when a file inside it is rewritten, so without this an application updated in place kept its stale record until the next Force full scan. The directory itself is still not enumerated: the extra work is one `metadata` call per already-known executable, bounded by the index rather than by the tree. A changed fingerprint re-reads that one file's metadata, a file the operating system reports as gone drops that one record, and a check that fails for any other reason keeps what the index holds. An index written before fingerprints existed carries none; that reads as "unknown", not "changed", so nothing is dropped and the fingerprints are recorded for next time.
 6. Changed directories are re-enumerated and their additions/removals are merged into a new catalog generation.
 7. Watcher-triggered scans emit deltas instead of replacing the entire frontend list.
 8. Interactive Refresh and Force full scan return a complete list and expose progress.
@@ -226,13 +249,52 @@ Icon hydration:
 - uses source fingerprints to reuse valid cached PNG data;
 - discards stale work after a new generation starts.
 
+The shell reports success and returns a generic icon when it cannot read a file, so an executable that
+is briefly unreadable — one replacing itself as it exits, or locked by another process — would
+otherwise hand back an icon indistinguishable from a real one. This matters because hydration
+re-extracts an icon that is missing and never one that is merely wrong: **Repair missing icons** and
+the periodic recovery pass both key on absence, and the file still has the same size and timestamp, so
+no fingerprint check invalidates the capture either.
+
+Two separate checks refuse such an answer, each proving something different.
+
+**On extraction**, an answer is refused when it is generic — the unknown-type icon, or the class icon
+of this path's own extension — _and_ the file exists but will not open for reading. Both halves are
+required. A generic answer about a readable file is honest, because an executable with no embedded
+icon really does show the generic application icon, and refusing it would restart extraction on every
+scan forever. A specific icon is kept even from a file that will not open, because the shell could not
+have invented it from the extension. A file that is simply absent, including everything on an
+unplugged drive, is not judged here at all: its fingerprint is the fingerprint of a missing file, so
+the entry is replaced by itself as soon as the file returns.
+
+**On reading the cache back**, an entry is refused when it is the icon of an _unrecognized_ file type
+while the path's own extension has a different class icon. Windows serves the class icon even for a
+path that does not exist, so falling back to the unknown-type icon proves it never looked at the
+extension. That check applies to every extension with an association of its own — `.exe`, `.lnk` and
+the rest — and deliberately does not test readability, because it judges an icon recorded in the past.
+Where an extension has no association its class icon _is_ the unknown-type icon, nothing can be told
+apart, and nothing is rejected. Existing caches therefore recover on the next hydration of the card,
+without a Reset catalog cache or a full rescan.
+
 Reset catalog cache removes generated catalog/index and icon cache files. It does not remove Favorites, Hidden entries, custom categories, category ordering, or manual assignments.
 
 Settings also exposes two narrower operations. **Repair missing icons** queues only applications currently missing an icon. **Clear icon cache** removes the standalone icon cache and queues extraction from the existing catalog. Neither operation enumerates drives or invalidates the incremental filesystem index.
 
-Every successful synchronization stores privacy-safe diagnostics with the catalog: completion time, elapsed milliseconds, scan mode, application total, source totals, and added/updated/removed counts. Paths and usernames are not included.
+Every successful synchronization stores privacy-safe diagnostics with the catalog: completion time, elapsed milliseconds, scan mode, application total, source totals, added/updated/removed counts, one health entry per source, and the launch-target outcome counts described in §8. Paths and usernames are not included.
+
+The window learns them through `catalog://diagnostics`, emitted after every completed scan. `get_apps` also returns the stored diagnostics, but that is the document read at startup — written by the _previous_ run — so a window relying on it alone showed the previous session's scan and never the one the user had just triggered, because `refresh_apps` and `force_full_scan` return only the application list. The event is what keeps the panel current; its listener is optional on the client interface, so a build without it degrades to the startup value rather than failing.
+
+Six fields were added to persisted data without moving the schema version: the health entry beside each source snapshot, the health list in the diagnostics, the launch-target outcome counts in the diagnostics, the executable fingerprints inside each filesystem-index directory record, and the category reasons and close risk on each application record. All six are additive and defaulted, so a cache written by an earlier build reads back with them empty and fills them in on the next scan — no migration branch, and nothing to undo when a rollback flag is turned off.
+
+`scan-settings.json` holds two rollback switches beside the user's scan folders. `catalog_target_availability_v1` selects the launch-target rule described in §8; `catalog_portable_fingerprint_v1` selects the executable verification described in §6. Both default to on, and both default to on again when the file is missing or unreadable, because the safe direction is keeping applications. Neither is accepted from the window: they decide what the backend puts in the catalog, so a `set_scan_settings` payload cannot move them — the stored value is carried through.
 
 ## 8. Filtering and duplicate resolution
+
+A record whose launch target no longer exists is dropped before deduplication, so a shortcut left behind by an uninstalled program never reaches the catalog. **Only a confirmed absence does that.** The check distinguishes four outcomes: the target is present; it is missing, meaning a local volume was mounted, the check completed, and Windows reported the file is not there; it is unverifiable, because the volume is not mounted, the path is a network share, access was denied, the I/O failed, or the path is relative with no base; or it is not applicable at all, because the launch mechanism is an AppUserModelId, a `steam://` URI, another protocol, or a shell location with no readable path. Only the second removes anything. `Path::exists` used to answer `false` for all of "gone", "not allowed to look" and "the disk was busy" alike, so a card could disappear because a directory was briefly unreadable. AppUserModelIds and Steam URIs are still never checked as files, and a network share is never touched, because reaching an unreachable one blocks for as long as the redirector takes.
+
+The rule reports how far it diverged from the one it replaced. Each scan records how many records reached each of those outcomes, plus how many it kept that `Path::exists` would have removed — that second number is exactly the count of denied and failed checks, because those are the only two outcomes the rules judge differently. The previous verdict is derived from the outcome already computed, so counting it costs no additional filesystem work and does not run the rollback rule. Settings → **Last scan diagnostics** shows both. A verdict that is wrong on a machine no fixture models — an unexpected volume, a permission layout the tests do not cover — therefore appears as a number there rather than as a card the user cannot account for. The counts are diagnostic: nothing reads them back, and no identity, category, dedup group or visibility class is derived from them.
+
+Once the category is final, each record also stores why it carries it, as stable `field=needle` identifiers — `publisher=jetbrains`, `exe=idea` — or as the override that decided it before the scorer ran (`source=steam`, `rule=wsl-start-app`), or `default=no-signal` when nothing matched. The reason is built from the category already on the record rather than by classifying again, so it cannot contradict the badge, and it costs one filtered pass over a single category's rules instead of the full thirteen-category scoring pass. The application dialog turns those identifiers into a sentence under **Why this category**; an identifier a build does not recognize is dropped rather than shown raw. Like the launch-target outcome, this is diagnostic only.
 
 Discovery and visibility are separate stages. Source adapters reject only structurally proven non-applications, such as invalid resource names, unsupported file types, runtime internals, uninstallers, and redistributables. Strong installer evidence instead assigns the retained candidate an installer artifact kind. Product vocabulary such as `Installer`, `Uninstaller`, `Demo`, `SDK`, or `Support` is evaluated by the recoverable visibility stage instead of deleting a candidate before the user can inspect it. AppUserModelIds remain opaque identifiers and are never parsed as paths or prose. Every retained candidate receives a `primary`, `auxiliary`, or `rejected` classification with a numeric score and stable reason codes. AUMID, Start Menu, Steam, registered uninstall products, coherent PE metadata, runtime paths, and component-role markers contribute independent evidence.
 
@@ -242,6 +304,16 @@ Category cards mount in batches rather than all at once, extended by an `Interse
 
 Normal categories, view-scoped search, and Favorites exclude `auxiliary` entries. The `Ctrl+K` quick-launch palette offers the same set the grid does: it excludes auxiliary entries, explicitly hidden entries, and all installer/documentation artifacts. An auxiliary record carries the product's own name and icon — an updater stub, a command environment, a component — so listing it beside the application asked the user to choose between two rows that look identical. Scenarios keep resolving against the wider set, because a scenario stores what the user picked, auxiliary or not. The **Auxiliary tools** view keeps uncertain runtime and maintenance components inspectable. A user can restore an entry to the main catalog; its canonical identity is persisted in local preferences and survives incremental refresh, full scan, and cache reset.
 
+A scenario's close list terminates processes by executable image, so what it may name is bounded by how badly Windows takes the loss. Each record carries the verdict as a stable identifier beside its other diagnostics — `close.critical` or `close.session`, absent for everything ordinary — decided from the executable's own file name by a curated list in `platform/windows/execution/protected.rs`. There is deliberately no "lives in System32" rule: `notepad.exe` and `mspaint.exe` live there and are perfectly safe to close, and a warning that fires on them gets clicked through.
+
+**Critical** — `lsass.exe`, `csrss.exe`, `winlogon.exe`, `services.exe`, `smss.exe`, `wininit.exe`, `lsaiso.exe`, `svchost.exe` — ends the operating system, so it is never closable. `svchost` is in the list because nothing here can tell which services one instance hosts. The refusal is enforced in the backend: `remember_close_targets` marks the entry rather than storing a usable path, and `close_apps` counts it as `blocked`, separately from the `unavailable` that means the window named something unknown. The window is untrusted, so the confirmation in the interface is a courtesy and this is the control. The risk is re-derived there rather than read from the record, so a cache written before the guard existed is refused from the first run instead of after a rescan. Adding such an entry to a close list is also refused while editing, which is where the user can act on it.
+
+**Not closable** — an entry that resolves to no executable at all, such as the PIDL-only **Проводник** and **Run** entries Windows ships, whose resolved target is a shell identifier like `::{52205FD8-…}` rather than a path. There is no process to end, so a close list containing one would silently do nothing; it is refused with that reason instead. Note that a differently-named record can still resolve to `C:\Windows\explorer.exe` — the Start-Apps entry for the Windows SDK does — and that one is a real Session target, judged by what it resolves to rather than by its name.
+
+**Session** — `explorer.exe`, `dwm.exe`, the shell hosts, and this application's own executable — ends the desktop session and Windows brings it back. Legitimate, so it stays the user's decision: adding one to a close list costs one explicit confirmation naming the consequence, and the entry is then marked in the list and in the picker. The launch list is untouched, because starting Explorer is ordinary.
+
+Each tier carries its own badge, because the label has to name the consequence rather than the category: **Danger** for Session, **Blocked** for Critical, and a plain **Cannot close** for the not-closable entries. One shared "Windows component" label read as an unexplained classification and said the same thing about an entry that ends the desktop as about one that cannot be closed at all. The full sentence is on the control's tooltip and in the confirmation itself.
+
 The reserved **Installers & Docs** view is the only normal navigation surface for non-hidden artifacts. It partitions one result set into **Installers** and **Docs**, omits empty sections, and excludes those records from All Apps, Favorites, Auxiliary tools, ordinary category counts, and quick launch. Hidden remains the administrative superset. Artifacts cannot be favorited or moved across the reserved-category boundary. Documentation launches immediately; an installer requires an explicit confirmation dialog that shows its name and publisher before the backend receives the existing catalog ID launch request.
 
 Every navigation badge reports the length of the view it opens, derived once per catalog change by a single selector shared by the sidebar and the drawer, so the number cannot contradict the list or differ between window widths. The settings page instead reports what the scanner classified as primary and auxiliary, hidden entries included; those two totals are named separately for that reason.
@@ -250,7 +322,7 @@ Beyond product components, two further classes are auxiliary. **Command environm
 
 User visibility overrides now prefer a separate hashed canonical identity. AUMID and Steam identities are strongest; normalized ProductName, publisher, and install root provide cross-source stability; resolved target and normalized path are conservative fallbacks. Legacy promoted IDs remain as fallback and are migrated when a current catalog entry can be matched. Portable roots remain part of identity, so copies at a different (or unknown) version do not collapse; copies at the same exact version are merged.
 
-The model retains PE `ProductName` and `OriginalFilename`, plus shortcut arguments. The App information dialog shows `Original filename` in Detection instead of duplicating `Launch type` as a second method row. OriginalFilename contributes installer/helper evidence but is never sufficient by itself to reject a normal registered product. Only known user-facing shortcut modes (`--profile-directory`, `--user-data-dir`, `--app`, `--app-id`, `--class`, Firefox `-p`) split target identity.
+The model retains PE `ProductName` and `OriginalFilename`, plus shortcut arguments. The App information dialog shows `Original filename` in Detection instead of duplicating `Launch type` as a second method row. Detection also explains the two decisions a user is most likely to question: **Why**, listing the classification reasons behind the catalog state, and **Launch target check**, naming the stable `target.*` outcome recorded when the record was scanned. Both are decisions the backend already made — nothing is recomputed to display them, and a record from a cache written before the check was recorded says nothing rather than claiming the check failed. OriginalFilename contributes installer/helper evidence but is never sufficient by itself to reject a normal registered product. Only known user-facing shortcut modes (`--profile-directory`, `--user-data-dir`, `--app`, `--app-id`, `--class`, Firefox `-p`) split target identity.
 
 Debug builds write `%LOCALAPPDATA%\WindowsApps\visibility-report.json` for rejected candidates. User-profile prefixes are replaced with `<USERPROFILE>` and the report is not emitted as a normal production log. A small synthetic fixture corpus lives under `src-tauri/tests/fixtures`; it validates the runner and regression examples but is not evidence of real-world accuracy.
 
@@ -268,7 +340,7 @@ Maintenance and housekeeping binaries decided by recoverable vocabulary are demo
 
 Two registrations Windows already holds are read once per scan and per cache load, and both are proof rather than inference. A product's own `BundleCachePath` under its uninstall key names the setup bundle it keeps for repair and uninstall: that file is an installer, said by the product that put it there, for any vendor and wherever they cached it. `App Paths` names the executable a vendor registered as the one users start, which protects a registered product living deep in a tree — `D:\...\7-Zip\7zFM.exe` — from being read as a component. Registry values stay untrusted input: they are compared as paths and never executed.
 
-One decision needs the whole catalog rather than a single record: **install-tree dominance**. An executable discovered below a directory that holds another discovered executable *from the same publisher* is a component of whatever lives above it — `CrystalDiskInfo9_7_1Aoi\CdiResource\AlertMail48.exe` under `DiskInfo64A.exe`, both Crystal Dew World, or `ENTERPRISE.WW\OSE.EXE` and `OFFICE.RU-RU\DWTRIG20.EXE` under an extracted Office tree's `SETUP.EXE`, all Microsoft. The relation is structural, costs no extra I/O, and recognizes components shipped by vendors no needle list mentions. The publisher requirement is what distinguishes a product tree from a shelf: a folder holding one vendor's loose portable and another vendor's application in a subfolder is not a product. Three further escapes keep real software out of it: an executable that names its own folder is the product of its own subtree (`Notepad3\Notepad3.exe`); an executable something else points at — a Start Menu shortcut target, a registered product's executable, an `App Paths` registration — is referenced software; and a file with no publisher is left alone rather than guessed about. Only bare files found on disk are judged this way. The pass is pure, so it re-applies identically on the cache path and needs no persisted flag.
+One decision needs the whole catalog rather than a single record: **install-tree dominance**. An executable discovered below a directory that holds another discovered executable _from the same publisher_ is a component of whatever lives above it — `CrystalDiskInfo9_7_1Aoi\CdiResource\AlertMail48.exe` under `DiskInfo64A.exe`, both Crystal Dew World, or `ENTERPRISE.WW\OSE.EXE` and `OFFICE.RU-RU\DWTRIG20.EXE` under an extracted Office tree's `SETUP.EXE`, all Microsoft. The relation is structural, costs no extra I/O, and recognizes components shipped by vendors no needle list mentions. The publisher requirement is what distinguishes a product tree from a shelf: a folder holding one vendor's loose portable and another vendor's application in a subfolder is not a product. Three further escapes keep real software out of it: an executable that names its own folder is the product of its own subtree (`Notepad3\Notepad3.exe`); an executable something else points at — a Start Menu shortcut target, a registered product's executable, an `App Paths` registration — is referenced software; and a file with no publisher is left alone rather than guessed about. Only bare files found on disk are judged this way. The pass is pure, so it re-applies identically on the cache path and needs no persisted flag.
 
 A visibility reason describes an executable, so across a merge it travels only between records that describe the **same** executable — the same resolved launch target, or the same path when a record resolves to nothing. Records merged by product family point at different files: the Visual Studio Code shortcut launches `Code.exe`, while the `vsce-sign.exe` that merges into it is a component of the same product. Copying regardless produced the worst class of error this catalog has had — World of Warcraft, 7-Zip File Manager, Visual Studio Code, TablePlus and AIDA64 Extreme each scored 85 on their own Start Menu registration and still sat in Auxiliary tools, because a component reason rode in on a sibling and was then read as the card's own on the next merge of the same group. The case the sticky rule exists for is unaffected: a Start Menu shortcut and the Apps Folder entry for it resolve to one target, so a merged Python IDLE or Visual Studio command prompt stays auxiliary however its AUMID sibling was classified.
 
@@ -339,6 +411,7 @@ Users can:
 - click a category in the sidebar to navigate to it;
 
 All Apps does not reorder categories: category ordering is available only from the sidebar. All Apps application drags render a fixed preview while their source remains in place without a transform, preventing grid overflow and clipped layouts. Pointer drags test the real pointer position against their scroll boundary, so autoscroll does not cancel an in-bounds drag; leaving the All Apps panel or sidebar still clears the preview and cancels the eventual drop. Sidebar category dragging uses the same fixed-preview approach, so labels and the sidebar width stay stable during a drag. Selecting a category from another view waits until All Apps is mounted, then aligns the selected section below the sticky header with a 12 px gap. The alignment rechecks live geometry until it is stable, covering deferred card layout from `content-visibility` without unbounded work. Switching categories inside All Apps starts with a smooth native scroll, waits for real scroll movement to settle, then makes one final smooth alignment. Reduced-motion users retain instant motion. Keyboard reordering remains available through the existing hidden activator.
+
 - move applications between categories;
 - mark applications as Favorites;
 - hide and later restore applications.
@@ -349,15 +422,25 @@ Move to category also accepts **Installers & Docs**. Filing an application there
 
 At widths of `1024px` and above, navigation uses a persistent sidebar. Below `1024px`, the same navigation is presented as an overlay drawer.
 
-Frontend preferences use schema version 12. Each launch card has a `preferenceIdentity`
+Frontend preferences use schema version 13. Each launch card has a `preferenceIdentity`
 derived from its product identity, launch role, and meaningful arguments. Favorites, hidden
 state, auxiliary promotion, manual installer marks, first-seen stamps, and category overrides use
 this card identity, so distinct launch modes of one product do not inherit each other's settings.
 Version 9 added the manual installer marks, version 10 the first-seen stamps, version 11 the
-scenarios and version 12 their creation date, which orders the More preview; an earlier document
-upgrades to an empty or undated value and keeps every other field it carried. A scenario stored
-before the date existed stays undated rather than being stamped with the migration's own clock, and
-sorts after the dated ones.
+scenarios, version 12 their creation date, which orders the More preview, and version 13 the
+starred scenarios; an earlier document upgrades to an empty or undated value and keeps every other
+field it carried. A scenario stored before the date existed stays undated rather than being stamped
+with the migration's own clock, and sorts after the dated ones. Starred scenarios are stored by
+scenario id rather than card identity, because a scenario is created in the application and never
+rediscovered by a scan; deleting a scenario drops its star, and a star naming no stored scenario is
+dropped on read instead of becoming an empty row.
+
+Favorites is split into two named sections: a Scenarios section above the Applications section, each
+carrying its own count. A starred scenario is collapsed and expands on its name to show the
+scenario's launch and close lists, resolved against the current catalog; entries the catalog no
+longer has are reported as unavailable rather than hidden. Scenario cards lay out in one column and
+in two from a viewport width of `1300px` in Favorites, where they share the width with nothing else,
+and from `1900px` on the Scenarios page, where each card also carries its editing controls.
 
 The catalog itself carries no timestamps, so the first-seen stamp is the only record of when an
 application appeared: every scan result and every background snapshot stamps the cards it reports
@@ -526,7 +609,8 @@ src/widgets/                     Large self-contained interface areas, each with
   sidebar-navigation/           Sidebar, drawer, navigation state and category drag
 src/features/                    User scenarios, each with a public index.ts
   app-actions, command-palette, edit-settings, launch-app, manage-category,
-  stale-copy, uninstall-app, update-app, view-app-details
+  manage-scenarios, run-scenario, stale-copy, uninstall-app, update-app,
+  view-app-details
 src/entities/app/                App entity: contracts, card UI, catalog selectors, metadata, IPC client
 src/entities/category/           Category entity: contracts, labels, accents
 src/entities/scenario/           Scenario entity: contracts, entry caps, identity resolution
@@ -543,7 +627,7 @@ src-tauri/src/catalog/sync/      Source and AppState-facing synchronization orch
 src-tauri/src/commands/          Tauri IPC transport handlers
 src-tauri/src/lifecycle/         Tray and window lifecycle
 src-tauri/src/platform/windows/  Windows-native boundary and compatibility facade
-  execution/                    Launch targets, metadata, and process execution
+  execution/                    Launch targets, metadata, process execution, close-risk classification
   registry/                     Install, uninstall, and Steam registry access
   shortcuts/                    Shell-link and global-shortcut integrations
   uninstall/                    Validated uninstall execution and local history
@@ -563,6 +647,35 @@ explicit file path. Single-file components stay flat. Reference: `pages/more/ui/
 
 The supported toolchain, local development commands, verification commands, and bundle path are maintained in [README.md](README.md#development).
 
+### Catalog golden master
+
+`src-tauri/src/catalog/golden/` is a test-only harness that runs synthetic fixtures through the real
+`sanitize` decisions and compares the normalized result — canonical id, preference identity, launch
+descriptor, source kind, artifact kind, visibility class, category, display name, and the dedup
+grouping — against a recorded baseline in `src-tauri/tests/fixtures/golden/`. It lives inside the
+crate because `sanitize` is `pub(crate)`; an external test crate cannot reach it, and a second copy
+of the decisions would prove nothing.
+
+Two machine-dependent inputs are pinned so a baseline recorded on one machine reproduces on another:
+the `App Paths` registrations the nested-component rule reads, and the Windows UI language that
+picks a merged card's display name. Both are recorded into the baseline's `diagnostics` block.
+
+A difference is classified rather than merely reported: a change to an identity, a launch descriptor,
+a category, a visibility class or a dedup group fails the run unless that case is on the allowlist
+the change declared. Recording a baseline is deliberate and never automatic:
+
+```powershell
+$env:WINDOWSAPPS_GOLDEN_UPDATE = "1"; cargo test --manifest-path src-tauri/Cargo.toml golden
+```
+
+Beside the fixtures, five properties run over deterministic generated catalogs with fixed seeds:
+the same input produces a byte-identical report, input order changes nothing, sanitizing an already
+sanitized catalog changes nothing, a cache round trip preserves every record, and a diagnostic field
+never moves an identity. A sixth records a known asymmetry rather than hiding it — `visibility_score`
+is the one field a second pass moves, because a merged card keeps the highest score of its members
+while a reload recomputes it from the surviving record alone. Every field a decision reads is stable,
+which is why it went unnoticed; it is pinned here so a later change to it is visible.
+
 ## 16. Continuous verification and release automation
 
 ### Pre-merge verification
@@ -570,11 +683,17 @@ The supported toolchain, local development commands, verification commands, and 
 `.github/workflows/verify.yml` runs on every pull request and on every push to `master`, with all actions SHA-pinned. Four independent jobs:
 
 - **Frontend** — `npm ci`, lint, type-check, tests with coverage, production build. Coverage is reported into the job log, not enforced: a percentage is not evidence that the critical paths are covered, and a threshold rewards tests written to move the number. The rule that actually protects behaviour is that every fixed bug gets a regression test.
-- **Backend** — `cargo fmt --check`, Clippy with warnings denied, Rust tests.
+- **Backend** — runs on two Windows images, `windows-latest` and `windows-2022`, because the catalog reads the registry, walks the filesystem and drives PowerShell and COM, so a green run on one build is not evidence for the other. Formatting and Clippy are image-independent and run once. The suite is split in two steps so a failure names its own cause: everything except `catalog::sources::start_apps::tests`, then that module alone — the only one that starts an external process. Both steps are required; the hosted images do ship PowerShell, so these are not flaky tests to be excused with `continue-on-error`. The split is exhaustive by construction: the two filters partition the suite, and their totals add up to the full count.
 - **MSRV** — pins the toolchain to the `rust-version` declared in `src-tauri/Cargo.toml`, asserts that the pin and the manifest agree, and compiles at that version. The declared MSRV is a compatibility promise, so it is compiled rather than asserted.
 - **Boundaries and release contract** — both dependency-boundary verifiers, all release-script tests, the runtime dependency audit, and the development dependency triage gate.
 
 The release workflow re-runs the same critical gates on the tag as an independent second check. A green pre-merge run is a prerequisite for a release, never a substitute.
+
+### Scan cost
+
+The bounded-work claims are asserted semantically rather than by a stopwatch, because a timing threshold in a test suite measures the machine it ran on. An unchanged tree costs **zero** directory enumerations, zero entries visited and zero PE re-reads, whatever its size; the only added work is one `metadata` call per already-known executable, bounded by the index rather than by the tree. `an_unchanged_tree_costs_no_enumeration_and_no_metadata_reads` pins this on 50 applications.
+
+Wall-clock cost was measured once, on a developer machine, by running the same unoptimized binary with `catalog_portable_fingerprint_v1` off and on — the rollback flag makes a real before/after possible without rebuilding. Median of five runs after one warm-up, 300 portable applications in 300 directories, repeated four times: **9.0 ms without verification, 12.0 ms with it**, so about 3 ms, or roughly 10 µs per known executable. That is a single measurement on one machine in a debug build, not a benchmark; it is recorded because it is the number that decides whether the check is affordable, and 3 ms sits inside the 20 ms allowance the change was held to.
 
 ### Dependency advisories
 
@@ -625,6 +744,12 @@ Run Refresh first. If the saved cache already contains bad records, use **Settin
 
 Confirm that it is on a permanent local drive and not under an excluded folder. Add its folder under **Settings → Application discovery** if needed. Executables without usable metadata may be rejected unless their filename/folder identify a real portable product.
 
+If a whole class of applications is missing — every Store application, say — open **Settings → Catalog maintenance → Last scan diagnostics** and read the source table. A source reported as `stale` or `failed_without_snapshot` is not discovering anything, and the count beside it is what it is still serving from an earlier run.
+
+### An application shows an old version after an update
+
+An incremental scan verifies known executables by size and modification time, so an in-place update is normally picked up on the next Refresh. An update that leaves both unchanged is not detected; **Force full scan** re-reads everything.
+
 ### Icon is missing
 
 Keep the application visible briefly so its ID receives hydration priority. Refresh if its shortcut or executable changed. Some Windows shell entries do not expose an extractable icon.
@@ -652,5 +777,5 @@ Run the complete verification commands in [README.md](README.md#development), th
 ---
 
 [README](README.md) ·
-[Release 0.2.8](https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.8) ·
+[Release 0.3.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.0) ·
 [Telegram: @keskiyo](https://t.me/keskiyo)

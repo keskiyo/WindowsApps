@@ -1,14 +1,3 @@
-//! Artifact kind: whether a record is an application, an installation artifact, or documentation.
-//!
-//! Documentation is decided first because a shortcut that opens a `.url` or an `http(s)` target can
-//! carry any file name; installer evidence second; everything else is an application.
-//!
-//! Outcome authority follows the evidence tier (see
-//! `docs/superpowers/specs/2026-08-02-classification-generalization-design.md`): structural facts
-//! and vendor-authored file names may classify, a localized display name may not. Both outcomes
-//! here are *visible* — an installer and a documentation shortcut are listed in Installers & Docs,
-//! so a misclassification on an uninspected machine costs a wrong list, never a missing app.
-
 mod documentation;
 mod installer;
 
@@ -61,6 +50,9 @@ pub(super) mod testing {
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
+            target_availability: None,
+            category_reasons: Vec::new(),
+            close_risk: None,
         }
     }
 

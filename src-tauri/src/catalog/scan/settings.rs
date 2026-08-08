@@ -12,6 +12,14 @@ pub(crate) struct ScanSettings {
     pub included_paths: Vec<String>,
     #[serde(default)]
     pub excluded_paths: Vec<String>,
+    #[serde(default = "enabled")]
+    pub catalog_target_availability_v1: bool,
+    #[serde(default = "enabled")]
+    pub catalog_portable_fingerprint_v1: bool,
+}
+
+fn enabled() -> bool {
+    true
 }
 
 impl Default for ScanSettings {
@@ -20,6 +28,8 @@ impl Default for ScanSettings {
             auto_scan_fixed_drives: true,
             included_paths: Vec::new(),
             excluded_paths: Vec::new(),
+            catalog_target_availability_v1: true,
+            catalog_portable_fingerprint_v1: true,
         }
     }
 }
@@ -50,6 +60,8 @@ mod tests {
             auto_scan_fixed_drives: true,
             included_paths: vec![r"E:\Portable".into()],
             excluded_paths: vec![r"D:\Archives".into()],
+            catalog_target_availability_v1: true,
+            catalog_portable_fingerprint_v1: true,
         };
 
         write(dir.path(), &settings).unwrap();

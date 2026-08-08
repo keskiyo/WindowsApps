@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react'
+import { Search, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { rankAppsByQueryTop } from '../../../entities/app'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
@@ -9,6 +9,7 @@ import type { AppPickerDialogProps } from '../types'
 export function AppPickerDialog({
 	apps,
 	label,
+	markOf,
 	onSelect,
 	onClose,
 }: AppPickerDialogProps) {
@@ -108,7 +109,9 @@ export function AppPickerDialog({
 							No apps match “{query}”
 						</li>
 					) : (
-						results.map((app, index) => (
+						results.map((app, index) => {
+							const mark = markOf?.(app) ?? null
+							return (
 							<li
 								key={app.id}
 								role="option"
@@ -116,6 +119,7 @@ export function AppPickerDialog({
 							>
 								<button
 									type="button"
+									title={mark?.reason}
 									onMouseMove={() => setSelected(index)}
 									onClick={() => onSelect(app)}
 									className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm ${index === selected ? 'palette-result-selected font-medium' : 'text-(--text-primary) hover:bg-(--surface-raised)'}`}
@@ -132,9 +136,23 @@ export function AppPickerDialog({
 									<span className="min-w-0 flex-1 truncate">
 										{app.name}
 									</span>
+									{mark && (
+										<span
+											className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.6875rem] ${mark.badge.tone === 'danger' ? 'border-(--category-orange) text-(--text-primary)' : 'border-(--border-neutral) text-(--text-muted)'}`}
+										>
+											{mark.badge.tone === 'danger' && (
+												<TriangleAlert
+													size={11}
+													aria-hidden="true"
+												/>
+											)}
+											{mark.badge.label}
+										</span>
+									)}
 								</button>
 							</li>
-						))
+							)
+						})
 					)}
 				</ul>
 			</div>

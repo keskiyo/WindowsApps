@@ -7,8 +7,6 @@ use std::process::Command;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-/// Extra MSI switches accepted alongside the uninstall verb and product code. Anything else
-/// (install verbs, properties like `EVIL=1`, transforms, log paths) is rejected.
 const ALLOWED_MSI_SWITCHES: &[&str] = &["/quiet", "/qn", "/qb", "/qb-", "/passive", "/norestart"];
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -25,23 +23,12 @@ pub(crate) struct UninstallTargetPreview {
     pub mechanism: UninstallMechanism,
 }
 
-/// A validated, normalized uninstall action. Both `preview` and `execute` derive their
-/// behaviour from this single value, so what the user sees and what runs cannot diverge, and
-/// nothing here can be influenced by the frontend (only an application id crosses IPC).
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Validated {
-    /// A concrete program plus already-split argument vector (no shell, no raw command line).
-    Process {
-        program: PathBuf,
-        args: Vec<String>,
-    },
-    Msix {
-        package_full_name: String,
-    },
+    Process { program: PathBuf, args: Vec<String> },
+    Msix { package_full_name: String },
 }
 
-/// Validate an untrusted uninstall target from the catalog. Returns a normalized action or a
-/// generic, path-free rejection reason.
 fn validate(target: &UninstallTarget) -> Result<Validated, String> {
     match target {
         UninstallTarget::Command {
@@ -83,9 +70,6 @@ fn validate_process(executable: &str, arguments: &str) -> Result<Validated, Stri
     Ok(Validated::Process { program, args })
 }
 
-/// Validate `msiexec` uninstall arguments: exactly one product code (GUID) with the uninstall
-/// verb and only allowlisted quiet/restart switches. The canonical System32 `msiexec.exe` is
-/// used so a poisoned registry path cannot redirect execution.
 fn validate_msi(arguments: &str) -> Result<Validated, String> {
     let tokens = parse_arguments(arguments)?;
     let mut product_code: Option<String> = None;
@@ -103,7 +87,6 @@ fn validate_msi(arguments: &str) -> Result<Validated, String> {
             }
             continue;
         }
-        // Glued form `MsiExec.exe /X{GUID}`.
         if lower.starts_with("/x") && is_product_code(&token[2..]) {
             if product_code
                 .replace(token[2..].to_ascii_uppercase())
@@ -159,8 +142,6 @@ pub(crate) fn execute(target: Option<UninstallTarget>) -> Result<(), String> {
             ensure_success(status.code(), status.success())
         }
         Validated::Msix { package_full_name } => {
-            // Identity is strictly `[A-Za-z0-9._~-]` (no quotes/spaces/metacharacters), so it
-            // cannot break out of the single-quoted PowerShell string.
             let script = format!("Remove-AppxPackage -Package '{package_full_name}'");
             let status = Command::new(exec_target::system_powershell())
                 .args([
@@ -178,9 +159,6 @@ pub(crate) fn execute(target: Option<UninstallTarget>) -> Result<(), String> {
     }
 }
 
-/// Quote-aware argument splitter. Honors double quotes (with `""` as a literal quote inside a
-/// quoted run) and rejects an unterminated quote instead of guessing. Empty input yields no
-/// arguments. Does not invoke a shell.
 fn parse_arguments(raw: &str) -> Result<Vec<String>, String> {
     let mut args = Vec::new();
     let mut current = String::new();
@@ -287,8 +265,6 @@ mod tests {
         }
     }
 
-    // ---- positive cases -------------------------------------------------
-
     #[test]
     fn accepts_plain_executable_without_arguments() {
         let validated = validate(&command(r"C:\Program Files\App\uninstall.exe", "")).unwrap();
@@ -356,8 +332,6 @@ mod tests {
         assert!(validate(&msix("OpenAI.Codex_1.2.3.0_x64__abc")).is_ok());
     }
 
-    // ---- negative cases -------------------------------------------------
-
     #[test]
     fn rejects_empty_relative_unc_and_device_paths() {
         assert!(validate(&command("   ", "")).is_err());
@@ -407,8 +381,6 @@ mod tests {
 
     #[test]
     fn command_injection_metacharacters_do_not_change_program() {
-        // No shell is involved, so these are treated as literal arguments to the fixed program
-        // (they cannot spawn a second process). The metacharacters survive as-is in argv.
         let validated = validate(&command(
             r"C:\App\uninstall.exe",
             r#"/S & calc.exe | whoami ; echo pwned"#,
@@ -433,7 +405,6 @@ mod tests {
 
     #[test]
     fn rejects_newline_in_arguments_is_split_not_executed() {
-        // A newline just separates tokens; it can never inject a new command (no shell).
         let validated = validate(&command(r"C:\App\uninstall.exe", "/S\ncalc.exe")).unwrap();
         let Validated::Process { args, .. } = validated else {
             panic!("expected process");
@@ -460,7 +431,6 @@ mod tests {
         ))
         .is_err());
         assert!(validate(&command("msiexec.exe", "/quiet /norestart")).is_err());
-        // no product code
     }
 
     #[test]
@@ -493,8 +463,6 @@ mod tests {
             UninstallMechanism::Msix
         );
     }
-
-    // ---- argument parser unit tests ------------------------------------
 
     #[test]
     fn parses_quoted_and_empty_arguments() {

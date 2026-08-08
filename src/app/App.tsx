@@ -22,6 +22,7 @@ import { MorePage } from '../pages/more'
 import { ScenariosPage } from '../pages/scenarios'
 import { SettingsPage } from '../pages/settings'
 import { useScenarioRunner } from '../features/run-scenario'
+import { filterFavoriteScenarios } from '../entities/scenario'
 import { AppShellChrome } from './layout/AppShellChrome'
 import { CommandPalette } from '../features/command-palette'
 import { Header } from '../widgets/app-header'
@@ -161,7 +162,12 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		closeApps: state.closeApps,
 		onFinished: useCallback((scenario, summary) => {
 			const notice = { id: `scenario-${scenario.id}` }
-			if (summary.unavailable > 0)
+			if (summary.blocked > 0)
+				toast.error(
+					`Scenario “${scenario.name}” left ${summary.blocked} open: Windows cannot survive closing them`,
+					notice,
+				)
+			else if (summary.unavailable > 0)
 				toast.error(`Scenario “${scenario.name}” failed`, notice)
 			else toast.success(`Scenario “${scenario.name}” started`, notice)
 		}, []),
@@ -273,6 +279,9 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									scenarios={state.scenarios}
 									apps={catalogApps}
 									runningId={scenarioRunner.runningId}
+									favoriteScenarioIds={
+										state.favoriteScenarioIds
+									}
 									onBack={() => navigation.selectView('more')}
 									onCreate={state.createScenario}
 									onRename={state.renameScenario}
@@ -280,6 +289,9 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									onAddApp={state.addScenarioApp}
 									onRemoveApp={state.removeScenarioApp}
 									onRun={scenarioRunner.run}
+									onToggleFavorite={
+										state.toggleFavoriteScenario
+									}
 								/>
 							)}
 							{state.activeView === 'settings' && (
@@ -326,6 +338,17 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 										collapsedCategories:
 											state.collapsedCategories,
 										favoriteAppIds: state.favoriteAppIds,
+										favoriteScenarios: {
+											scenarios: filterFavoriteScenarios(
+												state.scenarios,
+												state.favoriteScenarioIds,
+											),
+											apps: catalogApps,
+											runningId: scenarioRunner.runningId,
+											onRun: scenarioRunner.runById,
+											onToggleFavorite:
+												state.toggleFavoriteScenario,
+										},
 										onToggleCategory: state.toggleCategory,
 										onToggleFavorite: state.toggleFavorite,
 										onMoveApp: state.moveApp,

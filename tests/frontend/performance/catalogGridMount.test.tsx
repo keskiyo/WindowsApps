@@ -71,6 +71,13 @@ function renderGrid(size: number) {
 			categories={categories}
 			collapsedCategories={[]}
 			favoriteAppIds={[]}
+			favoriteScenarios={{
+				scenarios: [],
+				apps: [],
+				runningId: null,
+				onRun: vi.fn(),
+				onToggleFavorite: vi.fn(),
+			}}
 			onBack={vi.fn()}
 			onToggleCategory={vi.fn()}
 			onToggleFavorite={vi.fn()}

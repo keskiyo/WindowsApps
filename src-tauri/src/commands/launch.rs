@@ -11,20 +11,11 @@ pub(crate) struct LaunchStatusPayload {
     state: &'static str,
 }
 
-/// Best-effort readiness: blocks until the launched GUI process finishes its startup and is
-/// waiting for input (or the timeout/no-message-queue case returns). Always resolves to
-/// "ready" so the UI clears its launching state as soon as any signal arrives; genuine
-/// launch failures surface earlier via the `launch_app` error path.
 fn wait_for_launch_ready(handle: &launcher::OwnedProcessHandle) -> &'static str {
     launcher::wait_for_input_idle(handle, 12000);
     "ready"
 }
 
-/// Resolves the trusted launch target for an id coming from the webview.
-///
-/// Validation happens before the lookup: an id that cannot name a catalog entry is rejected
-/// without being used as a map key. The target itself always comes from `AppState`, never from
-/// the request — the webview passes an id and nothing else.
 fn resolve_launch_target(
     state: &AppState,
     id: &str,
@@ -55,8 +46,6 @@ pub(crate) async fn launch_app(app: tauri::AppHandle, id: String) -> Result<(), 
     if let Some(handle) = handle {
         let emitter = app.clone();
         let launch_id = id.clone();
-        // Held for the whole wait; when no slot is free the process handle is still closed and
-        // the UI falls back to its ceiling timer.
         let Some(permit) = launch_waits.acquire() else {
             return Ok(());
         };
@@ -93,8 +82,6 @@ mod tests {
         assert_eq!(path, r"C:\Editor.exe");
     }
 
-    // The id was an unbounded String used directly as a map key. Length is judged before the
-    // lookup so an oversized value never reaches trusted state.
     #[test]
     fn rejects_an_oversized_id_before_the_lookup() {
         let state = AppState::default();

@@ -10,9 +10,6 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
-/// Launches an app and, when the shell hands back a process handle (regular exe/shortcut
-/// launches), returns an owned handle so the caller can wait for the window to be ready.
-/// Store/UWP and shell hand-offs return `Ok(None)` — there is no handle to wait on.
 pub(crate) struct OwnedProcessHandle(isize);
 
 impl Drop for OwnedProcessHandle {
@@ -36,10 +33,6 @@ pub(crate) fn wait_for_input_idle(handle: &OwnedProcessHandle, timeout_ms: u32) 
 }
 
 pub(crate) fn launch(kind: LaunchKind, target: &str) -> Result<Option<OwnedProcessHandle>, String> {
-    // A protocol target has no file to check; requiring one rejected every Steam game, whose
-    // catalog entry is `steam://rungameid/<id>`. Handing the URI to the shell is also what
-    // should happen: Steam starts the game itself, so DRM, cloud saves, the overlay and
-    // playtime tracking all work — launching the bare executable bypasses them.
     if kind != LaunchKind::AppUserModelId && !is_launch_uri(target) && !Path::new(target).exists() {
         return Err(format!("File not found: {target}"));
     }
@@ -105,9 +98,6 @@ fn apps_folder_target(app_id: &str) -> String {
     format!(r"shell:AppsFolder\{app_id}")
 }
 
-/// Launch targets that address a protocol handler instead of a file. Deliberately an allowlist
-/// of the single scheme the catalog produces: targets are resolved server-side from what the
-/// scanner found, and this keeps it that way even if a future source starts emitting URIs.
 const LAUNCH_URI_SCHEMES: &[&str] = &["steam:"];
 
 fn is_launch_uri(target: &str) -> bool {
@@ -141,9 +131,6 @@ mod tests {
         assert!(validate_shell_result(31).is_err());
     }
 
-    // Steam entries carry `steam://rungameid/<id>` as their launch target and win the merge
-    // against any shortcut, so treating that as a missing file made every Steam game
-    // unlaunchable.
     #[test]
     fn steam_targets_are_recognized_as_protocol_uris() {
         assert!(is_launch_uri("steam://rungameid/2183900"));

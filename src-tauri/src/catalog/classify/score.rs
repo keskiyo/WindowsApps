@@ -1,36 +1,20 @@
-//! Weighted scoring engine. Every rule that matches adds its weight to its category; the category
-//! with the highest total wins, provided it clears `THRESHOLD` (otherwise the app is `Other`). Ties
-//! resolve by a fixed priority so the outcome is deterministic. Corroborating signals accumulate —
-//! several weak hits can outrank a single stronger one — which is the point of scoring over a cascade.
-
 use super::super::AppCategory;
 use super::signals::Signals;
 use super::tables::RULES;
 
-/// Signal strength, decisive → weak. A rule in the tables tags itself with one of these.
-pub(super) const DECISIVE: i32 = 120; // a narrow override that must beat a publisher (PDF vs Adobe)
+pub(super) const DECISIVE: i32 = 120;
 pub(super) const PUBLISHER: i32 = 100;
-pub(super) const FEATURE: i32 = 90; // verbatim inbox/Windows-feature marker
+pub(super) const FEATURE: i32 = 90;
 pub(super) const INSTALL_TREE: i32 = 80;
-pub(super) const EXE: i32 = 70; // resolved executable stem
-pub(super) const EXE_GLUE: i32 = 60; // marker glued into an executable name (SotaVPN → vpn)
-pub(super) const PRODUCT: i32 = 40; // PE product name
-pub(super) const DESC: i32 = 30; // PE file description
-pub(super) const NAME: i32 = 25; // display name
-pub(super) const PATH: i32 = 25; // a dedicated store/game install folder
+pub(super) const EXE: i32 = 70;
+pub(super) const EXE_GLUE: i32 = 60;
+pub(super) const PRODUCT: i32 = 40;
+pub(super) const DESC: i32 = 30;
+pub(super) const NAME: i32 = 25;
+pub(super) const PATH: i32 = 25;
 
-/// Minimum winning score, below which the app falls to `Other`.
-///
-/// Note what this does **not** do today: the smallest weight above is `NAME`/`PATH` at 25, so every
-/// rule already clears it on its own and the threshold never rejects anything. It only guards the
-/// zero-match case, which `best_score` starting at 0 already covers. Raising it so a lone weak
-/// signal needs corroboration — a single `Field::Path` substring currently assigns a category
-/// unaided — is a deliberate retune that has to be validated against the fixture corpus, not a
-/// constant to nudge in passing.
 const THRESHOLD: i32 = 20;
 
-/// Tie-break order, mirroring the intent of the previous first-match cascade: the earlier category
-/// wins when two totals are equal.
 const PRIORITY: &[AppCategory] = &[
     AppCategory::WindowsFeatures,
     AppCategory::Games,
@@ -47,6 +31,28 @@ const PRIORITY: &[AppCategory] = &[
     AppCategory::Utilities,
 ];
 
+const MAX_EVIDENCE: usize = 3;
+
+pub(super) fn evidence(signals: &Signals, category: AppCategory) -> Vec<String> {
+    let mut matched = RULES
+        .iter()
+        .filter(|rule| rule.category == category)
+        .filter_map(|rule| {
+            let needle = rule
+                .needles
+                .iter()
+                .find(|needle| signals.matches(rule.field, needle))?;
+            Some((rule.weight, format!("{}={needle}", rule.field.id())))
+        })
+        .collect::<Vec<_>>();
+    matched.sort_by_key(|(weight, _)| std::cmp::Reverse(*weight));
+    matched
+        .into_iter()
+        .take(MAX_EVIDENCE)
+        .map(|(_, reason)| reason)
+        .collect()
+}
+
 pub(super) fn best(signals: &Signals) -> AppCategory {
     let mut best_category = AppCategory::Other;
     let mut best_score = 0;
@@ -61,7 +67,6 @@ pub(super) fn best(signals: &Signals) -> AppCategory {
             })
             .map(|rule| rule.weight)
             .sum();
-        // Strictly greater keeps the earlier (higher-priority) category on ties.
         if score > best_score {
             best_score = score;
             best_category = category;

@@ -16,14 +16,6 @@ pub(crate) struct ExecutableMetadata {
     pub internal_name: Option<String>,
 }
 
-/// Whether an executable targets the console subsystem — a command-line tool such as `7z.exe` or
-/// `git.exe` — rather than the GUI subsystem. Read straight from the PE optional header: no
-/// metadata guessing, no launching, so it generalizes to any executable (including ones nobody
-/// can test by hand). Any read/parse problem answers `false`.
-/// Ceiling for a PE version resource. A real VS_VERSIONINFO block with every translation is a few
-/// kilobytes. The size comes from the file itself, which is untrusted input for this purpose, and
-/// it drives the allocation directly — so it is bounded before the buffer exists rather than after.
-/// A file above the cap simply reports no metadata.
 const MAX_VERSION_RESOURCE_BYTES: u32 = 4 * 1024 * 1024;
 
 pub(crate) fn read(path: &Path) -> ExecutableMetadata {
@@ -51,11 +43,6 @@ pub(crate) fn read(path: &Path) -> ExecutableMetadata {
     {
         return ExecutableMetadata::default();
     }
-    // Try every translation the file declares, not just the first. An executable with only a
-    // non-English block used to lose ProductName/CompanyName/FileDescription entirely, because
-    // the lookup was hard-coded to the first pair and fell back to US English — a query into a
-    // translation the file does not contain. These fields feed deduplication and visibility, so
-    // the loss changed classification. US English stays as a last resort.
     let translations = candidate_translations(translations(&data));
     let value = |key: &str| string_value(&data, &translations, key);
     ExecutableMetadata {
@@ -68,14 +55,10 @@ pub(crate) fn read(path: &Path) -> ExecutableMetadata {
     }
 }
 
-/// ProductVersion is the marketing version and the primary source; FileVersion is the numeric PE
-/// version, used only when ProductVersion is absent (some executables carry only FileVersion).
 fn pick_version(product_version: Option<String>, file_version: Option<String>) -> Option<String> {
     product_version.or(file_version)
 }
 
-/// The translations to query, in order: everything the file declares, then US English as a last
-/// resort (so a file with no translation block still gets the historical behaviour).
 fn candidate_translations(mut declared: Vec<(u16, u16)>) -> Vec<(u16, u16)> {
     const US_ENGLISH: (u16, u16) = (0x0409, 0x04b0);
     if !declared.contains(&US_ENGLISH) {
@@ -101,12 +84,9 @@ fn translations(data: &[u8]) -> Vec<(u16, u16)> {
             &mut length,
         )
     };
-    // The block is an array of (language, code page) u16 pairs; `length` is in bytes.
     if !found.as_bool() || buffer.is_null() || length < 4 {
         return Vec::new();
     }
-    // Same alignment concern as `string_value_for`: the block lives in a `Vec<u8>`. Read each
-    // `u16` from its bytes rather than reinterpreting a `u8` pointer as `*const u16`.
     let pair_count = length as usize / 4;
     // SAFETY: `buffer` is non-null (checked above) and points into `data`, which is still alive
     // and not mutated while the slice exists. The length is rounded *down* to whole 4-byte pairs,
@@ -150,10 +130,6 @@ fn string_value_for(data: &[u8], language: u16, code_page: u16, key: &str) -> Op
     if !found.as_bool() || buffer.is_null() || length == 0 {
         return None;
     }
-    // `buffer` points inside a `Vec<u8>`, whose alignment is 1, so reinterpreting it directly as
-    // `*const u16` violates the `from_raw_parts` alignment contract. Copy the raw bytes (a `u8`
-    // read has no alignment requirement) into a properly aligned `u16` buffer instead. `length`
-    // is a character count for string values.
     let mut wide = vec![0_u16; length as usize];
     // SAFETY: source and destination are both valid for `wide.len() * 2` bytes — the destination
     // by construction, the source because `length` is the character count the callee reported for
@@ -185,7 +161,6 @@ mod tests {
 
     #[test]
     fn a_files_own_translations_are_tried_before_the_english_fallback() {
-        // A Russian-only executable: its block is queried first, US English only as a backstop.
         let russian = (0x0419, 0x04b0);
         assert_eq!(
             candidate_translations(vec![russian]),

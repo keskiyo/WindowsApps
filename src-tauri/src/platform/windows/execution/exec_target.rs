@@ -1,18 +1,5 @@
-//! Shared validation for executable targets that originate outside the application.
-//!
-//! Registry values, `.lnk` targets and manifest fields are untrusted input
-//! (`AGENTS_backend.md` §4). Every caller that turns such a value into a process — the
-//! uninstaller, the "open the newer installed copy" path — resolves it through
-//! [`validate_executable_path`] first, and every caller that needs a Windows interpreter
-//! takes the canonical `System32` copy from here rather than relying on the `PATH` search
-//! order, which starts with the directory of the running executable.
-
 use std::path::{Path, PathBuf};
 
-/// Living-off-the-land binaries whose behaviour is fully controlled by their arguments. A
-/// tampered value such as `powershell.exe -Command <payload>` or `cmd.exe /C <payload>`
-/// would otherwise run attacker code, so these are never accepted as an executable target
-/// (msiexec is handled separately, with a strict argument allowlist).
 const INTERPRETER_EXECUTABLES: &[&str] = &[
     "cmd.exe",
     "powershell.exe",
@@ -41,8 +28,6 @@ const INTERPRETER_EXECUTABLES: &[&str] = &[
     "mavinject.exe",
 ];
 
-/// Why a candidate executable target was refused. Callers map this to their own wording so
-/// each surface keeps the message its tests and users already expect.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum RejectedTarget {
     Empty,
@@ -52,18 +37,12 @@ pub(crate) enum RejectedTarget {
     Interpreter,
 }
 
-/// Normalize and validate an executable path that came from outside the application.
-///
-/// Expands `%VAR%` references, strips surrounding quotes, then refuses anything that is not
-/// an absolute local `.exe`: empty values, UNC/device paths, non-executables, relative paths
-/// and script interpreters.
 pub(crate) fn validate_executable_path(value: &str) -> Result<PathBuf, RejectedTarget> {
     let expanded = expand_env(value.trim());
     let candidate = expanded.trim().trim_matches('"').trim();
     if candidate.is_empty() {
         return Err(RejectedTarget::Empty);
     }
-    // Reject UNC (`\\server\share`) and device (`\\?\`, `\\.\`) paths, in both slash forms.
     if candidate.starts_with(r"\\") || candidate.starts_with("//") {
         return Err(RejectedTarget::NetworkOrDevice);
     }
@@ -93,9 +72,6 @@ pub(crate) fn system_msiexec() -> PathBuf {
     system_root().join("System32").join("msiexec.exe")
 }
 
-/// Canonical Windows PowerShell. Resolving it by full path keeps a `powershell.exe` planted
-/// next to the running executable — the first entry in the `CreateProcess` search order —
-/// from being executed instead.
 pub(crate) fn system_powershell() -> PathBuf {
     system_root()
         .join("System32")
@@ -111,8 +87,6 @@ fn system_root() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from(r"C:\Windows"))
 }
 
-/// Expand `%VAR%` environment references (registry `REG_EXPAND_SZ` values arrive unexpanded).
-/// Unknown variables are left verbatim so validation still rejects them as non-absolute.
 pub(crate) fn expand_env(value: &str) -> String {
     let mut result = String::with_capacity(value.len());
     let mut rest = value;
@@ -208,8 +182,6 @@ mod tests {
         }
     }
 
-    // Each env-var test owns a uniquely named variable: the test binary is multi-threaded and
-    // the process environment is shared, so two tests touching one name race with each other.
     #[test]
     fn expands_known_variables_and_keeps_unknown_ones_verbatim() {
         std::env::set_var("WINAPPS_TEST_EXPAND_ROOT", r"C:\Base");

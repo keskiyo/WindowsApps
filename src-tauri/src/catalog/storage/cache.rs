@@ -1,5 +1,6 @@
 use crate::catalog::incremental::FilesystemIndex;
-use crate::catalog::source::SourceSnapshot;
+use crate::catalog::source::{SourceHealth, SourceSnapshot};
+use crate::catalog::target_availability::TargetAvailabilityDiff;
 use crate::catalog::{AppCategory, AppDetails, AppInfo, ArtifactKind};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -8,7 +9,6 @@ use std::io::{self, Write};
 use std::path::Path;
 
 const CACHE_FILE: &str = "apps-cache.json";
-/// 9 persists artifact classification and rebuilds sources that previously filtered installers.
 pub(crate) const CACHE_SCHEMA_VERSION: u32 = 9;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -24,6 +24,10 @@ pub(crate) struct CatalogDiagnostics {
     pub added: usize,
     pub removed: usize,
     pub updated: usize,
+    #[serde(default)]
+    pub sources: Vec<SourceHealth>,
+    #[serde(default)]
+    pub target_availability: TargetAvailabilityDiff,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -80,8 +84,6 @@ pub(crate) fn read_document(app_data_dir: &Path) -> Option<CatalogCache> {
 }
 
 fn parse_document(bytes: &[u8]) -> Option<CatalogCache> {
-    // Artifact kind is recomputed on every load, and installer evidence reads where a file lives.
-    // Resolved once per document, never per record.
     let places = crate::catalog::machine::MachineFacts::current();
     if let Ok(mut document) = serde_json::from_slice::<CatalogCache>(bytes) {
         if document.schema_version == CACHE_SCHEMA_VERSION {
@@ -89,21 +91,16 @@ fn parse_document(bytes: &[u8]) -> Option<CatalogCache> {
             return Some(document);
         }
         if matches!(document.schema_version, 2..=8) {
-            // Visibility classification arrived in 4; older documents need it recomputed.
             if document.schema_version < 4 {
                 for app in &mut document.apps {
                     crate::catalog::visibility::apply_visibility(app);
                 }
             }
-            // 5 replaced the combined Windows snapshot with one per scanner. The apps stay —
-            // only the stale snapshot goes, and the next scan repopulates the new keys.
             if document.schema_version < 5 {
                 document.sources.retain(|snapshot| {
                     snapshot.key.0 != crate::catalog::source::LEGACY_COMBINED_SOURCE
                 });
             }
-            // 8 recomputes cached details because the canonical local-folder target format
-            // changed. Metadata is derived from trusted catalog entries and is safe to refill.
             if document.schema_version < 8 {
                 document.app_details.clear();
             }
@@ -187,10 +184,6 @@ pub(crate) fn write_document(app_data_dir: &Path, document: &CatalogCache) -> io
     let temporary = app_data_dir.join("apps-cache.json.tmp");
     let backup = app_data_dir.join("apps-cache.json.bak");
     let bytes = serde_json::to_vec(document).map_err(io::Error::other)?;
-    // Flush the temp file to disk before it is renamed into place. Without this a power loss
-    // between the rename and the OS flushing its cache could leave `apps-cache.json` present but
-    // empty — and the still-good `.bak` is deleted moments later. `sync_all` costs a stat's worth
-    // of latency and the cache is written at most once per scan.
     {
         let mut file = fs::File::create(&temporary)?;
         file.write_all(&bytes)?;
@@ -290,6 +283,7 @@ mod tests {
             r"D:\Apps".into(),
             DirectoryRecord {
                 modified_nanos: 1,
+                executables: Default::default(),
                 child_directories: Vec::new(),
                 apps: vec![ordinary.clone()],
             },
@@ -310,16 +304,19 @@ mod tests {
                 SourceSnapshot {
                     key: SourceKey("start-menu".into()),
                     fingerprint: None,
+                    health: None,
                     apps: vec![docs],
                 },
                 SourceSnapshot {
                     key: SourceKey("portable".into()),
                     fingerprint: None,
+                    health: None,
                     apps: Vec::new(),
                 },
                 SourceSnapshot {
                     key: SourceKey("installer-cache".into()),
                     fingerprint: None,
+                    health: None,
                     apps: Vec::new(),
                 },
             ],
@@ -381,6 +378,7 @@ mod tests {
             r"D:\Apps".into(),
             DirectoryRecord {
                 modified_nanos: 1,
+                executables: Default::default(),
                 child_directories: Vec::new(),
                 apps: vec![amd.clone()],
             },
@@ -391,6 +389,7 @@ mod tests {
             sources: vec![SourceSnapshot {
                 key: SourceKey("start-menu".into()),
                 fingerprint: None,
+                health: None,
                 apps: vec![amd, docs],
             }],
             filesystem_index,
@@ -437,6 +436,7 @@ mod tests {
             r"D:\Apps".into(),
             DirectoryRecord {
                 modified_nanos: 1,
+                executables: Default::default(),
                 child_directories: Vec::new(),
                 apps: vec![cached_app("Editor", r"D:\Apps\Editor.exe")],
             },
@@ -447,6 +447,7 @@ mod tests {
             sources: vec![SourceSnapshot {
                 key: SourceKey("start-apps".into()),
                 fingerprint: None,
+                health: None,
                 apps: vec![website],
             }],
             filesystem_index,
@@ -497,6 +498,9 @@ mod tests {
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
+            target_availability: None,
+            category_reasons: Vec::new(),
+            close_risk: None,
         };
         std::fs::write(
             dir.path().join(CACHE_FILE),
@@ -543,6 +547,9 @@ mod tests {
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
+            target_availability: None,
+            category_reasons: Vec::new(),
+            close_risk: None,
         };
         std::fs::write(
             dir.path().join(CACHE_FILE),
@@ -586,6 +593,9 @@ mod tests {
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
+            target_availability: None,
+            category_reasons: Vec::new(),
+            close_risk: None,
         };
         write_document(
             dir.path(),
@@ -644,8 +654,6 @@ mod tests {
         );
     }
 
-    // 5 split the combined Windows snapshot into one per scanner. Leaving the old snapshot in
-    // place would keep merging its stale apps in forever, alongside the new per-scanner ones.
     #[test]
     fn migrates_v4_by_dropping_the_combined_windows_source() {
         let dir = tempfile::tempdir().unwrap();

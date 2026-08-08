@@ -25,9 +25,9 @@ describe('releaseHighlights', () => {
 	})
 
 	it('falls back to the first bullets when there is no Highlights heading', () => {
-		expect(releaseHighlights('- One\n- Two\n- Three\n- Four\n- Five')).toEqual(
-			['One', 'Two', 'Three', 'Four'],
-		)
+		expect(
+			releaseHighlights('- One\n- Two\n- Three\n- Four\n- Five'),
+		).toEqual(['One', 'Two', 'Three', 'Four'])
 	})
 })
 
@@ -39,16 +39,18 @@ describe('UpdateDialog', () => {
 
 		render(
 			<UpdateDialog
-				version='0.2.2'
-				date='2026-07-11T10:00:00Z'
+				version="0.2.2"
+				date="2026-07-11T10:00:00Z"
 				packageSize={5_600_000}
-				releaseUrl='https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2'
-				notes={'## Highlights\n- **Automatic updates** - signed update.'}
+				releaseUrl="https://github.com/keskiyo/WindowsApps/releases/tag/v0.2.2"
+				notes={
+					'## Highlights\n- **Automatic updates** - signed update.'
+				}
 				installing={false}
 				progress={null}
 				downloadedBytes={0}
 				totalBytes={null}
-				phase='idle'
+				phase="idle"
 				error={null}
 				onInstall={onInstall}
 				onDismiss={onDismiss}
@@ -87,16 +89,14 @@ describe('UpdateDialog', () => {
 	it('traps focus, closes on Escape, and restores focus', async () => {
 		const user = userEvent.setup()
 		const onDismiss = vi.fn()
-		const { rerender } = render(
-			<button type='button'>Open updates</button>,
-		)
+		const { rerender } = render(<button type="button">Open updates</button>)
 		const opener = screen.getByRole('button', { name: 'Open updates' })
 		opener.focus()
 		rerender(
 			<>
-				<button type='button'>Open updates</button>
+				<button type="button">Open updates</button>
 				<UpdateDialog
-					version='0.2.2'
+					version="0.2.2"
 					date={null}
 					packageSize={null}
 					releaseUrl={null}
@@ -105,7 +105,7 @@ describe('UpdateDialog', () => {
 					progress={null}
 					downloadedBytes={0}
 					totalBytes={null}
-					phase='idle'
+					phase="idle"
 					error={null}
 					onInstall={vi.fn()}
 					onDismiss={onDismiss}
@@ -124,7 +124,7 @@ describe('UpdateDialog', () => {
 
 		await user.keyboard('{Escape}')
 		expect(onDismiss).toHaveBeenCalledTimes(1)
-		rerender(<button type='button'>Open updates</button>)
+		rerender(<button type="button">Open updates</button>)
 		expect(
 			screen.getByRole('button', { name: 'Open updates' }),
 		).toHaveFocus()
@@ -134,7 +134,7 @@ describe('UpdateDialog', () => {
 		const onDismiss = vi.fn()
 		render(
 			<UpdateDialog
-				version='0.2.2'
+				version="0.2.2"
 				date={null}
 				packageSize={null}
 				releaseUrl={null}
@@ -143,7 +143,7 @@ describe('UpdateDialog', () => {
 				progress={42}
 				downloadedBytes={2_400_000}
 				totalBytes={5_600_000}
-				phase='downloading'
+				phase="downloading"
 				error={null}
 				onInstall={vi.fn()}
 				onDismiss={onDismiss}
@@ -161,7 +161,7 @@ describe('UpdateDialog', () => {
 	it('uses quiet update wording during the install phase', () => {
 		render(
 			<UpdateDialog
-				version='0.2.4'
+				version="0.2.4"
 				date={null}
 				packageSize={null}
 				releaseUrl={null}
@@ -170,7 +170,7 @@ describe('UpdateDialog', () => {
 				progress={100}
 				downloadedBytes={5_600_000}
 				totalBytes={5_600_000}
-				phase='installing'
+				phase="installing"
 				error={null}
 				onInstall={vi.fn()}
 				onDismiss={vi.fn()}
@@ -188,7 +188,7 @@ describe('UpdateDialog', () => {
 		const onInstall = vi.fn()
 		render(
 			<UpdateDialog
-				version='0.2.3'
+				version="0.2.3"
 				date={null}
 				packageSize={null}
 				releaseUrl={null}
@@ -197,8 +197,8 @@ describe('UpdateDialog', () => {
 				progress={null}
 				downloadedBytes={0}
 				totalBytes={null}
-				phase='failed'
-				error='The update package is unavailable.'
+				phase="failed"
+				error="The update package is unavailable."
 				onInstall={onInstall}
 				onDismiss={vi.fn()}
 				onOpenRelease={vi.fn()}

@@ -4,7 +4,7 @@ import type { UninstallHistoryEntry } from '../../../../entities/system'
 import {
 	UNINSTALL_METHOD_LABELS,
 	UNINSTALL_RESULT_LABELS,
-	uninstallDateFormatter,
+	timestampFormatter,
 } from '../../data'
 import type { UninstallHistoryProps } from '../../types'
 
@@ -90,7 +90,7 @@ export function UninstallHistory({ client }: UninstallHistoryProps) {
 								</span>
 							</div>
 							<p className="mt-2 text-sm text-slate-600">
-								{uninstallDateFormatter.format(
+								{timestampFormatter.format(
 									new Date(entry.timestamp * 1000),
 								)}
 							</p>

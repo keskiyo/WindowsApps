@@ -1,6 +1,3 @@
-//! Background icon/metadata hydration: a single worker drains the shared hydration queue for a
-//! generation, emits patch batches to the frontend, then merges them back into the cache document.
-
 use crate::app_state::AppState;
 use crate::catalog;
 use crate::catalog::cache::{self, CatalogCache};
@@ -40,10 +37,6 @@ pub(crate) fn enqueue_hydration(
                 .into_iter()
                 .map(|app| (app.id.clone(), app))
                 .collect::<HashMap<_, _>>();
-            // Patches are emitted in batches rather than one event per icon: the frontend
-            // rebuilds its whole app list per `catalog://patches` event, so ~N events for N
-            // apps caused O(N^2) work and main-thread jank (cards flickering in one-by-one,
-            // delayed hover animations). Batching collapses ~N events into ~N/BATCH.
             const BATCH: usize = 24;
             let mut patches = Vec::new();
             let mut batch: Vec<catalog::hydration::AppHydrationPatch> = Vec::new();
@@ -82,8 +75,6 @@ pub(crate) fn enqueue_hydration(
             if !batch.is_empty() {
                 let _ = worker_app.emit("catalog://patches", &batch);
             }
-            // One directory pass for the whole batch. Sweeping per written icon re-read the
-            // entire icons directory N times for N icons.
             catalog::icon_cache::sweep_superseded(&hydration_dir, &written_icons);
             patches
         })

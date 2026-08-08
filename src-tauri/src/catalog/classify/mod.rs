@@ -1,8 +1,3 @@
-//! App categorization. `classify_app` weighs every reliable signal on a fully merged record;
-//! `classify` is the reduced scan-time path with only a name and path. Both run the same weighted
-//! scorer (`score`) over tokenized signals (`signals`) and declarative rules (`tables`), so a keyword
-//! never fires on a substring of an unrelated word and corroborating signals accumulate.
-
 mod score;
 mod signals;
 mod tables;
@@ -11,9 +6,6 @@ use super::{AppCategory, AppInfo, LaunchKind, SourceKind};
 use signals::Signals;
 use std::path::Path;
 
-/// Final category for a fully resolved catalog entry (runs after deduplication). A Steam entry is
-/// Games by construction; everything else is decided by the weighted scorer, which reads the
-/// publisher, install tree, resolved executable, product name, file description, name, and path.
 pub(crate) fn classify_app(app: &AppInfo) -> AppCategory {
     if app.source_kind == SourceKind::Steam {
         return AppCategory::Games;
@@ -22,6 +14,20 @@ pub(crate) fn classify_app(app: &AppInfo) -> AppCategory {
         return AppCategory::Development;
     }
     score::best(&Signals::from_app(app))
+}
+
+pub(crate) fn category_reasons(app: &AppInfo) -> Vec<String> {
+    if app.source_kind == SourceKind::Steam {
+        return vec!["source=steam".into()];
+    }
+    if is_wsl_start_app(app) {
+        return vec!["rule=wsl-start-app".into()];
+    }
+    let reasons = score::evidence(&Signals::from_app(app), app.category);
+    if reasons.is_empty() {
+        return vec!["default=no-signal".into()];
+    }
+    reasons
 }
 
 fn is_wsl_start_app(app: &AppInfo) -> bool {
@@ -35,8 +41,6 @@ fn is_wsl_start_app(app: &AppInfo) -> bool {
         })
 }
 
-/// Provisional category during scanning, when only a display name and a path are known. The merged
-/// record is reclassified by `classify_app` after deduplication.
 pub(super) fn classify(name: &str, path: &str) -> AppCategory {
     score::best(&Signals::from_name_path(name, path))
 }
@@ -44,11 +48,9 @@ pub(super) fn classify(name: &str, path: &str) -> AppCategory {
 #[cfg(test)]
 mod tests {
     use super::super::{AppInfo, LaunchKind};
-    use super::{classify_app, AppCategory, SourceKind};
+    use super::{category_reasons, classify_app, AppCategory, SourceKind};
     use serde::Deserialize;
 
-    /// One labelled catalog record. Mirrors the visibility corpus fixture shape; `expected`
-    /// deserializes straight into `AppCategory` via its snake_case serde naming.
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct Fixture {
@@ -101,11 +103,12 @@ mod tests {
             visibility_class: Default::default(),
             visibility_score: 0,
             visibility_reasons: Vec::new(),
+            target_availability: None,
+            category_reasons: Vec::new(),
+            close_risk: None,
         }
     }
 
-    /// Regression corpus: a labelled set of "signals -> category" records guards accuracy so a later
-    /// weight or table change cannot silently regress it. Extend the JSON when adding coverage.
     #[test]
     fn category_fixture_corpus_matches_manual_labels() {
         let fixtures: Vec<Fixture> = serde_json::from_str(include_str!(
@@ -125,6 +128,77 @@ mod tests {
                 fixture.name
             );
         }
+    }
+
+    #[test]
+    fn every_classified_record_can_say_why() {
+        let fixtures: Vec<Fixture> = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/catalog_categories.json"
+        ))
+        .expect("category fixtures parse");
+        for fixture in &fixtures {
+            let mut app = build(fixture);
+            app.category = classify_app(&app);
+            let reasons = category_reasons(&app);
+
+            assert!(!reasons.is_empty(), "{}", fixture.name);
+            for reason in &reasons {
+                let (field, needle) = reason.split_once('=').unwrap_or_else(|| {
+                    panic!("{} produced an unparseable reason {reason}", fixture.name)
+                });
+                assert!(!field.is_empty() && !needle.is_empty(), "{}", fixture.name);
+            }
+            if app.category == AppCategory::Other {
+                assert_eq!(reasons, ["default=no-signal"], "{}", fixture.name);
+            } else {
+                assert_ne!(reasons, ["default=no-signal"], "{}", fixture.name);
+            }
+        }
+    }
+
+    #[test]
+    fn the_reason_explains_the_category_the_record_carries() {
+        let mut chrome = build(
+            &serde_json::from_str(
+                r#"{"name":"Google Chrome","path":"C:\\Program Files\\Google\\Chrome\\chrome.exe","expected":"browsers"}"#,
+            )
+            .unwrap(),
+        );
+        chrome.category = AppCategory::Browsers;
+
+        let browsers = category_reasons(&chrome);
+        chrome.category = AppCategory::Games;
+        let games = category_reasons(&chrome);
+
+        assert!(browsers.iter().any(|reason| reason.contains("chrome")));
+        assert_eq!(games, ["default=no-signal"]);
+    }
+
+    #[test]
+    fn an_override_reports_itself_rather_than_a_rule() {
+        let mut steam = build(
+            &serde_json::from_str(
+                r#"{"name":"Some Title","path":"steam://rungameid/1","source":"steam","expected":"games"}"#,
+            )
+            .unwrap(),
+        );
+        steam.category = classify_app(&steam);
+
+        assert_eq!(category_reasons(&steam), ["source=steam"]);
+    }
+
+    #[test]
+    fn a_wsl_start_app_reports_the_rule_that_moved_it() {
+        let mut wsl = build(
+            &serde_json::from_str(
+                r#"{"name":"Opaque distribution","path":"Vendor.Opaque!App","source":"start_apps","resolvedPath":"C:\\Program Files\\WSL\\wsl.exe","expected":"development"}"#,
+            )
+            .unwrap(),
+        );
+        wsl.launch_kind = LaunchKind::AppUserModelId;
+        wsl.category = classify_app(&wsl);
+
+        assert_eq!(category_reasons(&wsl), ["rule=wsl-start-app"]);
     }
 
     #[test]

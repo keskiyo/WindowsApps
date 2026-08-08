@@ -16,6 +16,10 @@ export type {
 	CloseAppsResult,
 	LaunchStatus,
 	ScanProgress,
+	SourceErrorKind,
+	SourceHealth,
+	SourceHealthState,
+	TargetAvailabilityDiff,
 	UninstallMechanism,
 	UninstallPreview,
 } from './model/app.types'
@@ -32,6 +36,7 @@ export { useIconRecovery } from './model/useIconRecovery'
 export { deduplicateVisibleApps } from './lib/appDeduplication'
 export {
 	buildAppReport,
+	classificationReasonsLabel,
 	descriptionLabel,
 	displayVersion,
 	formatFileDate,
@@ -39,7 +44,17 @@ export {
 	metadataRows,
 	middleEllipsis,
 	SOURCE_LABELS,
+	targetAvailabilityLabel,
 } from './lib/appMetadata'
+export { categoryReasonsLabel } from './lib/categoryReason'
+export {
+	closeBlockedMessage,
+	closeRiskBadge,
+	closeRiskReason,
+	closeRiskWarning,
+	isCloseBlocked,
+	type CloseRiskBadge,
+} from './lib/closeRisk'
 export {
 	getDropAction,
 	groupAppsByCategory,
