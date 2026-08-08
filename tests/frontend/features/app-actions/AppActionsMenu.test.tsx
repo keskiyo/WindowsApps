@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import '../../../../src/app/styles/index.css'
 import { AppActionsMenu } from '../../../../src/features/app-actions/ui/AppActionsMenu/AppActionsMenu'
 import type { AppInfo } from '../../../../src/entities/app'
+import type { CategoryDefinition } from '../../../../src/entities/category'
 
 const visualStudioCode: AppInfo = {
 	id: 'code',
@@ -35,8 +36,15 @@ function rect(left: number, top: number, width: number, height: number) {
 	} as DOMRect
 }
 
+const threeCategories: CategoryDefinition[] = [
+	{ id: 'games', label: 'Games', builtIn: true },
+	{ id: 'development', label: 'Development', builtIn: true },
+	{ id: 'browsers', label: 'Browsers', builtIn: true },
+]
+
 function renderMovableMenu(
 	anchorRef = createRef<HTMLButtonElement>(),
+	categories = threeCategories,
 ) {
 	const onClose = vi.fn()
 	const onMove = vi.fn()
@@ -45,12 +53,8 @@ function renderMovableMenu(
 			<button ref={anchorRef} type='button' aria-label='Actions menu anchor' />
 			<AppActionsMenu
 				app={visualStudioCode}
-				categories={[
-					{ id: 'games', label: 'Games', builtIn: true },
-					{ id: 'development', label: 'Development', builtIn: true },
-					{ id: 'browsers', label: 'Browsers', builtIn: true },
-				]}
-				categoryOrder={['games', 'development', 'browsers']}
+				categories={categories}
+				categoryOrder={categories.map(category => category.id)}
 				onClose={onClose}
 				onMove={onMove}
 				onInfo={vi.fn()}
@@ -141,12 +145,35 @@ describe('AppActionsMenu category cascade', () => {
 			name: 'Move Visual Studio Code to category',
 		})
 		expect(within(categories).getAllByRole('menuitem')).toHaveLength(3)
-		expect(categories).not.toHaveClass('overflow-y-auto')
 
 		await user.keyboard('{ArrowDown}')
 		expect(
 			within(categories).getByRole('menuitem', { name: 'Games' }),
 		).toHaveFocus()
+	})
+
+	it('bounds a category list that outgrows the window so the last entries stay reachable', async () => {
+		const user = userEvent.setup()
+		const manyCategories: CategoryDefinition[] = Array.from(
+			{ length: 16 },
+			(_, index) => ({
+				id: `custom-${index}`,
+				label: `Custom ${index}`,
+				builtIn: false,
+			}),
+		)
+		renderMovableMenu(createRef<HTMLButtonElement>(), manyCategories)
+
+		await user.click(
+			screen.getByRole('menuitem', { name: 'Move to category' }),
+		)
+		const categories = screen.getByRole('menu', {
+			name: 'Move Visual Studio Code to category',
+		})
+
+		expect(within(categories).getAllByRole('menuitem')).toHaveLength(16)
+		expect(categories).toHaveClass('max-h-[calc(100vh-1.5rem)]')
+		expect(categories).toHaveClass('overflow-y-auto')
 	})
 
 	it('does not dismiss the cascade before a category selection', async () => {

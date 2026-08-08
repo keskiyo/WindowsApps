@@ -6,9 +6,6 @@ export const CONFIRM_BUTTON =
 
 export const CANCEL_BUTTON = `${CONFIRM_BUTTON} border border-slate-300/80 bg-white/60 text-slate-700 hover:bg-violet-100/70 focus-visible:outline-violet-400`
 
-export const DANGER_VARIANT =
-	'danger-button border border-red-300/70 text-red-700 hover:bg-red-100 focus-visible:outline-red-400'
-
 export const ACTION_ROW = 'grid gap-2 sm:flex sm:flex-wrap sm:justify-end'
 
 export const UNINSTALL_METHOD_LABELS = {

@@ -2,6 +2,7 @@ import { Trash2, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { useFocusTrap } from '../../../shared/hooks/useFocusTrap'
+import { DANGER_VARIANT } from '../../../shared/ui/buttonVariants'
 
 export function DeleteCategoryDialog({
 	name,
@@ -62,7 +63,7 @@ export function DeleteCategoryDialog({
 					<button
 						type="button"
 						onClick={onConfirm}
-						className="rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white"
+						className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${DANGER_VARIANT}`}
 					>
 						Delete category
 					</button>

@@ -1,6 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Grip } from 'lucide-react'
+import { EllipsisVertical } from 'lucide-react'
 import { memo, useCallback, useRef, useState } from 'react'
 import { useIsLaunching } from '../../../../features/launch-app'
 import { AppActionsMenu } from '../../../../features/app-actions'
@@ -82,9 +82,9 @@ function AuxiliaryToolRowComponent({
 					event.stopPropagation()
 					setMenuOpen(value => !value)
 				}}
-				className="relative z-2 mr-2 grid size-9 cursor-grab place-items-center self-center rounded-lg border border-white/85 bg-white/72 text-slate-500 opacity-80 shadow-sm transition hover:text-violet-700 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-violet-500 active:cursor-grabbing"
+				className="relative z-2 mr-2 grid size-8 cursor-grab place-items-center self-center rounded-lg border border-white/85 bg-white/72 text-slate-500 opacity-75 shadow-sm transition hover:text-violet-700 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-violet-500 active:cursor-grabbing"
 			>
-				<Grip size={16} aria-hidden="true" />
+				<EllipsisVertical size={16} aria-hidden="true" />
 			</button>
 			{menuOpen && (
 				<AppActionsMenu

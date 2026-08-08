@@ -22,7 +22,7 @@ export function CategorySubmenu({
 			style={position}
 			role="menu"
 			aria-label={label}
-			className="motion-panel fixed z-[600] flex w-56 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-(--shadow-menu)"
+			className="motion-panel fixed z-[600] flex max-h-[calc(100vh-1.5rem)] w-56 max-w-[calc(100vw-1.5rem)] flex-col gap-0.5 overflow-y-auto rounded-xl border border-slate-200/85 bg-slate-50 p-2 text-left text-slate-700 shadow-(--shadow-menu)"
 		>
 			{categoryOrder.map(category => (
 				<button

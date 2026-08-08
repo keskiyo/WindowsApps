@@ -2,12 +2,12 @@ import { RefreshCw, RotateCcw, ScanSearch } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { MaintenanceConfirmation } from '../../../../features/edit-settings'
 import { ScanDiagnostics } from './ScanDiagnostics'
+import { DANGER_VARIANT } from '../../../../shared/ui/buttonVariants'
 import {
 	ACTION_BUTTON,
 	ACTION_ROW,
 	CANCEL_BUTTON,
 	CONFIRM_BUTTON,
-	DANGER_VARIANT,
 } from '../../data'
 import type { CatalogMaintenanceProps } from '../../types'
 

@@ -422,7 +422,9 @@ All Apps does not reorder categories: category ordering is available only from t
 - mark applications as Favorites;
 - hide and later restore applications.
 
-Deleting a custom category moves its applications to Other. Hidden is a separate navigation view and does not uninstall or modify the application.
+Deleting a custom category moves its applications to Other. Its confirmation reads as a destructive action rather than as the primary one, carrying the same outlined danger treatment as Reset catalog cache from a single shared definition, so the two cannot drift apart. Hidden is a separate navigation view and does not uninstall or modify the application.
+
+The category cascade is bounded by the window and scrolls inside itself, like the actions menu it opens from. A user with more categories than the window is tall could otherwise not reach the last of them: the panel is placed against the top viewport padding once it no longer fits, so without a bound its final entries sat below the screen edge with nothing to scroll.
 
 Move to category also accepts **Installers & Docs**. Filing an application there marks it as an installer, so it leaves the catalog and appears under Installers in that view; documentation is never assigned by hand, because the scan detects it on its own. The mark clears the application's Favorite, mirrors the durable card identity like every other manual choice, and is reversed by moving the entry to any ordinary category — which the actions menu keeps offering for a hand-filed entry. An installer or documentation entry the scan itself classified stays locked to its bucket and cannot be moved.
 
