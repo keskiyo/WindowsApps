@@ -7,7 +7,7 @@
 
 Start Menu shortcuts, installed programs, Store apps, Steam games and portable executables — collected into a single catalog that opens instantly and stays on your machine.
 
-[![Version](https://img.shields.io/badge/version-0.3.0-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.0)
+[![Version](https://img.shields.io/badge/version-0.3.1-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.1)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
@@ -15,7 +15,7 @@ Start Menu shortcuts, installed programs, Store apps, Steam games and portable e
 
 ### [⬇ Download for Windows](https://github.com/keskiyo/WindowsApps/releases/latest)
 
-[Documentation](Documentation.md) · [Release notes](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.0) · [Telegram](https://t.me/keskiyo)
+[Documentation](Documentation.md) · [Release notes](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.1) · [Telegram](https://t.me/keskiyo)
 
 <img src=".github/images/catalog.png" alt="Windows Apps catalog" width="880">
 
@@ -67,7 +67,7 @@ whose force scan and cache reset preserve Favorites, Hidden apps and categories.
 
 ## Install
 
-1. Download **`Windows.Apps_0.3.0_x64-setup.exe`** from the [latest release](https://github.com/keskiyo/WindowsApps/releases/latest).
+1. Download **`Windows.Apps_0.3.1_x64-setup.exe`** from the [latest release](https://github.com/keskiyo/WindowsApps/releases/latest).
 2. Run it.
 3. Start **Windows Apps** and choose **Scan for apps**.
 
@@ -143,7 +143,7 @@ Production build:
 npm run tauri build
 ```
 
-Local artifact: `src-tauri/target/release/bundle/nsis/Windows Apps_0.3.0_x64-setup.exe`
+Local artifact: `src-tauri/target/release/bundle/nsis/Windows Apps_0.3.1_x64-setup.exe`
 
 ## Support
 

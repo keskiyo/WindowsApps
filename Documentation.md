@@ -1,9 +1,9 @@
 # Windows Apps Technical Documentation
 
-Technical reference for Windows Apps `0.3.0`.
+Technical reference for Windows Apps `0.3.1`.
 
 [README](README.md) ·
-[Release 0.3.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.0) ·
+[Release 0.3.1](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.1) ·
 [Telegram](https://t.me/keskiyo)
 
 ---
@@ -785,5 +785,5 @@ Run the complete verification commands in [README.md](README.md#development), th
 ---
 
 [README](README.md) ·
-[Release 0.3.0](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.0) ·
+[Release 0.3.1](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.1) ·
 [Telegram: @keskiyo](https://t.me/keskiyo)
