@@ -20,7 +20,7 @@ pub(crate) struct CloseAppsResponse {
 
 #[derive(Debug, Default, PartialEq, Eq)]
 struct CloseRequest {
-    targets: Vec<PathBuf>,
+    targets: Vec<closer::CloseTarget>,
     unavailable: usize,
     blocked: usize,
 }
@@ -43,7 +43,10 @@ fn resolve_close_targets(state: &AppState, ids: Vec<String>) -> Result<CloseRequ
         match stored.get(&id) {
             Some(target) if target.blocked => request.blocked += 1,
             Some(target) if request.targets.len() < MAX_CLOSE_BATCH => {
-                request.targets.push(PathBuf::from(&target.path))
+                request.targets.push(closer::CloseTarget::new(
+                    PathBuf::from(&target.path),
+                    target.install_root.as_deref().map(PathBuf::from),
+                ))
             }
             _ => request.unavailable += 1,
         }
@@ -79,6 +82,14 @@ mod tests {
     use crate::app_state::{cached_app, remember_catalog};
     use crate::commands::MAX_CATALOG_ID_LENGTH;
 
+    fn executables(request: &CloseRequest) -> Vec<PathBuf> {
+        request
+            .targets
+            .iter()
+            .map(|target| target.executable.clone())
+            .collect()
+    }
+
     fn state_with(ids: &[&str]) -> AppState {
         let apps = ids
             .iter()
@@ -101,7 +112,7 @@ mod tests {
             resolve_close_targets(&state, vec!["editor".into(), "player".into()]).unwrap();
 
         assert_eq!(
-            request.targets,
+            executables(&request),
             vec![
                 PathBuf::from(r"C:\editor.exe"),
                 PathBuf::from(r"C:\player.exe")
@@ -131,7 +142,7 @@ mod tests {
         let request =
             resolve_close_targets(&state, vec!["editor".into(), "editor".into()]).unwrap();
 
-        assert_eq!(request.targets, vec![PathBuf::from(r"C:\editor.exe")]);
+        assert_eq!(executables(&request), vec![PathBuf::from(r"C:\editor.exe")]);
         assert_eq!(request.unavailable, 0);
     }
 
@@ -162,7 +173,7 @@ mod tests {
         assert_eq!(request.blocked, 1);
         assert_eq!(request.unavailable, 0);
         assert_eq!(
-            request.targets,
+            executables(&request),
             vec![PathBuf::from(r"C:\Editor\editor.exe")]
         );
     }
@@ -178,7 +189,7 @@ mod tests {
 
         assert_eq!(request.blocked, 0);
         assert_eq!(
-            request.targets,
+            executables(&request),
             vec![PathBuf::from(r"C:\Windows\explorer.exe")]
         );
     }

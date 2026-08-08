@@ -583,6 +583,20 @@ pub(crate) fn attach_close_risk(apps: &mut [AppInfo]) {
     }
 }
 
+pub(crate) fn close_scope_of(app: &AppInfo) -> Option<String> {
+    app.install_location
+        .as_deref()
+        .map(str::trim)
+        .filter(|location| !location.is_empty())
+        .map(str::to_owned)
+        .or_else(|| {
+            let target = close_target_of(app)?;
+            Path::new(&target)
+                .parent()
+                .map(|parent| parent.to_string_lossy().into_owned())
+        })
+}
+
 pub(crate) fn close_target_of(app: &AppInfo) -> Option<String> {
     let path = app.resolved_path.clone().or_else(|| {
         matches!(

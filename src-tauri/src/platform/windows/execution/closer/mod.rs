@@ -1,9 +1,12 @@
 mod frames;
+mod identity;
 mod processes;
 
-use processes::{image_path_of, running_images, same_executable, terminate};
+pub(crate) use identity::CloseTarget;
+
+use identity::is_instance_of;
+use processes::{image_path_of, running_images, terminate};
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
 
 const GRACE_PERIOD_MS: u64 = 5000;
 
@@ -13,31 +16,23 @@ pub(crate) struct CloseOutcome {
     pub(crate) not_running: usize,
 }
 
-fn file_names_of(targets: &[&str]) -> HashSet<String> {
-    targets
-        .iter()
-        .filter_map(|target| Path::new(target).file_name())
-        .map(|name| name.to_string_lossy().to_lowercase())
-        .collect()
+fn file_names_of(targets: &[CloseTarget]) -> HashSet<String> {
+    targets.iter().filter_map(CloseTarget::file_name).collect()
 }
 
-fn processes_of(target: &str, running: &[(u32, String)]) -> Vec<u32> {
+fn processes_of(target: &CloseTarget, running: &[(u32, String)]) -> Vec<u32> {
     running
         .iter()
-        .filter(|(_, image)| same_executable(image, target))
+        .filter(|(_, image)| is_instance_of(image, target))
         .map(|(pid, _)| *pid)
         .collect()
 }
 
-pub(crate) fn close_processes(targets: &[PathBuf]) -> CloseOutcome {
-    let targets: Vec<&str> = targets
-        .iter()
-        .filter_map(|target| target.to_str())
-        .collect();
+pub(crate) fn close_processes(targets: &[CloseTarget]) -> CloseOutcome {
     if targets.is_empty() {
         return CloseOutcome::default();
     }
-    let running = running_images(&file_names_of(&targets));
+    let running = running_images(&file_names_of(targets));
     let matched: Vec<Vec<u32>> = targets
         .iter()
         .map(|target| processes_of(target, &running))
@@ -53,10 +48,10 @@ pub(crate) fn close_processes(targets: &[PathBuf]) -> CloseOutcome {
         frames::ask_to_close(window);
     }
     std::thread::sleep(std::time::Duration::from_millis(GRACE_PERIOD_MS));
-    finish(&targets, &matched)
+    finish(targets, &matched)
 }
 
-fn finish(targets: &[&str], matched: &[Vec<u32>]) -> CloseOutcome {
+fn finish(targets: &[CloseTarget], matched: &[Vec<u32>]) -> CloseOutcome {
     let running = running_images(&file_names_of(targets));
     let mut outcome = CloseOutcome::default();
     for (target, before) in targets.iter().zip(matched) {
@@ -75,13 +70,20 @@ fn finish(targets: &[&str], matched: &[Vec<u32>]) -> CloseOutcome {
     outcome
 }
 
-fn is_gone(pid: u32, target: &str) -> bool {
-    image_path_of(pid).is_none_or(|image| !same_executable(&image, target))
+fn is_gone(pid: u32, target: &CloseTarget) -> bool {
+    image_path_of(pid).is_none_or(|image| !is_instance_of(&image, target))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::{Path, PathBuf};
+
+    fn target(executable: &str) -> CloseTarget {
+        let path = PathBuf::from(executable);
+        let root = path.parent().map(Path::to_path_buf);
+        CloseTarget::new(path, root)
+    }
 
     #[test]
     fn reports_nothing_for_an_empty_request() {
@@ -91,8 +93,8 @@ mod tests {
     #[test]
     fn reports_targets_that_are_not_running() {
         let outcome = close_processes(&[
-            PathBuf::from(r"C:\Nowhere\this-executable-does-not-exist.exe"),
-            PathBuf::from(r"C:\Nowhere\neither-does-this-one.exe"),
+            target(r"C:\Nowhere\this-executable-does-not-exist.exe"),
+            target(r"C:\Nowhere\neither-does-this-one.exe"),
         ]);
 
         assert_eq!(
@@ -106,7 +108,7 @@ mod tests {
 
     #[test]
     fn looks_only_for_the_executable_names_it_was_given() {
-        let names = file_names_of(&[r"C:\Editor\Editor.exe", "C:/Games/game.exe"]);
+        let names = file_names_of(&[target(r"C:\Editor\Editor.exe"), target("C:/Games/game.exe")]);
 
         assert_eq!(
             names,
@@ -123,14 +125,37 @@ mod tests {
         ];
 
         assert_eq!(
-            processes_of(r"C:\Editor\editor.exe", &running),
+            processes_of(&target(r"C:\Editor\editor.exe"), &running),
             vec![10, 11]
         );
     }
 
     #[test]
+    fn selects_the_processes_of_an_application_that_updated_itself() {
+        let chat = CloseTarget::new(
+            PathBuf::from(r"C:\Program Files\WindowsApps\Vendor.App_1.0.0.0_x64__abc\app\Chat.exe"),
+            Some(PathBuf::from(
+                r"C:\Program Files\WindowsApps\Vendor.App_1.0.0.0_x64__abc",
+            )),
+        );
+        let running = vec![
+            (
+                20,
+                r"C:\Program Files\WindowsApps\Vendor.App_2.5.9.0_x64__abc\app\Chat.exe"
+                    .to_string(),
+            ),
+            (
+                21,
+                r"C:\Program Files\WindowsApps\Other.App_2.5.9.0_x64__zzz\app\Chat.exe".to_string(),
+            ),
+        ];
+
+        assert_eq!(processes_of(&chat, &running), vec![20]);
+    }
+
+    #[test]
     fn counts_a_target_with_no_processes_as_idle() {
-        let outcome = finish(&[r"C:\Editor\editor.exe"], &[Vec::new()]);
+        let outcome = finish(&[target(r"C:\Editor\editor.exe")], &[Vec::new()]);
 
         assert_eq!(
             outcome,
@@ -143,7 +168,7 @@ mod tests {
 
     #[test]
     fn counts_a_target_whose_processes_are_gone_as_closed() {
-        let outcome = finish(&[r"C:\Nowhere\gone.exe"], &[vec![u32::MAX]]);
+        let outcome = finish(&[target(r"C:\Nowhere\gone.exe")], &[vec![u32::MAX]]);
 
         assert_eq!(
             outcome,

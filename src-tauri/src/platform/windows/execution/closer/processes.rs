@@ -9,11 +9,6 @@ use windows::Win32::System::Threading::{
     PROCESS_TERMINATE,
 };
 
-pub(super) fn same_executable(left: &str, right: &str) -> bool {
-    let normalize = |value: &str| value.trim().replace('/', "\\");
-    normalize(left).eq_ignore_ascii_case(&normalize(right))
-}
-
 struct OwnedHandle(HANDLE);
 
 impl Drop for OwnedHandle {
@@ -120,30 +115,6 @@ pub(super) fn terminate(pid: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn matches_windows_paths_case_insensitively() {
-        assert!(same_executable(
-            r"C:\Program Files\Editor\editor.exe",
-            r"c:\program files\editor\EDITOR.EXE"
-        ));
-    }
-
-    #[test]
-    fn matches_across_separator_styles() {
-        assert!(same_executable(
-            "C:/Program Files/Editor/editor.exe",
-            r"C:\Program Files\Editor\editor.exe"
-        ));
-    }
-
-    #[test]
-    fn does_not_match_a_different_executable_in_the_same_folder() {
-        assert!(!same_executable(
-            r"C:\Program Files\Editor\editor.exe",
-            r"C:\Program Files\Editor\updater.exe"
-        ));
-    }
 
     #[test]
     fn reads_the_executable_name_up_to_its_terminator() {

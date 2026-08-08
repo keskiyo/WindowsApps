@@ -65,6 +65,7 @@ pub(crate) struct UninstallPreview {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CloseTarget {
     pub(crate) path: String,
+    pub(crate) install_root: Option<String>,
     pub(crate) blocked: bool,
 }
 
@@ -152,7 +153,14 @@ pub(crate) fn remember_close_targets(state: &AppState, apps: &[AppInfo]) {
             let path = catalog::close_target_of(app)?;
             let blocked = crate::platform::windows::close_risk(Path::new(&path))
                 == crate::platform::windows::CloseRisk::Critical;
-            Some((app.id.clone(), CloseTarget { path, blocked }))
+            Some((
+                app.id.clone(),
+                CloseTarget {
+                    install_root: catalog::close_scope_of(app),
+                    path,
+                    blocked,
+                },
+            ))
         })
         .collect();
     if let Ok(mut stored) = state.close_targets.lock() {

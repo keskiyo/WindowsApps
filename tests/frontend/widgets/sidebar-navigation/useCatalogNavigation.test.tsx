@@ -195,6 +195,90 @@ describe('useCatalogNavigation', () => {
 		},
 	)
 
+	// Scrolled to the bottom of All Apps and then opening Settings used to land halfway down
+	// Settings, because the scroller is shared and nothing reset it.
+	it('starts a newly opened view at the top', () => {
+		const scroller = document.createElement('div')
+		scroller.id = 'catalog-scroll'
+		const scrollTo = vi.fn()
+		Object.defineProperty(scroller, 'scrollTop', {
+			value: 4200,
+			writable: true,
+		})
+		Object.defineProperty(scroller, 'scrollTo', { value: scrollTo })
+		document.body.append(scroller)
+		const { rerender } = renderHook(
+			({ activeView }: { activeView: AppView }) =>
+				useCatalogNavigation({
+					collapsedCategories: [],
+					activeView,
+					setActiveView: vi.fn(),
+					toggleCategory: vi.fn(),
+					closeDrawer: vi.fn(),
+				}),
+			{ initialProps: { activeView: 'all' as AppView } },
+		)
+
+		expect(scrollTo).not.toHaveBeenCalled()
+		rerender({ activeView: 'settings' })
+
+		expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+	})
+
+	it('leaves the position alone when the view has not changed', () => {
+		const scroller = document.createElement('div')
+		scroller.id = 'catalog-scroll'
+		const scrollTo = vi.fn()
+		Object.defineProperty(scroller, 'scrollTo', { value: scrollTo })
+		document.body.append(scroller)
+		const { rerender } = renderHook(
+			({ activeView }: { activeView: AppView }) =>
+				useCatalogNavigation({
+					collapsedCategories: [],
+					activeView,
+					setActiveView: vi.fn(),
+					toggleCategory: vi.fn(),
+					closeDrawer: vi.fn(),
+				}),
+			{ initialProps: { activeView: 'settings' as AppView } },
+		)
+
+		rerender({ activeView: 'settings' })
+
+		expect(scrollTo).not.toHaveBeenCalled()
+	})
+
+	// Jumping to a category switches to All Apps and then scrolls to that heading; resetting to the
+	// top on the way would undo the jump it was asked for.
+	it('does not reset the position when a category jump owns the scroll', () => {
+		const scroller = document.createElement('div')
+		scroller.id = 'catalog-scroll'
+		const scrollTo = vi.fn()
+		Object.defineProperty(scroller, 'scrollTop', {
+			value: 900,
+			writable: true,
+		})
+		Object.defineProperty(scroller, 'scrollTo', { value: scrollTo })
+		document.body.append(scroller)
+		captureAnimationFrames()
+		const { result, rerender } = renderHook(
+			({ activeView }: { activeView: AppView }) =>
+				useCatalogNavigation({
+					collapsedCategories: [],
+					activeView,
+					setActiveView: vi.fn(),
+					toggleCategory: vi.fn(),
+					closeDrawer: vi.fn(),
+				}),
+			{ initialProps: { activeView: 'settings' as AppView } },
+		)
+
+		act(() => result.current.selectCategory('other'))
+		rerender({ activeView: 'all' })
+
+		expect(scrollTo).not.toHaveBeenCalledWith({ top: 0, behavior: 'auto' })
+	})
+
 	it('opens the reserved artifact view without category scrolling', () => {
 		const setActiveView = vi.fn()
 		const closeDrawer = vi.fn()

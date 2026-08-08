@@ -39,6 +39,15 @@ export function useCatalogNavigation({
 	const [pendingCategory, setPendingCategory] =
 		useState<CategoryScrollRequest | null>(null)
 	const alignmentFrame = useRef<number | null>(null)
+	const shownView = useRef(activeView)
+	useLayoutEffect(() => {
+		if (shownView.current === activeView) return
+		shownView.current = activeView
+		if (pendingCategory) return
+		document
+			.getElementById('catalog-scroll')
+			?.scrollTo({ top: 0, behavior: 'auto' })
+	}, [activeView, pendingCategory])
 	useLayoutEffect(() => {
 		if (!pendingCategory || !isCatalogReady) return
 		const scroller = document.getElementById('catalog-scroll')
