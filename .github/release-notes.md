@@ -4,6 +4,8 @@ Windows Apps is a fast, private application catalog and launcher for Windows 10 
 
 - **Reliable scenario completion** — a scenario runs its configured launch and close lists as one protected operation. Its action stays disabled until all work has finished, which prevents duplicate launches and closes.
 - **Safer closing** — close detection follows application processes inside a dedicated executable directory, including launcher replacements and updated builds, while refusing shared system and installation roots.
+- **Cleaner Favorites and More** — scenario cards use responsive two- and three-column layouts without stretching neighbouring cards. More surfaces recently added applications and no longer shows scenario history.
+- **Catalog clarity** — application cards use compact controls, a subtle favorite star, and a focused Move to category cascade.
 
 ## Install
 

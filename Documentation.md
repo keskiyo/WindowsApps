@@ -1,6 +1,6 @@
 # Windows Apps Technical Documentation
 
-Technical reference for Windows Apps `0.3.2` (release preparation).
+Technical reference for Windows Apps `0.3.2`.
 
 [README](README.md) ·
 [Release 0.3.2](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.2) ·
