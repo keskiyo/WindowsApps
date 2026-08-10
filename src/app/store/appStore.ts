@@ -9,12 +9,13 @@ import { createLaunchActions } from './launchActions'
 import { createLifecycleActions } from './lifecycleActions'
 import { createPersist } from './persist'
 import { createScenarioActions } from './scenarioActions'
+import { createScenarioHistoryActions } from './scenarioHistoryActions'
 import { readPreferences } from './preferences'
-import type { AppPreferencesV13 } from './preferences'
+import type { AppPreferencesV14 } from './preferences'
 import type { AppsClient } from '../../entities/app'
 import type { AppState } from './types'
 
-function initialState(preferences: AppPreferencesV13) {
+function initialState(preferences: AppPreferencesV14) {
 	return {
 		apps: [],
 		query: '',
@@ -41,6 +42,7 @@ function initialState(preferences: AppPreferencesV13) {
 		installerAppIdentities: preferences.installerAppIdentities,
 		scenarios: preferences.scenarios,
 		favoriteScenarioIds: preferences.favoriteScenarioIds,
+		scenarioHistory: preferences.scenarioHistory,
 		firstSeenAt: preferences.firstSeenAt,
 		legacyCanonicalPreferences: preferences.legacyCanonicalPreferences,
 		preferencesPersisted: true,
@@ -73,6 +75,7 @@ export function createAppStore(
 			...createAppPlacementActions({ set, persist }),
 			...createCategoryActions({ set, get, persist, idFactory }),
 			...createScenarioActions({ set, get, persist, idFactory }),
+			...createScenarioHistoryActions({ set, get, persist }),
 		}
 	})
 }

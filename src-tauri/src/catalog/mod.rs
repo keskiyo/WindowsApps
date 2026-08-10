@@ -584,16 +584,19 @@ pub(crate) fn attach_close_risk(apps: &mut [AppInfo]) {
 }
 
 pub(crate) fn close_scope_of(app: &AppInfo) -> Option<String> {
-    app.install_location
+    close_target_of(app)
         .as_deref()
-        .map(str::trim)
-        .filter(|location| !location.is_empty())
-        .map(str::to_owned)
-        .or_else(|| {
-            let target = close_target_of(app)?;
-            Path::new(&target)
+        .and_then(|target| {
+            Path::new(target)
                 .parent()
                 .map(|parent| parent.to_string_lossy().into_owned())
+        })
+        .or_else(|| {
+            app.install_location
+                .as_deref()
+                .map(str::trim)
+                .filter(|location| !location.is_empty())
+                .map(str::to_owned)
         })
 }
 
@@ -729,6 +732,20 @@ mod tests {
         attach_close_risk(&mut apps);
 
         assert_eq!(apps[0].close_risk.as_deref(), Some("close.not_closable"));
+    }
+
+    #[test]
+    fn close_scope_uses_the_executable_parent_over_a_shared_vendor_root() {
+        let mut app = app(
+            "Product A",
+            r"C:\Program Files\Vendor\Product A\launcher.exe",
+        );
+        app.install_location = Some(r"C:\Program Files\Vendor".into());
+
+        assert_eq!(
+            close_scope_of(&app).as_deref(),
+            Some(r"C:\Program Files\Vendor\Product A")
+        );
     }
 
     fn walk_start_menu_shortcuts(roots: Vec<PathBuf>, budget: &StageBudget) -> Vec<AppInfo> {

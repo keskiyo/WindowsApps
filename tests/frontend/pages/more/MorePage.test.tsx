@@ -246,7 +246,7 @@ describe('MorePage', () => {
 	})
 
 	// A second click while apps are still starting would launch everything twice.
-	it('takes the run button out of service while that scenario runs', () => {
+	it('blocks the active preview scenario until it finishes', () => {
 		renderPage(
 			vi.fn(),
 			{
@@ -271,8 +271,46 @@ describe('MorePage', () => {
 			runControl({ runningId: 'gaming' }),
 		)
 
-		expect(screen.getByRole('button', { name: 'Run Gaming' })).toBeDisabled()
+		const run = screen.getByRole('button', { name: 'Run Gaming' })
+		expect(run).toBeDisabled()
+		expect(run).toHaveTextContent('Running…')
 		expect(screen.getByRole('button', { name: 'Run Work' })).toBeEnabled()
+	})
+
+	it('does not render legacy scenario history', () => {
+		render(
+			<MorePage
+				{...({
+					auxiliaryCount: 0,
+					hiddenCount: 0,
+					installersDocsCount: 0,
+					scenarioCount: 0,
+					preview: emptyPreview,
+					scenarioRun: runControl(),
+					onSelectView: vi.fn(),
+					scenarioHistory: [
+						{
+							id: 'old-run',
+							scenarioId: 'gaming',
+							scenarioName: 'Gaming',
+							startedAt: 1,
+							finishedAt: 2,
+							launched: 1,
+							closed: 0,
+							notRunning: 0,
+							unavailable: 0,
+							blocked: 0,
+							failed: 0,
+							cancelled: false,
+						},
+					],
+				} as unknown as MorePageProps)}
+			/>,
+		)
+
+		expect(
+			screen.queryByRole('heading', { name: 'Scenario history' }),
+		).not.toBeInTheDocument()
 	})
 
 	// Only this card: the preview cuts the list off, and the rest of it is something to run.

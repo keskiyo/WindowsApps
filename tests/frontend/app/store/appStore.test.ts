@@ -66,7 +66,7 @@ function client(overrides: Partial<AppsClient> = {}): AppsClient {
 		launchApp: vi.fn().mockResolvedValue(undefined),
 		closeApps: vi
 			.fn()
-			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0 }),
+			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0, failed: 0 }),
 		getUninstallPreview: vi.fn().mockResolvedValue({
 			appName: 'Visual Studio Code',
 			publisher: 'Microsoft',

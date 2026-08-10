@@ -69,11 +69,18 @@ pub(crate) struct CloseTarget {
     pub(crate) blocked: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct LaunchTarget {
+    pub(crate) kind: LaunchKind,
+    pub(crate) path: String,
+    pub(crate) arguments: Option<String>,
+}
+
 #[derive(Default)]
 pub(crate) struct AppState {
     pub(crate) catalog_ids: Mutex<HashSet<String>>,
     pub(crate) uninstall_targets: Mutex<HashMap<String, UninstallRecord>>,
-    pub(crate) launch_targets: Mutex<HashMap<String, (LaunchKind, String)>>,
+    pub(crate) launch_targets: Mutex<HashMap<String, LaunchTarget>>,
     pub(crate) close_targets: Mutex<HashMap<String, CloseTarget>>,
     pub(crate) app_details_targets: Mutex<HashMap<String, AppDetailsTarget>>,
     pub(crate) app_details_cache: Mutex<HashMap<String, CachedAppDetails>>,
@@ -139,7 +146,16 @@ pub(crate) fn remember_uninstall_targets(state: &AppState, apps: &[AppInfo]) {
 pub(crate) fn remember_launch_targets(state: &AppState, apps: &[AppInfo]) {
     let targets = apps
         .iter()
-        .map(|app| (app.id.clone(), (app.launch_kind, app.path.clone())))
+        .map(|app| {
+            (
+                app.id.clone(),
+                LaunchTarget {
+                    kind: app.launch_kind,
+                    path: app.path.clone(),
+                    arguments: app.launch_arguments.clone(),
+                },
+            )
+        })
         .collect();
     if let Ok(mut stored) = state.launch_targets.lock() {
         *stored = targets;
@@ -334,9 +350,34 @@ mod tests {
         let stored = state.launch_targets.lock().unwrap();
         assert_eq!(
             stored.get("code").cloned(),
-            Some((LaunchKind::Executable, r"C:\Code.exe".to_string()))
+            Some(LaunchTarget {
+                kind: LaunchKind::Executable,
+                path: r"C:\Code.exe".to_string(),
+                arguments: None,
+            })
         );
         assert!(stored.get("unknown-id").is_none());
+    }
+
+    #[test]
+    fn launch_targets_remember_catalog_arguments() {
+        let mut app = cached_app("Editor", r"C:\\Editor\\editor.exe");
+        app.id = "editor".into();
+        app.launch_arguments = Some("--safe-mode".into());
+        let state = AppState::default();
+
+        remember_launch_targets(&state, &[app]);
+
+        assert_eq!(
+            state
+                .launch_targets
+                .lock()
+                .unwrap()
+                .get("editor")
+                .unwrap()
+                .arguments,
+            Some("--safe-mode".into())
+        );
     }
 
     #[test]

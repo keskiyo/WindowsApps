@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { ScenarioRunDialog } from '../../../../features/manage-scenarios'
 import { buildMoreDestinations } from './data'
 import { MoreCard } from './MoreCard'
+import { MorePreviewRow } from './MorePreviewRow'
 import type { MorePageProps } from './types'
 
 export function MorePage({
@@ -10,6 +11,7 @@ export function MorePage({
 	hiddenCount,
 	installersDocsCount,
 	scenarioCount,
+	recentApps = [],
 	preview,
 	scenarioRun,
 	onSelectView,
@@ -54,6 +56,18 @@ export function MorePage({
 					/>
 				))}
 			</div>
+			{recentApps.length > 0 && (
+				<section className="mt-6 overflow-hidden rounded-2xl border border-(--border-neutral) bg-(--surface-panel)">
+					<header className="px-5 py-4">
+						<h2 className="text-base font-semibold">Recently added</h2>
+					</header>
+					<ul className="border-t border-(--border-neutral)">
+						{recentApps.map(entry => (
+							<MorePreviewRow key={entry.app.id} entry={entry} />
+						))}
+					</ul>
+				</section>
+			)}
 			{viewingScenarios && (
 				<ScenarioRunDialog
 					scenarios={scenarioRun.scenarios}

@@ -49,6 +49,12 @@ function listKey(list: ScenarioList): 'launchIdentities' | 'closeIdentities' {
 	return list === 'launch' ? 'launchIdentities' : 'closeIdentities'
 }
 
+function oppositeListKey(
+	list: ScenarioList,
+): 'launchIdentities' | 'closeIdentities' {
+	return list === 'launch' ? 'closeIdentities' : 'launchIdentities'
+}
+
 export function createScenarioActions({
 	set,
 	get,
@@ -123,10 +129,13 @@ export function createScenarioActions({
 		},
 		addScenarioApp(id, list, identity) {
 			const key = listKey(list)
+			const oppositeKey = oppositeListKey(list)
 			const scenario = get().scenarios.find(entry => entry.id === id)
 			if (!scenario) return { ok: false, error: 'Scenario not found' }
 			if (scenario[key].includes(identity))
 				return { ok: false, error: 'Already in this list' }
+			if (scenario[oppositeKey].includes(identity))
+				return { ok: false, error: 'An app cannot both launch and close' }
 			if (scenario[key].length >= MAX_SCENARIO_ENTRIES)
 				return {
 					ok: false,

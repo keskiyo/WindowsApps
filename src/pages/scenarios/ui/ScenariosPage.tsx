@@ -12,6 +12,7 @@ export function ScenariosPage({
 	scenarios,
 	apps,
 	runningId,
+	runProgress,
 	favoriteScenarioIds,
 	onBack,
 	onCreate,
@@ -24,6 +25,9 @@ export function ScenariosPage({
 }: ScenariosPageProps) {
 	const [creating, setCreating] = useState(false)
 	const newestFirst = sortScenariosByNewest(scenarios)
+	const runningStatus = runProgress
+		? `${runProgress.phase === 'launching' ? 'Launching' : 'Closing'} ${runProgress.completed}/${runProgress.total}`
+		: undefined
 
 	return (
 		<section
@@ -73,6 +77,9 @@ export function ScenariosPage({
 							scenario={scenario}
 							apps={apps}
 							running={runningId === scenario.id}
+							runningStatus={
+								runningId === scenario.id ? runningStatus : undefined
+							}
 							isFavorite={favoriteScenarioIds.includes(
 								scenario.id,
 							)}

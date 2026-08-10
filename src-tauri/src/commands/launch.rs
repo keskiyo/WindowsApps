@@ -1,5 +1,5 @@
 use super::is_valid_catalog_id;
-use crate::app_state::AppState;
+use crate::app_state::{AppState, LaunchTarget};
 use crate::error::AppError;
 use crate::platform::windows::launcher;
 use serde::Serialize;
@@ -16,10 +16,7 @@ fn wait_for_launch_ready(handle: &launcher::OwnedProcessHandle) -> &'static str 
     "ready"
 }
 
-fn resolve_launch_target(
-    state: &AppState,
-    id: &str,
-) -> Result<(crate::catalog::LaunchKind, String), AppError> {
+fn resolve_launch_target(state: &AppState, id: &str) -> Result<LaunchTarget, AppError> {
     if !is_valid_catalog_id(id) {
         return Err(AppError::LaunchUnavailable);
     }
@@ -32,17 +29,25 @@ fn resolve_launch_target(
 
 #[tauri::command]
 pub(crate) async fn launch_app(app: tauri::AppHandle, id: String) -> Result<(), AppError> {
-    let (launch_kind, path, launch_waits) = {
+    let (launch_target, launch_waits) = {
         let state = app.state::<AppState>();
-        let (kind, path) = resolve_launch_target(&state, &id)?;
-        (kind, path, state.launch_waits.clone())
+        (
+            resolve_launch_target(&state, &id)?,
+            state.launch_waits.clone(),
+        )
     };
-    let handle = tauri::async_runtime::spawn_blocking(move || launcher::launch(launch_kind, &path))
-        .await
-        .map_err(|error| AppError::Interrupted {
-            context: "Application launch",
-            source: error.to_string(),
-        })??;
+    let handle = tauri::async_runtime::spawn_blocking(move || {
+        launcher::launch(
+            launch_target.kind,
+            &launch_target.path,
+            launch_target.arguments.as_deref(),
+        )
+    })
+    .await
+    .map_err(|error| AppError::Interrupted {
+        context: "Application launch",
+        source: error.to_string(),
+    })??;
     if let Some(handle) = handle {
         let emitter = app.clone();
         let launch_id = id.clone();
@@ -77,9 +82,9 @@ mod tests {
         app.id = "editor".into();
         remember_catalog(&state, &[app]);
 
-        let (_, path) = resolve_launch_target(&state, "editor").unwrap();
+        let target = resolve_launch_target(&state, "editor").unwrap();
 
-        assert_eq!(path, r"C:\Editor.exe");
+        assert_eq!(target.path, r"C:\Editor.exe");
     }
 
     #[test]

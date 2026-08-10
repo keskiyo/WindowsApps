@@ -143,13 +143,15 @@ describe('ScenarioRunDialog', () => {
 		).toEqual(['Run Newest', 'Run Older', 'Run Legacy'])
 	})
 
-	it('takes the run button out of service while that scenario runs', () => {
+	it('blocks the active scenario action until it finishes', () => {
 		renderDialog({
 			scenarios: [gaming, scenario({ id: 'work', name: 'Work' })],
 			runningId: 'gaming',
 		})
 
-		expect(screen.getByRole('button', { name: 'Run Gaming' })).toBeDisabled()
+		const run = screen.getByRole('button', { name: 'Run Gaming' })
+		expect(run).toBeDisabled()
+		expect(run).toHaveTextContent('Running…')
 		expect(screen.getByRole('button', { name: 'Run Work' })).toBeEnabled()
 	})
 

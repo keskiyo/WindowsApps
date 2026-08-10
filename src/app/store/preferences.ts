@@ -8,13 +8,15 @@ import {
 } from '../../entities/category'
 import {
 	MAX_SCENARIO_ENTRIES,
+	MAX_SCENARIO_HISTORY,
 	MAX_SCENARIOS,
 	type Scenario,
+	type ScenarioRunRecord,
 } from '../../entities/scenario'
 
 export const PREFERENCES_KEY = 'windows-apps.preferences.v1'
 
-export const CURRENT_PREFERENCES_VERSION = 13
+export const CURRENT_PREFERENCES_VERSION = 14
 
 export const PREFERENCES_BACKUP_KEY = 'windows-apps.preferences.v1.bak'
 
@@ -26,8 +28,8 @@ export interface LegacyCanonicalPreferences {
 	categoryOverrides: Record<string, AppCategory>
 }
 
-export interface AppPreferencesV13 {
-	version: 13
+export interface AppPreferencesV14 {
+	version: 14
 	categories: CategoryDefinition[]
 	categoryOrder: AppCategory[]
 	favoriteAppIds: string[]
@@ -43,13 +45,14 @@ export interface AppPreferencesV13 {
 	installerAppIdentities: string[]
 	scenarios: Scenario[]
 	favoriteScenarioIds: string[]
+	scenarioHistory: ScenarioRunRecord[]
 	firstSeenAt: Record<string, number>
 	legacyCanonicalPreferences: LegacyCanonicalPreferences
 	unknownFields?: Record<string, unknown>
 }
 
-export const DEFAULT_PREFERENCES: AppPreferencesV13 = {
-	version: 13,
+export const DEFAULT_PREFERENCES: AppPreferencesV14 = {
+	version: 14,
 	categories: DEFAULT_CATEGORIES.map(category => ({ ...category })),
 	categoryOrder: [...CATEGORY_ORDER],
 	favoriteAppIds: [],
@@ -65,6 +68,7 @@ export const DEFAULT_PREFERENCES: AppPreferencesV13 = {
 	installerAppIdentities: [],
 	scenarios: [],
 	favoriteScenarioIds: [],
+	scenarioHistory: [],
 	firstSeenAt: {},
 	legacyCanonicalPreferences: {
 		favorite: [],
@@ -161,6 +165,7 @@ const KNOWN_PREFERENCE_FIELDS = new Set([
 	'installerAppIdentities',
 	'scenarios',
 	'favoriteScenarioIds',
+	'scenarioHistory',
 	'firstSeenAt',
 	'legacyCanonicalPreferences',
 ])
@@ -177,17 +182,17 @@ function normalizeScenarios(value: unknown): Scenario[] {
 		if (!id || !name || seenIds.has(id)) continue
 		seenIds.add(id)
 		const createdAt = raw.createdAt
+		const launchIdentities = uniqueStrings(raw.launchIdentities).slice(
+			0,
+			MAX_SCENARIO_ENTRIES,
+		)
 		scenarios.push({
 			id,
 			name,
-			launchIdentities: uniqueStrings(raw.launchIdentities).slice(
-				0,
-				MAX_SCENARIO_ENTRIES,
-			),
-			closeIdentities: uniqueStrings(raw.closeIdentities).slice(
-				0,
-				MAX_SCENARIO_ENTRIES,
-			),
+			launchIdentities,
+			closeIdentities: uniqueStrings(raw.closeIdentities)
+				.filter(identity => !launchIdentities.includes(identity))
+				.slice(0, MAX_SCENARIO_ENTRIES),
 			createdAt:
 				typeof createdAt === 'number' &&
 				Number.isFinite(createdAt) &&
@@ -197,6 +202,54 @@ function normalizeScenarios(value: unknown): Scenario[] {
 		})
 	}
 	return scenarios
+}
+
+function normalizeScenarioHistory(value: unknown): ScenarioRunRecord[] {
+	if (!Array.isArray(value)) return []
+	const records: ScenarioRunRecord[] = []
+	const seen = new Set<string>()
+	for (const item of value) {
+		if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+		const raw = item as Record<string, unknown>
+		const id = typeof raw.id === 'string' ? raw.id.trim() : ''
+		const scenarioId = typeof raw.scenarioId === 'string' ? raw.scenarioId.trim() : ''
+		const scenarioName = typeof raw.scenarioName === 'string' ? raw.scenarioName.trim() : ''
+		const numbers = [
+			raw.startedAt,
+			raw.finishedAt,
+			raw.launched,
+			raw.closed,
+			raw.notRunning,
+			raw.unavailable,
+			raw.blocked,
+			raw.failed,
+		]
+		if (
+			!id ||
+			!scenarioId ||
+			!scenarioName ||
+			seen.has(id) ||
+			numbers.some(value => typeof value !== 'number' || !Number.isFinite(value)) ||
+			typeof raw.cancelled !== 'boolean'
+		)
+			continue
+		seen.add(id)
+		records.push({
+			id,
+			scenarioId,
+			scenarioName,
+			startedAt: raw.startedAt as number,
+			finishedAt: raw.finishedAt as number,
+			launched: raw.launched as number,
+			closed: raw.closed as number,
+			notRunning: raw.notRunning as number,
+			unavailable: raw.unavailable as number,
+			blocked: raw.blocked as number,
+			failed: raw.failed as number,
+			cancelled: raw.cancelled,
+		})
+	}
+	return records.sort((left, right) => right.finishedAt - left.finishedAt).slice(0, MAX_SCENARIO_HISTORY)
 }
 
 function normalizeTimestampMap(value: unknown): Record<string, number> {
@@ -212,7 +265,7 @@ function normalizeTimestampMap(value: unknown): Record<string, number> {
 	) as Record<string, number>
 }
 
-export function normalizePreferences(value: unknown): AppPreferencesV13 {
+export function normalizePreferences(value: unknown): AppPreferencesV14 {
 	if (!value || typeof value !== 'object')
 		return structuredClone(DEFAULT_PREFERENCES)
 	const raw = value as Record<string, unknown>
@@ -237,6 +290,7 @@ export function normalizePreferences(value: unknown): AppPreferencesV13 {
 	const hasInstallerMarks = version >= 9
 	const hasFirstSeen = version >= 10
 	const hasScenarios = version >= 11
+	const hasScenarioHistory = version >= 14
 	const rawLegacy =
 		hasDurableIdentities &&
 		raw.legacyCanonicalPreferences &&
@@ -273,7 +327,7 @@ export function normalizePreferences(value: unknown): AppPreferencesV13 {
 		),
 	)
 	return {
-		version: 13,
+		version: 14,
 		categories,
 		categoryOrder,
 		favoriteAppIds: uniqueStrings(raw.favoriteAppIds),
@@ -305,13 +359,16 @@ export function normalizePreferences(value: unknown): AppPreferencesV13 {
 		favoriteScenarioIds: uniqueStrings(raw.favoriteScenarioIds).filter(id =>
 			scenarios.some(scenario => scenario.id === id),
 		),
+		scenarioHistory: hasScenarioHistory
+			? normalizeScenarioHistory(raw.scenarioHistory)
+			: [],
 		firstSeenAt: hasFirstSeen ? normalizeTimestampMap(raw.firstSeenAt) : {},
 		legacyCanonicalPreferences,
 		...(Object.keys(unknownFields).length > 0 ? { unknownFields } : {}),
 	}
 }
 
-export function readPreferences(storage: Storage): AppPreferencesV13 {
+export function readPreferences(storage: Storage): AppPreferencesV14 {
 	return (
 		readSlot(storage, PREFERENCES_KEY) ??
 		readSlot(storage, PREFERENCES_BACKUP_KEY) ??
@@ -319,7 +376,7 @@ export function readPreferences(storage: Storage): AppPreferencesV13 {
 	)
 }
 
-function readSlot(storage: Storage, key: string): AppPreferencesV13 | null {
+function readSlot(storage: Storage, key: string): AppPreferencesV14 | null {
 	try {
 		const value = storage.getItem(key)
 		return value ? normalizePreferences(JSON.parse(value)) : null
@@ -330,7 +387,7 @@ function readSlot(storage: Storage, key: string): AppPreferencesV13 | null {
 
 export function writePreferences(
 	storage: Storage,
-	preferences: AppPreferencesV13,
+	preferences: AppPreferencesV14,
 ): boolean {
 	if (storedVersionIsNewer(storage)) {
 		return true

@@ -14,6 +14,7 @@ export function ScenarioCard({
 	scenario,
 	apps,
 	running,
+	runningStatus,
 	isFavorite,
 	onToggleFavorite,
 	onRename,
@@ -70,8 +71,9 @@ export function ScenarioCard({
 							onClick={() => onRun(scenario)}
 							className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-(--accent) bg-(--utility-accent) px-3 text-xs font-medium text-(--text-primary) transition-colors hover:bg-(--utility-accent-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong) disabled:cursor-progress disabled:opacity-60"
 						>
-							<Play size={14} aria-hidden="true" />
-							{running ? 'Running…' : 'Run'}
+						<Play size={14} aria-hidden="true" />
+						{runningStatus && <span>{runningStatus}</span>}
+						{running ? 'Running…' : 'Run'}
 						</button>
 						<button
 							type="button"

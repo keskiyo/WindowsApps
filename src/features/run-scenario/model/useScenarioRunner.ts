@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { AppInfo, CloseAppsResult } from '../../../entities/app'
 import {
 	MAX_SCENARIO_ENTRIES,
@@ -13,6 +13,16 @@ export interface ScenarioRunSummary {
 	notRunning: number
 	unavailable: number
 	blocked: number
+	failed: number
+	cancelled: boolean
+	startedAt: number
+	finishedAt: number
+}
+
+export interface ScenarioRunProgress {
+	phase: 'launching' | 'closing'
+	completed: number
+	total: number
 }
 
 interface RunnerOptions {
@@ -28,6 +38,7 @@ const NOTHING_CLOSED: CloseAppsResult = {
 	notRunning: 0,
 	unavailable: 0,
 	blocked: 0,
+	failed: 0,
 }
 
 export function useScenarioRunner({
@@ -38,10 +49,14 @@ export function useScenarioRunner({
 	onFinished,
 }: RunnerOptions) {
 	const [runningId, setRunningId] = useState<string | null>(null)
+	const [progress, setProgress] = useState<ScenarioRunProgress | null>(null)
+	const activeRef = useRef(false)
 
 	const run = useCallback(
 		async (scenario: Scenario) => {
-			if (runningId) return
+			if (activeRef.current) return
+			activeRef.current = true
+			const startedAt = Date.now()
 			setRunningId(scenario.id)
 			const toLaunch = resolveScenarioApps(
 				scenario.launchIdentities.slice(0, MAX_SCENARIO_ENTRIES),
@@ -51,11 +66,16 @@ export function useScenarioRunner({
 				scenario.closeIdentities.slice(0, MAX_SCENARIO_ENTRIES),
 				apps,
 			)
+			setProgress({
+				phase: 'launching',
+				completed: 0,
+				total: toLaunch.apps.length,
+			})
 			let launched = 0
 			let unavailable = toLaunch.missing + toClose.missing
 			let closeResult = NOTHING_CLOSED
 			try {
-				for (const app of toLaunch.apps) {
+				for (const [index, app] of toLaunch.apps.entries()) {
 					try {
 						await launch(app)
 						launched += 1
@@ -63,8 +83,18 @@ export function useScenarioRunner({
 						void toAppClientError(error)
 						unavailable += 1
 					}
+					setProgress({
+						phase: 'launching',
+						completed: index + 1,
+						total: toLaunch.apps.length,
+					})
 				}
 				if (toClose.apps.length) {
+					setProgress({
+						phase: 'closing',
+						completed: 0,
+						total: toClose.apps.length,
+					})
 					try {
 						closeResult = await closeApps(
 							toClose.apps.map(app => app.id),
@@ -73,9 +103,16 @@ export function useScenarioRunner({
 						void toAppClientError(error)
 						unavailable += toClose.apps.length
 					}
+					setProgress({
+						phase: 'closing',
+						completed: toClose.apps.length,
+						total: toClose.apps.length,
+					})
 				}
 			} finally {
+				activeRef.current = false
 				setRunningId(null)
+				setProgress(null)
 			}
 			onFinished(scenario, {
 				launched,
@@ -83,9 +120,13 @@ export function useScenarioRunner({
 				notRunning: closeResult.notRunning,
 				unavailable: unavailable + closeResult.unavailable,
 				blocked: closeResult.blocked ?? 0,
+				failed: closeResult.failed,
+				cancelled: false,
+				startedAt,
+				finishedAt: Date.now(),
 			})
 		},
-		[apps, closeApps, launch, onFinished, runningId],
+		[apps, closeApps, launch, onFinished],
 	)
 
 	const runById = useCallback(
@@ -96,5 +137,5 @@ export function useScenarioRunner({
 		[run, scenarios],
 	)
 
-	return { run, runById, runningId }
+	return { run, runById, runningId, progress }
 }

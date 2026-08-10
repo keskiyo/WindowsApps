@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
@@ -10,6 +9,8 @@ use windows::Win32::System::Threading::{
 };
 
 struct OwnedHandle(HANDLE);
+
+const MAX_PROCESS_IMAGES: usize = 4096;
 
 impl Drop for OwnedHandle {
     fn drop(&mut self) {
@@ -54,19 +55,7 @@ pub(super) fn image_path_of(pid: u32) -> Option<String> {
     buffer.get(..written).map(String::from_utf16_lossy)
 }
 
-fn entry_file_name(entry: &PROCESSENTRY32W) -> String {
-    let name = entry
-        .szExeFile
-        .split(|character| *character == 0)
-        .next()
-        .unwrap_or_default();
-    String::from_utf16_lossy(name).to_lowercase()
-}
-
-pub(super) fn running_images(file_names: &HashSet<String>) -> Vec<(u32, String)> {
-    if file_names.is_empty() {
-        return Vec::new();
-    }
+pub(super) fn running_images() -> Vec<(u32, String)> {
     // SAFETY: `GetCurrentProcessId` takes no arguments and cannot fail.
     let own_pid = unsafe { GetCurrentProcessId() };
     // SAFETY: `CreateToolhelp32Snapshot` takes only plain values and reports failure through the
@@ -89,9 +78,12 @@ pub(super) fn running_images(file_names: &HashSet<String>) -> Vec<(u32, String)>
     let mut processes = Vec::new();
     loop {
         let pid = entry.th32ProcessID;
-        if pid != 0 && pid != own_pid && file_names.contains(&entry_file_name(&entry)) {
+        if pid != 0 && pid != own_pid {
             if let Some(image) = image_path_of(pid) {
                 processes.push((pid, image));
+                if processes.len() == MAX_PROCESS_IMAGES {
+                    break;
+                }
             }
         }
         // SAFETY: same invariants as `Process32FirstW` above; `entry` stays live for the loop.
@@ -117,34 +109,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reads_the_executable_name_up_to_its_terminator() {
-        let mut entry = PROCESSENTRY32W::default();
-        for (slot, character) in entry.szExeFile.iter_mut().zip("Editor.EXE".encode_utf16()) {
-            *slot = character;
-        }
-
-        assert_eq!(entry_file_name(&entry), "editor.exe");
-    }
-
-    #[test]
     fn never_lists_the_current_process() {
         // SAFETY: `GetCurrentProcessId` takes no arguments and cannot fail.
         let own_pid = unsafe { GetCurrentProcessId() };
-        let own_name = std::env::current_exe()
-            .ok()
-            .and_then(|path| {
-                path.file_name()
-                    .map(|name| name.to_string_lossy().to_lowercase())
-            })
-            .unwrap_or_default();
-
-        let running = running_images(&HashSet::from([own_name]));
+        let running = running_images();
 
         assert!(running.iter().all(|(pid, _)| *pid != own_pid));
-    }
-
-    #[test]
-    fn lists_nothing_without_a_name_to_look_for() {
-        assert!(running_images(&HashSet::new()).is_empty());
     }
 }

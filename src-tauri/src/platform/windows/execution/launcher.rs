@@ -32,7 +32,11 @@ pub(crate) fn wait_for_input_idle(handle: &OwnedProcessHandle, timeout_ms: u32) 
     unsafe { WaitForInputIdle(handle, timeout_ms) };
 }
 
-pub(crate) fn launch(kind: LaunchKind, target: &str) -> Result<Option<OwnedProcessHandle>, String> {
+pub(crate) fn launch(
+    kind: LaunchKind,
+    target: &str,
+    arguments: Option<&str>,
+) -> Result<Option<OwnedProcessHandle>, String> {
     if kind != LaunchKind::AppUserModelId && !is_launch_uri(target) && !Path::new(target).exists() {
         return Err(format!("File not found: {target}"));
     }
@@ -40,23 +44,36 @@ pub(crate) fn launch(kind: LaunchKind, target: &str) -> Result<Option<OwnedProce
         LaunchKind::AppUserModelId => apps_folder_target(target),
         LaunchKind::Executable | LaunchKind::Shortcut => target.to_string(),
     };
-    shell_execute_with_handle(&shell_target)
+    shell_execute_with_handle(&shell_target, parameters_for(kind, target, arguments))
 }
 
-fn shell_execute_with_handle(target: &str) -> Result<Option<OwnedProcessHandle>, String> {
+fn shell_execute_with_handle(
+    target: &str,
+    parameters: Option<&str>,
+) -> Result<Option<OwnedProcessHandle>, String> {
     let operation: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
     let file: Vec<u16> = OsStr::new(target).encode_wide().chain(Some(0)).collect();
+    let parameters = parameters.map(|value| {
+        OsStr::new(value)
+            .encode_wide()
+            .chain(Some(0))
+            .collect::<Vec<_>>()
+    });
     let mut info = SHELLEXECUTEINFOW {
         cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
         fMask: SEE_MASK_NOCLOSEPROCESS,
         lpVerb: PCWSTR(operation.as_ptr()),
         lpFile: PCWSTR(file.as_ptr()),
+        lpParameters: parameters
+            .as_ref()
+            .map_or(PCWSTR::null(), |value| PCWSTR(value.as_ptr())),
         nShow: SW_SHOWNORMAL.0,
         ..Default::default()
     };
     // SAFETY: `info` is fully initialized (`cbSize` set to its own size, remaining fields
-    // defaulted), and its `lpVerb`/`lpFile` point at `operation` and `file`, which are
-    // NUL-terminated UTF-16 buffers owned by this frame that outlive the call. `ShellExecuteExW`
+    // defaulted), and its `lpVerb`/`lpFile`/`lpParameters` point at `operation`, `file`, and the
+    // optional NUL-terminated UTF-16 parameter buffer owned by this frame that outlive the call.
+    // `ShellExecuteExW`
     // writes back into `info` through the exclusive `&mut`, and `SEE_MASK_NOCLOSEPROCESS` makes
     // any returned `hProcess` ours to close — which `OwnedProcessHandle` then does exactly once.
     unsafe { ShellExecuteExW(&mut info) }.map_err(|_| {
@@ -70,6 +87,16 @@ fn shell_execute_with_handle(target: &str) -> Result<Option<OwnedProcessHandle>,
     } else {
         Ok(Some(OwnedProcessHandle(info.hProcess.0 as isize)))
     }
+}
+
+fn parameters_for<'a>(
+    kind: LaunchKind,
+    target: &str,
+    arguments: Option<&'a str>,
+) -> Option<&'a str> {
+    (kind == LaunchKind::Executable && !is_launch_uri(target))
+        .then_some(arguments?.trim())
+        .filter(|value| !value.is_empty())
 }
 
 pub(crate) fn shell_execute(target: &str) -> Result<(), String> {
@@ -156,6 +183,46 @@ mod tests {
         assert_eq!(
             apps_folder_target("OpenAI.Codex_abc!App"),
             r"shell:AppsFolder\OpenAI.Codex_abc!App"
+        );
+    }
+
+    #[test]
+    fn keeps_arguments_for_executables() {
+        assert_eq!(
+            parameters_for(
+                LaunchKind::Executable,
+                r"C:\Editor.exe",
+                Some(" --safe-mode ")
+            ),
+            Some("--safe-mode")
+        );
+    }
+
+    #[test]
+    fn never_adds_parameters_to_shortcuts_aumids_or_uris() {
+        assert_eq!(
+            parameters_for(
+                LaunchKind::Shortcut,
+                r"C:\Menu\Editor.lnk",
+                Some("--safe-mode")
+            ),
+            None
+        );
+        assert_eq!(
+            parameters_for(
+                LaunchKind::AppUserModelId,
+                "Contoso.App!App",
+                Some("--safe-mode")
+            ),
+            None
+        );
+        assert_eq!(
+            parameters_for(
+                LaunchKind::Executable,
+                "steam://rungameid/1",
+                Some("--safe-mode")
+            ),
+            None
         );
     }
 }

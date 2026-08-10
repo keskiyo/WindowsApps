@@ -36,7 +36,7 @@ function scenario(value: Partial<Scenario> = {}): Scenario {
 }
 
 function closed(count: number): CloseAppsResult {
-	return { closed: count, notRunning: 0, unavailable: 0, blocked: 0 }
+	return { closed: count, notRunning: 0, unavailable: 0, blocked: 0, failed: 0 }
 }
 
 function setup(options: {
@@ -85,7 +85,14 @@ describe('useScenarioRunner', () => {
 		expect(order).toEqual(['launch:game', 'close:chat'])
 		expect(onFinished).toHaveBeenCalledWith(
 			expect.objectContaining({ id: 'gaming' }),
-			{ launched: 1, closed: 1, notRunning: 0, unavailable: 0, blocked: 0 },
+			expect.objectContaining({
+				launched: 1,
+				closed: 1,
+				notRunning: 0,
+				unavailable: 0,
+				blocked: 0,
+				failed: 0,
+			}),
 		)
 	})
 
@@ -124,7 +131,8 @@ describe('useScenarioRunner', () => {
 				closed: 0,
 				notRunning: 1,
 				unavailable: 1,
-				blocked: 0,
+		blocked: 0,
+		failed: 0,
 			})),
 		})
 
@@ -134,13 +142,14 @@ describe('useScenarioRunner', () => {
 			)
 		})
 
-		expect(onFinished).toHaveBeenCalledWith(expect.anything(), {
+		expect(onFinished).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
 			launched: 0,
 			closed: 0,
 			notRunning: 1,
 			unavailable: 1,
-			blocked: 0,
-		})
+		blocked: 0,
+		failed: 0,
+		}))
 	})
 
 	it('counts entries the catalog no longer has as unavailable', async () => {
@@ -159,13 +168,14 @@ describe('useScenarioRunner', () => {
 
 		expect(launch).toHaveBeenCalledTimes(1)
 		expect(closeApps).not.toHaveBeenCalled()
-		expect(onFinished).toHaveBeenCalledWith(expect.anything(), {
+		expect(onFinished).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
 			launched: 1,
 			closed: 0,
 			notRunning: 0,
 			unavailable: 2,
-			blocked: 0,
-		})
+		blocked: 0,
+		failed: 0,
+		}))
 	})
 
 	// A scenario is a batch: one app that refuses to start must not abort the rest of it.
@@ -183,13 +193,13 @@ describe('useScenarioRunner', () => {
 			)
 		})
 
-		expect(onFinished).toHaveBeenCalledWith(expect.anything(), {
+		expect(onFinished).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
 			launched: 1,
 			closed: 0,
 			notRunning: 0,
 			unavailable: 1,
 			blocked: 0,
-		})
+		}))
 	})
 
 	// A failed close request is one failure per app it was supposed to close, not one overall.
@@ -207,13 +217,13 @@ describe('useScenarioRunner', () => {
 			)
 		})
 
-		expect(onFinished).toHaveBeenCalledWith(expect.anything(), {
+		expect(onFinished).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
 			launched: 0,
 			closed: 0,
 			notRunning: 0,
 			unavailable: 2,
 			blocked: 0,
-		})
+		}))
 	})
 
 	it('never starts more than the entry cap, whatever the scenario holds', async () => {

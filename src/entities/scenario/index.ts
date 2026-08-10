@@ -3,7 +3,9 @@ export {
 	MAX_SCENARIOS,
 	type Scenario,
 	type ScenarioList,
+	type ScenarioRunRecord,
 	type ScenarioSummary,
+	MAX_SCENARIO_HISTORY,
 	summarizeScenario,
 } from './model/scenario.types'
 export {

@@ -45,6 +45,7 @@ export interface MorePageProps {
 	hiddenCount: number
 	installersDocsCount: number
 	scenarioCount: number
+	recentApps?: MorePreviewItem[]
 	preview: MoreAreaPreview
 	scenarioRun: ScenarioRunControl
 	onSelectView(view: AppView): void

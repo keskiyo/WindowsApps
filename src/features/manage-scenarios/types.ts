@@ -33,6 +33,7 @@ export interface ScenarioCardProps {
 	scenario: Scenario
 	apps: AppInfo[]
 	running: boolean
+	runningStatus?: string
 	isFavorite: boolean
 	onToggleFavorite(id: string): void
 	onRename(id: string, name: string): ScenarioNameResult

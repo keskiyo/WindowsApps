@@ -216,7 +216,8 @@
 	.lucide-table-properties,
 	.lucide-grid2x2,
 	.lucide-layout-grid,
-	.lucide-corner-down-left {
+	.lucide-corner-down-left,
+	.lucide-history {
 		color: var(--category-blue);
 	}
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast, Toaster } from 'sonner'
 import { useStore } from 'zustand'
 import {
@@ -65,6 +65,18 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 	const uninstall = useUninstallFlow(getUninstallPreview)
 	const [scanPromptDismissed, setScanPromptDismissed] = useState(false)
 	const [paletteOpen, setPaletteOpen] = useState(false)
+	const recentApps = useMemo(
+		() =>
+			catalogApps
+				.map(app => ({
+					app,
+					firstSeenAt: state.firstSeenAt[app.preferenceIdentity ?? app.id] ?? null,
+				}))
+				.filter(entry => entry.firstSeenAt !== null)
+				.sort((left, right) => (right.firstSeenAt ?? 0) - (left.firstSeenAt ?? 0))
+				.slice(0, 20),
+		[catalogApps, state.firstSeenAt],
+	)
 	const menuButtonRef = useRef<HTMLButtonElement>(null)
 	const searchInputRef = useRef<HTMLInputElement>(null)
 	const desktopNavigation = useDesktopNavigation()
@@ -161,16 +173,13 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		launch: state.launch,
 		closeApps: state.closeApps,
 		onFinished: useCallback((scenario, summary) => {
-			const notice = { id: `scenario-${scenario.id}` }
-			if (summary.blocked > 0)
-				toast.error(
-					`Scenario “${scenario.name}” left ${summary.blocked} open: Windows cannot survive closing them`,
-					notice,
-				)
-			else if (summary.unavailable > 0)
-				toast.error(`Scenario “${scenario.name}” failed`, notice)
-			else toast.success(`Scenario “${scenario.name}” started`, notice)
-		}, []),
+			state.recordScenarioRun({
+				id: crypto.randomUUID(),
+				scenarioId: scenario.id,
+				scenarioName: scenario.name,
+				...summary,
+			})
+		}, [state]),
 	})
 
 	useEffect(() => {
@@ -264,6 +273,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 										) ?? 0
 									}
 									scenarioCount={state.scenarios.length}
+									recentApps={recentApps}
 									preview={morePreview}
 									scenarioRun={{
 										scenarios: state.scenarios,
@@ -279,6 +289,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									scenarios={state.scenarios}
 									apps={catalogApps}
 									runningId={scenarioRunner.runningId}
+									runProgress={scenarioRunner.progress}
 									favoriteScenarioIds={
 										state.favoriteScenarioIds
 									}

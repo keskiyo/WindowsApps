@@ -74,6 +74,18 @@ describe('ScenariosPage', () => {
 		expect(view.onBack).toHaveBeenCalled()
 	})
 
+	it('shows the current operation count for the running scenario', () => {
+		render(
+			<ScenariosPage
+				{...props([gaming])}
+				runningId="gaming"
+				runProgress={{ phase: 'launching', completed: 1, total: 2 }}
+			/>,
+		)
+
+		expect(screen.getByText('Launching 1/2')).toBeInTheDocument()
+	})
+
 	it('creates a scenario from the inline field', async () => {
 		const view = props()
 		render(<ScenariosPage {...view} />)
@@ -236,6 +248,19 @@ describe('ScenariosPage', () => {
 	it('runs a scenario and blocks a second run while it is going', async () => {
 		const view = { ...props([gaming]), runningId: 'gaming' }
 		render(<ScenariosPage {...view} />)
+
+		const run = screen.getByRole('button', { name: 'Run Gaming' })
+		expect(run).toBeDisabled()
+		expect(run).toHaveTextContent('Running…')
+	})
+
+	it('blocks the active scenario action until it finishes', () => {
+		render(
+			<ScenariosPage
+				{...props([gaming])}
+				runningId="gaming"
+			/>,
+		)
 
 		const run = screen.getByRole('button', { name: 'Run Gaming' })
 		expect(run).toBeDisabled()

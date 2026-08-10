@@ -179,6 +179,7 @@ export interface CloseAppsResult {
 	notRunning: number
 	unavailable: number
 	blocked?: number
+	failed: number
 }
 
 export interface AppsClient {

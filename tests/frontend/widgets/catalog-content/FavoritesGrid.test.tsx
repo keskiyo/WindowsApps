@@ -162,4 +162,19 @@ describe('FavoritesGrid', () => {
 
 		expect(view.favoriteScenarios.onToggleFavorite).toHaveBeenCalledWith('gaming')
 	})
+
+	it('blocks the active favorite action until it finishes', () => {
+		const view = props([], [gaming])
+
+		render(
+			<FavoritesGrid
+				{...view}
+				favoriteScenarios={{ ...view.favoriteScenarios, runningId: 'gaming' }}
+			/>,
+		)
+
+		const run = screen.getByRole('button', { name: 'Run Gaming' })
+		expect(run).toBeDisabled()
+		expect(run).toHaveTextContent('Running…')
+	})
 })

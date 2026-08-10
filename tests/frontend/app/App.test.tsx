@@ -61,7 +61,7 @@ function renderApp(
 		launchApp: vi.fn().mockResolvedValue(undefined),
 		closeApps: vi
 			.fn()
-			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0 }),
+			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0, failed: 0 }),
 		getUninstallPreview: vi.fn().mockResolvedValue({
 			appName: 'Visual Studio Code',
 			publisher: 'Microsoft',
@@ -963,26 +963,16 @@ describe('App', () => {
 			await userEvent.click(screen.getByRole('button', { name: /^More/ }))
 			return rendered
 		}
-
-		// A scenario is one action to the user. Launching through the per-app feedback made a
-		// two-app scenario raise three notices: one per launch, then the run's own.
-		it('reports the whole run as a single notice', async () => {
+		it('keeps scenario outcomes out of transient notices', async () => {
 			const success = vi.spyOn(toast, 'success').mockClear()
 			const { client } = await withScenario(['steam', 'code'])
 
 			await userEvent.click(screen.getByRole('button', { name: 'Run Gaming' }))
 
 			await waitFor(() => expect(client.launchApp).toHaveBeenCalledTimes(2))
-			expect(success).toHaveBeenCalledOnce()
-			expect(success).toHaveBeenCalledWith(
-				'Scenario “Gaming” started',
-				expect.anything(),
-			)
+			expect(success).not.toHaveBeenCalled()
 		})
-
-		// One failed app is the whole run failing to do what it says, and it is still one notice —
-		// not a per-app error with its own Retry, which would retry that app outside the scenario.
-		it('reports a run that could not do what it says as one failure', async () => {
+		it('keeps failed scenario outcomes out of transient notices', async () => {
 			const errors = vi.spyOn(toast, 'error').mockClear()
 			const success = vi.spyOn(toast, 'success').mockClear()
 			await withScenario(['steam', 'code'], {
@@ -991,11 +981,7 @@ describe('App', () => {
 
 			await userEvent.click(screen.getByRole('button', { name: 'Run Gaming' }))
 
-			await waitFor(() => expect(errors).toHaveBeenCalledOnce())
-			expect(errors).toHaveBeenCalledWith(
-				'Scenario “Gaming” failed',
-				expect.anything(),
-			)
+			await waitFor(() => expect(errors).not.toHaveBeenCalled())
 			expect(success).not.toHaveBeenCalled()
 		})
 	})

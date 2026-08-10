@@ -2,10 +2,10 @@ Windows Apps is a fast, private application catalog and launcher for Windows 10 
 
 ## Highlights
 
-- **Move to category** scrolls once a catalog holds more categories than the window is tall. The panel is placed against the top of the screen when it no longer fits, so its last entries used to sit below the edge with no way to reach them.
-- Deleting a category now asks with a confirmation that reads as a destructive action rather than as the button to press.
+- **Reliable scenario completion** — a scenario runs its configured launch and close lists as one protected operation. Its action stays disabled until all work has finished, which prevents duplicate launches and closes.
+- **Safer closing** — close detection follows application processes inside a dedicated executable directory, including launcher replacements and updated builds, while refusing shared system and installation roots.
 
 ## Install
 
-1. Download `Windows.Apps_0.3.1_x64-setup.exe`.
+1. Download `Windows.Apps_0.3.2_x64-setup.exe`.
 2. Run it. The installer is not Authenticode-signed, so SmartScreen may show **Windows protected your PC**; choose **More info -> Run anyway**.

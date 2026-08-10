@@ -1,6 +1,6 @@
 import type { StoreApi } from 'zustand/vanilla'
 import type { AppCategory, CategoryDefinition } from '../../entities/category'
-import type { Scenario, ScenarioList } from '../../entities/scenario'
+import type { Scenario, ScenarioList, ScenarioRunRecord } from '../../entities/scenario'
 import type { LegacyCanonicalPreferences } from './preferences'
 import type {
 	AppHydrationPatch,
@@ -40,6 +40,7 @@ export interface AppState {
 	installerAppIdentities: string[]
 	scenarios: Scenario[]
 	favoriteScenarioIds: string[]
+	scenarioHistory: ScenarioRunRecord[]
 	firstSeenAt: Record<string, number>
 	legacyCanonicalPreferences: LegacyCanonicalPreferences
 	preferencesPersisted: boolean
@@ -81,6 +82,7 @@ export interface AppState {
 	): { ok: true } | { ok: false; error: string }
 	removeScenarioApp(id: string, list: ScenarioList, identity: string): void
 	toggleFavoriteScenario(id: string): void
+	recordScenarioRun(record: ScenarioRunRecord): void
 	getUninstallPreview(id: string): Promise<UninstallPreview>
 	uninstall(id: string): Promise<void>
 	setQuery(query: string): void

@@ -83,4 +83,25 @@ describe('catalog card grid', () => {
 
 		expect(offenders).toEqual([])
 	})
+
+	it('keeps Favorites applications on the shared auto-fitting grid', () => {
+		const favorites = readFileSync(
+			'src/widgets/catalog-content/ui/FavoritesGrid.tsx',
+			'utf8',
+		)
+
+		expect(favorites).toContain('className="app-card-grid"')
+		expect(favorites).not.toContain('favorites-app-card-grid')
+	})
+
+	it('lays out favorite scenarios in one, two, then three columns', () => {
+		const scenarios = readFileSync(
+			'src/features/manage-scenarios/ui/FavoriteScenarioList/FavoriteScenarioList.tsx',
+			'utf8',
+		)
+
+		expect(scenarios).toContain('min-[781px]:grid-cols-2')
+		expect(scenarios).toContain('min-[1601px]:grid-cols-3')
+		expect(scenarios).toContain('items-start')
+	})
 })

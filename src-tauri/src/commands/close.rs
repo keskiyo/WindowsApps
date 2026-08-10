@@ -16,6 +16,7 @@ pub(crate) struct CloseAppsResponse {
     not_running: usize,
     unavailable: usize,
     blocked: usize,
+    failed: usize,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -73,6 +74,7 @@ pub(crate) async fn close_apps(
         not_running: outcome.not_running,
         unavailable: request.unavailable,
         blocked: request.blocked,
+        failed: outcome.failed,
     })
 }
 

@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CloseTarget {
@@ -12,10 +12,6 @@ impl CloseTarget {
             executable,
             install_root,
         }
-    }
-
-    pub(super) fn file_name(&self) -> Option<String> {
-        file_name_of(&self.executable.to_string_lossy())
     }
 }
 
@@ -41,9 +37,6 @@ pub(super) fn is_instance_of(image: &str, target: &CloseTarget) -> bool {
     let image = normalize(image);
     if image == normalize(&target.executable.to_string_lossy()) {
         return true;
-    }
-    if file_name_of(&image) != target.file_name() {
-        return false;
     }
     target
         .install_root
@@ -71,21 +64,25 @@ fn normalize(path: &str) -> String {
     result.trim_end_matches('\\').to_string()
 }
 
-fn file_name_of(path: &str) -> Option<String> {
-    Path::new(&normalize(path))
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-}
-
 fn is_specific_enough(root: &str) -> bool {
     let segments = root.split('\\').filter(|part| !part.is_empty()).count();
-    if segments < 2 {
+    if segments < 3 {
         return false;
     }
     let stripped = strip_versions(root);
+    if is_windows_directory(&stripped) {
+        return false;
+    }
     !SHARED_CONTAINERS
         .iter()
         .any(|container| stripped.ends_with(container))
+}
+
+fn is_windows_directory(path: &str) -> bool {
+    path.split('\\')
+        .filter(|part| !part.is_empty())
+        .nth(1)
+        .is_some_and(|part| part == "windows")
 }
 
 fn is_within(image: &str, root: &str) -> bool {
@@ -159,15 +156,59 @@ mod tests {
     }
 
     #[test]
-    fn does_not_match_a_different_executable_in_the_same_folder() {
+    fn does_not_match_a_different_executable_outside_the_installation_root() {
         let editor = target(
             r"C:\Program Files\Editor\editor.exe",
             r"C:\Program Files\Editor",
         );
 
         assert!(!is_instance_of(
-            r"C:\Program Files\Editor\updater.exe",
+            r"C:\Program Files\Other\updater.exe",
             &editor
+        ));
+    }
+
+    #[test]
+    fn matches_different_processes_inside_a_dedicated_installation_root() {
+        let battle_net = target(
+            r"D:\Games\Battle.net\Battle.net Launcher.exe",
+            r"D:\Games\Battle.net",
+        );
+
+        assert!(is_instance_of(
+            r"D:\Games\Battle.net\Battle.net.exe",
+            &battle_net
+        ));
+        assert!(is_instance_of(
+            r"D:\Games\Battle.net\Agent.exe",
+            &battle_net
+        ));
+    }
+
+    #[test]
+    fn does_not_expand_a_shared_installation_root() {
+        let launcher = target(r"C:\Program Files\Vendor\launcher.exe", r"C:\Program Files");
+
+        assert!(!is_instance_of(
+            r"C:\Program Files\Other\other.exe",
+            &launcher
+        ));
+    }
+
+    #[test]
+    fn does_not_expand_a_two_level_installation_root() {
+        let launcher = target(r"D:\Games\launcher.exe", r"D:\Games");
+
+        assert!(!is_instance_of(r"D:\Games\Other\other.exe", &launcher));
+    }
+
+    #[test]
+    fn does_not_expand_a_windows_subdirectory() {
+        let command_prompt = target(r"C:\Windows\System32\cmd.exe", r"C:\Windows\System32");
+
+        assert!(!is_instance_of(
+            r"C:\Windows\System32\lsass.exe",
+            &command_prompt
         ));
     }
 

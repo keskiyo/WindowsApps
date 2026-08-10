@@ -15,7 +15,7 @@ function client(): AppsClient {
 		launchApp: vi.fn().mockResolvedValue(undefined),
 		closeApps: vi
 			.fn()
-			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0 }),
+			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0, failed: 0 }),
 		getAppDetails: vi.fn(),
 		openAppFolder: vi.fn().mockResolvedValue(undefined),
 		getUninstallPreview: vi.fn(),
@@ -191,6 +191,18 @@ describe('scenario actions', () => {
 		expect(store.getState().scenarios[0]?.launchIdentities).toEqual([
 			'app:game',
 		])
+	})
+
+	it('refuses an app already assigned to the opposite action list', () => {
+		const store = createAppStore(client(), memoryStorage().storage, idFactory)
+		const created = store.getState().createScenario('Gaming')
+		const id = created.ok ? created.id : ''
+		store.getState().addScenarioApp(id, 'launch', 'app:game')
+
+		expect(store.getState().addScenarioApp(id, 'close', 'app:game')).toEqual({
+			ok: false,
+			error: 'An app cannot both launch and close',
+		})
 	})
 
 	// One click runs the whole list, so what a list can hold is bounded at the source too.

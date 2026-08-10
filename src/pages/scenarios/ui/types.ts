@@ -1,10 +1,12 @@
 import type { AppInfo } from '../../../entities/app'
 import type { Scenario, ScenarioList } from '../../../entities/scenario'
+import type { ScenarioRunProgress } from '../../../features/run-scenario'
 
 export interface ScenariosPageProps {
 	scenarios: Scenario[]
 	apps: AppInfo[]
 	runningId: string | null
+	runProgress?: ScenarioRunProgress | null
 	favoriteScenarioIds: string[]
 	onBack(): void
 	onCreate(
