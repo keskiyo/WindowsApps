@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PREFERENCES_KEY } from '../../../../src/app/store/preferences'
+import {
+	PREFERENCES_BACKUP_KEY,
+	PREFERENCES_KEY,
+} from '../../../../src/app/store/preferences'
 import { AppClientError } from '../../../../src/shared/api/tauri/errors'
 import {
 	createAppStore,
@@ -94,6 +97,96 @@ function client(overrides: Partial<AppsClient> = {}): AppsClient {
 }
 
 describe('app store', () => {
+	it('imports normalized preferences and keeps the previous state as the local backup', () => {
+		const values = new Map<string, string>()
+		const storage = {
+			getItem: (key: string) => values.get(key) ?? null,
+			setItem: (key: string, value: string) => void values.set(key, value),
+		} as unknown as Storage
+		const store = createAppStore(client(), storage)
+		store.setState({ favoriteAppIds: ['before'] })
+		store.getState().toggleCategory('games')
+
+		const source = JSON.stringify({
+			version: 14,
+			favoriteAppIds: ['code'],
+			hiddenAppIds: ['chrome'],
+			importedField: 'kept',
+		})
+
+		expect(store.getState().validatePreferencesImport(source)).toEqual({
+			ok: true,
+		})
+		expect(store.getState().importPreferences(source)).toEqual({ ok: true })
+		expect(store.getState().favoriteAppIds).toEqual(['code'])
+		expect(store.getState().hiddenAppIds).toEqual(['chrome'])
+		expect(
+			JSON.parse(values.get(PREFERENCES_KEY) ?? '{}'),
+		).toMatchObject({ importedField: 'kept' })
+		expect(
+			JSON.parse(store.getState().exportPreferences()),
+		).toMatchObject({
+			version: 14,
+			favoriteAppIds: ['code'],
+			hiddenAppIds: ['chrome'],
+			importedField: 'kept',
+		})
+		expect(
+			JSON.parse(values.get(PREFERENCES_BACKUP_KEY) ?? '{}'),
+		).toMatchObject({ favoriteAppIds: ['before'] })
+	})
+
+	it('restores the rotating local preference backup', () => {
+		const values = new Map<string, string>([
+			[PREFERENCES_KEY, JSON.stringify({ version: 14, favoriteAppIds: ['now'] })],
+			[
+				PREFERENCES_BACKUP_KEY,
+				JSON.stringify({ version: 14, favoriteAppIds: ['before'] }),
+			],
+		])
+		const storage = {
+			getItem: (key: string) => values.get(key) ?? null,
+			setItem: (key: string, value: string) => void values.set(key, value),
+		} as unknown as Storage
+		const store = createAppStore(client(), storage)
+
+		expect(store.getState().restorePreferencesBackup()).toEqual({ ok: true })
+		expect(store.getState().favoriteAppIds).toEqual(['before'])
+	})
+
+	it('refuses import and restore when local preferences use a newer schema', () => {
+		const future = JSON.stringify({
+			version: 15,
+			favoriteAppIds: ['keep'],
+		})
+		const values = new Map<string, string>([
+			[PREFERENCES_KEY, future],
+			[
+				PREFERENCES_BACKUP_KEY,
+				JSON.stringify({ version: 14, favoriteAppIds: ['backup'] }),
+			],
+		])
+		const storage = {
+			getItem: (key: string) => values.get(key) ?? null,
+			setItem: (key: string, value: string) => void values.set(key, value),
+		} as unknown as Storage
+		const store = createAppStore(client(), storage)
+		const expected = {
+			ok: false as const,
+			error: 'Settings cannot be replaced by this version of Windows Apps.',
+		}
+
+		expect(
+			store
+				.getState()
+				.importPreferences('{"version":14,"favoriteAppIds":["imported"]}'),
+		).toEqual(expected)
+		expect(store.getState().favoriteAppIds).toEqual(['keep'])
+		expect(store.getState().restorePreferencesBackup()).toEqual(expected)
+		expect(store.getState().favoriteAppIds).toEqual(['keep'])
+		expect(values.get(PREFERENCES_KEY)).toBe(future)
+	})
+
 	it('keeps a scanner-detected artifact locked to its bucket', () => {
 		const installer = app({
 			id: 'setup',

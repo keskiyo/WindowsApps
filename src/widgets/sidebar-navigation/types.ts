@@ -18,6 +18,7 @@ export interface AppDrawerProps {
 	activeView: AppView
 	appCount: number
 	favoriteCount: number
+	favoriteScenarioCount?: number
 	triggerRef: RefObject<HTMLButtonElement>
 	onGoHome(): void
 	onSelectView(view: AppView): void

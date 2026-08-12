@@ -12,6 +12,7 @@ export function ScenariosPage({
 	scenarios,
 	apps,
 	runningId,
+	isScenarioRunning,
 	runProgress,
 	favoriteScenarioIds,
 	onBack,
@@ -77,6 +78,7 @@ export function ScenariosPage({
 							scenario={scenario}
 							apps={apps}
 							running={runningId === scenario.id}
+							isScenarioRunning={isScenarioRunning}
 							runningStatus={
 								runningId === scenario.id ? runningStatus : undefined
 							}

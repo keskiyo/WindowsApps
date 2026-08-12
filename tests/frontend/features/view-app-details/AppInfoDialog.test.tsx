@@ -230,8 +230,8 @@ describe('AppInfoDialog', () => {
 		})
 
 		await screen.findByText('Application')
-		expect(screen.getByText('Auxiliary tool')).toBeVisible()
-		expect(screen.getByText('Why')).toBeVisible()
+		expect(screen.getByText('Shown in Auxiliary tools')).toBeVisible()
+		expect(screen.getByText('Why shown here')).toBeVisible()
 		expect(screen.getByText('Maintenance executable')).toBeVisible()
 		expect(screen.getByText('Launch target check')).toBeVisible()
 		expect(screen.getByText('Not checked — access denied')).toBeVisible()
@@ -248,6 +248,61 @@ describe('AppInfoDialog', () => {
 		).not.toBeInTheDocument()
 	})
 
+	it('separates portable visibility from category evidence', async () => {
+		renderDialog({
+			app: {
+				...app,
+				sourceKind: 'portable',
+				originalFilename: undefined,
+				visibilityClass: 'auxiliary',
+				visibilityReasons: [
+					'portable_candidate',
+					'insufficient_launch_evidence',
+				],
+				categoryReasons: ['default=no-signal'],
+				targetAvailability: 'target.present',
+			},
+		})
+
+		await screen.findByText('Application')
+		const detection = within(
+			screen.getByRole('heading', { name: 'Detection' }).closest('section')!,
+		)
+		expect(screen.getByText('Catalog visibility')).toBeVisible()
+		expect(screen.getByText('Shown in Auxiliary tools')).toBeVisible()
+		expect(
+			screen.getByText(
+				'This executable has no reliable product metadata yet.',
+			),
+		).toBeVisible()
+		expect(detection.getByText('Category')).toBeVisible()
+		expect(screen.getByText('Other — no category evidence')).toBeVisible()
+		expect(detection.getByText('Verified on disk')).toBeVisible()
+		expect(screen.queryByText('Original filename')).not.toBeInTheDocument()
+		expect(screen.queryByText('Why this category')).not.toBeInTheDocument()
+	})
+
+	it('keeps known metadata and primary visibility distinct', async () => {
+		renderDialog({
+			app: {
+				...app,
+				originalFilename: 'example-editor.exe',
+				visibilityClass: 'primary',
+				visibilityReasons: [],
+				categoryReasons: ['publisher=jetbrains'],
+			},
+		})
+
+		await screen.findByText('Application')
+		const detection = within(
+			screen.getByRole('heading', { name: 'Detection' }).closest('section')!,
+		)
+		expect(screen.getByText('example-editor.exe')).toBeVisible()
+		expect(screen.getByText('Shown in the main catalog')).toBeVisible()
+		expect(detection.getByText('Category')).toBeVisible()
+		expect(screen.queryByText('Why shown here')).not.toBeInTheDocument()
+	})
+
 	// The category is the classification a user actually rearranges, and until now the only place
 	// its reason existed was the rule table in the backend source.
 	it('explains which signal put the entry in its category', async () => {
@@ -259,7 +314,10 @@ describe('AppInfoDialog', () => {
 		})
 
 		await screen.findByText('Application')
-		expect(screen.getByText('Why this category')).toBeVisible()
+		const detection = within(
+			screen.getByRole('heading', { name: 'Detection' }).closest('section')!,
+		)
+		expect(detection.getByText('Category')).toBeVisible()
 		expect(
 			screen.getByText('publisher “jetbrains”, executable “idea”'),
 		).toBeVisible()

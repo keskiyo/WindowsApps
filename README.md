@@ -62,8 +62,9 @@ location still exists. Copy the path, copy a full report, or open the containing
   <img src=".github/images/settings.png" alt="Settings and catalog maintenance" width="880">
 </div>
 
-**Settings** — scan folders, autostart, the global shortcut and updates, plus catalog maintenance
-whose force scan and cache reset preserve Favorites, Hidden apps and categories.
+**Settings** — scan folders, autostart, the global shortcut, updates, preference export/import
+and a one-step local backup, plus catalog maintenance whose force scan and cache reset preserve
+Favorites, Hidden apps and categories.
 
 ## Install
 

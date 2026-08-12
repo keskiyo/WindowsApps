@@ -34,6 +34,14 @@ const gaming: Scenario = {
 	createdAt: null,
 }
 
+const work: Scenario = {
+	id: 'work',
+	name: 'Work',
+	launchIdentities: ['gog'],
+	closeIdentities: [],
+	createdAt: null,
+}
+
 function favorite(id: string, name: string): AppInfo {
 	return {
 		id,
@@ -62,6 +70,7 @@ function props(apps: AppInfo[], scenarios: Scenario[] = []) {
 			scenarios,
 			apps,
 			runningId: null,
+			isScenarioRunning: false,
 			onRun: vi.fn(),
 			onToggleFavorite: vi.fn(),
 		},
@@ -163,18 +172,23 @@ describe('FavoritesGrid', () => {
 		expect(view.favoriteScenarios.onToggleFavorite).toHaveBeenCalledWith('gaming')
 	})
 
-	it('blocks the active favorite action until it finishes', () => {
-		const view = props([], [gaming])
+	it('blocks every favorite scenario action until the active run finishes', () => {
+		const view = props([], [gaming, work])
 
 		render(
 			<FavoritesGrid
 				{...view}
-				favoriteScenarios={{ ...view.favoriteScenarios, runningId: 'gaming' }}
+				favoriteScenarios={{
+					...view.favoriteScenarios,
+					runningId: 'gaming',
+					isScenarioRunning: true,
+				}}
 			/>,
 		)
 
 		const run = screen.getByRole('button', { name: 'Run Gaming' })
 		expect(run).toBeDisabled()
+		expect(screen.getByRole('button', { name: 'Run Work' })).toBeDisabled()
 		expect(run).toHaveTextContent('Running…')
 	})
 })

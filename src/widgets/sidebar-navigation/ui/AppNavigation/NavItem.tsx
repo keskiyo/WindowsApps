@@ -8,6 +8,7 @@ export function NavItem({
 	label,
 	active,
 	count,
+	secondaryCount,
 	className,
 	onClick,
 }: NavItemProps) {
@@ -18,7 +19,13 @@ export function NavItem({
 			type="button"
 			onClick={onClick}
 			aria-current={active ? 'page' : undefined}
-			aria-label={count === undefined ? label : `${label} ${count}`}
+			aria-label={
+				secondaryCount === undefined
+					? count === undefined
+						? label
+						: `${label} ${count}`
+					: `${label} ${count ?? 0} apps, ${secondaryCount} scenarios`
+			}
 			title={label}
 			{...spotlight}
 			className={`${navigationItemClass(active)}${className ? ` ${className}` : ''}`}
@@ -26,9 +33,10 @@ export function NavItem({
 			<SpotlightLayer size={90} />
 			<Icon className="shrink-0" size={17} />{' '}
 			<span className="min-w-0 truncate">{label}</span>
-			{count !== undefined && (
+			{(count !== undefined || secondaryCount !== undefined) && (
 				<span className="ml-auto shrink-0 rounded-md border border-(--border-neutral) bg-(--surface-inset) px-1.5 py-0.5 text-xs text-(--text-muted)">
-					{count}
+					{count ?? 0}
+					{secondaryCount !== undefined && ` · ${secondaryCount}`}
 				</span>
 			)}
 		</button>

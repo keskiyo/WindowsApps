@@ -77,6 +77,11 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 				.slice(0, 20),
 		[catalogApps, state.firstSeenAt],
 	)
+	const favoriteScenarios = useMemo(
+		() =>
+			filterFavoriteScenarios(state.scenarios, state.favoriteScenarioIds),
+		[state.favoriteScenarioIds, state.scenarios],
+	)
 	const menuButtonRef = useRef<HTMLButtonElement>(null)
 	const searchInputRef = useRef<HTMLInputElement>(null)
 	const desktopNavigation = useDesktopNavigation()
@@ -203,6 +208,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		activeView: state.activeView,
 		appCount: visibleCategorizedApps.length,
 		favoriteCount,
+		favoriteScenarioCount: favoriteScenarios.length,
 		onSelectView: navigation.selectView,
 		onSelectCategory: navigation.selectCategory,
 		onReorderCategory: state.reorderCategory,
@@ -250,6 +256,8 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 						className="app-panel flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto rounded-2xl"
 					>
 						<Header
+							primaryAppCount={visibleCategorizedApps.length}
+							auxiliaryToolCount={auxiliaryCount}
 							visibleCount={filteredApps.length}
 							query={state.query}
 							isRefreshing={state.isRefreshing}
@@ -277,9 +285,10 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									preview={morePreview}
 									scenarioRun={{
 										scenarios: state.scenarios,
-										apps: catalogApps,
-										runningId: scenarioRunner.runningId,
-										onRun: scenarioRunner.runById,
+											apps: catalogApps,
+											runningId: scenarioRunner.runningId,
+											isScenarioRunning: scenarioRunner.isRunning,
+											onRun: scenarioRunner.runById,
 									}}
 									onSelectView={navigation.selectView}
 								/>
@@ -289,6 +298,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									scenarios={state.scenarios}
 									apps={catalogApps}
 									runningId={scenarioRunner.runningId}
+									isScenarioRunning={scenarioRunner.isRunning}
 									runProgress={scenarioRunner.progress}
 									favoriteScenarioIds={
 										state.favoriteScenarioIds
@@ -308,6 +318,14 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 							{state.activeView === 'settings' && (
 								<SettingsPage
 									client={systemClient}
+									onExportPreferences={state.exportPreferences}
+									onValidatePreferencesImport={
+										state.validatePreferencesImport
+									}
+									onImportPreferences={state.importPreferences}
+									onRestorePreferencesBackup={
+										state.restorePreferencesBackup
+									}
 									onForceFullScan={state.forceFullScan}
 									onResetCatalogCache={
 										state.resetCatalogCache
@@ -315,11 +333,6 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									catalogDiagnostics={
 										state.catalogDiagnostics
 									}
-									visibilityCounts={{
-										primary: counts.classifiedPrimaryCount,
-										auxiliary:
-											counts.classifiedAuxiliaryCount,
-									}}
 									updater={updater}
 								/>
 							)}
@@ -350,13 +363,11 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 											state.collapsedCategories,
 										favoriteAppIds: state.favoriteAppIds,
 										favoriteScenarios: {
-											scenarios: filterFavoriteScenarios(
-												state.scenarios,
-												state.favoriteScenarioIds,
-											),
-											apps: catalogApps,
-											runningId: scenarioRunner.runningId,
-											onRun: scenarioRunner.runById,
+											scenarios: favoriteScenarios,
+										apps: catalogApps,
+										runningId: scenarioRunner.runningId,
+										isScenarioRunning: scenarioRunner.isRunning,
+										onRun: scenarioRunner.runById,
 											onToggleFavorite:
 												state.toggleFavoriteScenario,
 										},
@@ -389,6 +400,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 						activeView={state.activeView}
 						appCount={visibleCategorizedApps.length}
 						favoriteCount={favoriteCount}
+						favoriteScenarioCount={favoriteScenarios.length}
 						triggerRef={menuButtonRef}
 						onGoHome={navigation.goHome}
 						onSelectView={navigation.selectView}
@@ -434,13 +446,12 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 				)}
 				<Toaster
 					className="app-toaster"
-					theme="light"
+					theme="dark"
 					position="bottom-right"
 					expand
 					visibleToasts={5}
 					gap={10}
 					offset={16}
-					richColors
 					closeButton
 				/>
 			</div>

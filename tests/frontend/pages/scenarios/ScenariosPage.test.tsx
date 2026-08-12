@@ -35,6 +35,7 @@ function props(scenarios: Scenario[] = [], favoriteScenarioIds: string[] = []) {
 		scenarios,
 		apps: catalog,
 		runningId: null,
+		isScenarioRunning: false,
 		favoriteScenarioIds,
 		onToggleFavorite: vi.fn(),
 		onBack: vi.fn(),
@@ -51,6 +52,14 @@ const gaming: Scenario = {
 	id: 'gaming',
 	name: 'Gaming',
 	launchIdentities: ['game'],
+	closeIdentities: [],
+	createdAt: null,
+}
+
+const work: Scenario = {
+	id: 'work',
+	name: 'Work',
+	launchIdentities: ['chat'],
 	closeIdentities: [],
 	createdAt: null,
 }
@@ -246,7 +255,11 @@ describe('ScenariosPage', () => {
 	})
 
 	it('runs a scenario and blocks a second run while it is going', async () => {
-		const view = { ...props([gaming]), runningId: 'gaming' }
+		const view = {
+			...props([gaming]),
+			runningId: 'gaming',
+			isScenarioRunning: true,
+		}
 		render(<ScenariosPage {...view} />)
 
 		const run = screen.getByRole('button', { name: 'Run Gaming' })
@@ -254,16 +267,18 @@ describe('ScenariosPage', () => {
 		expect(run).toHaveTextContent('Running…')
 	})
 
-	it('blocks the active scenario action until it finishes', () => {
+	it('blocks every scenario action until the active run finishes', () => {
 		render(
 			<ScenariosPage
-				{...props([gaming])}
+				{...props([gaming, work])}
 				runningId="gaming"
+				isScenarioRunning
 			/>,
 		)
 
 		const run = screen.getByRole('button', { name: 'Run Gaming' })
 		expect(run).toBeDisabled()
+		expect(screen.getByRole('button', { name: 'Run Work' })).toBeDisabled()
 		expect(run).toHaveTextContent('Running…')
 	})
 
@@ -278,6 +293,34 @@ describe('ScenariosPage', () => {
 		)
 
 		expect(view.onRemoveApp).toHaveBeenCalledWith('gaming', 'launch', 'game')
+	})
+
+	it('locks the active scenario configuration without locking its favorite control', () => {
+		render(
+			<ScenariosPage
+				{...props([gaming], ['gaming'])}
+				runningId="gaming"
+				isScenarioRunning
+			/>,
+		)
+
+		expect(screen.getByRole('button', { name: 'Rename Gaming' })).toBeDisabled()
+		expect(screen.getByRole('button', { name: 'Delete Gaming' })).toBeDisabled()
+		expect(
+			screen.getByRole('button', {
+				name: 'Add an app to the Launch list of Gaming',
+			}),
+		).toBeDisabled()
+		expect(
+			screen.getByRole('button', {
+				name: 'Remove Backpack Battles from the Launch list of Gaming',
+			}),
+		).toBeDisabled()
+		expect(
+			screen.getByRole('button', {
+				name: 'Remove Gaming from favorites',
+			}),
+		).toBeEnabled()
 	})
 
 	// An entry that stopped resolving must be visible, not quietly gone.

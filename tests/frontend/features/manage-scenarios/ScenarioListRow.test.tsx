@@ -28,6 +28,7 @@ function renderRow(apps: AppInfo[], onRemove = vi.fn()) {
 			scenarioName='Gaming'
 			apps={apps}
 			missing={0}
+			disabled={false}
 			identityOf={entry => entry.id}
 			onAdd={vi.fn()}
 			onRemove={onRemove}

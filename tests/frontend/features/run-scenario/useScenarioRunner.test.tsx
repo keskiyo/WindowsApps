@@ -269,6 +269,32 @@ describe('useScenarioRunner', () => {
 		expect(view.result.current.runningId).toBeNull()
 	})
 
+	it('reports that the runner is busy for every scenario while a run is active', async () => {
+		let release = () => {}
+		const gate = new Promise<void>(resolve => {
+			release = resolve
+		})
+		const { view } = setup({
+			apps: [app('game')],
+			launch: vi.fn(() => gate),
+		})
+
+		let run: Promise<void> | undefined
+		act(() => {
+			run = view.result.current.run(
+				scenario({ launchIdentities: ['game'] }),
+			)
+		})
+
+		await waitFor(() => expect(view.result.current.isRunning).toBe(true))
+
+		await act(async () => {
+			release()
+			await run
+		})
+		expect(view.result.current.isRunning).toBe(false)
+	})
+
 	describe('runById', () => {
 		it('runs the scenario with that id', async () => {
 			const gaming = scenario({ launchIdentities: ['game'] })

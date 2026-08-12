@@ -14,6 +14,7 @@ export interface AppNavigationProps {
 	activeView: AppView
 	appCount: number
 	favoriteCount: number
+	favoriteScenarioCount?: number
 	onSelectView(view: AppView): void
 	onSelectCategory(category: AppCategory): void
 	onCreateCategory(
@@ -37,6 +38,7 @@ export interface NavItemProps {
 	label: string
 	active: boolean
 	count?: number
+	secondaryCount?: number
 	className?: string
 	onClick(): void
 }

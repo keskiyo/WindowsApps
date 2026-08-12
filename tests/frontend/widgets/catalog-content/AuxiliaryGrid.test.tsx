@@ -89,6 +89,16 @@ describe('AuxiliaryGrid', () => {
 		expect(onBack).toHaveBeenCalled()
 	})
 
+	it('uses three columns on wide layouts', () => {
+		render(<AuxiliaryGrid {...props()} />)
+
+		expect(
+			screen
+				.getByRole('button', { name: 'Launch Alpha' })
+				.parentElement,
+		).toHaveClass('min-[1601px]:grid-cols-3')
+	})
+
 	it('keeps the way back when no tool matches the search', async () => {
 		const onBack = vi.fn()
 		render(

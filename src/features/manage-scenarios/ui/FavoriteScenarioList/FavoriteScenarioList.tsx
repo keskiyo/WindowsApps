@@ -9,6 +9,7 @@ export function FavoriteScenarioList({
 	scenarios,
 	apps,
 	runningId,
+	isScenarioRunning,
 	onRun,
 	onToggleFavorite,
 }: FavoriteScenarioListProps) {
@@ -42,6 +43,7 @@ export function FavoriteScenarioList({
 						apps={apps}
 						expanded={expanded.includes(scenario.id)}
 						running={runningId === scenario.id}
+						isScenarioRunning={isScenarioRunning}
 						onToggle={toggle}
 						onRun={onRun}
 						onToggleFavorite={onToggleFavorite}

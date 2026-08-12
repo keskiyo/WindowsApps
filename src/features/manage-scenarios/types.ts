@@ -25,7 +25,7 @@ export interface ScenarioCloseWarningProps {
 
 export interface ScenarioAppTileProps {
 	app: AppInfo
-	remove?: { label: string; onRemove(): void }
+	remove?: { label: string; disabled: boolean; onRemove(): void }
 	mark?: CloseRiskMark | null
 }
 
@@ -33,6 +33,7 @@ export interface ScenarioCardProps {
 	scenario: Scenario
 	apps: AppInfo[]
 	running: boolean
+	isScenarioRunning: boolean
 	runningStatus?: string
 	isFavorite: boolean
 	onToggleFavorite(id: string): void
@@ -53,6 +54,7 @@ export interface ScenarioListRowProps {
 	scenarioName: string
 	apps: AppInfo[]
 	missing: number
+	disabled: boolean
 	markOf?(app: AppInfo): CloseRiskMark | null
 	onAdd(list: ScenarioList): void
 	onRemove(list: ScenarioList, identity: string): void

@@ -8,6 +8,7 @@ import { createIconActions } from './iconActions'
 import { createLaunchActions } from './launchActions'
 import { createLifecycleActions } from './lifecycleActions'
 import { createPersist } from './persist'
+import { createPreferenceTransferActions } from './preferenceTransferActions'
 import { createScenarioActions } from './scenarioActions'
 import { createScenarioHistoryActions } from './scenarioHistoryActions'
 import { readPreferences } from './preferences'
@@ -45,6 +46,7 @@ function initialState(preferences: AppPreferencesV14) {
 		scenarioHistory: preferences.scenarioHistory,
 		firstSeenAt: preferences.firstSeenAt,
 		legacyCanonicalPreferences: preferences.legacyCanonicalPreferences,
+		unknownPreferenceFields: preferences.unknownFields ?? {},
 		preferencesPersisted: true,
 		categories: preferences.categories,
 		launchingIds: [],
@@ -62,7 +64,6 @@ export function createAppStore(
 			set,
 			get,
 			storage,
-			unknownFields: preferences.unknownFields,
 		})
 		return {
 			...initialState(preferences),
@@ -76,6 +77,7 @@ export function createAppStore(
 			...createCategoryActions({ set, get, persist, idFactory }),
 			...createScenarioActions({ set, get, persist, idFactory }),
 			...createScenarioHistoryActions({ set, get, persist }),
+			...createPreferenceTransferActions({ set, get, persist, storage }),
 		}
 	})
 }

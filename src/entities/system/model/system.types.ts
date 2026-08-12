@@ -35,6 +35,7 @@ export interface SystemClient {
 	setScanSettings(settings: ScanSettings): Promise<ScanSettings>
 	getUninstallHistory(): Promise<UninstallHistoryEntry[]>
 	clearUninstallHistory(): Promise<void>
+	savePreferencesBackup(contents: string): Promise<boolean>
 	pickFolder(): Promise<string | null>
 	openTelegram(): Promise<void>
 	openGithub(): Promise<void>

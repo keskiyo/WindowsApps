@@ -8,6 +8,7 @@ export function ScenarioListRow({
 	scenarioName,
 	apps,
 	missing,
+	disabled,
 	markOf,
 	onAdd,
 	onRemove,
@@ -29,6 +30,7 @@ export function ScenarioListRow({
 						mark={markOf?.(app) ?? null}
 						remove={{
 							label: `Remove ${app.name} from the ${label} list of ${scenarioName}`,
+							disabled,
 							onRemove: () => onRemove(list, identityOf(app)),
 						}}
 					/>
@@ -42,8 +44,9 @@ export function ScenarioListRow({
 			<button
 				type="button"
 				aria-label={`Add an app to the ${label} list of ${scenarioName}`}
+				disabled={disabled}
 				onClick={() => onAdd(list)}
-				className="inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-lg border border-(--border-neutral) bg-(--surface-panel) px-3 text-xs font-medium text-(--text-primary) transition-colors hover:border-(--accent) hover:bg-(--surface-raised) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong) sm:self-auto"
+				className="inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-lg border border-(--border-neutral) bg-(--surface-panel) px-3 text-xs font-medium text-(--text-primary) transition-colors hover:border-(--accent) hover:bg-(--surface-raised) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong) disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
 			>
 				<Plus size={14} aria-hidden="true" />
 				Add

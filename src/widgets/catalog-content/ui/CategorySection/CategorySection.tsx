@@ -5,6 +5,7 @@ import {
 	CategoryNameEditor,
 	DeleteCategoryDialog,
 } from '../../../../features/manage-category'
+import { CollapsiblePanel } from '../../../../shared/ui/CollapsiblePanel'
 import { CategoryHeader } from './CategoryHeader'
 import type { CategorySectionProps } from './types'
 import { useProgressiveCards } from './useProgressiveCards'
@@ -72,8 +73,8 @@ export function CategorySection({
 					</button>
 				)}
 			</div>
-			{!collapsed && (
-				<>
+			<CollapsiblePanel open={!collapsed}>
+				<div>
 					<div className="app-card-grid">
 						{cards.visible.map(app => (
 							<CatalogAppCard
@@ -100,8 +101,8 @@ export function CategorySection({
 							className="h-1"
 						/>
 					)}
-				</>
-			)}
+				</div>
+			</CollapsiblePanel>
 			{deleting && (
 				<DeleteCategoryDialog
 					name={label}

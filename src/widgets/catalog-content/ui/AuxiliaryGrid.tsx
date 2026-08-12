@@ -17,7 +17,7 @@ export function AuxiliaryGrid(props: AuxiliaryGridProps) {
 				back={{ label: 'Back to More', onBack: props.onBack }}
 			/>
 			{apps.length ? (
-				<div className="grid min-w-0 grid-cols-1 gap-2.5 min-[769px]:grid-cols-2">
+				<div className="grid min-w-0 grid-cols-1 gap-2.5 min-[769px]:grid-cols-2 min-[1601px]:grid-cols-3">
 					{apps.map(app => (
 						<AuxiliaryToolRow
 							key={app.id}

@@ -143,3 +143,17 @@ describe('catalog search typo tolerance', () => {
 		expect(filterAppsByQuery([docker], 'вщслук missing')).toEqual([])
 	})
 })
+
+describe('catalog search metadata', () => {
+	it('finds an app by its version', () => {
+		const appWithVersion = app({
+			id: 'power-toys',
+			name: 'PowerToys',
+			version: '0.93.1',
+		})
+
+		expect(rankAppsByQuery([appWithVersion], '0.93.1')).toEqual([
+			appWithVersion,
+		])
+	})
+})

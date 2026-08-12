@@ -342,13 +342,7 @@ pub(crate) fn synchronize(
     );
     outcomes.push(SourceOutcome {
         key: "portable",
-        stop: if portable.complete {
-            None
-        } else if is_cancelled() {
-            Some(scan_control::StageStop::Cancelled)
-        } else {
-            Some(scan_control::StageStop::EntryLimit)
-        },
+        stop: portable.stop,
         answered: true,
         replaced: true,
         records: portable.apps.len(),

@@ -4,6 +4,7 @@ import {
 	PREFERENCES_BACKUP_KEY,
 	PREFERENCES_KEY,
 	normalizePreferences,
+	parsePreferenceImport,
 	readPreferences,
 	writePreferences,
 } from '../../../../src/app/store/preferences'
@@ -11,6 +12,39 @@ import { stableCustomCategoryAccent } from '../../../../src/entities/category/li
 import { CATEGORY_ORDER } from '../../../../src/entities/category'
 
 describe('preferences', () => {
+	it('accepts a normalized backup document and preserves unknown fields', () => {
+		expect(
+			parsePreferenceImport(
+				JSON.stringify({
+					version: 14,
+					favoriteAppIds: ['code'],
+					futurePreference: { density: 'compact' },
+				}),
+			),
+		).toMatchObject({
+			ok: true,
+			preferences: {
+				favoriteAppIds: ['code'],
+				unknownFields: { futurePreference: { density: 'compact' } },
+			},
+		})
+	})
+
+	it('rejects malformed and newer backup documents', () => {
+		expect(parsePreferenceImport('{')).toEqual({
+			ok: false,
+			error: 'The selected file is not a Windows Apps backup.',
+		})
+		expect(parsePreferenceImport(JSON.stringify({}))).toEqual({
+			ok: false,
+			error: 'The selected file is not a Windows Apps backup.',
+		})
+		expect(parsePreferenceImport(JSON.stringify({ version: 15 }))).toEqual({
+			ok: false,
+			error: 'This backup was created by a newer version of Windows Apps.',
+		})
+	})
+
 	it('uses complete defaults', () => {
 		expect(DEFAULT_PREFERENCES).toMatchObject({
 			version: 14,

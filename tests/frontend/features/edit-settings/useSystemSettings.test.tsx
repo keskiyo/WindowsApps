@@ -20,6 +20,7 @@ const client: SystemClient = {
 	setScanSettings: vi.fn(),
 	getUninstallHistory: vi.fn().mockResolvedValue([]),
 	clearUninstallHistory: vi.fn(),
+	savePreferencesBackup: vi.fn(),
 	pickFolder: vi.fn(),
 	openTelegram: vi.fn(),
 	openGithub: vi.fn(),

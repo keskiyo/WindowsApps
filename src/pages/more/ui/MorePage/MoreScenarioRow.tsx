@@ -4,6 +4,7 @@ import type { MoreScenarioRowProps } from './types'
 export function MoreScenarioRow({
 	scenario,
 	running,
+	isScenarioRunning,
 	onRun,
 }: MoreScenarioRowProps) {
 	return (
@@ -22,7 +23,7 @@ export function MoreScenarioRow({
 			<button
 				type="button"
 				aria-label={`Run ${scenario.name}`}
-				disabled={running}
+				disabled={isScenarioRunning}
 				onClick={() => onRun(scenario.id)}
 				className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-(--accent) bg-(--utility-accent) px-3 text-xs font-medium text-(--text-primary) transition-colors hover:bg-(--utility-accent-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong) disabled:cursor-progress disabled:opacity-60"
 			>

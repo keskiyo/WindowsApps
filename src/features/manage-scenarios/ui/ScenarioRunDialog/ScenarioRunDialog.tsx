@@ -11,6 +11,7 @@ export function ScenarioRunDialog({
 	scenarios,
 	apps,
 	runningId,
+	isScenarioRunning,
 	onRun,
 	onClose,
 }: ScenarioRunDialogProps) {
@@ -87,6 +88,7 @@ export function ScenarioRunDialog({
 								apps={apps}
 								expanded={expanded.includes(scenario.id)}
 								running={runningId === scenario.id}
+								isScenarioRunning={isScenarioRunning}
 								onToggle={toggle}
 								onRun={onRun}
 							/>

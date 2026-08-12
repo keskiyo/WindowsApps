@@ -192,7 +192,10 @@ fn visit_directory<F: Fn() -> bool>(
     let modified_nanos = directory_modified_nanos(directory);
     let cached = context.previous.directories.get(&key);
     let unchanged = context.mode == ScanMode::Incremental
-        && cached.is_some_and(|record| record.modified_nanos == modified_nanos);
+        && cached.is_some_and(|record| {
+            record.modified_nanos == modified_nanos
+                && cached_children_are_valid(directory, &record.child_directories)
+        });
 
     if unchanged {
         let mut record = cached.expect("checked above").clone();
@@ -282,6 +285,17 @@ fn visit_directory<F: Fn() -> bool>(
         }
         visit_directory(Path::new(&child), depth + 1, context, result);
     }
+}
+
+fn cached_children_are_valid(parent: &Path, children: &[String]) -> bool {
+    let parent = normalized_path(parent);
+    children.iter().all(|child| {
+        let child = Path::new(child);
+        is_scannable_directory(child)
+            && child
+                .parent()
+                .is_some_and(|value| normalized_path(value) == parent)
+    })
 }
 
 fn should_stop(
@@ -652,6 +666,51 @@ mod tests {
 
         assert_eq!(second.apps.len(), 1);
         assert_eq!(second.apps[0].name, "Replacement");
+    }
+
+    #[test]
+    fn recovers_an_invalid_cached_child_path() {
+        let root = tempfile::tempdir().unwrap();
+        let downloads = root
+            .path()
+            .join("\u{417}\u{430}\u{433}\u{440}\u{443}\u{437}\u{43a}\u{438}");
+        std::fs::create_dir_all(&downloads).unwrap();
+        let app_directory = downloads.join("Tool");
+        std::fs::create_dir_all(&app_directory).unwrap();
+        let installer = app_directory.join("Tool.exe");
+        std::fs::write(&installer, []).unwrap();
+        assert!(portable::is_portable_candidate(&installer));
+        assert!(
+            portable_app(installer, &crate::catalog::machine::MachineFacts::current()).is_some()
+        );
+        let mut first = scan_root(
+            root.path(),
+            &FilesystemIndex::default(),
+            ScanMode::Force,
+            &[],
+            || false,
+        );
+        assert!(first.apps.iter().any(|app| app.path.ends_with("Tool.exe")));
+        first
+            .index
+            .directories
+            .get_mut(&normalized_path(root.path()))
+            .unwrap()
+            .child_directories = vec![root
+            .path()
+            .join("missing-cache-child")
+            .to_string_lossy()
+            .into_owned()];
+
+        let second = scan_root(
+            root.path(),
+            &first.index,
+            ScanMode::Incremental,
+            &[],
+            || false,
+        );
+
+        assert!(second.apps.iter().any(|app| app.path.ends_with("Tool.exe")));
     }
 
     #[test]

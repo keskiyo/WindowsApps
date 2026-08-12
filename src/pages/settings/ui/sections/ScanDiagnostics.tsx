@@ -1,5 +1,6 @@
 import { ChevronDown, Wrench } from 'lucide-react'
 import { useState } from 'react'
+import { CollapsiblePanel } from '../../../../shared/ui/CollapsiblePanel'
 import type { ScanDiagnosticsProps } from '../../types'
 import { SourceHealthTable } from './SourceHealthTable'
 import { TargetAvailabilityPanel } from './TargetAvailabilityPanel'
@@ -23,8 +24,8 @@ export function ScanDiagnostics({ diagnostics }: ScanDiagnosticsProps) {
 					className={`transition-transform duration-(--motion-fast) motion-reduce:transition-none ${expanded ? 'rotate-180' : ''}`}
 				/>
 			</button>
-			{expanded && (
-				<div id="catalog-diagnostics">
+			<CollapsiblePanel open={expanded} id="catalog-diagnostics">
+				<div>
 					<div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2 text-sm sm:grid-cols-4">
 						<span className="text-slate-600">Mode</span>
 						<span>{diagnostics.mode}</span>
@@ -58,7 +59,7 @@ export function ScanDiagnostics({ diagnostics }: ScanDiagnosticsProps) {
 						diff={diagnostics.targetAvailability}
 					/>
 				</div>
-			)}
+			</CollapsiblePanel>
 		</div>
 	)
 }

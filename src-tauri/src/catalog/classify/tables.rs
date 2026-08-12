@@ -634,7 +634,7 @@ pub(super) static RULES: &[Rule] = &[
         System,
         Name,
         NAME,
-        &["command prompt", "powershell", "командная строка"],
+        &["command prompt", "powershell", "\u{43a}\u{43e}\u{43c}\u{430}\u{43d}\u{434}\u{43d}\u{430} \u{441}\u{442}\u{440}\u{43e}\u{43a}\u{430}"],
     ),
     rule(
         Utilities,

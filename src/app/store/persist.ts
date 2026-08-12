@@ -5,14 +5,12 @@ interface PersistOptions {
 	set: SetAppState
 	get: GetAppState
 	storage: Storage
-	unknownFields?: Record<string, unknown>
 }
 
 export function createPersist({
 	set,
 	get,
 	storage,
-	unknownFields,
 }: PersistOptions): PersistPreferences {
 	return () => {
 		const state = get()
@@ -36,7 +34,7 @@ export function createPersist({
 			scenarioHistory: state.scenarioHistory,
 			firstSeenAt: state.firstSeenAt,
 			legacyCanonicalPreferences: state.legacyCanonicalPreferences,
-			unknownFields,
+			unknownFields: state.unknownPreferenceFields,
 		})
 		if (persisted !== state.preferencesPersisted) {
 			set({ preferencesPersisted: persisted })

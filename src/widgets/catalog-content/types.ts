@@ -47,6 +47,7 @@ export interface FavoriteScenariosPanel {
 	scenarios: Scenario[]
 	apps: AppInfo[]
 	runningId: string | null
+	isScenarioRunning: boolean
 	onRun(id: string): void
 	onToggleFavorite(id: string): void
 }

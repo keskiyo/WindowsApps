@@ -8,6 +8,8 @@ export const tauriSystemClient: SystemClient = {
 	setScanSettings: settings => invokeTauri('set_scan_settings', { settings }),
 	getUninstallHistory: () => invokeTauri('get_uninstall_history'),
 	clearUninstallHistory: () => invokeTauri('clear_uninstall_history'),
+	savePreferencesBackup: contents =>
+		invokeTauri('save_preferences_backup', { contents }),
 	pickFolder: () =>
 		open({ directory: true }).then(result =>
 			typeof result === 'string' ? result : null,

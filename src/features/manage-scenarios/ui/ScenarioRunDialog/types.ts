@@ -5,6 +5,7 @@ export interface ScenarioRunDialogProps {
 	scenarios: Scenario[]
 	apps: AppInfo[]
 	runningId: string | null
+	isScenarioRunning: boolean
 	onRun(id: string): void
 	onClose(): void
 }
@@ -14,6 +15,7 @@ export interface ScenarioRunRowProps {
 	apps: AppInfo[]
 	expanded: boolean
 	running: boolean
+	isScenarioRunning: boolean
 	onToggle(id: string): void
 	onRun(id: string): void
 }

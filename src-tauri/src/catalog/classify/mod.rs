@@ -131,6 +131,14 @@ mod tests {
     }
 
     #[test]
+    fn localised_command_prompt_name_is_classified_without_path_hints() {
+        assert_eq!(
+            super::classify("\u{41a}\u{43e}\u{43c}\u{430}\u{43d}\u{434}\u{43d}\u{430} \u{441}\u{442}\u{440}\u{43e}\u{43a}\u{430}", r"D:\\Portable\\app.exe"),
+            AppCategory::System
+        );
+    }
+
+    #[test]
     fn every_classified_record_can_say_why() {
         let fixtures: Vec<Fixture> = serde_json::from_str(include_str!(
             "../../../tests/fixtures/catalog_categories.json"

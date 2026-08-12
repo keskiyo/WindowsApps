@@ -1,5 +1,6 @@
 import { ChevronRight, Play } from 'lucide-react'
 import { resolveScenarioApps } from '../../../../entities/scenario'
+import { CollapsiblePanel } from '../../../../shared/ui/CollapsiblePanel'
 import { ScenarioRunList } from './ScenarioRunList'
 import type { ScenarioRunRowProps } from './types'
 
@@ -8,6 +9,7 @@ export function ScenarioRunRow({
 	apps,
 	expanded,
 	running,
+	isScenarioRunning,
 	onToggle,
 	onRun,
 }: ScenarioRunRowProps) {
@@ -43,7 +45,7 @@ export function ScenarioRunRow({
 				<button
 					type="button"
 					aria-label={`Run ${scenario.name}`}
-					disabled={running}
+					disabled={isScenarioRunning}
 					onClick={() => onRun(scenario.id)}
 					className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-(--accent) bg-(--utility-accent) px-3 text-xs font-medium text-(--text-primary) transition-colors hover:bg-(--utility-accent-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong) disabled:cursor-progress disabled:opacity-60"
 				>
@@ -51,11 +53,8 @@ export function ScenarioRunRow({
 					{running ? 'Running…' : 'Run'}
 				</button>
 			</div>
-			{expanded && (
-				<div
-					id={panelId}
-					className="flex flex-col gap-3 px-4 pt-1 pb-3"
-				>
+			<CollapsiblePanel open={expanded} id={panelId}>
+				<div className="flex flex-col gap-3 px-4 pt-1 pb-3">
 					<ScenarioRunList
 						label="Launch"
 						scenarioName={scenario.name}
@@ -69,7 +68,7 @@ export function ScenarioRunRow({
 						missing={close.missing}
 					/>
 				</div>
-			)}
+			</CollapsiblePanel>
 		</li>
 	)
 }

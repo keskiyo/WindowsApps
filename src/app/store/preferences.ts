@@ -51,6 +51,14 @@ export interface AppPreferencesV14 {
 	unknownFields?: Record<string, unknown>
 }
 
+export type PreferenceTransferResult =
+	| { ok: true }
+	| { ok: false; error: string }
+
+export type PreferenceImportResult =
+	| { ok: true; preferences: AppPreferencesV14 }
+	| { ok: false; error: string }
+
 export const DEFAULT_PREFERENCES: AppPreferencesV14 = {
 	version: 14,
 	categories: DEFAULT_CATEGORIES.map(category => ({ ...category })),
@@ -368,6 +376,61 @@ export function normalizePreferences(value: unknown): AppPreferencesV14 {
 	}
 }
 
+export function parsePreferenceImport(source: string): PreferenceImportResult {
+	try {
+		const value: unknown = JSON.parse(source)
+		if (!value || typeof value !== 'object' || Array.isArray(value)) {
+			return {
+				ok: false,
+				error: 'The selected file is not a Windows Apps backup.',
+			}
+		}
+		const version = (value as { version?: unknown }).version
+		if (
+			typeof version !== 'number' ||
+			!Number.isSafeInteger(version) ||
+			version < 1
+		) {
+			return {
+				ok: false,
+				error: 'The selected file is not a Windows Apps backup.',
+			}
+		}
+		if (
+			version > CURRENT_PREFERENCES_VERSION
+		) {
+			return {
+				ok: false,
+				error: 'This backup was created by a newer version of Windows Apps.',
+			}
+		}
+		return { ok: true, preferences: normalizePreferences(value) }
+	} catch {
+		return {
+			ok: false,
+			error: 'The selected file is not a Windows Apps backup.',
+		}
+	}
+}
+
+export function serializePreferences(preferences: AppPreferencesV14): string {
+	const { unknownFields = {}, ...knownFields } = preferences
+	return JSON.stringify({ ...unknownFields, ...knownFields })
+}
+
+export function readPreferenceBackup(
+	storage: Storage,
+): PreferenceImportResult {
+	try {
+		const source = storage.getItem(PREFERENCES_BACKUP_KEY)
+		if (!source)
+			return { ok: false, error: 'No local backup is available yet.' }
+		return parsePreferenceImport(source)
+	} catch {
+		return { ok: false, error: 'The local backup could not be read.' }
+	}
+}
+
 export function readPreferences(storage: Storage): AppPreferencesV14 {
 	return (
 		readSlot(storage, PREFERENCES_KEY) ??
@@ -389,15 +452,14 @@ export function writePreferences(
 	storage: Storage,
 	preferences: AppPreferencesV14,
 ): boolean {
-	if (storedVersionIsNewer(storage)) {
+	if (hasNewerStoredPreferences(storage)) {
 		return true
 	}
 	rotateBackup(storage)
 	try {
-		const { unknownFields = {}, ...knownFields } = preferences
 		storage.setItem(
 			PREFERENCES_KEY,
-			JSON.stringify({ ...unknownFields, ...knownFields }),
+			serializePreferences(preferences),
 		)
 		return true
 	} catch {
@@ -405,7 +467,7 @@ export function writePreferences(
 	}
 }
 
-function storedVersionIsNewer(storage: Storage): boolean {
+export function hasNewerStoredPreferences(storage: Storage): boolean {
 	try {
 		const raw = storage.getItem(PREFERENCES_KEY)
 		if (!raw) return false

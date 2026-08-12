@@ -130,7 +130,7 @@ describe('UpdateDialog', () => {
 		).toHaveFocus()
 	})
 
-	it('does not dismiss with Escape while installing', async () => {
+	it('shows only the active download stage while installing', async () => {
 		const onDismiss = vi.fn()
 		render(
 			<UpdateDialog
@@ -155,6 +155,9 @@ describe('UpdateDialog', () => {
 		expect(onDismiss).not.toHaveBeenCalled()
 		expect(screen.getByLabelText('Update progress')).toBeInTheDocument()
 		expect(screen.getByText('Downloading')).toBeInTheDocument()
+		expect(screen.queryByText('Verifying')).not.toBeInTheDocument()
+		expect(screen.queryByText('Installing')).not.toBeInTheDocument()
+		expect(screen.queryByText('Restarting')).not.toBeInTheDocument()
 		expect(screen.getByLabelText('2.3 MB of 5.3 MB')).toBeInTheDocument()
 	})
 

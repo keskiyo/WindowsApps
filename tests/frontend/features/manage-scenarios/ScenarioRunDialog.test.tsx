@@ -43,6 +43,7 @@ function renderDialog(value: {
 	scenarios?: Scenario[]
 	apps?: AppInfo[]
 	runningId?: string | null
+	isScenarioRunning?: boolean
 } = {}) {
 	const onRun = vi.fn()
 	const onClose = vi.fn()
@@ -55,8 +56,9 @@ function renderDialog(value: {
 					app('chat', 'Chat'),
 					app('mail', 'Mail'),
 				]
-			}
+		}
 			runningId={value.runningId ?? null}
+			isScenarioRunning={value.isScenarioRunning ?? false}
 			onRun={onRun}
 			onClose={onClose}
 		/>,
@@ -143,16 +145,17 @@ describe('ScenarioRunDialog', () => {
 		).toEqual(['Run Newest', 'Run Older', 'Run Legacy'])
 	})
 
-	it('blocks the active scenario action until it finishes', () => {
+	it('blocks every scenario action until the active run finishes', () => {
 		renderDialog({
 			scenarios: [gaming, scenario({ id: 'work', name: 'Work' })],
 			runningId: 'gaming',
+			isScenarioRunning: true,
 		})
 
 		const run = screen.getByRole('button', { name: 'Run Gaming' })
 		expect(run).toBeDisabled()
 		expect(run).toHaveTextContent('Running…')
-		expect(screen.getByRole('button', { name: 'Run Work' })).toBeEnabled()
+		expect(screen.getByRole('button', { name: 'Run Work' })).toBeDisabled()
 	})
 
 	it('reports entries the catalog no longer has instead of shrinking the list', async () => {

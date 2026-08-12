@@ -14,6 +14,7 @@ export function ScenarioCard({
 	scenario,
 	apps,
 	running,
+	isScenarioRunning,
 	runningStatus,
 	isFavorite,
 	onToggleFavorite,
@@ -59,15 +60,16 @@ export function ScenarioCard({
 						<button
 							type="button"
 							aria-label={`Rename ${scenario.name}`}
+							disabled={running}
 							onClick={() => setRenaming(true)}
-							className="grid size-8 shrink-0 place-items-center rounded-lg border border-(--border-neutral) hover:bg-(--surface-raised) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong)"
+							className="grid size-8 shrink-0 place-items-center rounded-lg border border-(--border-neutral) hover:bg-(--surface-raised) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong) disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							<Pencil size={15} aria-hidden="true" />
 						</button>
 						<button
 							type="button"
 							aria-label={`Run ${scenario.name}`}
-							disabled={running}
+							disabled={isScenarioRunning}
 							onClick={() => onRun(scenario)}
 							className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-(--accent) bg-(--utility-accent) px-3 text-xs font-medium text-(--text-primary) transition-colors hover:bg-(--utility-accent-hover) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong) disabled:cursor-progress disabled:opacity-60"
 						>
@@ -78,8 +80,9 @@ export function ScenarioCard({
 						<button
 							type="button"
 							aria-label={`Delete ${scenario.name}`}
+							disabled={running}
 							onClick={() => onDelete(scenario.id)}
-							className="danger-button grid size-8 shrink-0 place-items-center rounded-lg border border-(--border-neutral) hover:bg-(--surface-raised) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong)"
+							className="danger-button grid size-8 shrink-0 place-items-center rounded-lg border border-(--border-neutral) hover:bg-(--surface-raised) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent-strong) disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							<Trash2 size={15} aria-hidden="true" />
 						</button>
@@ -92,6 +95,7 @@ export function ScenarioCard({
 				scenarioName={scenario.name}
 				apps={launch.apps}
 				missing={launch.missing}
+				disabled={running}
 				identityOf={appIdentity}
 				onAdd={picker.open}
 				onRemove={(list, identity) =>
@@ -104,6 +108,7 @@ export function ScenarioCard({
 				scenarioName={scenario.name}
 				apps={close.apps}
 				missing={close.missing}
+				disabled={running}
 				markOf={picker.markOf}
 				identityOf={appIdentity}
 				onAdd={picker.open}

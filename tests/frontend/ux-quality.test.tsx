@@ -93,6 +93,7 @@ function renderApp(
 		setScanSettings: vi.fn().mockImplementation(async s => s),
 		getUninstallHistory: vi.fn().mockResolvedValue([]),
 		clearUninstallHistory: vi.fn().mockResolvedValue(undefined),
+		savePreferencesBackup: vi.fn().mockResolvedValue(true),
 		pickFolder: vi.fn().mockResolvedValue(null),
 		openTelegram: vi.fn().mockResolvedValue(undefined),
 		openGithub: vi.fn().mockResolvedValue(undefined),

@@ -104,6 +104,7 @@ pub fn run() {
             commands::settings::get_system_settings,
             commands::settings::set_autostart,
             commands::settings::set_scan_settings,
+            commands::settings::save_preferences_backup,
             commands::links::open_telegram,
             commands::links::open_github,
             commands::links::open_apps_settings,

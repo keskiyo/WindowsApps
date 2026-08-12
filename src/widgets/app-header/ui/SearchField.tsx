@@ -6,8 +6,6 @@ import type { SearchFieldProps } from '../types'
 export function SearchField({
 	query,
 	searchRef,
-	isRefreshing,
-	scanProgress,
 	onQueryChange,
 }: SearchFieldProps) {
 	const searchSpotlight = useSpotlight()
@@ -15,7 +13,7 @@ export function SearchField({
 	return (
 		<div className="min-w-0 flex-1">
 			<span id="search-hint" className="sr-only">
-				Searches app name, publisher, description, and install path
+				Searches app name, publisher, version, description, and install path
 			</span>
 			<label
 				className="group relative flex w-full items-center rounded-xl"
@@ -33,6 +31,11 @@ export function SearchField({
 					ref={searchRef}
 					value={query}
 					onChange={event => onQueryChange(event.target.value)}
+					onKeyDown={event => {
+						if (event.key !== 'Escape' || !query) return
+						event.preventDefault()
+						onQueryChange('')
+					}}
 					placeholder="Search apps…"
 					aria-describedby="search-hint"
 					className={`search-input h-11 w-full rounded-xl border border-white/90 bg-slate-100/75 pl-11 text-sm text-slate-800 outline-none placeholder:text-slate-500 ${query.length > 0 ? 'pr-11' : 'pr-11 sm:pr-[4.75rem]'}`}
@@ -60,19 +63,6 @@ export function SearchField({
 					</button>
 				)}
 			</label>
-			{isRefreshing && scanProgress && (
-				<p
-					className="mt-1.5 truncate px-1 text-xs text-violet-700"
-					aria-live="polite"
-					aria-atomic="true"
-				>
-					{scanProgress.stage}
-					{scanProgress.location ? ` · ${scanProgress.location}` : ''}
-					{scanProgress.totalRoots > 0
-						? ` · ${scanProgress.completedRoots}/${scanProgress.totalRoots}`
-						: ''}
-				</p>
-			)}
 		</div>
 	)
 }

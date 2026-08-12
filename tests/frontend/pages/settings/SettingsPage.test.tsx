@@ -1,8 +1,12 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { SettingsPage } from '../../../../src/pages/settings/ui/SettingsPage'
 import type { SystemClient } from '../../../../src/entities/system'
+
+async function openAdvancedSettings() {
+	await userEvent.click(screen.getByRole('button', { name: /Advanced/ }))
+}
 
 describe('SettingsPage', () => {
 	const settings = {
@@ -23,6 +27,7 @@ describe('SettingsPage', () => {
 		setScanSettings: vi.fn().mockImplementation(async value => value),
 		getUninstallHistory: vi.fn().mockResolvedValue([]),
 		clearUninstallHistory: vi.fn().mockResolvedValue(undefined),
+		savePreferencesBackup: vi.fn().mockResolvedValue(true),
 		pickFolder: vi.fn().mockResolvedValue(null),
 		openTelegram: vi.fn().mockResolvedValue(undefined),
 		openGithub: vi.fn().mockResolvedValue(undefined),
@@ -78,15 +83,54 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 
 		const maintenance = screen.getByRole('heading', {
 			name: 'Catalog maintenance',
 		})
-		const history = screen.getByRole('heading', { name: 'Uninstall history' })
+		const history = screen.getByRole('heading', {
+			name: 'Uninstall history',
+		})
 		expect(
 			maintenance.compareDocumentPosition(history) &
 				Node.DOCUMENT_POSITION_FOLLOWING,
 		).toBeTruthy()
+	})
+
+	it('keeps infrequent settings in a collapsed Advanced section', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+
+		const advanced = screen.getByRole('button', { name: /Advanced/ })
+		expect(advanced).toHaveAttribute('aria-expanded', 'false')
+		expect(
+			screen.queryByText('Application discovery'),
+		).not.toBeInTheDocument()
+
+		await userEvent.click(advanced)
+		expect(advanced).toHaveAttribute('aria-expanded', 'true')
+		expect(screen.getByText('Application discovery')).toBeInTheDocument()
+	})
+
+	it('does not render catalog visibility counts outside scan diagnostics', async () => {
+		render(
+			<SettingsPage
+				client={systemClient()}
+				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
+			/>,
+		)
+		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
+
+		expect(
+			screen.queryByText('Primary applications'),
+		).not.toBeInTheDocument()
+		expect(screen.queryByText('Auxiliary tools')).not.toBeInTheDocument()
 	})
 
 	it('keeps scan diagnostics collapsed until toggled', async () => {
@@ -107,6 +151,7 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 
 		const toggle = screen.getByRole('button', {
 			name: 'Last scan diagnostics',
@@ -119,6 +164,10 @@ describe('SettingsPage', () => {
 		expect(screen.getByText('Duration')).toBeInTheDocument()
 
 		await userEvent.click(toggle)
+		fireEvent.transitionEnd(
+			screen.getByText('Duration').closest('#catalog-diagnostics')!,
+			{ propertyName: 'grid-template-rows' },
+		)
 		expect(screen.queryByText('Duration')).not.toBeInTheDocument()
 	})
 
@@ -154,6 +203,7 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Last scan diagnostics' }),
 		)
@@ -183,6 +233,7 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Last scan diagnostics' }),
 		)
@@ -217,6 +268,7 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Last scan diagnostics' }),
 		)
@@ -248,11 +300,14 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Last scan diagnostics' }),
 		)
 
-		expect(screen.queryByText('Launch target check')).not.toBeInTheDocument()
+		expect(
+			screen.queryByText('Launch target check'),
+		).not.toBeInTheDocument()
 	})
 
 	it('does not render manual icon-maintenance controls', async () => {
@@ -281,6 +336,7 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Force full scan' }),
@@ -301,6 +357,7 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 		const trigger = screen.getByRole('button', { name: 'Force full scan' })
 		await userEvent.click(trigger)
 		await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -308,29 +365,25 @@ describe('SettingsPage', () => {
 		expect(trigger).toHaveFocus()
 	})
 
-	it('uses readable dark text in the light catalog maintenance surface', async () => {
+	it('uses readable dark text in the catalog maintenance confirmation', async () => {
 		render(
 			<SettingsPage
 				client={systemClient()}
 				onForceFullScan={vi.fn().mockResolvedValue(undefined)}
-				visibilityCounts={{ primary: 12, auxiliary: 3 }}
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Force full scan' }),
 		)
-		expect(
-			screen.getByText(/The next scan will take longer/),
-		).toHaveClass('text-slate-700')
+		expect(screen.getByText(/The next scan will take longer/)).toHaveClass(
+			'text-slate-700',
+		)
 		expect(screen.getByRole('button', { name: 'Cancel' })).toHaveClass(
 			'text-slate-700',
 		)
-		expect(screen.getByText('Primary applications')).toHaveClass(
-			'text-slate-600',
-		)
-		expect(screen.getByText('12')).toHaveClass('text-slate-800')
 	})
 
 	it('confirms and resets the catalog cache', async () => {
@@ -343,6 +396,7 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Reset catalog cache' }),
@@ -365,6 +419,7 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Force full scan' }),
@@ -388,10 +443,14 @@ describe('SettingsPage', () => {
 			screen.getByRole('dialog', { name: 'Confirm full scan' }),
 		).toBeInTheDocument()
 		expect(
-			screen.queryByRole('dialog', { name: 'Confirm catalog cache reset' }),
+			screen.queryByRole('dialog', {
+				name: 'Confirm catalog cache reset',
+			}),
 		).not.toBeInTheDocument()
 		// One question, one answer: never two Cancel buttons on screen.
-		expect(screen.getAllByRole('button', { name: 'Cancel' })).toHaveLength(1)
+		expect(screen.getAllByRole('button', { name: 'Cancel' })).toHaveLength(
+			1,
+		)
 	})
 
 	// Swapping confirmations is not a dismissal — pulling focus back to the other trigger would
@@ -405,11 +464,14 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Force full scan' }),
 		)
-		const reset = screen.getByRole('button', { name: 'Reset catalog cache' })
+		const reset = screen.getByRole('button', {
+			name: 'Reset catalog cache',
+		})
 		await userEvent.click(reset)
 
 		expect(reset).toHaveFocus()
@@ -424,37 +486,42 @@ describe('SettingsPage', () => {
 			/>,
 		)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 
-		expect(screen.getByText('Application discovery').closest('div')).toBeTruthy()
+		expect(
+			screen.getByText('Application discovery').closest('div'),
+		).toBeTruthy()
 		expect(
 			screen.getByRole('button', { name: 'Reset catalog cache' }),
 		).toHaveClass('danger-button')
 		expect(
-			screen.getByText('Catalog maintenance').closest('.settings-surface'),
+			screen
+				.getByText('Catalog maintenance')
+				.closest('.settings-surface'),
 		).toBeInTheDocument()
 	})
 
 	it('loads system settings and toggles Windows startup', async () => {
 		const client: SystemClient = {
-			getSettings: vi
-				.fn()
-				.mockResolvedValue({
-					version: '0.1.0',
-					autostartEnabled: false,
-					shortcut: {
-						available: true,
-						label: 'Win+Shift+Q',
-						error: null,
-					},
-					scanSettings: {
-						autoScanFixedDrives: true,
-						includedPaths: [String.raw`D:\Games`],
-						excludedPaths: [],
-					},
-					fixedDrives: ['C:\\', 'D:\\', 'E:\\'],
-				}),
+			getSettings: vi.fn().mockResolvedValue({
+				version: '0.1.0',
+				autostartEnabled: false,
+				shortcut: {
+					available: true,
+					label: 'Win+Shift+Q',
+					error: null,
+				},
+				scanSettings: {
+					autoScanFixedDrives: true,
+					includedPaths: [String.raw`D:\Games`],
+					excludedPaths: [],
+				},
+				fixedDrives: ['C:\\', 'D:\\', 'E:\\'],
+			}),
 			setAutostart: vi.fn().mockResolvedValue(undefined),
-			setScanSettings: vi.fn().mockImplementation(async settings => settings),
+			setScanSettings: vi
+				.fn()
+				.mockImplementation(async settings => settings),
 			getUninstallHistory: vi.fn().mockResolvedValue([
 				{
 					id: 'history-1',
@@ -466,6 +533,7 @@ describe('SettingsPage', () => {
 				},
 			]),
 			clearUninstallHistory: vi.fn().mockResolvedValue(undefined),
+			savePreferencesBackup: vi.fn().mockResolvedValue(true),
 			pickFolder: vi.fn().mockResolvedValue(String.raw`F:\Stick\Tools`),
 			openTelegram: vi.fn().mockResolvedValue(undefined),
 			openGithub: vi.fn().mockResolvedValue(undefined),
@@ -488,6 +556,7 @@ describe('SettingsPage', () => {
 			}),
 		)
 		expect(client.openGithub).toHaveBeenCalledOnce()
+		await openAdvancedSettings()
 		expect(screen.getByText('Fixed local drives')).toBeInTheDocument()
 		expect(screen.getByText('Visual Studio Code')).toBeInTheDocument()
 		expect(screen.getByText('E:\\')).toBeInTheDocument()
@@ -506,7 +575,11 @@ describe('SettingsPage', () => {
 			getSettings: vi.fn().mockResolvedValue({
 				version: '0.1.0',
 				autostartEnabled: false,
-				shortcut: { available: true, label: 'Win+Shift+Q', error: null },
+				shortcut: {
+					available: true,
+					label: 'Win+Shift+Q',
+					error: null,
+				},
 				scanSettings: {
 					autoScanFixedDrives: true,
 					includedPaths: [],
@@ -515,9 +588,12 @@ describe('SettingsPage', () => {
 				fixedDrives: ['C:\\'],
 			}),
 			setAutostart: vi.fn().mockResolvedValue(undefined),
-			setScanSettings: vi.fn().mockImplementation(async settings => settings),
+			setScanSettings: vi
+				.fn()
+				.mockImplementation(async settings => settings),
 			getUninstallHistory: vi.fn().mockResolvedValue([]),
 			clearUninstallHistory: vi.fn().mockResolvedValue(undefined),
+			savePreferencesBackup: vi.fn().mockResolvedValue(true),
 			pickFolder: vi.fn().mockResolvedValue(String.raw`F:\Stick\Tools`),
 			openTelegram: vi.fn().mockResolvedValue(undefined),
 			openGithub: vi.fn().mockResolvedValue(undefined),
@@ -525,6 +601,7 @@ describe('SettingsPage', () => {
 		}
 		render(<SettingsPage client={client} />)
 		await screen.findByText('Version 0.1.0')
+		await openAdvancedSettings()
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Browse for scan folder' }),
 		)
@@ -549,7 +626,10 @@ describe('SettingsPage', () => {
 			},
 		])
 		render(<SettingsPage client={client} />)
-		expect(await screen.findByText('Visual Studio Code')).toBeInTheDocument()
+		await openAdvancedSettings()
+		expect(
+			await screen.findByText('Visual Studio Code'),
+		).toBeInTheDocument()
 		expect(screen.getByText('Succeeded')).toHaveClass('success-badge')
 
 		await userEvent.click(screen.getByRole('button', { name: 'Clear' }))
@@ -559,6 +639,8 @@ describe('SettingsPage', () => {
 		)
 
 		expect(client.clearUninstallHistory).toHaveBeenCalledOnce()
-		expect(screen.getByText('No uninstall history yet.')).toBeInTheDocument()
+		expect(
+			screen.getByText('No uninstall history yet.'),
+		).toBeInTheDocument()
 	})
 })

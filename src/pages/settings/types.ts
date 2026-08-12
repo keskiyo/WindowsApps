@@ -16,10 +16,19 @@ export type ScanPathKind = 'includedPaths' | 'excludedPaths'
 
 export interface SettingsPageProps {
 	client: SystemClient
+	onExportPreferences?: () => string
+	onValidatePreferencesImport?: (
+		source: string,
+	) => { ok: true } | { ok: false; error: string }
+	onImportPreferences?: (
+		source: string,
+	) => { ok: true } | { ok: false; error: string }
+	onRestorePreferencesBackup?: () =>
+		| { ok: true }
+		| { ok: false; error: string }
 	onForceFullScan?: () => Promise<void>
 	onResetCatalogCache?: () => Promise<void>
 	catalogDiagnostics?: CatalogDiagnostics | null
-	visibilityCounts?: { primary: number; auxiliary: number }
 	updater?: UpdaterState
 }
 
@@ -39,7 +48,6 @@ export interface CatalogMaintenanceProps {
 	confirming: MaintenanceConfirmation
 	canReset: boolean
 	catalogDiagnostics?: CatalogDiagnostics | null
-	visibilityCounts?: { primary: number; auxiliary: number }
 	setConfirming(value: MaintenanceConfirmation): void
 	onForceFullScan(): Promise<void>
 	onResetCatalogCache(): Promise<void>

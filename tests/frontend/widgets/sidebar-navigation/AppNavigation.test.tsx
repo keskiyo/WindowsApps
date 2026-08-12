@@ -14,6 +14,29 @@ const categories: CategoryDefinition[] = [
 ]
 
 describe('AppNavigation', () => {
+	it('always distinguishes favorite app and scenario counts', () => {
+		render(
+			<AppNavigation
+				categoryOrder={[]}
+				categories={categories}
+				counts={new Map()}
+				activeView="all"
+				appCount={3}
+				favoriteCount={3}
+				favoriteScenarioCount={2}
+				onSelectView={vi.fn()}
+				onSelectCategory={vi.fn()}
+				onCreateCategory={() => ({ ok: true, id: 'custom' })}
+				onReorderCategory={vi.fn()}
+			/>,
+		)
+
+		const favorites = screen.getByRole('button', {
+			name: 'Favorites 3 apps, 2 scenarios',
+		})
+		expect(favorites).toHaveTextContent('3 · 2')
+	})
+
 	it('uses the category label as both selector and drag activator', async () => {
 		const counts = new Map<AppCategory, number>([
 			['games', 2],

@@ -1,17 +1,22 @@
 import { useSystemSettings } from '../../../features/edit-settings'
 import { useUpdater } from '../../../features/update-app'
 import { CatalogMaintenance } from './sections/CatalogMaintenance'
+import { AdvancedSettings } from './sections/AdvancedSettings'
 import { GeneralSettings } from './sections/GeneralSettings'
+import { PreferencesBackup } from './sections/PreferencesBackup/PreferencesBackup'
 import { SettingsDiscoveryControls } from './sections/SettingsDiscoveryControls'
 import { UninstallHistory } from './sections/UninstallHistory'
 import type { SettingsPageProps } from '../types'
 
 export function SettingsPage({
 	client,
+	onExportPreferences,
+	onValidatePreferencesImport,
+	onImportPreferences,
+	onRestorePreferencesBackup,
 	onForceFullScan,
 	onResetCatalogCache,
 	catalogDiagnostics,
-	visibilityCounts,
 	updater: sharedUpdater,
 }: SettingsPageProps) {
 	const {
@@ -50,14 +55,6 @@ export function SettingsPage({
 					</p>
 				</div>
 			</div>
-			<SettingsDiscoveryControls
-				settings={settings}
-				saving={saving}
-				onSaveScanSettings={saveScanSettings}
-				onAddPath={addPath}
-				onRemovePath={removePath}
-				onPickFolder={client.pickFolder}
-			/>
 			<GeneralSettings
 				settings={settings}
 				saving={saving}
@@ -67,20 +64,41 @@ export function SettingsPage({
 				onOpenTelegram={client.openTelegram}
 				onOpenAppsSettings={client.openAppsSettings}
 			/>
-			{onForceFullScan && (
-				<CatalogMaintenance
-					forcing={forcing}
-					resetting={resetting}
-					confirming={confirming}
-					canReset={Boolean(onResetCatalogCache)}
-					catalogDiagnostics={catalogDiagnostics}
-					visibilityCounts={visibilityCounts}
-					setConfirming={setConfirming}
-					onForceFullScan={forceFullScan}
-					onResetCatalogCache={resetCatalogCache}
+			<AdvancedSettings>
+				<SettingsDiscoveryControls
+					settings={settings}
+					saving={saving}
+					onSaveScanSettings={saveScanSettings}
+					onAddPath={addPath}
+					onRemovePath={removePath}
+					onPickFolder={client.pickFolder}
 				/>
-			)}
-			<UninstallHistory client={client} />
+				{onExportPreferences &&
+					onValidatePreferencesImport &&
+					onImportPreferences &&
+					onRestorePreferencesBackup && (
+						<PreferencesBackup
+							onExport={onExportPreferences}
+							onSaveExport={client.savePreferencesBackup}
+							onValidateImport={onValidatePreferencesImport}
+							onImport={onImportPreferences}
+							onRestore={onRestorePreferencesBackup}
+						/>
+					)}
+				{onForceFullScan && (
+					<CatalogMaintenance
+						forcing={forcing}
+						resetting={resetting}
+						confirming={confirming}
+						canReset={Boolean(onResetCatalogCache)}
+						catalogDiagnostics={catalogDiagnostics}
+						setConfirming={setConfirming}
+						onForceFullScan={forceFullScan}
+						onResetCatalogCache={resetCatalogCache}
+					/>
+				)}
+				<UninstallHistory client={client} />
+			</AdvancedSettings>
 			{error && (
 				<p role="alert" className="mt-4 text-sm text-red-700">
 					{error}

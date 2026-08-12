@@ -6,6 +6,7 @@ export interface ScenariosPageProps {
 	scenarios: Scenario[]
 	apps: AppInfo[]
 	runningId: string | null
+	isScenarioRunning: boolean
 	runProgress?: ScenarioRunProgress | null
 	favoriteScenarioIds: string[]
 	onBack(): void

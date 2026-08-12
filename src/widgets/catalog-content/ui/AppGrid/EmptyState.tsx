@@ -14,7 +14,7 @@ export function EmptyState({ hasQuery }: { hasQuery: boolean }) {
 				</h2>
 				<p className="mt-2 text-sm text-slate-600">
 					{hasQuery
-						? 'Try a different search.'
+						? 'Try an app name, publisher, version, or install location.'
 						: 'Refresh to scan Windows again.'}
 				</p>
 			</div>

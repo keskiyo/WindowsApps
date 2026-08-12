@@ -75,6 +75,7 @@ function renderGrid(size: number) {
 				scenarios: [],
 				apps: [],
 				runningId: null,
+				isScenarioRunning: false,
 				onRun: vi.fn(),
 				onToggleFavorite: vi.fn(),
 			}}

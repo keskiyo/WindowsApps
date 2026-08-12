@@ -45,6 +45,7 @@ function fieldsFor(app: AppInfo): SearchFields {
 			app.path,
 			app.installLocation,
 			app.originalFilename,
+			app.version,
 			app.description,
 			app.visibilityReasons?.join(' '),
 			app.visibilityReasons?.includes('product_component')

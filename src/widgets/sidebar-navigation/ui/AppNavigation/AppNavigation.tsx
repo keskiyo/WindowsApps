@@ -61,6 +61,7 @@ export function AppNavigation(props: AppNavigationProps) {
 					label="Favorites"
 					active={props.activeView === 'favorites'}
 					count={props.favoriteCount}
+					secondaryCount={props.favoriteScenarioCount ?? 0}
 					onClick={() => props.onSelectView('favorites')}
 				/>
 				<NavItem

@@ -2,6 +2,8 @@ import type { RefObject } from 'react'
 import type { ScanProgress } from '../../entities/app'
 
 export interface HeaderProps {
+	primaryAppCount: number
+	auxiliaryToolCount: number
 	visibleCount: number
 	query: string
 	isRefreshing: boolean
@@ -18,8 +20,6 @@ export interface HeaderProps {
 export interface SearchFieldProps {
 	query: string
 	searchRef: RefObject<HTMLInputElement>
-	isRefreshing: boolean
-	scanProgress: ScanProgress | null
 	onQueryChange(query: string): void
 }
 

@@ -17,7 +17,6 @@ export function CatalogMaintenance({
 	confirming,
 	canReset,
 	catalogDiagnostics,
-	visibilityCounts,
 	setConfirming,
 	onForceFullScan,
 	onResetCatalogCache,
@@ -37,7 +36,7 @@ export function CatalogMaintenance({
 	}, [confirming])
 
 	return (
-		<div className="settings-surface mt-5 rounded-2xl border border-white/85 bg-white/58 p-5">
+		<div className="settings-surface rounded-2xl border border-white/85 bg-white/58 p-5">
 			<div className="flex items-start gap-4">
 				<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner">
 					<RefreshCw size={19} aria-hidden="true" />
@@ -135,18 +134,6 @@ export function CatalogMaintenance({
 							{resetting ? 'Resetting…' : 'Confirm reset'}
 						</button>
 					</div>
-				</div>
-			)}
-			{visibilityCounts && (
-				<div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-200/80 pt-4 text-sm">
-					<span className="text-slate-600">Primary applications</span>
-					<span className="font-medium text-slate-800">
-						{visibilityCounts.primary}
-					</span>
-					<span className="text-slate-600">Auxiliary tools</span>
-					<span className="font-medium text-slate-800">
-						{visibilityCounts.auxiliary}
-					</span>
 				</div>
 			)}
 			{catalogDiagnostics && (

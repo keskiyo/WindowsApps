@@ -1,4 +1,5 @@
 use crate::catalog::incremental::{scan_root_with_duration, FilesystemIndex, ScanLimit, ScanMode};
+use crate::catalog::sync::scan_control::StageStop;
 use crate::catalog::{AppInfo, ScanProgress};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -7,7 +8,7 @@ use std::time::{Duration, Instant};
 pub(super) struct PortableScanResult {
     pub(super) apps: Vec<AppInfo>,
     pub(super) filesystem_index: FilesystemIndex,
-    pub(super) complete: bool,
+    pub(super) stop: Option<StageStop>,
 }
 
 pub(super) struct PortableScanInput<'a> {
@@ -28,7 +29,7 @@ pub(super) fn scan_roots(
     let started_at = Instant::now();
     let mut apps = BTreeMap::new();
     let mut filesystem_index = FilesystemIndex::default();
-    let mut complete = true;
+    let mut stop = None;
     progress(ScanProgress {
         stage: "Portable applications".into(),
         location: None,
@@ -37,24 +38,30 @@ pub(super) fn scan_roots(
     });
     for (index, root) in input.roots.iter().enumerate() {
         if is_cancelled() {
-            complete = false;
+            stop = Some(StageStop::Cancelled);
             break;
         }
         let remaining = input.max_duration.saturating_sub(started_at.elapsed());
+        let root_duration = root_duration(remaining, input.roots.len() - index);
         let scanned = scan_root_with_duration(
             root,
             input.previous_index,
             input.mode,
             input.excluded,
             is_cancelled,
-            remaining,
+            root_duration,
             input.verify_fingerprints,
         );
-        let complete_root = !matches!(
-            scanned.limit_reached,
-            Some(ScanLimit::Entries | ScanLimit::Time)
-        );
-        complete &= complete_root;
+        let root_stop = match scanned.limit_reached {
+            Some(ScanLimit::Entries) => Some(StageStop::EntryLimit),
+            Some(ScanLimit::Time) => Some(StageStop::TimedOut),
+            Some(ScanLimit::Depth) | None => None,
+        };
+        let cancelled = is_cancelled();
+        let complete_root = root_stop.is_none() && !cancelled;
+        if stop.is_none() {
+            stop = cancelled.then_some(StageStop::Cancelled).or(root_stop);
+        }
         for app in merge_root_apps(input.previous_apps, scanned.apps, root, complete_root) {
             apps.insert(app.id.clone(), app);
         }
@@ -70,12 +77,19 @@ pub(super) fn scan_roots(
             completed_roots: index + 1,
             total_roots: input.roots.len(),
         });
+        if cancelled {
+            break;
+        }
     }
     PortableScanResult {
         apps: apps.into_values().collect(),
         filesystem_index,
-        complete,
+        stop,
     }
+}
+
+fn root_duration(remaining: Duration, roots_remaining: usize) -> Duration {
+    remaining / u32::try_from(roots_remaining.max(1)).unwrap_or(u32::MAX)
 }
 
 fn merge_root_apps(
@@ -129,6 +143,7 @@ fn path_is_within_root(path: &str, root: &Path) -> bool {
 mod tests {
     use super::*;
     use crate::catalog::incremental::{DirectoryRecord, FilesystemIndex, ScanMode};
+    use crate::catalog::sync::scan_control::StageStop;
     use crate::catalog::{AppCategory, AppInfo, LaunchKind, SourceKind, VisibilityClass};
     use std::collections::BTreeMap;
     use std::path::Path;
@@ -259,6 +274,19 @@ mod tests {
                 .map(|app| app.id.as_str())
                 .collect::<Vec<_>>(),
             vec!["first", "second"]
+        );
+        assert_eq!(scanned.stop, Some(StageStop::TimedOut));
+    }
+
+    #[test]
+    fn shares_the_remaining_time_with_unvisited_roots() {
+        assert_eq!(
+            root_duration(Duration::from_secs(90), 3),
+            Duration::from_secs(30)
+        );
+        assert_eq!(
+            root_duration(Duration::from_secs(91), 2),
+            Duration::from_millis(45_500)
         );
     }
 }

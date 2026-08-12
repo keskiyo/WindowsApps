@@ -22,8 +22,8 @@ export function ScanPrompt({ isScanning, onScan, onDismiss }: ScanPromptProps) {
 					Find your applications
 				</h2>
 				<p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">
-					Scan Windows when you are ready. Nothing runs automatically
-					at startup.
+					Scan Windows to build your catalog. Nothing runs automatically at
+					startup.
 				</p>
 				<button
 					type="button"

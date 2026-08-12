@@ -137,5 +137,5 @@ export function useScenarioRunner({
 		[run, scenarios],
 	)
 
-	return { run, runById, runningId, progress }
+	return { run, runById, runningId, isRunning: runningId !== null, progress }
 }

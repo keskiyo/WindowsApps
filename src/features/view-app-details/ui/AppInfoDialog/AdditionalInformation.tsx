@@ -1,6 +1,7 @@
 import { ChevronDown, Info } from 'lucide-react'
 import { useId, useState } from 'react'
 import { formatFileDate, formatFileSize } from '../../../../entities/app'
+import { CollapsiblePanel } from '../../../../shared/ui/CollapsiblePanel'
 import { availability, loadingValue, signature } from './detailValues'
 import type { AdditionalInformationProps } from './types'
 
@@ -79,29 +80,21 @@ export function AdditionalInformation({
 					aria-hidden="true"
 				/>
 			</button>
-			<div
-				id={contentId}
-				aria-hidden={!expanded}
-				className={`grid transition-[grid-template-rows,opacity] duration-(--motion-medium) ease-(--motion-ease-out) motion-reduce:transition-none ${expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
-			>
-				<div className="overflow-hidden">
-					<dl className="grid grid-cols-1 border-t border-(--border-neutral) sm:grid-cols-2">
-						{rows.map(([label, value]) => (
-							<div
-								key={label}
-								className="grid grid-cols-[minmax(8rem,auto)_minmax(0,1fr)] gap-3 border-b border-(--border-neutral) px-4 py-3 text-sm last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0"
-							>
-								<dt className="text-(--text-subtle)">
-									{label}
-								</dt>
-								<dd className="break-words text-(--text-primary)">
-									{value}
-								</dd>
-							</div>
-						))}
-					</dl>
-				</div>
-			</div>
+			<CollapsiblePanel open={expanded} id={contentId}>
+				<dl className="grid grid-cols-1 border-t border-(--border-neutral) sm:grid-cols-2">
+					{rows.map(([label, value]) => (
+						<div
+							key={label}
+							className="grid grid-cols-[minmax(8rem,auto)_minmax(0,1fr)] gap-3 border-b border-(--border-neutral) px-4 py-3 text-sm last:border-b-0 sm:[&:nth-last-child(2)]:border-b-0"
+						>
+							<dt className="text-(--text-subtle)">{label}</dt>
+							<dd className="break-words text-(--text-primary)">
+								{value}
+							</dd>
+						</div>
+					))}
+				</dl>
+			</CollapsiblePanel>
 		</section>
 	)
 }

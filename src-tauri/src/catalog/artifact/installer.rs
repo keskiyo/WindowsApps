@@ -59,17 +59,17 @@ pub(in crate::catalog) fn has_installer_filename_evidence(
     internal_name: Option<&str>,
 ) -> bool {
     let normalized_path = path.replace('/', r"\").to_lowercase();
-    let filename = Path::new(path)
+    let path_filename = Path::new(path)
         .file_stem()
         .and_then(|value| value.to_str())
         .unwrap_or_default();
-    if filename.eq_ignore_ascii_case("AMDSoftwareCompatibilityTool")
+    if path_filename.eq_ignore_ascii_case("AMDSoftwareCompatibilityTool")
         && normalized_path.contains(r"\amd\cim\")
     {
         return true;
     }
     internal_name.is_some_and(strong_installer_name)
-        || strong_installer_name(filename)
+        || strong_installer_name(path)
         || original_filename.is_some_and(strong_installer_name)
 }
 
@@ -103,11 +103,19 @@ fn is_registered_product(app: &AppInfo) -> bool {
 }
 
 fn strong_installer_name(value: &str) -> bool {
-    let stem = Path::new(value)
-        .file_stem()
+    let filename = Path::new(value)
+        .file_name()
         .and_then(|value| value.to_str())
-        .unwrap_or(value)
-        .to_lowercase();
+        .unwrap_or(value);
+    let stem = if filename
+        .get(filename.len().saturating_sub(4)..)
+        .is_some_and(|suffix| suffix.eq_ignore_ascii_case(".exe"))
+    {
+        &filename[..filename.len() - 4]
+    } else {
+        filename
+    }
+    .to_lowercase();
     stem == "msiexec"
         || stem == "setup"
         || stem == "installer"
@@ -180,6 +188,20 @@ mod tests {
                 ArtifactKind::Installer,
                 "{}",
                 app.path
+            );
+        }
+    }
+
+    #[test]
+    fn versioned_setup_filenames_keep_their_setup_marker() {
+        for filename in [
+            r"D:\Downloads\Vendor.App_2026.08.12_x64-setup.exe",
+            r"D:\Downloads\Vendor.App_2026.08.12_x64-setup.ExE",
+            "Vendor.App_2026.08.12_x64-setup",
+        ] {
+            assert!(
+                super::has_installer_filename_evidence(filename, None, None),
+                "{filename}"
             );
         }
     }

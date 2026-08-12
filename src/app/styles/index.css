@@ -225,6 +225,7 @@
 	.lucide-arrow-left,
 	.lucide-arrow-right,
 	.lucide-settings,
+	.lucide-sliders-horizontal,
 	.lucide-wrench,
 	.lucide-app-window,
 	.lucide-keyboard,
@@ -339,7 +340,39 @@ button {
 	padding-right: 3rem !important;
 }
 
+.app-toaster [data-sonner-toast][data-styled='true'] {
+	background: var(--surface-raised) !important;
+	border: 1px solid var(--border-neutral) !important;
+	border-radius: 0.75rem !important;
+	box-shadow: var(--shadow-menu) !important;
+	color: var(--text-primary) !important;
+}
+
+.app-toaster [data-sonner-toast] [data-icon] {
+	color: var(--accent-strong);
+}
+
+.app-toaster [data-sonner-toast][data-type='success'] [data-icon] {
+	color: var(--category-green);
+}
+
+.app-toaster [data-sonner-toast][data-type='info'] [data-icon] {
+	color: var(--category-cyan);
+}
+
+.app-toaster [data-sonner-toast][data-type='warning'] [data-icon] {
+	color: var(--category-orange);
+}
+
+.app-toaster [data-sonner-toast][data-type='error'] [data-icon] {
+	color: var(--category-red);
+}
+
 .app-toaster [data-sonner-toast] [data-close-button] {
+	background: var(--surface-inset) !important;
+	border: 1px solid var(--border-neutral) !important;
+	border-radius: 0.5rem !important;
+	color: var(--text-muted) !important;
 	display: grid !important;
 	padding: 0 !important;
 	top: 50% !important;
@@ -350,6 +383,35 @@ button {
 	line-height: 0 !important;
 	place-items: center !important;
 	transform: translateY(-50%) !important;
+}
+
+.app-toaster [data-sonner-toast] [data-close-button]:hover {
+	background: color-mix(
+		in oklab,
+		var(--accent) 16%,
+		var(--surface-inset)
+	) !important;
+	border-color: color-mix(
+		in oklab,
+		var(--accent) 46%,
+		var(--border-neutral)
+	) !important;
+	color: var(--text-primary) !important;
+}
+
+.app-toaster [data-sonner-toast] [data-close-button]:focus-visible {
+	outline: 2px solid var(--accent-strong);
+	outline-offset: 2px;
+}
+
+.app-toaster [data-sonner-toast] [data-button] {
+	background: var(--utility-accent) !important;
+	border-radius: 0.5rem !important;
+	color: var(--text-primary) !important;
+}
+
+.app-toaster [data-sonner-toast] [data-button]:hover {
+	background: var(--utility-accent-hover) !important;
 }
 
 .app-toaster [data-sonner-toast] [data-close-button] svg {

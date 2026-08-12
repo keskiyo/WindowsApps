@@ -25,6 +25,7 @@ export function MorePage({
 		preview,
 		scenarioPreview: {
 			runningId: scenarioRun.runningId,
+			isScenarioRunning: scenarioRun.isScenarioRunning,
 			onRun: scenarioRun.onRun,
 			onViewAll: () => setViewingScenarios(true),
 		},
@@ -43,7 +44,7 @@ export function MorePage({
 						More
 					</h1>
 					<p className="mt-1 text-sm text-(--text-muted)">
-						Catalog views kept out of the main list.
+						Secondary catalog views.
 					</p>
 				</div>
 			</header>
@@ -73,6 +74,7 @@ export function MorePage({
 					scenarios={scenarioRun.scenarios}
 					apps={scenarioRun.apps}
 					runningId={scenarioRun.runningId}
+					isScenarioRunning={scenarioRun.isScenarioRunning}
 					onRun={scenarioRun.onRun}
 					onClose={() => setViewingScenarios(false)}
 				/>

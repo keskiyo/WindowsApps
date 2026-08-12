@@ -63,6 +63,7 @@ export function AppDrawer(props: AppDrawerProps) {
 					activeView={props.activeView}
 					appCount={props.appCount}
 					favoriteCount={props.favoriteCount}
+					favoriteScenarioCount={props.favoriteScenarioCount}
 					onSelectView={props.onSelectView}
 					onSelectCategory={props.onSelectCategory}
 					onReorderCategory={props.onReorderCategory}

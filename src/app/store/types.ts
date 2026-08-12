@@ -2,6 +2,7 @@ import type { StoreApi } from 'zustand/vanilla'
 import type { AppCategory, CategoryDefinition } from '../../entities/category'
 import type { Scenario, ScenarioList, ScenarioRunRecord } from '../../entities/scenario'
 import type { LegacyCanonicalPreferences } from './preferences'
+import type { PreferenceTransferResult } from './preferences'
 import type {
 	AppHydrationPatch,
 	AppInfo,
@@ -43,6 +44,7 @@ export interface AppState {
 	scenarioHistory: ScenarioRunRecord[]
 	firstSeenAt: Record<string, number>
 	legacyCanonicalPreferences: LegacyCanonicalPreferences
+	unknownPreferenceFields: Record<string, unknown>
 	preferencesPersisted: boolean
 	categories: CategoryDefinition[]
 	launchingIds: string[]
@@ -87,6 +89,10 @@ export interface AppState {
 	uninstall(id: string): Promise<void>
 	setQuery(query: string): void
 	setActiveView(view: AppView): void
+	exportPreferences(): string
+	validatePreferencesImport(source: string): PreferenceTransferResult
+	importPreferences(source: string): PreferenceTransferResult
+	restorePreferencesBackup(): PreferenceTransferResult
 	toggleFavorite(id: string): void
 	hideApp(id: string): void
 	restoreApp(id: string): void

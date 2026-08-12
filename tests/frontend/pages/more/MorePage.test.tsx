@@ -43,6 +43,7 @@ function runControl(
 		scenarios: [],
 		apps: [],
 		runningId: null,
+		isScenarioRunning: false,
 		onRun: vi.fn(),
 		...value,
 	}
@@ -68,6 +69,12 @@ function renderPage(
 }
 
 describe('MorePage', () => {
+	it('describes More as secondary catalog views', () => {
+		renderPage()
+
+		expect(screen.getByText('Secondary catalog views.')).toBeInTheDocument()
+	})
+
 	it('shows the More symbol in the page header', () => {
 		renderPage()
 
@@ -246,7 +253,7 @@ describe('MorePage', () => {
 	})
 
 	// A second click while apps are still starting would launch everything twice.
-	it('blocks the active preview scenario until it finishes', () => {
+	it('blocks every preview scenario until the active run finishes', () => {
 		renderPage(
 			vi.fn(),
 			{
@@ -268,13 +275,13 @@ describe('MorePage', () => {
 					},
 				],
 			},
-			runControl({ runningId: 'gaming' }),
+			runControl({ runningId: 'gaming', isScenarioRunning: true }),
 		)
 
 		const run = screen.getByRole('button', { name: 'Run Gaming' })
 		expect(run).toBeDisabled()
 		expect(run).toHaveTextContent('Running…')
-		expect(screen.getByRole('button', { name: 'Run Work' })).toBeEnabled()
+		expect(screen.getByRole('button', { name: 'Run Work' })).toBeDisabled()
 	})
 
 	it('does not render legacy scenario history', () => {
