@@ -469,9 +469,8 @@ button {
 	-webkit-backdrop-filter: blur(16px) saturate(118%);
 	backdrop-filter: blur(16px) saturate(118%);
 	box-shadow:
-		0 16px 34px oklch(0.14 0.014 270 / 0.34),
 		0 0 0 1px oklch(0.72 0.12 292 / 0.08),
-		0 10px 30px oklch(0.58 0.14 292 / 0.12);
+		0 6px 18px oklch(0.58 0.14 292 / 0.05);
 }
 
 .app-card-glass::before {
@@ -489,28 +488,8 @@ button {
 	pointer-events: none;
 }
 
-.app-card-glass::after {
-	position: absolute;
-	right: 18%;
-	bottom: -0.35rem;
-	left: 18%;
-	height: 0.7rem;
-	border-radius: 999px;
-	background: oklch(0.58 0.2 292 / 0.25);
-	content: '';
-	filter: blur(12px);
-	opacity: 0.5;
-	pointer-events: none;
-}
-
 .app-card-tile.app-card-glass {
-	box-shadow:
-		0 16px 34px oklch(0.14 0.014 270 / 0.34),
-		0 8px 22px oklch(0.58 0.14 292 / 0.06);
-}
-
-.app-card-tile.app-card-glass::after {
-	opacity: 0.25;
+	box-shadow: 0 8px 22px oklch(0.58 0.14 292 / 0.06);
 }
 
 .theme-graphite-surface [class*='bg-white'],

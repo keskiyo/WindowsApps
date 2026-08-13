@@ -2,6 +2,7 @@ import { ChevronRight, Play } from 'lucide-react'
 import { resolveScenarioApps } from '../../../../entities/scenario'
 import { CollapsiblePanel } from '../../../../shared/ui/CollapsiblePanel'
 import { ScenarioRunList } from './ScenarioRunList'
+import { ScenarioStopButton } from '../ScenarioStopButton'
 import type { ScenarioRunRowProps } from './types'
 
 export function ScenarioRunRow({
@@ -12,6 +13,7 @@ export function ScenarioRunRow({
 	isScenarioRunning,
 	onToggle,
 	onRun,
+	onCancel,
 }: ScenarioRunRowProps) {
 	const panelId = `scenario-contents-${scenario.id}`
 	const launch = resolveScenarioApps(
@@ -64,6 +66,12 @@ export function ScenarioRunRow({
 					<Play size={14} aria-hidden="true" />
 					{running ? 'Running…' : 'Run'}
 				</button>
+				{running && onCancel && (
+					<ScenarioStopButton
+						scenarioName={scenario.name}
+						onCancel={onCancel}
+					/>
+				)}
 			</div>
 			<CollapsiblePanel open={expanded} id={panelId}>
 				<div className="flex flex-col gap-3 px-4 pt-1 pb-3">

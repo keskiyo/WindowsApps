@@ -48,6 +48,7 @@ export function useSystemSettings({
 		if (!settings || saving) return
 		const enabled = !settings.autostartEnabled
 		setSaving(true)
+		setError(null)
 		try {
 			await client.setAutostart(enabled)
 			setSettings({ ...settings, autostartEnabled: enabled })

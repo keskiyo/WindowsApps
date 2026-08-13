@@ -1,0 +1,4 @@
+# Updater-signature fixtures are signed byte streams. Git treats them as text by default, so a
+# checkout with core.autocrlf=true (the default on GitHub's Windows runners) rewrites LF to CRLF
+# and the detached signature no longer covers the bytes on disk.
+src-tauri/tests/fixtures/updater-signature/** binary

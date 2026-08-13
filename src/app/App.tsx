@@ -33,6 +33,7 @@ import { useGlobalShortcuts } from './model/useGlobalShortcuts'
 import { useStaleCopy } from '../features/stale-copy'
 import { useUpdater } from '../features/update-app'
 import { toAppClientError } from '../shared/api/tauri/errors'
+import { AppErrorBoundary } from './AppErrorBoundary'
 import { AppStoreProvider } from './store/storeContext'
 import type { AppProps } from './types'
 
@@ -96,6 +97,15 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		onUninstall: state.uninstall,
 	})
 	const installerLaunch = useInstallerLaunch(feedback.launch)
+	const reportDialogFailure = useCallback(
+		(kind: string, detail: string) => {
+			toast.error('That panel could not be shown. Try again.')
+			void systemClient
+				.logClientError?.(kind, detail)
+				.catch(() => undefined)
+		},
+		[systemClient],
+	)
 	const navigation = useCatalogNavigation({
 		collapsedCategories: state.collapsedCategories,
 		activeView,
@@ -119,14 +129,20 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 	useEffect(() => {
 		let dispose: (() => void) | undefined
 		let cancelled = false
-		void initialize()
-			.then(value => {
-				if (cancelled) value()
-				else dispose = value
-			})
-			.catch(error => {
-				if (!cancelled) toast.error(toAppClientError(error).message)
-			})
+		function connect() {
+			void initialize()
+				.then(value => {
+					if (cancelled) value()
+					else dispose = value
+				})
+				.catch(error => {
+					if (cancelled) return
+					toast.error(toAppClientError(error).message, {
+						action: { label: 'Retry', onClick: () => connect() },
+					})
+				})
+		}
+		connect()
 		return () => {
 			cancelled = true
 			dispose?.()
@@ -270,7 +286,9 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 							onOpenNavigation={() => setDrawerOpen(true)}
 							showMenu={!desktopNavigation}
 						/>
-						<main className="mx-auto w-full max-w-375 px-5 pt-7 pb-12 sm:px-8">
+						<main
+							className={`mx-auto w-full max-w-375 pt-7 pb-12 ${isCatalogView ? 'px-2' : 'px-5 sm:px-8'}`}
+						>
 							{state.activeView === 'more' && (
 								<MorePage
 									auxiliaryCount={auxiliaryCount}
@@ -285,10 +303,11 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									preview={morePreview}
 									scenarioRun={{
 										scenarios: state.scenarios,
-											apps: catalogApps,
-											runningId: scenarioRunner.runningId,
-											isScenarioRunning: scenarioRunner.isRunning,
-											onRun: scenarioRunner.runById,
+										apps: catalogApps,
+										runningId: scenarioRunner.runningId,
+										isScenarioRunning: scenarioRunner.isRunning,
+										onRun: scenarioRunner.runById,
+										onCancel: scenarioRunner.cancel,
 									}}
 									onSelectView={navigation.selectView}
 								/>
@@ -310,6 +329,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									onAddApp={state.addScenarioApp}
 									onRemoveApp={state.removeScenarioApp}
 									onRun={scenarioRunner.run}
+									onCancel={scenarioRunner.cancel}
 									onToggleFavorite={
 										state.toggleFavoriteScenario
 									}
@@ -364,10 +384,12 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 										favoriteAppIds: state.favoriteAppIds,
 										favoriteScenarios: {
 											scenarios: favoriteScenarios,
-										apps: catalogApps,
-										runningId: scenarioRunner.runningId,
-										isScenarioRunning: scenarioRunner.isRunning,
-										onRun: scenarioRunner.runById,
+											apps: catalogApps,
+											runningId: scenarioRunner.runningId,
+											isScenarioRunning:
+												scenarioRunner.isRunning,
+											onRun: scenarioRunner.runById,
+											onCancel: scenarioRunner.cancel,
 											onToggleFavorite:
 												state.toggleFavoriteScenario,
 										},
@@ -411,39 +433,44 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 						onExited={() => setDrawerMounted(false)}
 					/>
 				)}
-				{paletteOpen && (
-					<CommandPalette
-						apps={paletteApps}
-						onLaunch={installerLaunch.requestLaunch}
-						onClose={() => setPaletteOpen(false)}
-					/>
-				)}
-				{appInfoDialog.app && (
-					<AppInfoDialog
-						app={appInfoDialog.app}
-						categories={state.categories}
-						appsClient={appsClient}
-						onClose={appInfoDialog.close}
-					/>
-				)}
-				{uninstall.app && (
-					<UninstallDialog
-						appName={uninstall.app.name}
-						preview={uninstall.preview}
-						isPreviewLoading={uninstall.isPreviewLoading}
-						previewError={uninstall.previewError}
-						onClose={uninstall.close}
-						onConfirm={confirmUninstall}
-					/>
-				)}
-				{installerLaunch.app && (
-					<InstallerLaunchDialog
-						app={installerLaunch.app}
-						pending={installerLaunch.pending}
-						onCancel={installerLaunch.cancel}
-						onConfirm={installerLaunch.confirm}
-					/>
-				)}
+				<AppErrorBoundary
+					fallback={null}
+					onError={reportDialogFailure}
+				>
+					{paletteOpen && (
+						<CommandPalette
+							apps={paletteApps}
+							onLaunch={installerLaunch.requestLaunch}
+							onClose={() => setPaletteOpen(false)}
+						/>
+					)}
+					{appInfoDialog.app && (
+						<AppInfoDialog
+							app={appInfoDialog.app}
+							categories={state.categories}
+							appsClient={appsClient}
+							onClose={appInfoDialog.close}
+						/>
+					)}
+					{uninstall.app && (
+						<UninstallDialog
+							appName={uninstall.app.name}
+							preview={uninstall.preview}
+							isPreviewLoading={uninstall.isPreviewLoading}
+							previewError={uninstall.previewError}
+							onClose={uninstall.close}
+							onConfirm={confirmUninstall}
+						/>
+					)}
+					{installerLaunch.app && (
+						<InstallerLaunchDialog
+							app={installerLaunch.app}
+							pending={installerLaunch.pending}
+							onCancel={installerLaunch.cancel}
+							onConfirm={installerLaunch.confirm}
+						/>
+					)}
+				</AppErrorBoundary>
 				<Toaster
 					className="app-toaster"
 					theme="dark"

@@ -139,7 +139,7 @@ export function createCatalogActions({
 			}
 		},
 		async resetCatalogCache() {
-			set({ isRefreshing: true, error: null, apps: [] })
+			set({ isRefreshing: true, error: null })
 			try {
 				const apps = client.resetCatalogCache
 					? await client.resetCatalogCache()

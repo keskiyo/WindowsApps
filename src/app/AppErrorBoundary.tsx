@@ -1,11 +1,28 @@
-import { Component, type ReactNode } from 'react'
+import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 interface AppErrorBoundaryProps {
 	children: ReactNode
+	fallback?: ReactNode
+	onError?(kind: string, detail: string): void
 }
 
 interface AppErrorBoundaryState {
 	failed: boolean
+}
+
+const MAX_DETAIL_LENGTH = 2000
+
+function describeFailure(error: unknown, info: ErrorInfo): [string, string] {
+	const kind = error instanceof Error ? error.name : typeof error
+	const message = error instanceof Error ? error.message : String(error)
+	const stack = error instanceof Error ? (error.stack ?? '') : ''
+	return [
+		kind,
+		`${message}\n${stack}\n${info.componentStack ?? ''}`.slice(
+			0,
+			MAX_DETAIL_LENGTH,
+		),
+	]
 }
 
 export class AppErrorBoundary extends Component<
@@ -18,8 +35,14 @@ export class AppErrorBoundary extends Component<
 		return { failed: true }
 	}
 
+	componentDidCatch(error: unknown, info: ErrorInfo) {
+		const [kind, detail] = describeFailure(error, info)
+		this.props.onError?.(kind, detail)
+	}
+
 	render() {
 		if (this.state.failed) {
+			if (this.props.fallback !== undefined) return this.props.fallback
 			return (
 				<main
 					role="alert"

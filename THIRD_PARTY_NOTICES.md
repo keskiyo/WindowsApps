@@ -4,331 +4,331 @@ Windows Apps v0.3.4 distribution notices. Generated from `npm ls --omit=dev --al
 
 ## npm runtime dependencies
 
-| Package | Version | License | Source | Notice obligation |
-| --- | --- | --- | --- | --- |
-| @dnd-kit/accessibility | 3.1.1 | MIT | https://www.npmjs.com/package/@dnd-kit/accessibility/v/3.1.1 | Retain the upstream license and required attribution notice. |
-| @dnd-kit/core | 6.3.1 | MIT | https://www.npmjs.com/package/@dnd-kit/core/v/6.3.1 | Retain the upstream license and required attribution notice. |
-| @dnd-kit/sortable | 10.0.0 | MIT | https://www.npmjs.com/package/@dnd-kit/sortable/v/10.0.0 | Retain the upstream license and required attribution notice. |
-| @dnd-kit/utilities | 3.2.2 | MIT | https://www.npmjs.com/package/@dnd-kit/utilities/v/3.2.2 | Retain the upstream license and required attribution notice. |
-| @tauri-apps/api | 2.11.1 | Apache-2.0 OR MIT | https://www.npmjs.com/package/@tauri-apps/api/v/2.11.1 | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| @tauri-apps/plugin-dialog | 2.7.1 | MIT OR Apache-2.0 | https://www.npmjs.com/package/@tauri-apps/plugin-dialog/v/2.7.1 | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| @tauri-apps/plugin-process | 2.3.1 | MIT OR Apache-2.0 | https://www.npmjs.com/package/@tauri-apps/plugin-process/v/2.3.1 | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| @tauri-apps/plugin-updater | 2.10.1 | MIT OR Apache-2.0 | https://www.npmjs.com/package/@tauri-apps/plugin-updater/v/2.10.1 | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| @types/prop-types | 15.7.15 | MIT | https://www.npmjs.com/package/@types/prop-types/v/15.7.15 | Retain the upstream license and required attribution notice. |
-| @types/react | 18.3.31 | MIT | https://www.npmjs.com/package/@types/react/v/18.3.31 | Retain the upstream license and required attribution notice. |
-| csstype | 3.2.3 | MIT | https://www.npmjs.com/package/csstype/v/3.2.3 | Retain the upstream license and required attribution notice. |
-| js-tokens | 4.0.0 | MIT | https://www.npmjs.com/package/js-tokens/v/4.0.0 | Retain the upstream license and required attribution notice. |
-| loose-envify | 1.4.0 | MIT | https://www.npmjs.com/package/loose-envify/v/1.4.0 | Retain the upstream license and required attribution notice. |
-| lucide-react | 0.468.0 | ISC | https://www.npmjs.com/package/lucide-react/v/0.468.0 | Retain the upstream license and required attribution notice. |
-| react | 18.3.1 | MIT | https://www.npmjs.com/package/react/v/18.3.1 | Retain the upstream license and required attribution notice. |
-| react-dom | 18.3.1 | MIT | https://www.npmjs.com/package/react-dom/v/18.3.1 | Retain the upstream license and required attribution notice. |
-| scheduler | 0.23.2 | MIT | https://www.npmjs.com/package/scheduler/v/0.23.2 | Retain the upstream license and required attribution notice. |
-| sonner | 1.7.4 | MIT | https://www.npmjs.com/package/sonner/v/1.7.4 | Retain the upstream license and required attribution notice. |
-| tslib | 2.8.1 | 0BSD | https://www.npmjs.com/package/tslib/v/2.8.1 | Retain the upstream license and required attribution notice. |
-| zustand | 5.0.14 | MIT | https://www.npmjs.com/package/zustand/v/5.0.14 | Retain the upstream license and required attribution notice. |
+| Package                    | Version | License           | Source                                                            | Notice obligation                                              |
+| -------------------------- | ------- | ----------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
+| @dnd-kit/accessibility     | 3.1.1   | MIT               | https://www.npmjs.com/package/@dnd-kit/accessibility/v/3.1.1      | Retain the upstream license and required attribution notice.   |
+| @dnd-kit/core              | 6.3.1   | MIT               | https://www.npmjs.com/package/@dnd-kit/core/v/6.3.1               | Retain the upstream license and required attribution notice.   |
+| @dnd-kit/sortable          | 10.0.0  | MIT               | https://www.npmjs.com/package/@dnd-kit/sortable/v/10.0.0          | Retain the upstream license and required attribution notice.   |
+| @dnd-kit/utilities         | 3.2.2   | MIT               | https://www.npmjs.com/package/@dnd-kit/utilities/v/3.2.2          | Retain the upstream license and required attribution notice.   |
+| @tauri-apps/api            | 2.11.1  | Apache-2.0 OR MIT | https://www.npmjs.com/package/@tauri-apps/api/v/2.11.1            | Retain Apache-2.0 license text and any applicable NOTICE file. |
+| @tauri-apps/plugin-dialog  | 2.7.1   | MIT OR Apache-2.0 | https://www.npmjs.com/package/@tauri-apps/plugin-dialog/v/2.7.1   | Retain Apache-2.0 license text and any applicable NOTICE file. |
+| @tauri-apps/plugin-process | 2.3.1   | MIT OR Apache-2.0 | https://www.npmjs.com/package/@tauri-apps/plugin-process/v/2.3.1  | Retain Apache-2.0 license text and any applicable NOTICE file. |
+| @tauri-apps/plugin-updater | 2.10.1  | MIT OR Apache-2.0 | https://www.npmjs.com/package/@tauri-apps/plugin-updater/v/2.10.1 | Retain Apache-2.0 license text and any applicable NOTICE file. |
+| @types/prop-types          | 15.7.15 | MIT               | https://www.npmjs.com/package/@types/prop-types/v/15.7.15         | Retain the upstream license and required attribution notice.   |
+| @types/react               | 18.3.31 | MIT               | https://www.npmjs.com/package/@types/react/v/18.3.31              | Retain the upstream license and required attribution notice.   |
+| csstype                    | 3.2.3   | MIT               | https://www.npmjs.com/package/csstype/v/3.2.3                     | Retain the upstream license and required attribution notice.   |
+| js-tokens                  | 4.0.0   | MIT               | https://www.npmjs.com/package/js-tokens/v/4.0.0                   | Retain the upstream license and required attribution notice.   |
+| loose-envify               | 1.4.0   | MIT               | https://www.npmjs.com/package/loose-envify/v/1.4.0                | Retain the upstream license and required attribution notice.   |
+| lucide-react               | 0.468.0 | ISC               | https://www.npmjs.com/package/lucide-react/v/0.468.0              | Retain the upstream license and required attribution notice.   |
+| react                      | 18.3.1  | MIT               | https://www.npmjs.com/package/react/v/18.3.1                      | Retain the upstream license and required attribution notice.   |
+| react-dom                  | 18.3.1  | MIT               | https://www.npmjs.com/package/react-dom/v/18.3.1                  | Retain the upstream license and required attribution notice.   |
+| scheduler                  | 0.23.2  | MIT               | https://www.npmjs.com/package/scheduler/v/0.23.2                  | Retain the upstream license and required attribution notice.   |
+| sonner                     | 1.7.4   | MIT               | https://www.npmjs.com/package/sonner/v/1.7.4                      | Retain the upstream license and required attribution notice.   |
+| tslib                      | 2.8.1   | 0BSD              | https://www.npmjs.com/package/tslib/v/2.8.1                       | Retain the upstream license and required attribution notice.   |
+| zustand                    | 5.0.14  | MIT               | https://www.npmjs.com/package/zustand/v/5.0.14                    | Retain the upstream license and required attribution notice.   |
 
 ## Rust Windows x64 runtime and build dependencies
 
-| Crate | Version | License | Source | Notice obligation |
-| --- | --- | --- | --- | --- |
-| adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | https://github.com/oyvindln/adler2 | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| aho-corasick | 1.1.4 | Unlicense OR MIT | https://github.com/BurntSushi/aho-corasick | Retain the upstream license and required attribution notice. |
-| alloc-no-stdlib | 2.0.4 | BSD-3-Clause | https://github.com/dropbox/rust-alloc-no-stdlib | Retain the upstream license and required attribution notice. |
-| alloc-stdlib | 0.2.4 | BSD-3-Clause | https://github.com/dropbox/rust-alloc-no-stdlib | Retain the upstream license and required attribution notice. |
-| anyhow | 1.0.104 | MIT OR Apache-2.0 | https://github.com/dtolnay/anyhow | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| arrayvec | 0.7.6 | MIT OR Apache-2.0 | https://github.com/bluss/arrayvec | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| atomic-waker | 1.1.2 | Apache-2.0 OR MIT | https://github.com/smol-rs/atomic-waker | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| autocfg | 1.5.1 | Apache-2.0 OR MIT | https://github.com/cuviper/autocfg | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| base64 | 0.22.1 | MIT OR Apache-2.0 | https://github.com/marshallpierce/rust-base64 | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| bitflags | 1.3.2 | MIT/Apache-2.0 | https://github.com/bitflags/bitflags | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| bitflags | 2.13.0 | MIT OR Apache-2.0 | https://github.com/bitflags/bitflags | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| bit-set | 0.8.0 | Apache-2.0 OR MIT | https://github.com/contain-rs/bit-set | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| bit-vec | 0.8.0 | Apache-2.0 OR MIT | https://github.com/contain-rs/bit-vec | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| block-buffer | 0.10.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| brotli | 8.0.4 | BSD-3-Clause AND MIT | https://github.com/dropbox/rust-brotli | Retain the upstream license and required attribution notice. |
-| brotli-decompressor | 5.0.3 | BSD-3-Clause/MIT | https://github.com/dropbox/rust-brotli-decompressor | Retain the upstream license and required attribution notice. |
-| bytemuck | 1.25.0 | Zlib OR Apache-2.0 OR MIT | https://github.com/Lokathor/bytemuck | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| byteorder | 1.5.0 | Unlicense OR MIT | https://github.com/BurntSushi/byteorder | Retain the upstream license and required attribution notice. |
-| byteorder-lite | 0.1.0 | Unlicense OR MIT | https://github.com/image-rs/byteorder-lite | Retain the upstream license and required attribution notice. |
-| bytes | 1.12.0 | MIT | https://github.com/tokio-rs/bytes | Retain the upstream license and required attribution notice. |
-| byte-unit | 5.2.3 | MIT | https://github.com/magiclen/byte-unit | Retain the upstream license and required attribution notice. |
-| camino | 1.2.2 | MIT OR Apache-2.0 | https://github.com/camino-rs/camino | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| cargo_metadata | 0.19.2 | MIT | https://github.com/oli-obk/cargo_metadata | Retain the upstream license and required attribution notice. |
-| cargo_toml | 0.22.3 | Apache-2.0 OR MIT | https://gitlab.com/lib.rs/cargo_toml | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| cargo-platform | 0.1.9 | MIT OR Apache-2.0 | https://github.com/rust-lang/cargo | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| cc | 1.2.64 | MIT OR Apache-2.0 | https://github.com/rust-lang/cc-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| cfb | 0.7.3 | MIT | https://github.com/mdsteele/rust-cfb | Retain the upstream license and required attribution notice. |
-| cfg-if | 1.0.4 | MIT OR Apache-2.0 | https://github.com/rust-lang/cfg-if | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| cookie | 0.18.1 | MIT OR Apache-2.0 | https://github.com/SergioBenitez/cookie-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| cpufeatures | 0.2.17 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| crc32fast | 1.5.0 | MIT OR Apache-2.0 | https://github.com/srijs/rust-crc32fast | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| crossbeam-channel | 0.5.15 | MIT OR Apache-2.0 | https://github.com/crossbeam-rs/crossbeam | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| crossbeam-utils | 0.8.21 | MIT OR Apache-2.0 | https://github.com/crossbeam-rs/crossbeam | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| crypto-common | 0.1.7 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| cssparser | 0.36.0 | MPL-2.0 | https://github.com/servo/rust-cssparser | Retain MPL 2.0 notices and provide source for modified MPL-covered files. |
-| cssparser-macros | 0.6.1 | MPL-2.0 | https://github.com/servo/rust-cssparser | Retain MPL 2.0 notices and provide source for modified MPL-covered files. |
-| ctor | 0.8.0 | Apache-2.0 OR MIT | https://github.com/mmastrac/rust-ctor | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| ctor-proc-macro | 0.0.7 | Apache-2.0 OR MIT | https://github.com/mmastrac/rust-ctor | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| darling | 0.23.0 | MIT | https://github.com/TedDriggs/darling | Retain the upstream license and required attribution notice. |
-| darling_core | 0.23.0 | MIT | https://github.com/TedDriggs/darling | Retain the upstream license and required attribution notice. |
-| darling_macro | 0.23.0 | MIT | https://github.com/TedDriggs/darling | Retain the upstream license and required attribution notice. |
-| deranged | 0.5.8 | MIT OR Apache-2.0 | https://github.com/jhpratt/deranged | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| derive_more | 2.1.1 | MIT | https://github.com/JelteF/derive_more | Retain the upstream license and required attribution notice. |
-| derive_more-impl | 2.1.1 | MIT | https://github.com/JelteF/derive_more | Retain the upstream license and required attribution notice. |
-| digest | 0.10.7 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| dirs | 6.0.0 | MIT OR Apache-2.0 | https://github.com/soc/dirs-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| dirs-sys | 0.5.0 | MIT OR Apache-2.0 | https://github.com/dirs-dev/dirs-sys-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| displaydoc | 0.2.6 | MIT OR Apache-2.0 | https://github.com/yaahc/displaydoc | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| dom_query | 0.27.0 | MIT | https://github.com/niklak/dom_query | Retain the upstream license and required attribution notice. |
-| dpi | 0.1.2 | Apache-2.0 AND MIT | https://github.com/rust-windowing/winit | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| dtoa | 1.0.11 | MIT OR Apache-2.0 | https://github.com/dtolnay/dtoa | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| dtoa-short | 0.3.5 | MPL-2.0 | https://github.com/upsuper/dtoa-short | Retain MPL 2.0 notices and provide source for modified MPL-covered files. |
-| dunce | 1.0.5 | CC0-1.0 OR MIT-0 OR Apache-2.0 | https://gitlab.com/kornelski/dunce | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| dyn-clone | 1.0.20 | MIT OR Apache-2.0 | https://github.com/dtolnay/dyn-clone | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| embed-resource | 3.0.9 | MIT | https://github.com/nabijaczleweli/rust-embed-resource | Retain the upstream license and required attribution notice. |
-| equivalent | 1.0.2 | Apache-2.0 OR MIT | https://github.com/indexmap-rs/equivalent | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| erased-serde | 0.4.10 | MIT OR Apache-2.0 | https://github.com/dtolnay/erased-serde | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| fastrand | 2.4.1 | Apache-2.0 OR MIT | https://github.com/smol-rs/fastrand | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| fdeflate | 0.3.7 | MIT OR Apache-2.0 | https://github.com/image-rs/fdeflate | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| fern | 0.7.1 | MIT | https://github.com/daboross/fern | Retain the upstream license and required attribution notice. |
-| find-msvc-tools | 0.1.9 | MIT OR Apache-2.0 | https://github.com/rust-lang/cc-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| flate2 | 1.1.9 | MIT OR Apache-2.0 | https://github.com/rust-lang/flate2-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| fnv | 1.0.7 | Apache-2.0 / MIT | https://github.com/servo/rust-fnv | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| foldhash | 0.2.0 | Zlib | https://github.com/orlp/foldhash | Retain the upstream license and required attribution notice. |
-| form_urlencoded | 1.2.2 | MIT OR Apache-2.0 | https://github.com/servo/rust-url | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| futures-channel | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| futures-core | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| futures-macro | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| futures-sink | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| futures-task | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| futures-util | 0.3.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| generic-array | 0.14.7 | MIT | https://github.com/fizyk20/generic-array.git | Retain the upstream license and required attribution notice. |
-| getrandom | 0.2.17 | MIT OR Apache-2.0 | https://github.com/rust-random/getrandom | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| getrandom | 0.3.4 | MIT OR Apache-2.0 | https://github.com/rust-random/getrandom | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| getrandom | 0.4.3 | MIT OR Apache-2.0 | https://github.com/rust-random/getrandom | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| glob | 0.3.3 | MIT OR Apache-2.0 | https://github.com/rust-lang/glob | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| hashbrown | 0.12.3 | MIT OR Apache-2.0 | https://github.com/rust-lang/hashbrown | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| hashbrown | 0.17.1 | MIT OR Apache-2.0 | https://github.com/rust-lang/hashbrown | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| heck | 0.5.0 | MIT OR Apache-2.0 | https://github.com/withoutboats/heck | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| html5ever | 0.38.0 | MIT OR Apache-2.0 | https://github.com/servo/html5ever | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| http | 1.4.2 | MIT OR Apache-2.0 | https://github.com/hyperium/http | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| httparse | 1.10.1 | MIT OR Apache-2.0 | https://github.com/seanmonstar/httparse | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| http-body | 1.0.1 | MIT | https://github.com/hyperium/http-body | Retain the upstream license and required attribution notice. |
-| http-body-util | 0.1.3 | MIT | https://github.com/hyperium/http-body | Retain the upstream license and required attribution notice. |
-| hyper | 1.10.1 | MIT | https://github.com/hyperium/hyper | Retain the upstream license and required attribution notice. |
-| hyper-rustls | 0.27.9 | Apache-2.0 OR ISC OR MIT | https://github.com/rustls/hyper-rustls | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| hyper-util | 0.1.20 | MIT | https://github.com/hyperium/hyper-util | Retain the upstream license and required attribution notice. |
-| ico | 0.5.0 | MIT | https://github.com/mdsteele/rust-ico | Retain the upstream license and required attribution notice. |
-| icu_collections | 2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| icu_locale_core | 2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| icu_normalizer | 2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| icu_normalizer_data | 2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| icu_properties | 2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| icu_properties_data | 2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| icu_provider | 2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| ident_case | 1.0.1 | MIT/Apache-2.0 | https://github.com/TedDriggs/ident_case | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| idna | 1.1.0 | MIT OR Apache-2.0 | https://github.com/servo/rust-url/ | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| idna_adapter | 1.2.2 | Apache-2.0 OR MIT | https://github.com/hsivonen/idna_adapter | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| image | 0.25.10 | MIT OR Apache-2.0 | https://github.com/image-rs/image | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| indexmap | 1.9.3 | Apache-2.0 OR MIT | https://github.com/bluss/indexmap | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| indexmap | 2.14.0 | Apache-2.0 OR MIT | https://github.com/indexmap-rs/indexmap | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| infer | 0.19.0 | MIT | https://github.com/bojand/infer | Retain the upstream license and required attribution notice. |
-| ipnet | 2.12.0 | MIT OR Apache-2.0 | https://github.com/krisprice/ipnet | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| itoa | 1.0.18 | MIT OR Apache-2.0 | https://github.com/dtolnay/itoa | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| json-patch | 3.0.1 | MIT/Apache-2.0 | https://github.com/idubrov/json-patch | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| jsonptr | 0.6.3 | MIT OR Apache-2.0 | https://github.com/chanced/jsonptr | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| keyboard-types | 0.7.0 | MIT OR Apache-2.0 | https://github.com/pyfisch/keyboard-types | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| libc | 0.2.186 | MIT OR Apache-2.0 | https://github.com/rust-lang/libc | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| litemap | 0.8.2 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| lock_api | 0.4.14 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| log | 0.4.32 | MIT OR Apache-2.0 | https://github.com/rust-lang/log | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| markup5ever | 0.38.0 | MIT OR Apache-2.0 | https://github.com/servo/html5ever | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| memchr | 2.8.2 | Unlicense OR MIT | https://github.com/BurntSushi/memchr | Retain the upstream license and required attribution notice. |
-| mime | 0.3.17 | MIT OR Apache-2.0 | https://github.com/hyperium/mime | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| minisign-verify | 0.2.5 | MIT | https://github.com/jedisct1/rust-minisign-verify | Retain the upstream license and required attribution notice. |
-| miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 | https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| mio | 1.2.1 | MIT | https://github.com/tokio-rs/mio | Retain the upstream license and required attribution notice. |
-| moxcms | 0.8.1 | BSD-3-Clause OR Apache-2.0 | https://github.com/awxkee/moxcms.git | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| muda | 0.19.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/muda | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| new_debug_unreachable | 1.0.6 | MIT | https://github.com/mbrubeck/rust-debug-unreachable | Retain the upstream license and required attribution notice. |
-| num-conv | 0.2.2 | MIT OR Apache-2.0 | https://github.com/jhpratt/num-conv | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| num-traits | 0.2.19 | MIT OR Apache-2.0 | https://github.com/rust-num/num-traits | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| once_cell | 1.21.4 | MIT OR Apache-2.0 | https://github.com/matklad/once_cell | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| option-ext | 0.2.0 | MPL-2.0 | https://github.com/soc/option-ext.git | Retain MPL 2.0 notices and provide source for modified MPL-covered files. |
-| parking_lot | 0.12.5 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| parking_lot_core | 0.9.12 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| percent-encoding | 2.3.2 | MIT OR Apache-2.0 | https://github.com/servo/rust-url/ | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| phf | 0.13.1 | MIT | https://github.com/rust-phf/rust-phf | Retain the upstream license and required attribution notice. |
-| phf_codegen | 0.13.1 | MIT | https://github.com/rust-phf/rust-phf | Retain the upstream license and required attribution notice. |
-| phf_generator | 0.13.1 | MIT | https://github.com/rust-phf/rust-phf | Retain the upstream license and required attribution notice. |
-| phf_macros | 0.13.1 | MIT | https://github.com/rust-phf/rust-phf | Retain the upstream license and required attribution notice. |
-| phf_shared | 0.13.1 | MIT | https://github.com/rust-phf/rust-phf | Retain the upstream license and required attribution notice. |
-| pin-project-lite | 0.2.17 | Apache-2.0 OR MIT | https://github.com/taiki-e/pin-project-lite | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| plist | 1.9.0 | MIT | https://github.com/ebarnard/rust-plist/ | Retain the upstream license and required attribution notice. |
-| png | 0.17.16 | MIT OR Apache-2.0 | https://github.com/image-rs/image-png | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| png | 0.18.1 | MIT OR Apache-2.0 | https://github.com/image-rs/image-png | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| potential_utf | 0.1.5 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| powerfmt | 0.2.0 | MIT OR Apache-2.0 | https://github.com/jhpratt/powerfmt | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| precomputed-hash | 0.1.1 | MIT | https://github.com/emilio/precomputed-hash | Retain the upstream license and required attribution notice. |
-| proc-macro2 | 1.0.106 | MIT OR Apache-2.0 | https://github.com/dtolnay/proc-macro2 | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| pxfm | 0.1.29 | BSD-3-Clause OR Apache-2.0 | https://github.com/awxkee/pxfm | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| quick-xml | 0.39.4 | MIT | https://github.com/tafia/quick-xml | Retain the upstream license and required attribution notice. |
-| quote | 1.0.45 | MIT OR Apache-2.0 | https://github.com/dtolnay/quote | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| raw-window-handle | 0.6.2 | MIT OR Apache-2.0 OR Zlib | https://github.com/rust-windowing/raw-window-handle | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| regex | 1.12.4 | MIT OR Apache-2.0 | https://github.com/rust-lang/regex | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| regex-automata | 0.4.14 | MIT OR Apache-2.0 | https://github.com/rust-lang/regex | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| regex-syntax | 0.8.11 | MIT OR Apache-2.0 | https://github.com/rust-lang/regex | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| reqwest | 0.13.4 | MIT OR Apache-2.0 | https://github.com/seanmonstar/reqwest | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| rfd | 0.16.0 | MIT | https://github.com/PolyMeilex/rfd | Retain the upstream license and required attribution notice. |
-| ring | 0.17.14 | Apache-2.0 AND ISC | https://github.com/briansmith/ring | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| rust_decimal | 1.42.1 | MIT | https://github.com/paupino/rust-decimal | Retain the upstream license and required attribution notice. |
-| rustc_version | 0.4.1 | MIT OR Apache-2.0 | https://github.com/djc/rustc-version-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| rustc-hash | 2.1.2 | Apache-2.0 OR MIT | https://github.com/rust-lang/rustc-hash | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| rustls | 0.23.41 | Apache-2.0 OR ISC OR MIT | https://github.com/rustls/rustls | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| rustls-pki-types | 1.15.0 | MIT OR Apache-2.0 | https://github.com/rustls/pki-types | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| rustls-platform-verifier | 0.7.0 | MIT OR Apache-2.0 | https://github.com/rustls/rustls-platform-verifier | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| rustls-webpki | 0.103.13 | ISC | https://github.com/rustls/webpki | Retain the upstream license and required attribution notice. |
-| same-file | 1.0.6 | Unlicense/MIT | https://github.com/BurntSushi/same-file | Retain the upstream license and required attribution notice. |
-| schemars | 0.8.22 | MIT | https://github.com/GREsau/schemars | Retain the upstream license and required attribution notice. |
-| schemars_derive | 0.8.22 | MIT | https://github.com/GREsau/schemars | Retain the upstream license and required attribution notice. |
-| scopeguard | 1.2.0 | MIT OR Apache-2.0 | https://github.com/bluss/scopeguard | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| selectors | 0.36.1 | MPL-2.0 | https://github.com/servo/stylo | Retain MPL 2.0 notices and provide source for modified MPL-covered files. |
-| semver | 1.0.28 | MIT OR Apache-2.0 | https://github.com/dtolnay/semver | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serde | 1.0.228 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serde_core | 1.0.228 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serde_derive | 1.0.228 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serde_derive_internals | 0.29.1 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serde_json | 1.0.150 | MIT OR Apache-2.0 | https://github.com/serde-rs/json | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serde_repr | 0.1.20 | MIT OR Apache-2.0 | https://github.com/dtolnay/serde-repr | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serde_spanned | 1.1.1 | MIT OR Apache-2.0 | https://github.com/toml-rs/toml | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serde_with | 3.21.0 | MIT OR Apache-2.0 | https://github.com/jonasbb/serde_with/ | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serde_with_macros | 3.21.0 | MIT OR Apache-2.0 | https://github.com/jonasbb/serde_with/ | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serde-untagged | 0.1.9 | MIT OR Apache-2.0 | https://github.com/dtolnay/serde-untagged | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serialize-to-javascript | 0.1.2 | MIT OR Apache-2.0 | https://github.com/chippers/serialize-to-javascript | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| serialize-to-javascript-impl | 0.1.2 | MIT OR Apache-2.0 | https://github.com/chippers/serialize-to-javascript | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| servo_arc | 0.4.3 | MIT OR Apache-2.0 | https://github.com/servo/stylo | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| sha2 | 0.10.9 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| shlex | 2.0.1 | MIT OR Apache-2.0 | https://github.com/comex/rust-shlex | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| simd-adler32 | 0.3.9 | MIT | https://github.com/mcountryman/simd-adler32 | Retain the upstream license and required attribution notice. |
-| siphasher | 1.0.3 | MIT/Apache-2.0 | https://github.com/jedisct1/rust-siphash | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| slab | 0.4.12 | MIT | https://github.com/tokio-rs/slab | Retain the upstream license and required attribution notice. |
-| smallvec | 1.15.2 | MIT OR Apache-2.0 | https://github.com/servo/rust-smallvec | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| socket2 | 0.6.4 | MIT OR Apache-2.0 | https://github.com/rust-lang/socket2 | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| softbuffer | 0.4.8 | MIT OR Apache-2.0 | https://github.com/rust-windowing/softbuffer | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 | https://github.com/storyyeller/stable_deref_trait | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| string_cache | 0.9.0 | MIT OR Apache-2.0 | https://github.com/servo/string-cache | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| string_cache_codegen | 0.6.1 | MIT OR Apache-2.0 | https://github.com/servo/string-cache | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| strsim | 0.11.1 | MIT | https://github.com/rapidfuzz/strsim-rs | Retain the upstream license and required attribution notice. |
-| subtle | 2.6.1 | BSD-3-Clause | https://github.com/dalek-cryptography/subtle | Retain the upstream license and required attribution notice. |
-| syn | 2.0.118 | MIT OR Apache-2.0 | https://github.com/dtolnay/syn | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| sync_wrapper | 1.0.2 | Apache-2.0 | https://github.com/Actyx/sync_wrapper | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| synstructure | 0.13.2 | MIT | https://github.com/mystor/synstructure | Retain the upstream license and required attribution notice. |
-| tao | 0.35.3 | Apache-2.0 | https://github.com/tauri-apps/tao | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri | 2.11.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-build | 2.6.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-codegen | 2.6.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-macros | 2.6.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-plugin | 2.6.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-plugin-dialog | 2.7.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-plugin-fs | 2.5.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-plugin-log | 2.8.0 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-plugin-process | 2.3.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-plugin-single-instance | 2.4.2 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-plugin-updater | 2.10.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-runtime | 2.11.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-runtime-wry | 2.11.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-utils | 2.9.3 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tauri-winres | 0.3.6 | MIT | https://github.com/tauri-apps/winres | Retain the upstream license and required attribution notice. |
-| tempfile | 3.27.0 | MIT OR Apache-2.0 | https://github.com/Stebalien/tempfile | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tendril | 0.5.0 | MIT OR Apache-2.0 | https://github.com/servo/html5ever | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| thiserror | 1.0.69 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| thiserror | 2.0.18 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| thiserror-impl | 1.0.69 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| thiserror-impl | 2.0.18 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| time | 0.3.49 | MIT OR Apache-2.0 | https://github.com/time-rs/time | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| time-core | 0.1.9 | MIT OR Apache-2.0 | https://github.com/time-rs/time | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| time-macros | 0.2.29 | MIT OR Apache-2.0 | https://github.com/time-rs/time | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tinystr | 0.8.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| tokio | 1.52.3 | MIT | https://github.com/tokio-rs/tokio | Retain the upstream license and required attribution notice. |
-| tokio-rustls | 0.26.4 | MIT OR Apache-2.0 | https://github.com/rustls/tokio-rustls | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tokio-util | 0.7.18 | MIT | https://github.com/tokio-rs/tokio | Retain the upstream license and required attribution notice. |
-| toml | 0.9.12+spec-1.1.0 | MIT OR Apache-2.0 | https://github.com/toml-rs/toml | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| toml | 1.1.2+spec-1.1.0 | MIT OR Apache-2.0 | https://github.com/toml-rs/toml | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| toml_datetime | 0.7.5+spec-1.1.0 | MIT OR Apache-2.0 | https://github.com/toml-rs/toml | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| toml_datetime | 1.1.1+spec-1.1.0 | MIT OR Apache-2.0 | https://github.com/toml-rs/toml | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| toml_parser | 1.1.2+spec-1.1.0 | MIT OR Apache-2.0 | https://github.com/toml-rs/toml | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| toml_writer | 1.1.1+spec-1.1.0 | MIT OR Apache-2.0 | https://github.com/toml-rs/toml | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| tower | 0.5.3 | MIT | https://github.com/tower-rs/tower | Retain the upstream license and required attribution notice. |
-| tower-http | 0.6.11 | MIT | https://github.com/tower-rs/tower-http | Retain the upstream license and required attribution notice. |
-| tower-layer | 0.3.3 | MIT | https://github.com/tower-rs/tower | Retain the upstream license and required attribution notice. |
-| tower-service | 0.3.3 | MIT | https://github.com/tower-rs/tower | Retain the upstream license and required attribution notice. |
-| tracing | 0.1.44 | MIT | https://github.com/tokio-rs/tracing | Retain the upstream license and required attribution notice. |
-| tracing-attributes | 0.1.31 | MIT | https://github.com/tokio-rs/tracing | Retain the upstream license and required attribution notice. |
-| tracing-core | 0.1.36 | MIT | https://github.com/tokio-rs/tracing | Retain the upstream license and required attribution notice. |
-| tray-icon | 0.24.1 | MIT OR Apache-2.0 | https://github.com/tauri-apps/tray-icon | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| try-lock | 0.2.5 | MIT | https://github.com/seanmonstar/try-lock | Retain the upstream license and required attribution notice. |
-| typeid | 1.0.3 | MIT OR Apache-2.0 | https://github.com/dtolnay/typeid | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| typenum | 1.20.1 | MIT OR Apache-2.0 | https://github.com/paholg/typenum | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| unic-char-property | 0.9.0 | MIT/Apache-2.0 | https://github.com/open-i18n/rust-unic/ | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| unic-char-range | 0.9.0 | MIT/Apache-2.0 | https://github.com/open-i18n/rust-unic/ | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| unic-common | 0.9.0 | MIT/Apache-2.0 | https://github.com/open-i18n/rust-unic/ | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| unicode-ident | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 | https://github.com/dtolnay/unicode-ident | Retain the Unicode license and data notice. |
-| unicode-segmentation | 1.13.3 | MIT OR Apache-2.0 | https://github.com/unicode-rs/unicode-segmentation | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| unic-ucd-ident | 0.9.0 | MIT/Apache-2.0 | https://github.com/open-i18n/rust-unic/ | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| unic-ucd-version | 0.9.0 | MIT/Apache-2.0 | https://github.com/open-i18n/rust-unic/ | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| untrusted | 0.9.0 | ISC | https://github.com/briansmith/untrusted | Retain the upstream license and required attribution notice. |
-| url | 2.5.8 | MIT OR Apache-2.0 | https://github.com/servo/rust-url | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| urlpattern | 0.3.0 | MIT | https://github.com/denoland/rust-urlpattern | Retain the upstream license and required attribution notice. |
-| utf-8 | 0.7.6 | MIT OR Apache-2.0 | https://github.com/SimonSapin/rust-utf8 | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| utf8_iter | 1.0.4 | Apache-2.0 OR MIT | https://github.com/hsivonen/utf8_iter | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| utf8-width | 0.1.8 | MIT | https://github.com/magiclen/utf8-width | Retain the upstream license and required attribution notice. |
-| uuid | 1.23.3 | Apache-2.0 OR MIT | https://github.com/uuid-rs/uuid | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| value-bag | 1.12.0 | Apache-2.0 OR MIT | https://github.com/sval-rs/value-bag | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| version_check | 0.9.5 | MIT/Apache-2.0 | https://github.com/SergioBenitez/version_check | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| vswhom | 0.1.0 | MIT | https://github.com/nabijaczleweli/vswhom.rs | Retain the upstream license and required attribution notice. |
-| vswhom-sys | 0.1.3 | MIT | https://github.com/nabijaczleweli/vswhom-sys.rs | Retain the upstream license and required attribution notice. |
-| walkdir | 2.5.0 | Unlicense/MIT | https://github.com/BurntSushi/walkdir | Retain the upstream license and required attribution notice. |
-| want | 0.3.1 | MIT | https://github.com/seanmonstar/want | Retain the upstream license and required attribution notice. |
-| web_atoms | 0.2.5 | MIT OR Apache-2.0 | https://github.com/servo/html5ever | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| webview2-com | 0.38.2 | MIT | https://github.com/wravery/webview2-rs | Retain the upstream license and required attribution notice. |
-| webview2-com-macros | 0.8.1 | MIT | https://github.com/wravery/webview2-rs | Retain the upstream license and required attribution notice. |
-| webview2-com-sys | 0.38.2 | MIT | https://github.com/wravery/webview2-rs | Retain the upstream license and required attribution notice. |
-| winapi-util | 0.1.11 | Unlicense OR MIT | https://github.com/BurntSushi/winapi-util | Retain the upstream license and required attribution notice. |
-| windows | 0.61.3 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows_x86_64_msvc | 0.52.6 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows_x86_64_msvc | 0.53.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-collections | 0.2.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-core | 0.61.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-future | 0.2.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-implement | 0.60.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-interface | 0.59.3 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-link | 0.1.3 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-link | 0.2.1 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-numerics | 0.2.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-result | 0.3.4 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-strings | 0.4.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-sys | 0.59.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-sys | 0.60.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-sys | 0.61.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-targets | 0.52.6 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-targets | 0.53.5 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-threading | 0.1.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| windows-version | 0.1.7 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| window-vibrancy | 0.6.0 | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri-plugin-vibrancy | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| winnow | 0.7.15 | MIT | https://github.com/winnow-rs/winnow | Retain the upstream license and required attribution notice. |
-| winnow | 1.0.3 | MIT | https://github.com/winnow-rs/winnow | Retain the upstream license and required attribution notice. |
-| winreg | 0.55.0 | MIT | https://github.com/gentoo90/winreg-rs | Retain the upstream license and required attribution notice. |
-| writeable | 0.6.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| wry | 0.55.1 | Apache-2.0 OR MIT | https://github.com/tauri-apps/wry | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| yoke | 0.8.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| yoke-derive | 0.8.2 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| zerofrom | 0.1.8 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| zerofrom-derive | 0.1.7 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| zeroize | 1.9.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/utils | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| zerotrie | 0.2.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| zerovec | 0.11.6 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| zerovec-derive | 0.11.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x | Retain the Unicode license and data notice. |
-| zip | 4.6.1 | MIT | https://github.com/zip-rs/zip2.git | Retain the upstream license and required attribution notice. |
-| zmij | 1.0.21 | MIT | https://github.com/dtolnay/zmij | Retain the upstream license and required attribution notice. |
-| zune-core | 0.5.1 | MIT OR Apache-2.0 OR Zlib | https://github.com/etemesi254/zune-image | Retain Apache-2.0 license text and any applicable NOTICE file. |
-| zune-jpeg | 0.5.15 | MIT OR Apache-2.0 OR Zlib | https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpeg | Retain Apache-2.0 license text and any applicable NOTICE file. |
+| Crate                        | Version           | License                             | Source                                                             | Notice obligation                                                         |
+| ---------------------------- | ----------------- | ----------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| adler2                       | 2.0.1             | 0BSD OR MIT OR Apache-2.0           | https://github.com/oyvindln/adler2                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| aho-corasick                 | 1.1.4             | Unlicense OR MIT                    | https://github.com/BurntSushi/aho-corasick                         | Retain the upstream license and required attribution notice.              |
+| alloc-no-stdlib              | 2.0.4             | BSD-3-Clause                        | https://github.com/dropbox/rust-alloc-no-stdlib                    | Retain the upstream license and required attribution notice.              |
+| alloc-stdlib                 | 0.2.4             | BSD-3-Clause                        | https://github.com/dropbox/rust-alloc-no-stdlib                    | Retain the upstream license and required attribution notice.              |
+| anyhow                       | 1.0.104           | MIT OR Apache-2.0                   | https://github.com/dtolnay/anyhow                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| arrayvec                     | 0.7.6             | MIT OR Apache-2.0                   | https://github.com/bluss/arrayvec                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| atomic-waker                 | 1.1.2             | Apache-2.0 OR MIT                   | https://github.com/smol-rs/atomic-waker                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| autocfg                      | 1.5.1             | Apache-2.0 OR MIT                   | https://github.com/cuviper/autocfg                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| base64                       | 0.22.1            | MIT OR Apache-2.0                   | https://github.com/marshallpierce/rust-base64                      | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| bitflags                     | 1.3.2             | MIT/Apache-2.0                      | https://github.com/bitflags/bitflags                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| bitflags                     | 2.13.0            | MIT OR Apache-2.0                   | https://github.com/bitflags/bitflags                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| bit-set                      | 0.8.0             | Apache-2.0 OR MIT                   | https://github.com/contain-rs/bit-set                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| bit-vec                      | 0.8.0             | Apache-2.0 OR MIT                   | https://github.com/contain-rs/bit-vec                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| block-buffer                 | 0.10.4            | MIT OR Apache-2.0                   | https://github.com/RustCrypto/utils                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| brotli                       | 8.0.4             | BSD-3-Clause AND MIT                | https://github.com/dropbox/rust-brotli                             | Retain the upstream license and required attribution notice.              |
+| brotli-decompressor          | 5.0.3             | BSD-3-Clause/MIT                    | https://github.com/dropbox/rust-brotli-decompressor                | Retain the upstream license and required attribution notice.              |
+| bytemuck                     | 1.25.0            | Zlib OR Apache-2.0 OR MIT           | https://github.com/Lokathor/bytemuck                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| byteorder                    | 1.5.0             | Unlicense OR MIT                    | https://github.com/BurntSushi/byteorder                            | Retain the upstream license and required attribution notice.              |
+| byteorder-lite               | 0.1.0             | Unlicense OR MIT                    | https://github.com/image-rs/byteorder-lite                         | Retain the upstream license and required attribution notice.              |
+| bytes                        | 1.12.0            | MIT                                 | https://github.com/tokio-rs/bytes                                  | Retain the upstream license and required attribution notice.              |
+| byte-unit                    | 5.2.3             | MIT                                 | https://github.com/magiclen/byte-unit                              | Retain the upstream license and required attribution notice.              |
+| camino                       | 1.2.2             | MIT OR Apache-2.0                   | https://github.com/camino-rs/camino                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| cargo_metadata               | 0.19.2            | MIT                                 | https://github.com/oli-obk/cargo_metadata                          | Retain the upstream license and required attribution notice.              |
+| cargo_toml                   | 0.22.3            | Apache-2.0 OR MIT                   | https://gitlab.com/lib.rs/cargo_toml                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| cargo-platform               | 0.1.9             | MIT OR Apache-2.0                   | https://github.com/rust-lang/cargo                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| cc                           | 1.2.64            | MIT OR Apache-2.0                   | https://github.com/rust-lang/cc-rs                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| cfb                          | 0.7.3             | MIT                                 | https://github.com/mdsteele/rust-cfb                               | Retain the upstream license and required attribution notice.              |
+| cfg-if                       | 1.0.4             | MIT OR Apache-2.0                   | https://github.com/rust-lang/cfg-if                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| cookie                       | 0.18.1            | MIT OR Apache-2.0                   | https://github.com/SergioBenitez/cookie-rs                         | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| cpufeatures                  | 0.2.17            | MIT OR Apache-2.0                   | https://github.com/RustCrypto/utils                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| crc32fast                    | 1.5.0             | MIT OR Apache-2.0                   | https://github.com/srijs/rust-crc32fast                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| crossbeam-channel            | 0.5.15            | MIT OR Apache-2.0                   | https://github.com/crossbeam-rs/crossbeam                          | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| crossbeam-utils              | 0.8.21            | MIT OR Apache-2.0                   | https://github.com/crossbeam-rs/crossbeam                          | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| crypto-common                | 0.1.7             | MIT OR Apache-2.0                   | https://github.com/RustCrypto/traits                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| cssparser                    | 0.36.0            | MPL-2.0                             | https://github.com/servo/rust-cssparser                            | Retain MPL 2.0 notices and provide source for modified MPL-covered files. |
+| cssparser-macros             | 0.6.1             | MPL-2.0                             | https://github.com/servo/rust-cssparser                            | Retain MPL 2.0 notices and provide source for modified MPL-covered files. |
+| ctor                         | 0.8.0             | Apache-2.0 OR MIT                   | https://github.com/mmastrac/rust-ctor                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| ctor-proc-macro              | 0.0.7             | Apache-2.0 OR MIT                   | https://github.com/mmastrac/rust-ctor                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| darling                      | 0.23.0            | MIT                                 | https://github.com/TedDriggs/darling                               | Retain the upstream license and required attribution notice.              |
+| darling_core                 | 0.23.0            | MIT                                 | https://github.com/TedDriggs/darling                               | Retain the upstream license and required attribution notice.              |
+| darling_macro                | 0.23.0            | MIT                                 | https://github.com/TedDriggs/darling                               | Retain the upstream license and required attribution notice.              |
+| deranged                     | 0.5.8             | MIT OR Apache-2.0                   | https://github.com/jhpratt/deranged                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| derive_more                  | 2.1.1             | MIT                                 | https://github.com/JelteF/derive_more                              | Retain the upstream license and required attribution notice.              |
+| derive_more-impl             | 2.1.1             | MIT                                 | https://github.com/JelteF/derive_more                              | Retain the upstream license and required attribution notice.              |
+| digest                       | 0.10.7            | MIT OR Apache-2.0                   | https://github.com/RustCrypto/traits                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| dirs                         | 6.0.0             | MIT OR Apache-2.0                   | https://github.com/soc/dirs-rs                                     | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| dirs-sys                     | 0.5.0             | MIT OR Apache-2.0                   | https://github.com/dirs-dev/dirs-sys-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| displaydoc                   | 0.2.6             | MIT OR Apache-2.0                   | https://github.com/yaahc/displaydoc                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| dom_query                    | 0.27.0            | MIT                                 | https://github.com/niklak/dom_query                                | Retain the upstream license and required attribution notice.              |
+| dpi                          | 0.1.2             | Apache-2.0 AND MIT                  | https://github.com/rust-windowing/winit                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| dtoa                         | 1.0.11            | MIT OR Apache-2.0                   | https://github.com/dtolnay/dtoa                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| dtoa-short                   | 0.3.5             | MPL-2.0                             | https://github.com/upsuper/dtoa-short                              | Retain MPL 2.0 notices and provide source for modified MPL-covered files. |
+| dunce                        | 1.0.5             | CC0-1.0 OR MIT-0 OR Apache-2.0      | https://gitlab.com/kornelski/dunce                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| dyn-clone                    | 1.0.20            | MIT OR Apache-2.0                   | https://github.com/dtolnay/dyn-clone                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| embed-resource               | 3.0.9             | MIT                                 | https://github.com/nabijaczleweli/rust-embed-resource              | Retain the upstream license and required attribution notice.              |
+| equivalent                   | 1.0.2             | Apache-2.0 OR MIT                   | https://github.com/indexmap-rs/equivalent                          | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| erased-serde                 | 0.4.10            | MIT OR Apache-2.0                   | https://github.com/dtolnay/erased-serde                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| fastrand                     | 2.4.1             | Apache-2.0 OR MIT                   | https://github.com/smol-rs/fastrand                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| fdeflate                     | 0.3.7             | MIT OR Apache-2.0                   | https://github.com/image-rs/fdeflate                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| fern                         | 0.7.1             | MIT                                 | https://github.com/daboross/fern                                   | Retain the upstream license and required attribution notice.              |
+| find-msvc-tools              | 0.1.9             | MIT OR Apache-2.0                   | https://github.com/rust-lang/cc-rs                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| flate2                       | 1.1.9             | MIT OR Apache-2.0                   | https://github.com/rust-lang/flate2-rs                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| fnv                          | 1.0.7             | Apache-2.0 / MIT                    | https://github.com/servo/rust-fnv                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| foldhash                     | 0.2.0             | Zlib                                | https://github.com/orlp/foldhash                                   | Retain the upstream license and required attribution notice.              |
+| form_urlencoded              | 1.2.2             | MIT OR Apache-2.0                   | https://github.com/servo/rust-url                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| futures-channel              | 0.3.32            | MIT OR Apache-2.0                   | https://github.com/rust-lang/futures-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| futures-core                 | 0.3.32            | MIT OR Apache-2.0                   | https://github.com/rust-lang/futures-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| futures-macro                | 0.3.32            | MIT OR Apache-2.0                   | https://github.com/rust-lang/futures-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| futures-sink                 | 0.3.32            | MIT OR Apache-2.0                   | https://github.com/rust-lang/futures-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| futures-task                 | 0.3.32            | MIT OR Apache-2.0                   | https://github.com/rust-lang/futures-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| futures-util                 | 0.3.32            | MIT OR Apache-2.0                   | https://github.com/rust-lang/futures-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| generic-array                | 0.14.7            | MIT                                 | https://github.com/fizyk20/generic-array.git                       | Retain the upstream license and required attribution notice.              |
+| getrandom                    | 0.2.17            | MIT OR Apache-2.0                   | https://github.com/rust-random/getrandom                           | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| getrandom                    | 0.3.4             | MIT OR Apache-2.0                   | https://github.com/rust-random/getrandom                           | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| getrandom                    | 0.4.3             | MIT OR Apache-2.0                   | https://github.com/rust-random/getrandom                           | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| glob                         | 0.3.3             | MIT OR Apache-2.0                   | https://github.com/rust-lang/glob                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| hashbrown                    | 0.12.3            | MIT OR Apache-2.0                   | https://github.com/rust-lang/hashbrown                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| hashbrown                    | 0.17.1            | MIT OR Apache-2.0                   | https://github.com/rust-lang/hashbrown                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| heck                         | 0.5.0             | MIT OR Apache-2.0                   | https://github.com/withoutboats/heck                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| html5ever                    | 0.38.0            | MIT OR Apache-2.0                   | https://github.com/servo/html5ever                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| http                         | 1.4.2             | MIT OR Apache-2.0                   | https://github.com/hyperium/http                                   | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| httparse                     | 1.10.1            | MIT OR Apache-2.0                   | https://github.com/seanmonstar/httparse                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| http-body                    | 1.0.1             | MIT                                 | https://github.com/hyperium/http-body                              | Retain the upstream license and required attribution notice.              |
+| http-body-util               | 0.1.3             | MIT                                 | https://github.com/hyperium/http-body                              | Retain the upstream license and required attribution notice.              |
+| hyper                        | 1.10.1            | MIT                                 | https://github.com/hyperium/hyper                                  | Retain the upstream license and required attribution notice.              |
+| hyper-rustls                 | 0.27.9            | Apache-2.0 OR ISC OR MIT            | https://github.com/rustls/hyper-rustls                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| hyper-util                   | 0.1.20            | MIT                                 | https://github.com/hyperium/hyper-util                             | Retain the upstream license and required attribution notice.              |
+| ico                          | 0.5.0             | MIT                                 | https://github.com/mdsteele/rust-ico                               | Retain the upstream license and required attribution notice.              |
+| icu_collections              | 2.2.0             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| icu_locale_core              | 2.2.0             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| icu_normalizer               | 2.2.0             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| icu_normalizer_data          | 2.2.0             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| icu_properties               | 2.2.0             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| icu_properties_data          | 2.2.0             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| icu_provider                 | 2.2.0             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| ident_case                   | 1.0.1             | MIT/Apache-2.0                      | https://github.com/TedDriggs/ident_case                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| idna                         | 1.1.0             | MIT OR Apache-2.0                   | https://github.com/servo/rust-url/                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| idna_adapter                 | 1.2.2             | Apache-2.0 OR MIT                   | https://github.com/hsivonen/idna_adapter                           | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| image                        | 0.25.10           | MIT OR Apache-2.0                   | https://github.com/image-rs/image                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| indexmap                     | 1.9.3             | Apache-2.0 OR MIT                   | https://github.com/bluss/indexmap                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| indexmap                     | 2.14.0            | Apache-2.0 OR MIT                   | https://github.com/indexmap-rs/indexmap                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| infer                        | 0.19.0            | MIT                                 | https://github.com/bojand/infer                                    | Retain the upstream license and required attribution notice.              |
+| ipnet                        | 2.12.0            | MIT OR Apache-2.0                   | https://github.com/krisprice/ipnet                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| itoa                         | 1.0.18            | MIT OR Apache-2.0                   | https://github.com/dtolnay/itoa                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| json-patch                   | 3.0.1             | MIT/Apache-2.0                      | https://github.com/idubrov/json-patch                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| jsonptr                      | 0.6.3             | MIT OR Apache-2.0                   | https://github.com/chanced/jsonptr                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| keyboard-types               | 0.7.0             | MIT OR Apache-2.0                   | https://github.com/pyfisch/keyboard-types                          | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| libc                         | 0.2.186           | MIT OR Apache-2.0                   | https://github.com/rust-lang/libc                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| litemap                      | 0.8.2             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| lock_api                     | 0.4.14            | MIT OR Apache-2.0                   | https://github.com/Amanieu/parking_lot                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| log                          | 0.4.32            | MIT OR Apache-2.0                   | https://github.com/rust-lang/log                                   | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| markup5ever                  | 0.38.0            | MIT OR Apache-2.0                   | https://github.com/servo/html5ever                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| memchr                       | 2.8.2             | Unlicense OR MIT                    | https://github.com/BurntSushi/memchr                               | Retain the upstream license and required attribution notice.              |
+| mime                         | 0.3.17            | MIT OR Apache-2.0                   | https://github.com/hyperium/mime                                   | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| minisign-verify              | 0.2.5             | MIT                                 | https://github.com/jedisct1/rust-minisign-verify                   | Retain the upstream license and required attribution notice.              |
+| miniz_oxide                  | 0.8.9             | MIT OR Zlib OR Apache-2.0           | https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide      | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| mio                          | 1.2.1             | MIT                                 | https://github.com/tokio-rs/mio                                    | Retain the upstream license and required attribution notice.              |
+| moxcms                       | 0.8.1             | BSD-3-Clause OR Apache-2.0          | https://github.com/awxkee/moxcms.git                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| muda                         | 0.19.3            | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/muda                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| new_debug_unreachable        | 1.0.6             | MIT                                 | https://github.com/mbrubeck/rust-debug-unreachable                 | Retain the upstream license and required attribution notice.              |
+| num-conv                     | 0.2.2             | MIT OR Apache-2.0                   | https://github.com/jhpratt/num-conv                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| num-traits                   | 0.2.19            | MIT OR Apache-2.0                   | https://github.com/rust-num/num-traits                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| once_cell                    | 1.21.4            | MIT OR Apache-2.0                   | https://github.com/matklad/once_cell                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| option-ext                   | 0.2.0             | MPL-2.0                             | https://github.com/soc/option-ext.git                              | Retain MPL 2.0 notices and provide source for modified MPL-covered files. |
+| parking_lot                  | 0.12.5            | MIT OR Apache-2.0                   | https://github.com/Amanieu/parking_lot                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| parking_lot_core             | 0.9.12            | MIT OR Apache-2.0                   | https://github.com/Amanieu/parking_lot                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| percent-encoding             | 2.3.2             | MIT OR Apache-2.0                   | https://github.com/servo/rust-url/                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| phf                          | 0.13.1            | MIT                                 | https://github.com/rust-phf/rust-phf                               | Retain the upstream license and required attribution notice.              |
+| phf_codegen                  | 0.13.1            | MIT                                 | https://github.com/rust-phf/rust-phf                               | Retain the upstream license and required attribution notice.              |
+| phf_generator                | 0.13.1            | MIT                                 | https://github.com/rust-phf/rust-phf                               | Retain the upstream license and required attribution notice.              |
+| phf_macros                   | 0.13.1            | MIT                                 | https://github.com/rust-phf/rust-phf                               | Retain the upstream license and required attribution notice.              |
+| phf_shared                   | 0.13.1            | MIT                                 | https://github.com/rust-phf/rust-phf                               | Retain the upstream license and required attribution notice.              |
+| pin-project-lite             | 0.2.17            | Apache-2.0 OR MIT                   | https://github.com/taiki-e/pin-project-lite                        | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| plist                        | 1.9.0             | MIT                                 | https://github.com/ebarnard/rust-plist/                            | Retain the upstream license and required attribution notice.              |
+| png                          | 0.17.16           | MIT OR Apache-2.0                   | https://github.com/image-rs/image-png                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| png                          | 0.18.1            | MIT OR Apache-2.0                   | https://github.com/image-rs/image-png                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| potential_utf                | 0.1.5             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| powerfmt                     | 0.2.0             | MIT OR Apache-2.0                   | https://github.com/jhpratt/powerfmt                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| precomputed-hash             | 0.1.1             | MIT                                 | https://github.com/emilio/precomputed-hash                         | Retain the upstream license and required attribution notice.              |
+| proc-macro2                  | 1.0.106           | MIT OR Apache-2.0                   | https://github.com/dtolnay/proc-macro2                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| pxfm                         | 0.1.29            | BSD-3-Clause OR Apache-2.0          | https://github.com/awxkee/pxfm                                     | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| quick-xml                    | 0.39.4            | MIT                                 | https://github.com/tafia/quick-xml                                 | Retain the upstream license and required attribution notice.              |
+| quote                        | 1.0.45            | MIT OR Apache-2.0                   | https://github.com/dtolnay/quote                                   | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| raw-window-handle            | 0.6.2             | MIT OR Apache-2.0 OR Zlib           | https://github.com/rust-windowing/raw-window-handle                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| regex                        | 1.12.4            | MIT OR Apache-2.0                   | https://github.com/rust-lang/regex                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| regex-automata               | 0.4.14            | MIT OR Apache-2.0                   | https://github.com/rust-lang/regex                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| regex-syntax                 | 0.8.11            | MIT OR Apache-2.0                   | https://github.com/rust-lang/regex                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| reqwest                      | 0.13.4            | MIT OR Apache-2.0                   | https://github.com/seanmonstar/reqwest                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| rfd                          | 0.16.0            | MIT                                 | https://github.com/PolyMeilex/rfd                                  | Retain the upstream license and required attribution notice.              |
+| ring                         | 0.17.14           | Apache-2.0 AND ISC                  | https://github.com/briansmith/ring                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| rust_decimal                 | 1.42.1            | MIT                                 | https://github.com/paupino/rust-decimal                            | Retain the upstream license and required attribution notice.              |
+| rustc_version                | 0.4.1             | MIT OR Apache-2.0                   | https://github.com/djc/rustc-version-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| rustc-hash                   | 2.1.2             | Apache-2.0 OR MIT                   | https://github.com/rust-lang/rustc-hash                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| rustls                       | 0.23.41           | Apache-2.0 OR ISC OR MIT            | https://github.com/rustls/rustls                                   | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| rustls-pki-types             | 1.15.0            | MIT OR Apache-2.0                   | https://github.com/rustls/pki-types                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| rustls-platform-verifier     | 0.7.0             | MIT OR Apache-2.0                   | https://github.com/rustls/rustls-platform-verifier                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| rustls-webpki                | 0.103.13          | ISC                                 | https://github.com/rustls/webpki                                   | Retain the upstream license and required attribution notice.              |
+| same-file                    | 1.0.6             | Unlicense/MIT                       | https://github.com/BurntSushi/same-file                            | Retain the upstream license and required attribution notice.              |
+| schemars                     | 0.8.22            | MIT                                 | https://github.com/GREsau/schemars                                 | Retain the upstream license and required attribution notice.              |
+| schemars_derive              | 0.8.22            | MIT                                 | https://github.com/GREsau/schemars                                 | Retain the upstream license and required attribution notice.              |
+| scopeguard                   | 1.2.0             | MIT OR Apache-2.0                   | https://github.com/bluss/scopeguard                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| selectors                    | 0.36.1            | MPL-2.0                             | https://github.com/servo/stylo                                     | Retain MPL 2.0 notices and provide source for modified MPL-covered files. |
+| semver                       | 1.0.28            | MIT OR Apache-2.0                   | https://github.com/dtolnay/semver                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serde                        | 1.0.228           | MIT OR Apache-2.0                   | https://github.com/serde-rs/serde                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serde_core                   | 1.0.228           | MIT OR Apache-2.0                   | https://github.com/serde-rs/serde                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serde_derive                 | 1.0.228           | MIT OR Apache-2.0                   | https://github.com/serde-rs/serde                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serde_derive_internals       | 0.29.1            | MIT OR Apache-2.0                   | https://github.com/serde-rs/serde                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serde_json                   | 1.0.150           | MIT OR Apache-2.0                   | https://github.com/serde-rs/json                                   | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serde_repr                   | 0.1.20            | MIT OR Apache-2.0                   | https://github.com/dtolnay/serde-repr                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serde_spanned                | 1.1.1             | MIT OR Apache-2.0                   | https://github.com/toml-rs/toml                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serde_with                   | 3.21.0            | MIT OR Apache-2.0                   | https://github.com/jonasbb/serde_with/                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serde_with_macros            | 3.21.0            | MIT OR Apache-2.0                   | https://github.com/jonasbb/serde_with/                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serde-untagged               | 0.1.9             | MIT OR Apache-2.0                   | https://github.com/dtolnay/serde-untagged                          | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serialize-to-javascript      | 0.1.2             | MIT OR Apache-2.0                   | https://github.com/chippers/serialize-to-javascript                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| serialize-to-javascript-impl | 0.1.2             | MIT OR Apache-2.0                   | https://github.com/chippers/serialize-to-javascript                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| servo_arc                    | 0.4.3             | MIT OR Apache-2.0                   | https://github.com/servo/stylo                                     | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| sha2                         | 0.10.9            | MIT OR Apache-2.0                   | https://github.com/RustCrypto/hashes                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| shlex                        | 2.0.1             | MIT OR Apache-2.0                   | https://github.com/comex/rust-shlex                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| simd-adler32                 | 0.3.9             | MIT                                 | https://github.com/mcountryman/simd-adler32                        | Retain the upstream license and required attribution notice.              |
+| siphasher                    | 1.0.3             | MIT/Apache-2.0                      | https://github.com/jedisct1/rust-siphash                           | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| slab                         | 0.4.12            | MIT                                 | https://github.com/tokio-rs/slab                                   | Retain the upstream license and required attribution notice.              |
+| smallvec                     | 1.15.2            | MIT OR Apache-2.0                   | https://github.com/servo/rust-smallvec                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| socket2                      | 0.6.4             | MIT OR Apache-2.0                   | https://github.com/rust-lang/socket2                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| softbuffer                   | 0.4.8             | MIT OR Apache-2.0                   | https://github.com/rust-windowing/softbuffer                       | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| stable_deref_trait           | 1.2.1             | MIT OR Apache-2.0                   | https://github.com/storyyeller/stable_deref_trait                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| string_cache                 | 0.9.0             | MIT OR Apache-2.0                   | https://github.com/servo/string-cache                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| string_cache_codegen         | 0.6.1             | MIT OR Apache-2.0                   | https://github.com/servo/string-cache                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| strsim                       | 0.11.1            | MIT                                 | https://github.com/rapidfuzz/strsim-rs                             | Retain the upstream license and required attribution notice.              |
+| subtle                       | 2.6.1             | BSD-3-Clause                        | https://github.com/dalek-cryptography/subtle                       | Retain the upstream license and required attribution notice.              |
+| syn                          | 2.0.118           | MIT OR Apache-2.0                   | https://github.com/dtolnay/syn                                     | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| sync_wrapper                 | 1.0.2             | Apache-2.0                          | https://github.com/Actyx/sync_wrapper                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| synstructure                 | 0.13.2            | MIT                                 | https://github.com/mystor/synstructure                             | Retain the upstream license and required attribution notice.              |
+| tao                          | 0.35.3            | Apache-2.0                          | https://github.com/tauri-apps/tao                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri                        | 2.11.3            | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/tauri                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-build                  | 2.6.3             | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/tauri                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-codegen                | 2.6.3             | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/tauri                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-macros                 | 2.6.3             | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/tauri                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-plugin                 | 2.6.3             | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/tauri                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-plugin-dialog          | 2.7.1             | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/plugins-workspace                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-plugin-fs              | 2.5.1             | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/plugins-workspace                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-plugin-log             | 2.8.0             | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/plugins-workspace                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-plugin-process         | 2.3.1             | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/plugins-workspace                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-plugin-single-instance | 2.4.2             | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/plugins-workspace                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-plugin-updater         | 2.10.1            | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/plugins-workspace                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-runtime                | 2.11.3            | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/tauri                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-runtime-wry            | 2.11.3            | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/tauri                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-utils                  | 2.9.3             | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/tauri                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tauri-winres                 | 0.3.6             | MIT                                 | https://github.com/tauri-apps/winres                               | Retain the upstream license and required attribution notice.              |
+| tempfile                     | 3.27.0            | MIT OR Apache-2.0                   | https://github.com/Stebalien/tempfile                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tendril                      | 0.5.0             | MIT OR Apache-2.0                   | https://github.com/servo/html5ever                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| thiserror                    | 1.0.69            | MIT OR Apache-2.0                   | https://github.com/dtolnay/thiserror                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| thiserror                    | 2.0.18            | MIT OR Apache-2.0                   | https://github.com/dtolnay/thiserror                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| thiserror-impl               | 1.0.69            | MIT OR Apache-2.0                   | https://github.com/dtolnay/thiserror                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| thiserror-impl               | 2.0.18            | MIT OR Apache-2.0                   | https://github.com/dtolnay/thiserror                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| time                         | 0.3.49            | MIT OR Apache-2.0                   | https://github.com/time-rs/time                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| time-core                    | 0.1.9             | MIT OR Apache-2.0                   | https://github.com/time-rs/time                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| time-macros                  | 0.2.29            | MIT OR Apache-2.0                   | https://github.com/time-rs/time                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tinystr                      | 0.8.3             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| tokio                        | 1.52.3            | MIT                                 | https://github.com/tokio-rs/tokio                                  | Retain the upstream license and required attribution notice.              |
+| tokio-rustls                 | 0.26.4            | MIT OR Apache-2.0                   | https://github.com/rustls/tokio-rustls                             | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tokio-util                   | 0.7.18            | MIT                                 | https://github.com/tokio-rs/tokio                                  | Retain the upstream license and required attribution notice.              |
+| toml                         | 0.9.12+spec-1.1.0 | MIT OR Apache-2.0                   | https://github.com/toml-rs/toml                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| toml                         | 1.1.2+spec-1.1.0  | MIT OR Apache-2.0                   | https://github.com/toml-rs/toml                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| toml_datetime                | 0.7.5+spec-1.1.0  | MIT OR Apache-2.0                   | https://github.com/toml-rs/toml                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| toml_datetime                | 1.1.1+spec-1.1.0  | MIT OR Apache-2.0                   | https://github.com/toml-rs/toml                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| toml_parser                  | 1.1.2+spec-1.1.0  | MIT OR Apache-2.0                   | https://github.com/toml-rs/toml                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| toml_writer                  | 1.1.1+spec-1.1.0  | MIT OR Apache-2.0                   | https://github.com/toml-rs/toml                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| tower                        | 0.5.3             | MIT                                 | https://github.com/tower-rs/tower                                  | Retain the upstream license and required attribution notice.              |
+| tower-http                   | 0.6.11            | MIT                                 | https://github.com/tower-rs/tower-http                             | Retain the upstream license and required attribution notice.              |
+| tower-layer                  | 0.3.3             | MIT                                 | https://github.com/tower-rs/tower                                  | Retain the upstream license and required attribution notice.              |
+| tower-service                | 0.3.3             | MIT                                 | https://github.com/tower-rs/tower                                  | Retain the upstream license and required attribution notice.              |
+| tracing                      | 0.1.44            | MIT                                 | https://github.com/tokio-rs/tracing                                | Retain the upstream license and required attribution notice.              |
+| tracing-attributes           | 0.1.31            | MIT                                 | https://github.com/tokio-rs/tracing                                | Retain the upstream license and required attribution notice.              |
+| tracing-core                 | 0.1.36            | MIT                                 | https://github.com/tokio-rs/tracing                                | Retain the upstream license and required attribution notice.              |
+| tray-icon                    | 0.24.1            | MIT OR Apache-2.0                   | https://github.com/tauri-apps/tray-icon                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| try-lock                     | 0.2.5             | MIT                                 | https://github.com/seanmonstar/try-lock                            | Retain the upstream license and required attribution notice.              |
+| typeid                       | 1.0.3             | MIT OR Apache-2.0                   | https://github.com/dtolnay/typeid                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| typenum                      | 1.20.1            | MIT OR Apache-2.0                   | https://github.com/paholg/typenum                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| unic-char-property           | 0.9.0             | MIT/Apache-2.0                      | https://github.com/open-i18n/rust-unic/                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| unic-char-range              | 0.9.0             | MIT/Apache-2.0                      | https://github.com/open-i18n/rust-unic/                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| unic-common                  | 0.9.0             | MIT/Apache-2.0                      | https://github.com/open-i18n/rust-unic/                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| unicode-ident                | 1.0.24            | (MIT OR Apache-2.0) AND Unicode-3.0 | https://github.com/dtolnay/unicode-ident                           | Retain the Unicode license and data notice.                               |
+| unicode-segmentation         | 1.13.3            | MIT OR Apache-2.0                   | https://github.com/unicode-rs/unicode-segmentation                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| unic-ucd-ident               | 0.9.0             | MIT/Apache-2.0                      | https://github.com/open-i18n/rust-unic/                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| unic-ucd-version             | 0.9.0             | MIT/Apache-2.0                      | https://github.com/open-i18n/rust-unic/                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| untrusted                    | 0.9.0             | ISC                                 | https://github.com/briansmith/untrusted                            | Retain the upstream license and required attribution notice.              |
+| url                          | 2.5.8             | MIT OR Apache-2.0                   | https://github.com/servo/rust-url                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| urlpattern                   | 0.3.0             | MIT                                 | https://github.com/denoland/rust-urlpattern                        | Retain the upstream license and required attribution notice.              |
+| utf-8                        | 0.7.6             | MIT OR Apache-2.0                   | https://github.com/SimonSapin/rust-utf8                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| utf8_iter                    | 1.0.4             | Apache-2.0 OR MIT                   | https://github.com/hsivonen/utf8_iter                              | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| utf8-width                   | 0.1.8             | MIT                                 | https://github.com/magiclen/utf8-width                             | Retain the upstream license and required attribution notice.              |
+| uuid                         | 1.23.3            | Apache-2.0 OR MIT                   | https://github.com/uuid-rs/uuid                                    | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| value-bag                    | 1.12.0            | Apache-2.0 OR MIT                   | https://github.com/sval-rs/value-bag                               | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| version_check                | 0.9.5             | MIT/Apache-2.0                      | https://github.com/SergioBenitez/version_check                     | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| vswhom                       | 0.1.0             | MIT                                 | https://github.com/nabijaczleweli/vswhom.rs                        | Retain the upstream license and required attribution notice.              |
+| vswhom-sys                   | 0.1.3             | MIT                                 | https://github.com/nabijaczleweli/vswhom-sys.rs                    | Retain the upstream license and required attribution notice.              |
+| walkdir                      | 2.5.0             | Unlicense/MIT                       | https://github.com/BurntSushi/walkdir                              | Retain the upstream license and required attribution notice.              |
+| want                         | 0.3.1             | MIT                                 | https://github.com/seanmonstar/want                                | Retain the upstream license and required attribution notice.              |
+| web_atoms                    | 0.2.5             | MIT OR Apache-2.0                   | https://github.com/servo/html5ever                                 | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| webview2-com                 | 0.38.2            | MIT                                 | https://github.com/wravery/webview2-rs                             | Retain the upstream license and required attribution notice.              |
+| webview2-com-macros          | 0.8.1             | MIT                                 | https://github.com/wravery/webview2-rs                             | Retain the upstream license and required attribution notice.              |
+| webview2-com-sys             | 0.38.2            | MIT                                 | https://github.com/wravery/webview2-rs                             | Retain the upstream license and required attribution notice.              |
+| winapi-util                  | 0.1.11            | Unlicense OR MIT                    | https://github.com/BurntSushi/winapi-util                          | Retain the upstream license and required attribution notice.              |
+| windows                      | 0.61.3            | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows_x86_64_msvc          | 0.52.6            | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows_x86_64_msvc          | 0.53.1            | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-collections          | 0.2.0             | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-core                 | 0.61.2            | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-future               | 0.2.1             | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-implement            | 0.60.2            | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-interface            | 0.59.3            | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-link                 | 0.1.3             | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-link                 | 0.2.1             | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-numerics             | 0.2.0             | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-result               | 0.3.4             | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-strings              | 0.4.2             | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-sys                  | 0.59.0            | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-sys                  | 0.60.2            | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-sys                  | 0.61.2            | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-targets              | 0.52.6            | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-targets              | 0.53.5            | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-threading            | 0.1.0             | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| windows-version              | 0.1.7             | MIT OR Apache-2.0                   | https://github.com/microsoft/windows-rs                            | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| window-vibrancy              | 0.6.0             | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/tauri-plugin-vibrancy                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| winnow                       | 0.7.15            | MIT                                 | https://github.com/winnow-rs/winnow                                | Retain the upstream license and required attribution notice.              |
+| winnow                       | 1.0.3             | MIT                                 | https://github.com/winnow-rs/winnow                                | Retain the upstream license and required attribution notice.              |
+| winreg                       | 0.55.0            | MIT                                 | https://github.com/gentoo90/winreg-rs                              | Retain the upstream license and required attribution notice.              |
+| writeable                    | 0.6.3             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| wry                          | 0.55.1            | Apache-2.0 OR MIT                   | https://github.com/tauri-apps/wry                                  | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| yoke                         | 0.8.3             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| yoke-derive                  | 0.8.2             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| zerofrom                     | 0.1.8             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| zerofrom-derive              | 0.1.7             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| zeroize                      | 1.9.0             | Apache-2.0 OR MIT                   | https://github.com/RustCrypto/utils                                | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| zerotrie                     | 0.2.4             | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| zerovec                      | 0.11.6            | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| zerovec-derive               | 0.11.3            | Unicode-3.0                         | https://github.com/unicode-org/icu4x                               | Retain the Unicode license and data notice.                               |
+| zip                          | 4.6.1             | MIT                                 | https://github.com/zip-rs/zip2.git                                 | Retain the upstream license and required attribution notice.              |
+| zmij                         | 1.0.21            | MIT                                 | https://github.com/dtolnay/zmij                                    | Retain the upstream license and required attribution notice.              |
+| zune-core                    | 0.5.1             | MIT OR Apache-2.0 OR Zlib           | https://github.com/etemesi254/zune-image                           | Retain Apache-2.0 license text and any applicable NOTICE file.            |
+| zune-jpeg                    | 0.5.15            | MIT OR Apache-2.0 OR Zlib           | https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpeg | Retain Apache-2.0 license text and any applicable NOTICE file.            |

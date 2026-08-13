@@ -12,7 +12,11 @@ foreach ($requiredPattern in @(
   '\[string\]\$ProcessPath',
   '\[int\]\$RefreshCancelCycles = 100',
   '\[int\]\$IdleMinutes = 120',
-  '\$logsDirectory = Join-Path \$env:LOCALAPPDATA "dev\.neiroslop\.windowsapps\\logs"'
+  '\$logsDirectory = Join-Path \$env:LOCALAPPDATA "dev\.neiroslop\.windowsapps\\logs"',
+  'Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = \$parentProcessId"',
+  'childWorkingSetBytes = \$descendants\.bytes',
+  'totalWorkingSetBytes = \[long\]\$target\.WorkingSet64 \+ \$descendants\.bytes',
+  'totalWorkingSetGrowthPercent = \$totalWorkingSetGrowthPercent'
 )) {
   if ($source -notmatch $requiredPattern) {
     throw "Release soak harness is missing $requiredPattern"

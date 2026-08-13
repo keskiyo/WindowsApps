@@ -61,6 +61,7 @@ export function MoreCard({ destination, onSelect }: MoreCardProps) {
 									running={preview.runningId === scenario.id}
 									isScenarioRunning={preview.isScenarioRunning}
 									onRun={preview.onRun}
+									onCancel={preview.onCancel}
 								/>
 							))}
 				</ul>

@@ -95,6 +95,24 @@ describe('ScenariosPage', () => {
 		expect(screen.getByText('Launching 1/2')).toBeInTheDocument()
 	})
 
+	it('stops the running scenario without leaving the page', async () => {
+		const view = props([gaming])
+		const onCancel = vi.fn()
+		render(
+			<ScenariosPage {...view} runningId="gaming" onCancel={onCancel} />,
+		)
+
+		await userEvent.click(screen.getByRole('button', { name: 'Stop Gaming' }))
+
+		expect(onCancel).toHaveBeenCalledOnce()
+	})
+
+	it('offers no stop control while nothing is running', () => {
+		render(<ScenariosPage {...props([gaming])} onCancel={vi.fn()} />)
+
+		expect(screen.queryByRole('button', { name: 'Stop Gaming' })).toBeNull()
+	})
+
 	it('creates a scenario from the inline field', async () => {
 		const view = props()
 		render(<ScenariosPage {...view} />)

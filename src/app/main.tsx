@@ -9,9 +9,13 @@ import './styles/index.css'
 
 const appStore = createAppStore(tauriAppsClient)
 
+function reportInterfaceFailure(kind: string, detail: string) {
+	void tauriSystemClient.logClientError?.(kind, detail).catch(() => undefined)
+}
+
 createRoot(document.getElementById('root')!).render(
 	<StrictMode>
-		<AppErrorBoundary>
+		<AppErrorBoundary onError={reportInterfaceFailure}>
 			<App
 				store={appStore}
 				systemClient={tauriSystemClient}

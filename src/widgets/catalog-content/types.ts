@@ -49,6 +49,7 @@ export interface FavoriteScenariosPanel {
 	runningId: string | null
 	isScenarioRunning: boolean
 	onRun(id: string): void
+	onCancel?(): void
 	onToggleFavorite(id: string): void
 }
 

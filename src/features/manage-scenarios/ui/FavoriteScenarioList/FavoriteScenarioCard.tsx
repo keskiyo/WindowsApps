@@ -3,6 +3,7 @@ import { resolveScenarioApps } from '../../../../entities/scenario'
 import { CollapsiblePanel } from '../../../../shared/ui/CollapsiblePanel'
 import { FavoriteStar } from '../../../../shared/ui/FavoriteStar'
 import { ScenarioRunList } from '../ScenarioRunDialog/ScenarioRunList'
+import { ScenarioStopButton } from '../ScenarioStopButton'
 import type { FavoriteScenarioCardProps } from './types'
 
 export function FavoriteScenarioCard({
@@ -13,6 +14,7 @@ export function FavoriteScenarioCard({
 	isScenarioRunning,
 	onToggle,
 	onRun,
+	onCancel,
 	onToggleFavorite,
 }: FavoriteScenarioCardProps) {
 	const panelId = `favorite-scenario-${scenario.id}`
@@ -72,6 +74,12 @@ export function FavoriteScenarioCard({
 					<Play size={14} aria-hidden="true" />
 					{running ? 'Running…' : 'Run'}
 				</button>
+				{running && onCancel && (
+					<ScenarioStopButton
+						scenarioName={scenario.name}
+						onCancel={onCancel}
+					/>
+				)}
 			</div>
 			<CollapsiblePanel open={expanded} id={panelId}>
 				<div className="flex flex-col gap-3 border-t border-(--border-neutral) px-3 py-3">

@@ -16,6 +16,43 @@ function Decode-OuterBase64 {
   [IO.File]::WriteAllBytes($DestinationPath, [Convert]::FromBase64String($outer))
 }
 
+function Get-IndexBlobSize {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RelativePath
+  )
+
+  $previousPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $size = & git -C $repoRoot cat-file -s ":$RelativePath"
+  } catch {
+    $size = $null
+  } finally {
+    $ErrorActionPreference = $previousPreference
+  }
+  if ($LASTEXITCODE -ne 0 -or "$size" -notmatch '^\s*(\d+)\s*$') {
+    return $null
+  }
+  return [int]$Matches[1]
+}
+
+function Assert-FixtureBytesIntact {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RelativePath
+  )
+
+  $indexSize = Get-IndexBlobSize -RelativePath $RelativePath
+  if ($null -eq $indexSize) {
+    return
+  }
+  $workingSize = (Get-Item -LiteralPath (Join-Path $repoRoot $RelativePath)).Length
+  if ($workingSize -ne $indexSize) {
+    throw "$RelativePath is $workingSize bytes in the working tree and $indexSize bytes in git; end-of-line conversion altered a signed fixture. Keep src-tauri/tests/fixtures/updater-signature marked binary in .gitattributes"
+  }
+}
+
 function Assert-Verification {
   param(
     [Parameter(Mandatory = $true)]
@@ -38,6 +75,9 @@ function Assert-Verification {
 }
 
 try {
+  foreach ($fixture in @("payload.bin", "payload.bin.sig", "public.key", "wrong-public.key")) {
+    Assert-FixtureBytesIntact -RelativePath "src-tauri/tests/fixtures/updater-signature/$fixture"
+  }
   New-Item -ItemType Directory -Path $tempRoot | Out-Null
   $signaturePath = Join-Path $tempRoot "payload.sig"
   $publicKeyPath = Join-Path $tempRoot "public.key"

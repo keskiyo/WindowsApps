@@ -40,13 +40,60 @@ function Get-TargetProcess {
   }
 }
 
+function Get-DescendantWorkingSet {
+  param([int]$RootProcessId)
+
+  $seen = [Collections.Generic.HashSet[int]]::new()
+  [void]$seen.Add($RootProcessId)
+  $pending = [Collections.Generic.Queue[int]]::new()
+  $pending.Enqueue($RootProcessId)
+  $totalBytes = [long]0
+  $privateBytes = [long]0
+  $processCount = 0
+
+  while ($pending.Count -gt 0) {
+    $parentProcessId = $pending.Dequeue()
+    try {
+      $children = @(Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $parentProcessId" -ErrorAction Stop)
+    } catch {
+      $children = @()
+    }
+    foreach ($child in $children) {
+      $childProcessId = [int]$child.ProcessId
+      if (-not $seen.Add($childProcessId)) {
+        continue
+      }
+      $pending.Enqueue($childProcessId)
+      $processCount += 1
+      if ($null -ne $child.WorkingSetSize) {
+        $totalBytes += [long]$child.WorkingSetSize
+      }
+      if ($null -ne $child.PrivatePageCount) {
+        $privateBytes += [long]$child.PrivatePageCount
+      }
+    }
+  }
+
+  return [ordered]@{
+    bytes = $totalBytes
+    privateBytes = $privateBytes
+    count = $processCount
+  }
+}
+
 function Get-MemorySample {
   $target = Get-TargetProcess
+  $descendants = Get-DescendantWorkingSet -RootProcessId $target.Id
   return [ordered]@{
     observedAt = [DateTime]::UtcNow.ToString("o")
     workingSetBytes = $target.WorkingSet64
     privateMemoryBytes = $target.PrivateMemorySize64
     virtualMemoryBytes = $target.VirtualMemorySize64
+    childWorkingSetBytes = $descendants.bytes
+    childPrivateMemoryBytes = $descendants.privateBytes
+    childProcessCount = $descendants.count
+    totalWorkingSetBytes = [long]$target.WorkingSet64 + $descendants.bytes
+    totalPrivateMemoryBytes = [long]$target.PrivateMemorySize64 + $descendants.privateBytes
   }
 }
 
@@ -99,6 +146,9 @@ $samples.Add((Get-MemorySample))
 $initialWorkingSet = $samples[0].workingSetBytes
 $finalWorkingSet = $samples[$samples.Count - 1].workingSetBytes
 $workingSetGrowthPercent = if ($initialWorkingSet -eq 0) { $null } else { (($finalWorkingSet - $initialWorkingSet) / $initialWorkingSet) * 100 }
+$initialTotalWorkingSet = $samples[0].totalWorkingSetBytes
+$finalTotalWorkingSet = $samples[$samples.Count - 1].totalWorkingSetBytes
+$totalWorkingSetGrowthPercent = if ($initialTotalWorkingSet -eq 0) { $null } else { (($finalTotalWorkingSet - $initialTotalWorkingSet) / $initialTotalWorkingSet) * 100 }
 $record = [ordered]@{
   sourceCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
   process = [ordered]@{
@@ -116,6 +166,7 @@ $record = [ordered]@{
     cachedCatalogVisibleMs = $CachedCatalogVisibleMs
     cancelAcknowledgementMs = $CancelAcknowledgementMs
     workingSetGrowthPercent = $workingSetGrowthPercent
+    totalWorkingSetGrowthPercent = $totalWorkingSetGrowthPercent
   }
   memorySamples = $samples
   logs = [ordered]@{

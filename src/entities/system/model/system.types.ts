@@ -43,6 +43,7 @@ export interface SystemClient {
 	openRelease?(version: string): Promise<void>
 	staleCopyStatus?(): Promise<StaleCopyInfo | null>
 	openInstalledCopy?(): Promise<void>
+	logClientError?(kind: string, detail: string): Promise<void>
 }
 
 export interface StaleCopyInfo {

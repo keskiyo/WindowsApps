@@ -47,6 +47,25 @@ describe('useSystemSettings', () => {
 		)
 	})
 
+	// A stale message used to survive under a later successful action.
+	it('clears an earlier failure once the startup toggle succeeds', async () => {
+		const setAutostart = vi
+			.fn()
+			.mockRejectedValueOnce(new AppClientError('INTERNAL', 'Denied.'))
+			.mockResolvedValue(undefined)
+		const { result } = renderHook(() =>
+			useSystemSettings({ client: { ...client, setAutostart } }),
+		)
+		await waitFor(() => expect(result.current.settings).not.toBeNull())
+
+		await act(() => result.current.toggleAutostart())
+		expect(result.current.error).toBe('Denied.')
+
+		await act(() => result.current.toggleAutostart())
+
+		expect(result.current.error).toBeNull()
+	})
+
 	it('allows only one catalog maintenance operation at a time', async () => {
 		let finishForce: (() => void) | undefined
 		const force = vi.fn(

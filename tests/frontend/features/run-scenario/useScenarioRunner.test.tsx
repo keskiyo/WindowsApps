@@ -96,6 +96,35 @@ describe('useScenarioRunner', () => {
 		)
 	})
 
+	// A scenario can hold many heavy applications; without a stop the user could only watch.
+	it('stops a running scenario and reports the run as cancelled', async () => {
+		const launched: string[] = []
+		const { view, closeApps, onFinished } = setup({
+			apps: [app('game'), app('chat'), app('music')],
+			launch: vi.fn(async (entry: AppInfo) => {
+				launched.push(entry.id)
+				view.result.current.cancel()
+			}),
+		})
+
+		await act(async () => {
+			await view.result.current.run(
+				scenario({
+					launchIdentities: ['game', 'chat'],
+					closeIdentities: ['music'],
+				}),
+			)
+		})
+
+		expect(launched).toEqual(['game'])
+		expect(closeApps).not.toHaveBeenCalled()
+		expect(view.result.current.isRunning).toBe(false)
+		expect(onFinished).toHaveBeenCalledWith(
+			expect.objectContaining({ id: 'gaming' }),
+			expect.objectContaining({ launched: 1, cancelled: true }),
+		)
+	})
+
 	// The backend enumerates once and waits out a single grace period, so the whole close list has
 	// to arrive as one request; one call per app would make the user wait that period per app.
 	it('closes the whole list in a single request', async () => {

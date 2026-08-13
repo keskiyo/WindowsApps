@@ -59,6 +59,28 @@ describe('useUpdater', () => {
 		).toBe('0.2.2')
 	})
 
+	// Install failures are classified from upstream plugin text, which is not a contract. Any
+	// unrecognised wording must still leave a safe message and a usable retry.
+	it('keeps a recoverable failure state for unrecognised install errors', async () => {
+		const available = update('0.2.2')
+		available.download = vi
+			.fn()
+			.mockRejectedValue(new Error('Ошибка 42'))
+		check.mockResolvedValue(available)
+		const { result } = renderHook(() => useUpdater())
+		await waitFor(() => expect(result.current.update).not.toBeNull())
+
+		await act(async () => {
+			await result.current.install()
+		})
+
+		expect(result.current.phase).toBe('failed')
+		expect(result.current.error).toBeTruthy()
+		expect(result.current.error).not.toContain('42')
+		expect(result.current.installing).toBe(false)
+		expect(result.current.update).not.toBeNull()
+	})
+
 	it('manual checks show a dismissed version again', async () => {
 		localStorage.setItem('windows-apps.dismissed-update-version', '0.2.2')
 		check.mockResolvedValue(update('0.2.2'))

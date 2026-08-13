@@ -13,12 +13,14 @@ export interface ScenarioRunControl {
 	runningId: string | null
 	isScenarioRunning: boolean
 	onRun(id: string): void
+	onCancel?(): void
 }
 
 export interface ScenarioPreviewControl {
 	runningId: string | null
 	isScenarioRunning: boolean
 	onRun(id: string): void
+	onCancel?(): void
 	onViewAll(): void
 }
 
@@ -67,4 +69,5 @@ export interface MoreScenarioRowProps {
 	running: boolean
 	isScenarioRunning: boolean
 	onRun(id: string): void
+	onCancel?(): void
 }

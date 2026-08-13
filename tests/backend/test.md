@@ -4,11 +4,11 @@ The Rust backend has no external integration-test crate. Tests live next to the
 modules they exercise in `#[cfg(test)]` blocks so they can validate private and
 `pub(crate)` behaviour without widening production APIs.
 
-Snapshot: `v0.3.3`.
+Snapshot: `v0.3.4`.
 
-- Rust: **575 test entries** in **70 source files**; one developer-only timing
-  test is ignored in the normal run.
-- Frontend: **512 Vitest tests** in **71 files**; it is documented here only to
+- Rust: **578 test entries** in **71 source files**; one developer-only timing
+  test is ignored in the normal run, so a green suite reports 577 passed.
+- Frontend: **525 Vitest tests** in **71 files**; it is documented here only to
   distinguish the two suites.
 - Backend tests must be deterministic. Filesystem/cache tests use
   `tempfile::tempdir()` and never inspect real user directories, registry data,
@@ -115,16 +115,18 @@ uninstall and watcher lifecycle.
 ## Core, IPC and lifecycle
 
 The core suite checks that webview requests remain ID-only, blocking work leaves
-the IPC caller thread, errors never expose local internals, window close hides
-to tray, autostart hides only after tray setup succeeds, and an exact
-`--autostart` argument is required.
+the IPC caller thread, errors never expose local internals, interface-failure
+reports stay bounded and free of control characters, window close hides to tray,
+autostart hides only after tray setup succeeds, and an exact `--autostart`
+argument is required.
 
-| Module                                                               | Tests |
-| -------------------------------------------------------------------- | ----: |
-| [`app_state.rs`](../../src-tauri/src/app_state.rs)                   |    11 |
-| [`commands/catalog.rs`](../../src-tauri/src/commands/catalog.rs)     |     5 |
-| [`commands/close.rs`](../../src-tauri/src/commands/close.rs)         |     6 |
-| [`commands/details.rs`](../../src-tauri/src/commands/details.rs)     |     1 |
+| Module                                                                   | Tests |
+| ------------------------------------------------------------------------ | ----: |
+| [`app_state.rs`](../../src-tauri/src/app_state.rs)                       |    11 |
+| [`commands/catalog.rs`](../../src-tauri/src/commands/catalog.rs)         |     5 |
+| [`commands/close.rs`](../../src-tauri/src/commands/close.rs)             |     6 |
+| [`commands/details.rs`](../../src-tauri/src/commands/details.rs)         |     1 |
+| [`commands/diagnostics.rs`](../../src-tauri/src/commands/diagnostics.rs) |     3 |
 | [`commands/launch.rs`](../../src-tauri/src/commands/launch.rs)       |     5 |
 | [`commands/mod.rs`](../../src-tauri/src/commands/mod.rs)             |     1 |
 | [`commands/settings.rs`](../../src-tauri/src/commands/settings.rs)   |     3 |

@@ -118,7 +118,8 @@ pub fn run() {
             commands::links::open_apps_settings,
             commands::links::open_release,
             commands::links::stale_copy_status,
-            commands::links::open_installed_copy
+            commands::links::open_installed_copy,
+            commands::diagnostics::log_client_error
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

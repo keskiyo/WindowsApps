@@ -193,6 +193,16 @@ describe('App', () => {
 		)
 	})
 
+	it('keeps only a narrow edge around catalog cards', async () => {
+		renderApp()
+		const launch = await screen.findByRole('button', {
+			name: 'Launch Steam',
+		})
+
+		expect(launch.closest('main')).toHaveClass('px-2')
+		expect(launch.closest('main')).not.toHaveClass('sm:px-8')
+	})
+
 	it('renders the English catalog and category counts', async () => {
 		renderApp()
 		expect(
@@ -205,6 +215,31 @@ describe('App', () => {
 			screen.getByRole('heading', { name: 'Development' }),
 		).toBeInTheDocument()
 		expect(screen.getAllByText('1 app')).toHaveLength(3)
+	})
+
+	// A rejected event registration used to leave the skeleton grid on screen with no way back.
+	it('offers a retry instead of an endless skeleton when the event bridge fails', async () => {
+		const errors = vi.spyOn(toast, 'error').mockClear()
+		const onScanProgress = vi
+			.fn()
+			.mockRejectedValueOnce(new Error('bridge unavailable'))
+			.mockResolvedValue(() => undefined)
+		const { client } = renderApp({ onScanProgress })
+
+		await waitFor(() => expect(errors).toHaveBeenCalled())
+		expect(screen.queryByLabelText('Loading applications')).toBeNull()
+		expect(client.getApps).not.toHaveBeenCalled()
+
+		const calls = errors.mock.calls
+		const retry = calls[calls.length - 1]?.[1]?.action
+		expect(retry).toMatchObject({ label: 'Retry' })
+		await act(async () => {
+			;(retry as { onClick(event: unknown): void }).onClick(new MouseEvent('click'))
+		})
+
+		expect(
+			await screen.findByRole('heading', { name: 'Games' }),
+		).toBeInTheDocument()
 	})
 
 	it('exposes full app and category names when visible labels are truncated', async () => {

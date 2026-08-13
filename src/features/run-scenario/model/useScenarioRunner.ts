@@ -51,11 +51,17 @@ export function useScenarioRunner({
 	const [runningId, setRunningId] = useState<string | null>(null)
 	const [progress, setProgress] = useState<ScenarioRunProgress | null>(null)
 	const activeRef = useRef(false)
+	const cancelledRef = useRef(false)
+
+	const cancel = useCallback(() => {
+		if (activeRef.current) cancelledRef.current = true
+	}, [])
 
 	const run = useCallback(
 		async (scenario: Scenario) => {
 			if (activeRef.current) return
 			activeRef.current = true
+			cancelledRef.current = false
 			const startedAt = Date.now()
 			setRunningId(scenario.id)
 			const toLaunch = resolveScenarioApps(
@@ -76,6 +82,7 @@ export function useScenarioRunner({
 			let closeResult = NOTHING_CLOSED
 			try {
 				for (const [index, app] of toLaunch.apps.entries()) {
+					if (cancelledRef.current) break
 					try {
 						await launch(app)
 						launched += 1
@@ -89,7 +96,7 @@ export function useScenarioRunner({
 						total: toLaunch.apps.length,
 					})
 				}
-				if (toClose.apps.length) {
+				if (!cancelledRef.current && toClose.apps.length) {
 					setProgress({
 						phase: 'closing',
 						completed: 0,
@@ -121,7 +128,7 @@ export function useScenarioRunner({
 				unavailable: unavailable + closeResult.unavailable,
 				blocked: closeResult.blocked ?? 0,
 				failed: closeResult.failed,
-				cancelled: false,
+				cancelled: cancelledRef.current,
 				startedAt,
 				finishedAt: Date.now(),
 			})
@@ -137,5 +144,12 @@ export function useScenarioRunner({
 		[run, scenarios],
 	)
 
-	return { run, runById, runningId, isRunning: runningId !== null, progress }
+	return {
+		run,
+		runById,
+		cancel,
+		runningId,
+		isRunning: runningId !== null,
+		progress,
+	}
 }

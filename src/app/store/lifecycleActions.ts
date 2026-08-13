@@ -80,6 +80,7 @@ export function createLifecycleActions({
 						)
 						initializationDispose = null
 						initializationPromise = null
+						set({ isLoading: false })
 						throw error
 					}
 					await get().load()

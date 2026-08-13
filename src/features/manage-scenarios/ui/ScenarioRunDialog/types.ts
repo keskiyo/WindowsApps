@@ -8,6 +8,7 @@ export interface ScenarioRunDialogProps {
 	runningId: string | null
 	isScenarioRunning: boolean
 	onRun(id: string): void
+	onCancel?(): void
 	onClose(): void
 }
 
@@ -19,6 +20,7 @@ export interface ScenarioRunRowProps {
 	isScenarioRunning: boolean
 	onToggle(id: string): void
 	onRun(id: string): void
+	onCancel?(): void
 }
 
 export interface ScenarioRunListProps {

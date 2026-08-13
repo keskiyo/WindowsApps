@@ -72,6 +72,9 @@ Star applications for quick access, or run a Scenario that opens one group of ap
 ![Scenarios page with launch and close lists](.github/images/scenarios.png)
 
 Each Scenario shows the applications it will launch and the applications it will close before you run it.
+A running Scenario can be stopped: the remaining applications are not started and nothing is closed.
+If an application later disappears from Windows, its saved name and icon remain visible as
+**Unavailable** so it can be removed without deleting the whole Scenario.
 
 ## More catalog views
 
@@ -89,7 +92,10 @@ Inspect local file details, architecture, signature status and installation stat
 
 ![Settings page with startup, shortcut, Windows apps, updates and Advanced controls](.github/images/settings.png)
 
-Everyday settings stay visible. Scanning, backups and maintenance live under Advanced. When Windows startup is enabled, Windows Apps starts in the system tray; choose **Open Windows Apps** from the tray menu when you need the window.
+Everyday settings stay visible. Scanning, backups and maintenance live under Advanced. Settings
+export contains preferences only, and import reports an error if Windows Apps cannot persist the
+restored data. When Windows startup is enabled, Windows Apps starts in the system tray; choose
+**Open Windows Apps** from the tray menu when you need the window.
 
 ## Install
 

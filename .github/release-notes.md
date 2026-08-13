@@ -2,11 +2,9 @@ Windows Apps is a fast, private application catalog and launcher for Windows 10 
 
 ## Highlights
 
-- **Private native actions** — catalog data sent to the interface no longer contains execution paths, launch arguments or uninstall commands.
-- **Resilient catalog recovery** — failed or incomplete sources retain their last good records, and catalog cache writes retain a recoverable backup.
+- **Resilient catalog recovery** — failed or incomplete sources retain their last good records, and catalog cache writes retain a recoverable backup. A cache reset that fails now leaves the visible catalog untouched instead of emptying it.
 - **Recoverable Scenarios** — unavailable application entries keep their saved identity and can be identified and removed instead of forcing deletion of the whole Scenario.
-- **Safer settings import** — preference imports report failed persistence instead of claiming that unsaved settings were restored.
-- **Verified updates** — release automation cryptographically verifies the generated installer against the configured Tauri updater key before publishing its manifest.
+- **Interface recovery** — a failed event connection no longer leaves the catalog on a loading placeholder, and offers a retry. A failing dialog closes on its own instead of replacing the whole window, and the failure is written to the local application log.
 
 ## Install
 

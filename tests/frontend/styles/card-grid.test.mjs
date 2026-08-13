@@ -43,25 +43,30 @@ describe('catalog card grid', () => {
 		expect(rule('.app-card-grid')).toContain('justify-content: center')
 	})
 
+	// Two decorative layers used to sit behind every card: a near-black drop shadow that read as a
+	// dark plate on the graphite surface, and a blurred violet bar under the bottom edge that
+	// smeared across the full width of an auxiliary row. Elevation is the rim plus one faint glow.
+	it('lifts cards without a plate behind them', () => {
+		expect(rule('.app-card-glass')).not.toContain('oklch(0.14')
+		expect(rule('.app-card-tile.app-card-glass')).not.toContain('oklch(0.14')
+		expect(stylesheet).not.toContain('.app-card-glass::after')
+	})
+
 	it('uses a single quiet edge and a thinner interactive spotlight', () => {
 		const glass = rule('.app-card-tile.app-card-glass')
 		expect(glass).not.toContain('0 0 0 1px')
 		expect(glass).toContain(
 			'0 8px 22px oklch(0.58 0.14 292 / 0.06)',
 		)
-		expect(rule('.app-card-tile.app-card-glass::after')).toContain(
-			'opacity: 0.25',
-		)
 		expect(rule('.app-card-tile .spotlight::before')).toContain(
 			'padding: 1.4px',
 		)
 	})
 
-	it('keeps the quieter visual treatment scoped away from auxiliary rows', () => {
+	it('keeps a full-width auxiliary row no louder than a tile', () => {
 		expect(rule('.app-card-glass')).toContain(
-			'0 10px 30px oklch(0.58 0.14 292 / 0.12)',
+			'0 6px 18px oklch(0.58 0.14 292 / 0.05)',
 		)
-		expect(rule('.app-card-glass::after')).toContain('opacity: 0.5')
 		expect(rule('.spotlight::before')).toContain('padding: 2.4px')
 	})
 

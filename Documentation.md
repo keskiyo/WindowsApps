@@ -68,19 +68,26 @@ Main source areas:
 
 Command families cover catalog reads and scans, icon hydration, launch/close,
 details/folder, uninstall/history, system settings, settings backup export,
-project links, update release links, and stale-copy handling. Commands return
+project links, update release links, stale-copy handling, and bounded
+interface-failure reporting. Commands return
 `Result<T, AppError>`; errors expose stable `SCREAMING_SNAKE` codes and static
 safe messages. Internal paths, commands, registry values and upstream errors
 never reach the webview.
 
-Scenario close actions accept catalog IDs only. The trusted catalog classifies
+A running Scenario can be stopped from any surface that started it. The stop is
+cooperative: the launch loop ends at the next entry, the close phase is skipped,
+and the recorded run is marked cancelled. Scenario close actions accept catalog
+IDs only. The trusted catalog classifies
 close targets; only `Safe` targets may be added or executed. Critical Windows
 processes and session components are counted as blocked rather than terminated.
 
 The native logger starts before application setup and retains `Info`-level
 production diagnostics in Tauri's platform log directory. A root React error
 boundary replaces render failures with a static recovery screen; exception
-details are not displayed in the webview.
+details are not displayed in the webview. The boundary reports the failure kind
+and a truncated stack to the native log through `log_client_error`, which strips
+control characters and bounds both fields. Dialogs sit behind their own boundary
+so a failing panel closes instead of replacing the whole interface.
 
 Catalog reads, refreshes and catalog-update events use a display DTO. The DTO
 excludes uninstall targets and arguments, launch arguments, resolved execution
@@ -263,9 +270,22 @@ cargo test --manifest-path src-tauri/Cargo.toml
 - contracts: frontend/platform boundaries, release-script tests and dependency
   audit gates, including updater-signature fixtures.
 
+The signed updater-signature fixtures under `src-tauri/tests/fixtures/` are
+byte streams, not text. `.gitattributes` marks that directory `binary` so a
+checkout with `core.autocrlf` enabled cannot rewrite line endings and invalidate
+the detached signature; `test-verify-updater-signature.ps1` also compares each
+fixture against its size in the index and names that failure explicitly.
+
 Node.js `22.22.2` and Rust `1.96.0` are pinned in `.node-version` and
 `rust-toolchain.toml`. Cargo verification uses `--locked`; the separate MSRV
 job builds with Rust `1.88.0`.
+
+The v0.3.4 release preparation also provides `scripts/run-release-soak.ps1`.
+It binds to one exact application PID and executable path, records operator-confirmed
+Refresh/Cancel outcomes, samples memory during the idle/watcher window, and writes
+local evidence under `.1localDocuments`. It never controls or terminates the target
+process. This record is reference-machine evidence, not a replacement for CI or the
+clean Windows acceptance matrix.
 
 Runtime `npm audit --omit=dev --audit-level=high` admits no exceptions. High or
 critical development-only advisories require dated entries in
@@ -290,5 +310,8 @@ source is MIT-licensed; third-party notices are recorded in
 | Old version or icon        | Refresh; missing icons can be repaired from catalog maintenance without losing preferences.              |
 | Shortcut/startup fails     | Re-enable it in Settings; Windows policy or another process can block registration.                      |
 | Uninstall unavailable      | The catalog record has no trusted, parseable uninstall target.                                           |
+| Catalog stays on placeholders | The event connection failed; use **Retry** in the notice. Refresh and launch keep working without it. |
+| A panel closes by itself   | That dialog failed to render; the failure is in the application log and the catalog is unaffected.        |
+| Scenario runs too long     | Use **Stop** next to the running Scenario; started applications stay open and nothing is closed.          |
 | Update/download failure    | Retry from the update dialog or use the linked GitHub release.                                           |
 | SmartScreen warning        | Expected for the unsigned NSIS installer; verify the release source and updater signature.               |

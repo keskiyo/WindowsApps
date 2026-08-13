@@ -815,6 +815,26 @@ describe('app store', () => {
 		expect(api.getApps).not.toHaveBeenCalled()
 	})
 
+	// The initial state is `isLoading: true` and only `load()` clears it. Rejecting before the
+	// load left the skeleton grid on screen forever, with no way back except a restart. The
+	// rejection still owns the message, so `error` stays empty and only one notice is shown.
+	it('leaves the loading state when subscription registration fails', async () => {
+		const api = client({
+			onScanProgress: vi
+				.fn()
+				.mockRejectedValue(new Error('bridge unavailable')),
+		})
+		const store = createAppStore(api)
+
+		await expect(store.getState().initialize()).rejects.toThrow(
+			'bridge unavailable',
+		)
+
+		expect(store.getState().isLoading).toBe(false)
+		expect(store.getState().error).toBeNull()
+		expect(api.getApps).not.toHaveBeenCalled()
+	})
+
 	it('retries initialization after a failed subscription instead of caching the rejection', async () => {
 		const onCatalogChanged = vi
 			.fn()
@@ -1062,6 +1082,24 @@ describe('app store', () => {
 		expect(api.resetCatalogCache).toHaveBeenCalledOnce()
 		expect(store.getState().apps).toEqual([apps[2]])
 		expect(store.getState().hasCache).toBe(true)
+	})
+
+	it('keeps the visible catalog when a cache reset fails', async () => {
+		const store = createAppStore(
+			client({
+				resetCatalogCache: vi
+					.fn()
+					.mockRejectedValue(new Error('reset denied')),
+			}),
+		)
+		store.setState({ apps, hasCache: true })
+
+		await expect(store.getState().resetCatalogCache()).rejects.toThrow(
+			'reset denied',
+		)
+
+		expect(store.getState().apps).toEqual(apps)
+		expect(store.getState().isRefreshing).toBe(false)
 	})
 
 	it('requests priority hydration for visible icon ids', async () => {

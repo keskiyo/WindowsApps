@@ -20,4 +20,6 @@ export const tauriSystemClient: SystemClient = {
 	openRelease: version => invokeTauri('open_release', { version }),
 	staleCopyStatus: () => invokeTauri('stale_copy_status'),
 	openInstalledCopy: () => invokeTauri('open_installed_copy'),
+	logClientError: (kind, detail) =>
+		invokeTauri('log_client_error', { kind, detail }),
 }
