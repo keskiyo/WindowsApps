@@ -902,12 +902,19 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-	*,
-	*::before,
-	*::after {
-		animation-duration: 0.01ms !important;
-		animation-iteration-count: 1 !important;
-		scroll-behavior: auto !important;
-		transition-duration: 0.01ms !important;
+	.activity-bar-fill,
+	.app-card,
+	.motion-overlay,
+	.update-modal-backdrop,
+	.motion-panel,
+	.update-modal-panel,
+	.drawer-backdrop,
+	.drawer-panel,
+	.drawer-shell.is-closing .drawer-backdrop,
+	.drawer-shell.is-closing .drawer-panel,
+	.spotlight::before,
+	.spotlight::after {
+		animation: none !important;
+		transition: none !important;
 	}
 }

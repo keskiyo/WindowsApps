@@ -281,7 +281,11 @@ describe('MorePage', () => {
 		const run = screen.getByRole('button', { name: 'Run Gaming' })
 		expect(run).toBeDisabled()
 		expect(run).toHaveTextContent('Running…')
-		expect(screen.getByRole('button', { name: 'Run Work' })).toBeDisabled()
+		expect(
+			screen.getByRole('button', {
+				name: 'Run Work unavailable while another scenario is running',
+			}),
+		).toBeDisabled()
 	})
 
 	it('does not render legacy scenario history', () => {

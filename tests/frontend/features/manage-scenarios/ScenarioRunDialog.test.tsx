@@ -155,7 +155,11 @@ describe('ScenarioRunDialog', () => {
 		const run = screen.getByRole('button', { name: 'Run Gaming' })
 		expect(run).toBeDisabled()
 		expect(run).toHaveTextContent('Running…')
-		expect(screen.getByRole('button', { name: 'Run Work' })).toBeDisabled()
+		expect(
+			screen.getByRole('button', {
+				name: 'Run Work unavailable while another scenario is running',
+			}),
+		).toBeDisabled()
 	})
 
 	it('reports entries the catalog no longer has instead of shrinking the list', async () => {

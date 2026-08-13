@@ -188,7 +188,11 @@ describe('FavoritesGrid', () => {
 
 		const run = screen.getByRole('button', { name: 'Run Gaming' })
 		expect(run).toBeDisabled()
-		expect(screen.getByRole('button', { name: 'Run Work' })).toBeDisabled()
+		expect(
+			screen.getByRole('button', {
+				name: 'Run Work unavailable while another scenario is running',
+			}),
+		).toBeDisabled()
 		expect(run).toHaveTextContent('Running…')
 	})
 })

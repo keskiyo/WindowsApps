@@ -584,7 +584,11 @@ pub(crate) fn attach_close_risk(apps: &mut [AppInfo]) {
 }
 
 pub(crate) fn close_scope_of(app: &AppInfo) -> Option<String> {
-    close_target_of(app)
+    let target = close_target_of(app);
+    if target.as_deref().is_some_and(is_steam_client_target) {
+        return None;
+    }
+    target
         .as_deref()
         .and_then(|target| {
             Path::new(target)
@@ -598,6 +602,12 @@ pub(crate) fn close_scope_of(app: &AppInfo) -> Option<String> {
                 .filter(|location| !location.is_empty())
                 .map(str::to_owned)
         })
+}
+
+fn is_steam_client_target(path: &str) -> bool {
+    Path::new(path)
+        .file_name()
+        .is_some_and(|name| name.eq_ignore_ascii_case("steam.exe"))
 }
 
 pub(crate) fn close_target_of(app: &AppInfo) -> Option<String> {
@@ -746,6 +756,13 @@ mod tests {
             close_scope_of(&app).as_deref(),
             Some(r"C:\Program Files\Vendor\Product A")
         );
+    }
+
+    #[test]
+    fn steam_client_does_not_expand_close_scope_to_installed_games() {
+        let steam = app("Steam", r"C:\Program Files (x86)\Steam\steam.exe");
+
+        assert_eq!(close_scope_of(&steam), None);
     }
 
     fn walk_start_menu_shortcuts(roots: Vec<PathBuf>, budget: &StageBudget) -> Vec<AppInfo> {

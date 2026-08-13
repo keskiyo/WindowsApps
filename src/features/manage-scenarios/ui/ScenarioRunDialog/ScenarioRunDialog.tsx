@@ -55,7 +55,7 @@ export function ScenarioRunDialog({
 					event.preventDefault()
 					onClose()
 				}}
-				className="motion-panel flex max-h-[min(48rem,calc(100vh-4rem))] w-full min-w-xl flex-col overflow-hidden rounded-2xl border border-(--border-neutral) bg-(--surface-panel) shadow-(--shadow-palette)"
+				className="motion-panel flex max-h-[min(48rem,calc(100vh-4rem))] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-(--border-neutral) bg-(--surface-panel) shadow-(--shadow-palette)"
 			>
 				<div className="flex items-center gap-3 border-b border-(--border-neutral) px-4 py-3">
 					<ListChecks size={18} aria-hidden="true" />

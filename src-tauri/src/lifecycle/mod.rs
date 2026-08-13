@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -43,6 +44,33 @@ pub(crate) fn show_main_window(app: &AppHandle) {
         let _ = window.show();
         let _ = window.set_focus();
     }
+}
+
+pub(crate) fn hide_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+}
+
+pub(crate) fn starts_hidden_from_autostart<I, S>(args: I) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    args.into_iter()
+        .any(|argument| argument.as_ref() == OsStr::new("--autostart"))
+}
+
+pub(crate) fn should_hide_on_autostart(autostart: bool, tray_ready: bool) -> bool {
+    autostart && tray_ready
+}
+
+pub(crate) fn should_show_on_second_instance<I, S>(args: I) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    !starts_hidden_from_autostart(args)
 }
 
 pub(crate) fn setup_tray(app: &AppHandle, state: Arc<LifecycleState>) -> tauri::Result<()> {
@@ -103,5 +131,28 @@ mod tests {
         assert_eq!(tray_action("open"), Some(TrayAction::Open));
         assert_eq!(tray_action("quit"), Some(TrayAction::Quit));
         assert_eq!(tray_action("unknown"), None);
+    }
+
+    #[test]
+    fn autostart_mode_requires_an_exact_argument() {
+        assert!(starts_hidden_from_autostart(["app.exe", "--autostart"]));
+        assert!(!starts_hidden_from_autostart(["app.exe"]));
+        assert!(!starts_hidden_from_autostart([
+            "app.exe",
+            "--autostart-extra",
+        ]));
+    }
+
+    #[test]
+    fn autostart_hides_only_when_the_tray_is_ready() {
+        assert!(should_hide_on_autostart(true, true));
+        assert!(!should_hide_on_autostart(true, false));
+        assert!(!should_hide_on_autostart(false, true));
+    }
+
+    #[test]
+    fn second_autostart_invocation_keeps_the_existing_window_hidden() {
+        assert!(!should_show_on_second_instance(["app.exe", "--autostart"]));
+        assert!(should_show_on_second_instance(["app.exe"]));
     }
 }

@@ -6,7 +6,7 @@ const VALUE_NAME: &str = "Windows Apps";
 fn command() -> Result<String, String> {
     let executable = std::env::current_exe()
         .map_err(|error| format!("Could not locate Windows Apps: {error}"))?;
-    Ok(format!(r#""{}""#, executable.display()))
+    Ok(format!(r#""{}" --autostart"#, executable.display()))
 }
 
 pub(crate) fn is_enabled() -> Result<bool, String> {
@@ -42,6 +42,6 @@ mod tests {
     fn startup_command_quotes_the_executable_path() {
         let value = command().unwrap();
         assert!(value.starts_with('"'));
-        assert!(value.ends_with('"'));
+        assert!(value.ends_with("\" --autostart"));
     }
 }

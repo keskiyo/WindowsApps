@@ -2,12 +2,12 @@ Windows Apps is a fast, private application catalog and launcher for Windows 10 
 
 ## Highlights
 
-- **Reliable scenario completion** — a scenario runs its configured launch and close lists as one protected operation. Its action stays disabled until all work has finished, which prevents duplicate launches and closes.
-- **Safer closing** — close detection follows application processes inside a dedicated executable directory, including launcher replacements and updated builds, while refusing shared system and installation roots.
-- **Cleaner Favorites and More** — scenario cards use responsive two- and three-column layouts without stretching neighbouring cards. More surfaces recently added applications and no longer shows scenario history.
-- **Catalog clarity** — application cards use compact controls, a subtle favorite star, and a focused Move to category cascade.
+- **Safe scenario lock** — while one Scenario starts and closes applications, every other Run action becomes unavailable and visually muted. This prevents silent duplicate work.
+- **Startup stays out of the way** — enabling Windows startup now launches Windows Apps directly to the system tray. Use **Open Windows Apps** from its tray menu whenever you need the window.
+- **Safer Steam closing** — closing Steam targets only `steam.exe`; games remain separate Scenario entries.
+- **Clearer Favorites** — Scenario cards use responsive two- and three-column layouts without stretching neighbouring cards, and Favorites includes both starred applications and scenarios.
 
 ## Install
 
-1. Download `Windows.Apps_0.3.2_x64-setup.exe`.
+1. Download `Windows.Apps_0.3.3_x64-setup.exe`.
 2. Run it. The installer is not Authenticode-signed, so SmartScreen may show **Windows protected your PC**; choose **More info -> Run anyway**.

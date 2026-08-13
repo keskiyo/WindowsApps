@@ -151,7 +151,8 @@ Close operates on trusted process identities, not visible windows alone. It
 first requests normal close, then performs a bounded recheck before terminating
 survivors. The application process, Windows-critical images and unsafe process
 groups are excluded. Store/URI entries without a safe executable close target
-are reported unavailable.
+are reported unavailable. Steam closes by its exact `steam.exe` target, never
+by the Steam installation directory, so games remain explicit Scenario entries.
 
 ### Uninstall
 
@@ -162,6 +163,11 @@ Rust-owned target. History excludes paths, command lines and internal errors.
 ### Windows integration and updates
 
 - Tray, startup, global shortcut and window lifecycle are backend-owned.
+- An enabled Windows startup entry launches the installed application with an
+  internal exact `--autostart` argument. That launch hides the main window only
+  after the tray is ready; the tray's **Open Windows Apps** action restores it.
+  A normal launch remains visible, and a tray initialization failure keeps the
+  window visible.
 - WebView2 uses Tauri's silent bootstrapper when missing.
 - The updater checks the signed release manifest on startup; the user chooses
   whether to download and restart.

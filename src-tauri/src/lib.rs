@@ -17,14 +17,17 @@ use platform::windows::{autostart, global_shortcut, install_registry};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let lifecycle = Arc::new(lifecycle::LifecycleState::default());
+    let starts_hidden_from_autostart = lifecycle::starts_hidden_from_autostart(std::env::args_os());
     let close_lifecycle = Arc::clone(&lifecycle);
     let tray_lifecycle = Arc::clone(&lifecycle);
     let mut builder = tauri::Builder::default();
     #[cfg(desktop)]
     {
         builder = builder
-            .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-                lifecycle::show_main_window(app);
+            .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+                if lifecycle::should_show_on_second_instance(args) {
+                    lifecycle::show_main_window(app);
+                }
             }))
             .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_process::init());
@@ -55,8 +58,16 @@ pub fn run() {
                     }
                 }
             }
-            if let Err(error) = lifecycle::setup_tray(app.handle(), Arc::clone(&tray_lifecycle)) {
-                log::error!("Could not create the system tray: {error}");
+            let tray_ready = match lifecycle::setup_tray(app.handle(), Arc::clone(&tray_lifecycle))
+            {
+                Ok(()) => true,
+                Err(error) => {
+                    log::error!("Could not create the system tray: {error}");
+                    false
+                }
+            };
+            if lifecycle::should_hide_on_autostart(starts_hidden_from_autostart, tray_ready) {
+                lifecycle::hide_main_window(app.handle());
             }
             if let Ok(app_data_dir) = app.path().app_data_dir() {
                 if let Some(apps) = load_sanitized_cache(&app_data_dir) {

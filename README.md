@@ -1,155 +1,135 @@
-<div align="center">
-  <img src="public/app-icon.png" width="96" height="96" alt="Windows Apps logo">
+<p>
+  <img src="public/app-icon.png" width="88" height="88" alt="Windows Apps logo">
+</p>
 
 # Windows Apps
 
-**Every application on your PC, in one searchable place.**
+A local catalog for the Windows software you already use.
 
-Start Menu shortcuts, installed programs, Store apps, Steam games and portable executables — collected into a single catalog that opens instantly and stays on your machine.
+Windows Apps finds Start Menu shortcuts, installed desktop programs, Microsoft Store apps, Steam games and portable executables. It brings them together in one searchable catalog and merges duplicate entries into a single application card.
 
-[![Version](https://img.shields.io/badge/version-0.3.2-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.2)
+[![Version](https://img.shields.io/badge/version-0.3.3-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.3)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
 ![Local first](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
 
-### [⬇ Download for Windows](https://github.com/keskiyo/WindowsApps/releases/latest)
+## [⬇ Download Windows Apps](https://github.com/keskiyo/WindowsApps/releases/latest)
 
-[Documentation](Documentation.md) · [Release notes](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.2) · [Telegram](https://t.me/keskiyo)
+Windows 10/11 · x64 · Local-first
 
-<img src=".github/images/catalog.png" alt="Windows Apps catalog" width="880">
+![Windows Apps catalog with categories, search and application cards](.github/images/catalog.png)
 
-</div>
+## One catalog for Windows software
 
----
+Windows keeps applications in several places. Windows Apps combines:
 
-## Contents
+- Start Menu shortcuts
+- installed desktop programs
+- Microsoft Store apps
+- Steam games
+- portable executables in folders you choose
 
-[Why](#why) · [Screenshots](#screenshots) · [Install](#install) · [Features](#features) · [Privacy](#privacy) · [Development](#development)
+When the same application is discovered from more than one source, it appears once rather than as a collection of duplicates.
 
-## Why
+## From discovery to launch
 
-Windows spreads your software across four places that never agree with each other: the Start Menu, Installed apps, the Microsoft Store, and whatever you unzipped to a folder. Windows Apps reads all of them and produces one list.
+1. **Discover** Windows software, Steam games and selected portable-app folders.
+2. **Organize** the catalog with categories, Favorites, Auxiliary tools and Scenarios.
+3. **Launch** applications through their native Windows, Steam or executable path.
 
-The interesting part is what happens next. The same program found as a shortcut, a registry entry, a Store package and a Steam game becomes **one card**. Runtime components, updaters and language servers step aside into **Auxiliary tools** instead of cluttering your categories. And your favorites and custom categories follow the application itself, so a rescan or a version bump does not scatter them.
+## Built for everyday use
 
-Everything runs locally. Nothing about your machine is uploaded.
+### Search the catalog
 
-## Screenshots
+Find applications by name, publisher, description or path, including typo-tolerant search.
 
-<div align="center">
-  <img src=".github/images/more.png" alt="More: auxiliary tools, scenarios, hidden apps and installers" width="880">
-</div>
+### Keep one card per application
 
-**More** holds what is kept out of the main list — Auxiliary tools, Scenarios, Hidden apps and
-Installers & Docs. Each card carries the count of the view it opens and previews its newest entries.
+Shortcuts, registry entries, Store packages and other representations of the same program are merged into one card.
 
-<div align="center">
-  <img src=".github/images/scenarios.png" alt="Scenarios with launch and close lists" width="880">
-</div>
+### Launch through the right system path
 
-**Scenarios** pair a launch list with a close list. One click starts everything in the first and
-fully closes everything in the second.
+Steam games open through Steam, packaged apps through Windows and executables directly.
 
-<div align="center">
-  <img src=".github/images/app-info.png" alt="App information dialog" width="880">
-</div>
+### Save useful setups
 
-**App information** — size, dates, architecture, Authenticode signature and whether the install
-location still exists. Copy the path, copy a full report, or open the containing folder.
+Favorites, categories and Scenarios let you keep common applications and launch-and-close setups close at hand.
 
-<div align="center">
-  <img src=".github/images/settings.png" alt="Settings and catalog maintenance" width="880">
-</div>
+## Favorites and Scenarios
 
-**Settings** — scan folders, autostart, the global shortcut, updates, preference export/import
-and a one-step local backup, plus catalog maintenance whose force scan and cache reset preserve
-Favorites, Hidden apps and categories.
+![Favorites page with starred applications and run-ready scenarios](.github/images/favorites.png)
+
+Star applications for quick access, or run a Scenario that opens one group of applications and closes another.
+
+## Scenario details
+
+![Scenarios page with launch and close lists](.github/images/scenarios.png)
+
+Each Scenario shows the applications it will launch and the applications it will close before you run it.
+
+## More catalog views
+
+![More page with Auxiliary tools, Scenarios, Hidden and Installers and Docs](.github/images/more.png)
+
+Auxiliary tools, hidden applications, installers and documentation stay available without crowding the main catalog.
+
+## Application details
+
+![App information dialog with file and launch details](.github/images/app-info.png)
+
+Inspect local file details, architecture, signature status and installation state for an application card.
+
+## Settings and maintenance
+
+![Settings page with startup, shortcut, Windows apps, updates and Advanced controls](.github/images/settings.png)
+
+Everyday settings stay visible. Scanning, backups and maintenance live under Advanced. When Windows startup is enabled, Windows Apps starts in the system tray; choose **Open Windows Apps** from the tray menu when you need the window.
 
 ## Install
 
-1. Download **`Windows.Apps_0.3.2_x64-setup.exe`** from the [latest release](https://github.com/keskiyo/WindowsApps/releases/latest).
-2. Run it.
-3. Start **Windows Apps** and choose **Scan for apps**.
+1. Download [**`Windows.Apps_0.3.3_x64-setup.exe`**](https://github.com/keskiyo/WindowsApps/releases/latest).
+2. Run the installer.
+3. Start Windows Apps and choose **Scan for apps**.
 
-> The installer is not Authenticode-signed, so SmartScreen may show _"Windows protected your PC"_. Choose **More info → Run anyway**. Download only from this repository's Releases. Automatic updates are cryptographically signed and verified by the app before installing.
+> [!WARNING]
+> The installer is not Authenticode-signed, so SmartScreen may show **Windows protected your PC**. Choose **More info → Run anyway** and download only from this repository's Releases.
 
-| Requirement  | Value                      |
-| ------------ | -------------------------- |
-| OS           | Windows 10 or 11           |
-| Architecture | x64                        |
-| Runtime      | Microsoft Edge WebView2    |
-| Internet     | Not required after install |
-
-## Features
-
-- **One app, one card** — shortcuts, registry entries, Store packages, Steam games and discovered executables are merged into a single application when they point to the same product.
-
-- **Typo and layout tolerant search** — finds apps by name, publisher, description and path even with misspellings or the wrong keyboard layout.
-
-- **Native launching** — Steam games launch through Steam, packaged apps through Windows, shortcuts as shortcuts, and executables directly. No generic launcher path that breaks overlays, cloud saves or playtime tracking.
-
-- **Real launch status** — an app is considered launched when its window is ready, not when a process merely appears.
-
-- **Scenarios** — save a set of apps to start and another set to fully close, then run both as one action. A close list will not take a process Windows cannot survive losing, and asks before it takes one that ends the desktop shell.
-
-- **Non-destructive filtering** — updaters, crash handlers, runtimes, documentation and other secondary entries are moved to **Auxiliary tools** instead of silently disappearing.
-
-- **Stable app identity** — Favorites, Hidden state, categories and scenarios survive executable path changes, version updates, rescans and cache resets. Scenarios can be starred too, and Favorites shows them beside the applications.
-
-- **Conservative detection** — ambiguous applications stay visible instead of being incorrectly merged or removed. Text matches alone cannot permanently discard an entry. A card is removed only when Windows confirms its file is gone; a check that was denied or failed keeps the application and says so.
-
-- **Decisions you can read** — the application dialog reports which signal chose the category, why an entry is Auxiliary, and what the launch-target check found. Settings adds the health of each catalog source.
-
-- **Local app inspection** — architecture, Authenticode status, file metadata and install state are resolved locally from the catalog entry.
-
-- **Bounded scanning** — filesystem discovery has hard depth, entry and time limits; junctions and symbolic links are never followed.
+| Requirement  | Value                           |
+| ------------ | ------------------------------- |
+| OS           | Windows 10 or 11                |
+| Architecture | x64                             |
+| Runtime      | Microsoft Edge WebView2         |
+| Internet     | Not required after installation |
+| Account      | Not required                    |
 
 ## Privacy
 
-- Catalog and metadata stay on the PC.
-- No telemetry or application inventory is uploaded.
-- Launch and uninstall targets are resolved inside Rust from application IDs.
-- Shell command strings are not used.
-- Unvalidated uninstall commands and network targets are rejected.
+Windows Apps is local-first. It has no telemetry, cloud account, application-inventory uploads or online metadata enrichment; catalog data remains on your machine.
 
-See [Documentation.md](Documentation.md#13-privacy-and-security) for implementation details.
+For implementation and security details, see [Technical Documentation](Documentation.md#13-privacy-and-security).
+
+## Known limitations
+
+- Windows 10/11 and x64 only.
+- The installer is not Authenticode-signed; SmartScreen may appear.
+- Microsoft Edge WebView2 is required.
 
 ## Development
 
-Prerequisites: Node.js 22, Rust 1.88+ with the MSVC toolchain, Microsoft C++ Build Tools and Windows SDK, WebView2 Runtime, and the [Tauri Windows prerequisites](https://v2.tauri.app/start/prerequisites/).
+Prerequisites: Node.js 22, Rust 1.88+ with the MSVC toolchain, Microsoft C++ Build Tools, Windows SDK and the [Tauri Windows prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```powershell
 npm install
 npm run tauri dev
 ```
 
-Verification — all of these must pass:
+See [Technical Documentation](Documentation.md#16-verification-and-releases) for verification and release commands.
 
-```powershell
-npm run lint
-npm run typecheck
-npm test
-npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
-cargo fmt --manifest-path src-tauri/Cargo.toml --check
-cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-```
+## Contributing
 
-Coverage is reported, not gated (`npm run test:coverage`). The MSRV declared in `src-tauri/Cargo.toml` is a compatibility promise and is compiled by the MSRV job in `.github/workflows/verify.yml`.
+Bug reports and pull requests are welcome. Read [Technical Documentation](Documentation.md) before changing code or workflows.
 
-Production build:
+## Links
 
-```powershell
-npm run tauri build
-```
-
-Local artifact: `src-tauri/target/release/bundle/nsis/Windows Apps_0.3.2_x64-setup.exe`
-
-## Support
-
-[Technical documentation](Documentation.md) · [Releases](https://github.com/keskiyo/WindowsApps/releases) · [Telegram: @keskiyo](https://t.me/keskiyo)
-
-<div align="center">
-  <sub>Built with Tauri, Rust, React, TypeScript, Vite and native Windows APIs.</sub>
-</div>
+[Documentation](Documentation.md) · [Releases](https://github.com/keskiyo/WindowsApps/releases) · [Telegram: @keskiyo](https://t.me/keskiyo)
