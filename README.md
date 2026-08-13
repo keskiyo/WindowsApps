@@ -1,22 +1,27 @@
-<p>
+<p align="center">
   <img src="public/app-icon.png" width="88" height="88" alt="Windows Apps logo">
 </p>
 
-# Windows Apps
+<h1 align="center">Windows Apps</h1>
 
-A local catalog for the Windows software you already use.
+<p align="center">A local catalog for the Windows software you already use.</p>
 
-Windows Apps finds Start Menu shortcuts, installed desktop programs, Microsoft Store apps, Steam games and portable executables. It brings them together in one searchable catalog and merges duplicate entries into a single application card.
+<p align="center">
+  Windows Apps finds Start Menu shortcuts, installed desktop programs, Microsoft Store apps, Steam games and portable executables.<br>
+  It brings them together in one searchable catalog and merges duplicate entries into a single application card.
+</p>
 
-[![Version](https://img.shields.io/badge/version-0.3.3-7C3AED?style=flat-square)](https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.3)
-![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&logo=windows11&logoColor=white)
-![Architecture](https://img.shields.io/badge/architecture-x64-334155?style=flat-square)
-![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
-![Local first](https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square)
+<p align="center">
+  <a href="https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.3"><img src="https://img.shields.io/badge/version-0.3.3-7C3AED?style=flat-square" alt="Version"></a>
+  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/architecture-x64-334155?style=flat-square" alt="Architecture">
+  <img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri">
+  <img src="https://img.shields.io/badge/catalog-local--first-16A34A?style=flat-square" alt="Local first">
+</p>
 
-## [⬇ Download Windows Apps](https://github.com/keskiyo/WindowsApps/releases/latest)
+<h2 align="center"><a href="https://github.com/keskiyo/WindowsApps/releases/latest">⬇ Download Windows Apps</a></h2>
 
-Windows 10/11 · x64 · Local-first
+<p align="center">Windows 10/11 · x64 · Local-first</p>
 
 ![Windows Apps catalog with categories, search and application cards](.github/images/catalog.png)
 
