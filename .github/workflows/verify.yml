@@ -102,13 +102,13 @@ jobs:
               shell: pwsh
               run: |
                   $declared = (Select-String -Path src-tauri/Cargo.toml -Pattern '^rust-version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
-                  $installed = (& rustc --version).Split(' ')[1]
+                  $installed = (& rustc +1.88.0 --version).Split(' ')[1]
                   if ($declared -ne $installed) {
                     throw "Cargo.toml declares MSRV $declared but this job pins $installed; update both together"
                   }
 
             - name: Build at the declared MSRV
-              run: cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
+              run: cargo +1.88.0 check --locked --manifest-path src-tauri/Cargo.toml --all-targets
 
     contracts:
         name: Boundaries and release contract

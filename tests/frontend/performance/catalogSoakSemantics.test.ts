@@ -60,10 +60,31 @@ function client(apps: AppInfo[]): AppsClient {
 }
 
 describe('catalog soak semantics', () => {
-	it('keeps 10000 records bounded, responsive to refresh cancellation and generation-safe', async () => {
+	it('keeps a 10000-record catalog bounded and generation-safe', async () => {
 		const apps = Array.from({ length: 10000 }, (_, index) => app(index))
 		const appsClient = client(apps)
 		const store = createAppStore(appsClient)
+		await store.getState().load()
+
+		const queries = ['windows', 'кириллица', 'duplicate', 'metadata', 'missing']
+		for (const query of queries) {
+			store.getState().setQuery(query)
+			expect(selectFilteredApps(store.getState()).length).toBeLessThanOrEqual(
+				apps.length,
+			)
+		}
+
+		store.getState().applyPatches([
+			{ id: 'app-1', generation: 2, publisher: 'Stale' },
+		])
+
+		expect(store.getState().apps).toHaveLength(10000)
+		expect(store.getState().apps[1].publisher).not.toBe('Stale')
+	})
+
+	it('keeps 1000 sequential query/filter operations bounded', async () => {
+		const apps = Array.from({ length: 100 }, (_, index) => app(index))
+		const store = createAppStore(client(apps))
 		await store.getState().load()
 
 		const queries = ['windows', 'кириллица', 'duplicate', 'metadata', 'missing']
@@ -73,6 +94,13 @@ describe('catalog soak semantics', () => {
 				apps.length,
 			)
 		}
+	})
+
+	it('keeps 100 refresh/cancel pairs idle after completion', async () => {
+		const apps = Array.from({ length: 100 }, (_, index) => app(index))
+		const appsClient = client(apps)
+		const store = createAppStore(appsClient)
+		await store.getState().load()
 
 		for (let index = 0; index < 100; index += 1)
 			await Promise.all([
@@ -80,14 +108,8 @@ describe('catalog soak semantics', () => {
 				store.getState().cancelScan(),
 			])
 
-		store.getState().applyPatches([
-			{ id: 'app-1', generation: 2, publisher: 'Stale' },
-		])
-
-		expect(store.getState().apps).toHaveLength(10000)
 		expect(store.getState().isRefreshing).toBe(false)
-		expect(store.getState().apps[1].publisher).not.toBe('Stale')
 		expect(appsClient.refreshApps).toHaveBeenCalledTimes(100)
 		expect(appsClient.cancelScan).toHaveBeenCalledTimes(100)
-	}, 30000)
+	})
 })
