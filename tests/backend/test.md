@@ -1,132 +1,151 @@
 # Backend test map
 
-The Rust backend has **no separate test tree**. Unlike the frontend (`tests/frontend/**` mirroring
-`src/**`), every backend test lives **colocated** in a `#[cfg(test)] mod tests` block at the bottom
-of the module it exercises, because the tests reach `pub(crate)`/private items an external test crate
-cannot. This file is the index of where those tests are and what they cover.
+The Rust backend has no external integration-test crate. Tests live next to the
+modules they exercise in `#[cfg(test)]` blocks so they can validate private and
+`pub(crate)` behaviour without widening production APIs.
 
-- Total: **449 tests** across **59 files** (all plain `#[test]`; no integration `tests/` crate).
-- Convention: [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md) §10 — colocated, `tempfile::tempdir()`
-  for any filesystem/cache test, never touching real user dirs, registry, network, or installed apps;
-  deterministic and order-independent; every fixed bug gets a failing-before-fix regression test.
+Snapshot: `v0.3.3`.
+
+- Rust: **575 test entries** in **70 source files**; one developer-only timing
+  test is ignored in the normal run.
+- Frontend: **512 Vitest tests** in **71 files**; it is documented here only to
+  distinguish the two suites.
+- Backend tests must be deterministic. Filesystem/cache tests use
+  `tempfile::tempdir()` and never inspect real user directories, registry data,
+  network state, or installed applications.
 
 ## Run
 
-```bash
+```powershell
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-```bash
+```powershell
 cargo test --manifest-path src-tauri/Cargo.toml catalog::dedup::tests
 ```
 
-Second form runs one module's tests (swap the path). Add `--no-fail-fast` to see every failure.
+The second form runs one module's tests. Add `--no-fail-fast` to report every
+failure. The release gate also runs `cargo fmt --check` and Clippy with
+`-D warnings`.
 
-## Catalog — scanning, dedup, classification, cache (`src-tauri/src/catalog/`)
+## Catalog
 
-| File                                                                                     | Tests | What it verifies                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ---------------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`mod.rs`](../../src-tauri/src/catalog/mod.rs)                                           | 75    | Catalog assembly, `sanitize`/`sanitize_reported`, phantom-drop (`target_is_present`), console demotion, portable naming, and the `classify`/`classify_app` category cases (Steam/publisher/install-path/resolved-exe/product-name signals, new categories, false-positive fixes, locale-independent classification).                                                                                                                                                                                                                                |
-| [`dedup/mod.rs`](../../src-tauri/src/catalog/dedup/mod.rs)                               | 70    | Evidence-based merging, `should_merge` thresholds, publisher/version/install-root vetoes, deterministic `canonical_order_key` + fixed-point loop, the differential harness vs a reference resolver and the scale invariant, system-tool aliases (File Explorer, Run dialog, …), cross-artifact-kind merge blocking, and the locale-aware display-name pick (`name_script`/`choose_display_name`).                                                                                                                                                   |
-| [`dedup/merge.rs`](../../src-tauri/src/catalog/dedup/merge.rs)                           | 4     | What a merged card inherits: artifact kind and the reserved `installers_docs` category, non-sticky reasons dropped, and — the rule that keeps registered applications visible — a visibility reason travelling only between records that resolve to the _same_ executable, so a component merged in by product family cannot demote the card while a same-target Apps Folder twin still can.                                                                                                                                                        |
-| [`visibility/mod.rs`](../../src-tauri/src/catalog/visibility/mod.rs)                     | 38    | `classify_visibility` scoring and Primary/Auxiliary/Rejected reason codes: rejection reserved to structural evidence (framework packages, shell-location shortcuts), word-based markers only demoting, uninstall verbs in first name position, maintenance/console/command-environment, product components and architecture stubs, Steam prerequisite depots, dead AutoGenerated Start-Apps, console demotion surviving reclassification, the synthetic fixture corpus, and the foreign-machine corpus that enforces "no word may remove a record". |
-| [`visibility/markers/rules.rs`](../../src-tauri/src/catalog/visibility/markers/rules.rs) | 5     | The needle table as data: no rule can express rejection, a `LocalCorpus` needle's weight is capped by the engine rather than by the table, display vocabulary never does more than force Auxiliary, every rule carries needles.                                                                                                                                                                                                                                                                                                                     |
-| [`visibility/report.rs`](../../src-tauri/src/catalog/visibility/report.rs)               | 1     | Dev-only visibility report shape.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| [`artifact/installer.rs`](../../src-tauri/src/catalog/artifact/installer.rs)             | 13    | Installation-artifact evidence: vendor file names with no location gate, registered `BundleCachePath` bundles, self-extracting stubs by `OriginalFilename`, redistributables, the MySQL/AMD/Windows-SDK corpus cases, the Windows Installer engine, and the counterexamples — uninstall targets, Steam library entries, and products merely _named_ `Uninstall`/`Installer`.                                                                                                                                                                        |
-| [`artifact/documentation.rs`](../../src-tauri/src/catalog/artifact/documentation.rs)     | 6     | Documentation by what a shortcut opens: document extensions and `http(s)` targets (including localized names carrying no en/ru vocabulary), SDK sample folders, the Apps Folder twin of a Start Menu shortcut reaching the same verdict, and package-family Store apps left alone.                                                                                                                                                                                                                                                                  |
-| [`classify/mod.rs`](../../src-tauri/src/catalog/classify/mod.rs)                         | 2     | The `catalog_categories.json` fixture corpus (≥60 labelled records) guards category accuracy; WSL-backed Start Apps are Development.                                                                                                                                                                                                                                                                                                                                                                                                                |
-| [`tree.rs`](../../src-tauri/src/catalog/tree.rs)                                         | 8     | Install-tree dominance: nested executables sharing the publisher above them are components (measured CrystalDiskInfo and Office trees), while a different vendor in a subfolder, an executable naming its own folder — architecture suffix included — a referenced target, a file with no publisher, and same-directory peers are all kept.                                                                                                                                                                                                         |
-| [`place.rs`](../../src-tauri/src/catalog/place.rs)                                       | 3     | Path place classes: a redirected download folder resolved through the shell, Windows' own constants holding without any resolved folder, and a name-alike neighbour not swallowed by a root.                                                                                                                                                                                                                                                                                                                                                        |
-| [`machine.rs`](../../src-tauri/src/catalog/machine.rs)                                   | 2     | Registration lookups compare paths case- and separator-insensitively; an empty registration set claims nothing.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| [`model.rs`](../../src-tauri/src/catalog/model.rs)                                       | 1     | Unknown persisted category/visibility-reason values degrade to `Other`/`Unknown` (serde tolerance) instead of failing the cache.                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| [`storage/cache.rs`](../../src-tauri/src/catalog/storage/cache.rs)                       | 15    | `apps-cache.json` load/store: exact-version load, older-version upgrade including the schema-9 artifact pass, pre-schema array, atomic write + `.bak` recovery, reset leaving preferences intact.                                                                                                                                                                                                                                                                                                                                                   |
-| [`storage/icon_cache.rs`](../../src-tauri/src/catalog/storage/icon_cache.rs)             | 13    | Content-addressed icon storage, key stability, bounded icon reads, superseded-file sweep, clear/rebuild.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| [`details/target.rs`](../../src-tauri/src/catalog/details/target.rs)                     | 6     | Trusted detail/folder targets: UNC and verbatim-path rejection, canonical containment under the Windows root, AUMID entries refused a folder target, missing-root behaviour.                                                                                                                                                                                                                                                                                                                                                                        |
-| [`details/read.rs`](../../src-tauri/src/catalog/details/read.rs)                         | 4     | Local metadata reads: size/dates, packaged executables, non-PE system targets reported as `notApplicable`, unresolved AUMID left unknown.                                                                                                                                                                                                                                                                                                                                                                                                           |
-| [`details/cache.rs`](../../src-tauri/src/catalog/details/cache.rs)                       | 1     | Cached details are reused only for the current file fingerprint.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| [`scan/coordinator.rs`](../../src-tauri/src/catalog/scan/coordinator.rs)                 | 4     | Single scan entry point, coalescing overlapping scans, cancellation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| [`scan/incremental.rs`](../../src-tauri/src/catalog/scan/incremental.rs)                 | 7     | Incremental reuse: unchanged directories skipped, only-changed re-read, bounded work.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| [`scan/hydration.rs`](../../src-tauri/src/catalog/scan/hydration.rs)                     | 6     | Lazy batched icon hydration: bounded patches, visible-first priority.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| [`scan/settings.rs`](../../src-tauri/src/catalog/scan/settings.rs)                       | 2     | Scan-path normalization (absolute, case-insensitive dedupe), include/exclude.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| [`sources/registry.rs`](../../src-tauri/src/catalog/sources/registry.rs)                 | 10    | Uninstall-key parsing into candidates across hives; environment-variable expansion; system-component filtering.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| [`sources/portable.rs`](../../src-tauri/src/catalog/sources/portable.rs)                 | 8     | Portable-executable discovery and exclusions (`.venv`/`site-packages`/driver-staging), product-metadata gating.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| [`sources/start_apps.rs`](../../src-tauri/src/catalog/sources/start_apps.rs)             | 15    | Start Menu / AUMID discovery and target resolution, plus the bounded, killable PowerShell helper (timeout, cancellation, output cap).                                                                                                                                                                                                                                                                                                                                                                                                               |
-| [`sources/installer_cache.rs`](../../src-tauri/src/catalog/sources/installer_cache.rs)   | 3     | The bounded targeted installer-cache source: environment-resolved roots only, executables classified as installers, entry limit marking the snapshot incomplete.                                                                                                                                                                                                                                                                                                                                                                                    |
-| [`sources/steam.rs`](../../src-tauri/src/catalog/sources/steam.rs)                       | 6     | Steam library / manifest parsing into game candidates.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| [`sources/source.rs`](../../src-tauri/src/catalog/sources/source.rs)                     | 2     | `catalog::source` plug-in seam.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| [`sync/document.rs`](../../src-tauri/src/catalog/sync/document.rs)                       | 5     | Sanitized-cache load, stale-uninstall reset, generation-guarded write-back.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| [`sync/mod.rs`](../../src-tauri/src/catalog/sync/mod.rs)                                 | 4     | Post-scan pipeline ordering and per-source snapshot merging.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| [`sync/portable.rs`](../../src-tauri/src/catalog/sync/portable.rs)                       | 5     | Portable-stage assembly: per-root budgets and snapshot retention when a root stops early.                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| [`sync/scan_control.rs`](../../src-tauri/src/catalog/sync/scan_control.rs)               | 5     | Cooperative cancellation: stage deadlines, entry caps, and the stop reason each produces.                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| [`sync/hydration.rs`](../../src-tauri/src/catalog/sync/hydration.rs)                     | 1     | Hydration patch merge preserves existing icons.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+The catalog suite protects source discovery, installer/document separation,
+classification, conservative visibility, duplicate merging, trusted target
+resolution, cache migration, bounded scans, source-snapshot retention, icon
+hydration and deterministic catalog output.
 
-The `dedup/` submodules (`evidence`, `signals`, `family`, `target`, `identity`, `blocking`,
-`candidate`, `arguments`, `display_name`, `report`) carry the implementation; their behavioural tests
-deliberately stayed in `dedup/mod.rs`, where they assert resolved catalogs rather than internals.
-`merge.rs` is the exception: what a merged card inherits is a contract of its own.
+| Module                                                                                           |     Tests |
+| ------------------------------------------------------------------------------------------------ | --------: |
+| [`catalog/mod.rs`](../../src-tauri/src/catalog/mod.rs)                                           |        81 |
+| [`catalog/artifact/documentation.rs`](../../src-tauri/src/catalog/artifact/documentation.rs)     |         6 |
+| [`catalog/artifact/installer.rs`](../../src-tauri/src/catalog/artifact/installer.rs)             |        14 |
+| [`catalog/classify/mod.rs`](../../src-tauri/src/catalog/classify/mod.rs)                         |         7 |
+| [`catalog/dedup/merge.rs`](../../src-tauri/src/catalog/dedup/merge.rs)                           |         4 |
+| [`catalog/dedup/mod.rs`](../../src-tauri/src/catalog/dedup/mod.rs)                               |        72 |
+| [`catalog/details/cache.rs`](../../src-tauri/src/catalog/details/cache.rs)                       |         1 |
+| [`catalog/details/read.rs`](../../src-tauri/src/catalog/details/read.rs)                         |         4 |
+| [`catalog/details/target.rs`](../../src-tauri/src/catalog/details/target.rs)                     |         6 |
+| [`catalog/golden/mod.rs`](../../src-tauri/src/catalog/golden/mod.rs)                             |         5 |
+| [`catalog/golden/properties.rs`](../../src-tauri/src/catalog/golden/properties.rs)               |         7 |
+| [`catalog/golden/timings.rs`](../../src-tauri/src/catalog/golden/timings.rs)                     | 1 ignored |
+| [`catalog/machine.rs`](../../src-tauri/src/catalog/machine.rs)                                   |         2 |
+| [`catalog/model.rs`](../../src-tauri/src/catalog/model.rs)                                       |         1 |
+| [`catalog/place.rs`](../../src-tauri/src/catalog/place.rs)                                       |         3 |
+| [`catalog/scan/coordinator.rs`](../../src-tauri/src/catalog/scan/coordinator.rs)                 |         5 |
+| [`catalog/scan/hydration.rs`](../../src-tauri/src/catalog/scan/hydration.rs)                     |         7 |
+| [`catalog/scan/incremental.rs`](../../src-tauri/src/catalog/scan/incremental.rs)                 |        15 |
+| [`catalog/scan/settings.rs`](../../src-tauri/src/catalog/scan/settings.rs)                       |         2 |
+| [`catalog/sources/installer_cache.rs`](../../src-tauri/src/catalog/sources/installer_cache.rs)   |         3 |
+| [`catalog/sources/portable.rs`](../../src-tauri/src/catalog/sources/portable.rs)                 |         8 |
+| [`catalog/sources/registry.rs`](../../src-tauri/src/catalog/sources/registry.rs)                 |        10 |
+| [`catalog/sources/source.rs`](../../src-tauri/src/catalog/sources/source.rs)                     |         4 |
+| [`catalog/sources/start_apps.rs`](../../src-tauri/src/catalog/sources/start_apps.rs)             |        15 |
+| [`catalog/sources/steam.rs`](../../src-tauri/src/catalog/sources/steam.rs)                       |         7 |
+| [`catalog/storage/cache.rs`](../../src-tauri/src/catalog/storage/cache.rs)                       |        16 |
+| [`catalog/storage/icon_cache.rs`](../../src-tauri/src/catalog/storage/icon_cache.rs)             |        13 |
+| [`catalog/sync/document.rs`](../../src-tauri/src/catalog/sync/document.rs)                       |         5 |
+| [`catalog/sync/hydration.rs`](../../src-tauri/src/catalog/sync/hydration.rs)                     |         1 |
+| [`catalog/sync/mod.rs`](../../src-tauri/src/catalog/sync/mod.rs)                                 |        12 |
+| [`catalog/sync/portable.rs`](../../src-tauri/src/catalog/sync/portable.rs)                       |         6 |
+| [`catalog/sync/scan_control.rs`](../../src-tauri/src/catalog/sync/scan_control.rs)               |         5 |
+| [`catalog/target_availability.rs`](../../src-tauri/src/catalog/target_availability.rs)           |        12 |
+| [`catalog/tree.rs`](../../src-tauri/src/catalog/tree.rs)                                         |         8 |
+| [`catalog/visibility/markers/rules.rs`](../../src-tauri/src/catalog/visibility/markers/rules.rs) |         5 |
+| [`catalog/visibility/mod.rs`](../../src-tauri/src/catalog/visibility/mod.rs)                     |        38 |
+| [`catalog/visibility/report.rs`](../../src-tauri/src/catalog/visibility/report.rs)               |         1 |
 
-Classification support modules without their own `#[cfg(test)]` block — `catalog/fields.rs`,
-`catalog/artifact/mod.rs`, `catalog/visibility/markers/structural.rs` — are exercised through the
-files above, which assert the decisions they feed rather than the predicates in isolation.
+Fixture corpora in `src-tauri/tests/fixtures/` anchor category, visibility and
+foreign-machine decisions. They are regression data, not claims of real-world
+coverage.
 
-## Platform / Windows boundary (`src-tauri/src/platform/windows/`)
+## Windows platform boundary
 
-| File                                                                                                        | Tests | What it verifies                                                                                                                              |
-| ----------------------------------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`uninstall/uninstaller.rs`](../../src-tauri/src/platform/windows/uninstall/uninstaller.rs)                 | 17    | Uninstall mechanism selection (vendor/MSI/MSIX), UNC/network rejection, no recursive deletion.                                                |
-| [`execution/executable_metadata.rs`](../../src-tauri/src/platform/windows/execution/executable_metadata.rs) | 7     | PE version-resource reads: ProductName/OriginalFilename/InternalName, bounded allocation, malformed-PE safety.                                |
-| [`execution/exec_target.rs`](../../src-tauri/src/platform/windows/execution/exec_target.rs)                 | 6     | Launch target from a fixed exe + argument vector; refusal of shell strings, interpreters, UNC.                                                |
-| [`execution/launcher.rs`](../../src-tauri/src/platform/windows/execution/launcher.rs)                       | 5     | Native launch mechanisms dispatch.                                                                                                            |
-| [`icon_extractor.rs`](../../src-tauri/src/platform/windows/icon_extractor.rs)                               | 5     | HICON extraction with RAII guards, missing-icon handling.                                                                                     |
-| [`registry/install_registry.rs`](../../src-tauri/src/platform/windows/registry/install_registry.rs)         | 5     | Installed-product registry reads; stale-copy detection.                                                                                       |
-| [`execution/pe.rs`](../../src-tauri/src/platform/windows/execution/pe.rs)                                   | 3     | PE header parsing: machine type → architecture, console subsystem, malformed/missing files.                                                   |
-| [`execution/folder.rs`](../../src-tauri/src/platform/windows/execution/folder.rs)                           | 3     | Open-folder accepts one existing local directory only; relative, UNC, verbatim, and missing paths refused.                                    |
-| [`uninstall/uninstall_history.rs`](../../src-tauri/src/platform/windows/uninstall/uninstall_history.rs)     | 3     | History ring (newest 100) storing only name/publisher/mechanism/result.                                                                       |
-| [`change_watcher.rs`](../../src-tauri/src/platform/windows/change_watcher.rs)                               | 3     | Filesystem change-watcher lifecycle owned by `AppState`.                                                                                      |
-| [`shortcuts/global_shortcut.rs`](../../src-tauri/src/platform/windows/shortcuts/global_shortcut.rs)         | 3     | `Win+Shift+Q` physical-key binding; the guard owns and joins its thread even when registration fails.                                         |
-| [`drives.rs`](../../src-tauri/src/platform/windows/drives.rs)                                               | 2     | Fixed-drive enumeration; removable/optical/network excluded.                                                                                  |
-| [`execution/signature.rs`](../../src-tauri/src/platform/windows/execution/signature.rs)                     | 1     | Authenticode status mapping distinguishes unsigned files from other verification failures.                                                    |
-| [`known_folders.rs`](../../src-tauri/src/platform/windows/known_folders.rs)                                 | 1     | `SHGetKnownFolderPath` reads resolve without panicking and yield absolute, non-empty paths; asserts shape, never a machine-specific location. |
-| [`registry/registered_targets.rs`](../../src-tauri/src/platform/windows/registry/registered_targets.rs)     | 1     | `App Paths` and `BundleCachePath` reads tolerate missing keys and return trimmed, unquoted values.                                            |
-| [`locale.rs`](../../src-tauri/src/platform/windows/locale.rs)                                               | 1     | OS UI language → script class (`ru-ru`→Cyrillic, `en-us`→Latin) for the locale-aware display name.                                            |
-| [`autostart.rs`](../../src-tauri/src/platform/windows/autostart.rs)                                         | 1     | Launch-at-sign-in registration toggle.                                                                                                        |
+These tests validate the only layer that calls Windows APIs: executable and
+folder target validation, launch/close process identity, PE metadata,
+signatures, icons, registry, startup, drive discovery, global shortcut,
+uninstall and watcher lifecycle.
 
-## Core — state, IPC transport, errors, lifecycle (`src-tauri/src/`)
+| Module                                                                                                                       | Tests |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----: |
+| [`platform/windows/autostart.rs`](../../src-tauri/src/platform/windows/autostart.rs)                                         |     1 |
+| [`platform/windows/change_watcher.rs`](../../src-tauri/src/platform/windows/change_watcher.rs)                               |     3 |
+| [`platform/windows/drives.rs`](../../src-tauri/src/platform/windows/drives.rs)                                               |     2 |
+| [`platform/windows/execution/closer/frames.rs`](../../src-tauri/src/platform/windows/execution/closer/frames.rs)             |     2 |
+| [`platform/windows/execution/closer/identity.rs`](../../src-tauri/src/platform/windows/execution/closer/identity.rs)         |    14 |
+| [`platform/windows/execution/closer/mod.rs`](../../src-tauri/src/platform/windows/execution/closer/mod.rs)                   |    10 |
+| [`platform/windows/execution/closer/processes.rs`](../../src-tauri/src/platform/windows/execution/closer/processes.rs)       |     1 |
+| [`platform/windows/execution/exec_target.rs`](../../src-tauri/src/platform/windows/execution/exec_target.rs)                 |     6 |
+| [`platform/windows/execution/executable_metadata.rs`](../../src-tauri/src/platform/windows/execution/executable_metadata.rs) |     7 |
+| [`platform/windows/execution/folder.rs`](../../src-tauri/src/platform/windows/execution/folder.rs)                           |     3 |
+| [`platform/windows/execution/launcher.rs`](../../src-tauri/src/platform/windows/execution/launcher.rs)                       |     7 |
+| [`platform/windows/execution/pe.rs`](../../src-tauri/src/platform/windows/execution/pe.rs)                                   |     3 |
+| [`platform/windows/execution/protected.rs`](../../src-tauri/src/platform/windows/execution/protected.rs)                     |     8 |
+| [`platform/windows/execution/signature.rs`](../../src-tauri/src/platform/windows/execution/signature.rs)                     |     1 |
+| [`platform/windows/icon_extractor.rs`](../../src-tauri/src/platform/windows/icon_extractor.rs)                               |    14 |
+| [`platform/windows/known_folders.rs`](../../src-tauri/src/platform/windows/known_folders.rs)                                 |     1 |
+| [`platform/windows/locale.rs`](../../src-tauri/src/platform/windows/locale.rs)                                               |     1 |
+| [`platform/windows/registry/install_registry.rs`](../../src-tauri/src/platform/windows/registry/install_registry.rs)         |     5 |
+| [`platform/windows/registry/registered_targets.rs`](../../src-tauri/src/platform/windows/registry/registered_targets.rs)     |     1 |
+| [`platform/windows/registry/uninstall_registry.rs`](../../src-tauri/src/platform/windows/registry/uninstall_registry.rs)     |     2 |
+| [`platform/windows/shortcuts/global_shortcut.rs`](../../src-tauri/src/platform/windows/shortcuts/global_shortcut.rs)         |     3 |
+| [`platform/windows/uninstall/uninstall_history.rs`](../../src-tauri/src/platform/windows/uninstall/uninstall_history.rs)     |     3 |
+| [`platform/windows/uninstall/uninstaller.rs`](../../src-tauri/src/platform/windows/uninstall/uninstaller.rs)                 |    17 |
 
-| File                                                                 | Tests | What it verifies                                                                                                                                                                                               |
-| -------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`app_state.rs`](../../src-tauri/src/app_state.rs)                   | 7     | `AppState` id→target resolution (launch, uninstall, details), app-scoped launch-wait capacity, in-memory detail cache merged into the next catalog write, uninstall-history recording without command details. |
-| [`error.rs`](../../src-tauri/src/error.rs)                           | 6     | `AppError` code ↔ `safe_message` mapping (static, no path/command/registry/username), `From<String>` → `Other`, distinct cancel/coalesce/unavailable/validation/not-found.                                     |
-| [`commands/launch.rs`](../../src-tauri/src/commands/launch.rs)       | 5     | Launch resolves bounded, valid catalog ids through `AppState` only.                                                                                                                                            |
-| [`commands/catalog.rs`](../../src-tauri/src/commands/catalog.rs)     | 4     | Catalog command transport adapters.                                                                                                                                                                            |
-| [`commands/uninstall.rs`](../../src-tauri/src/commands/uninstall.rs) | 4     | Uninstall id validation and preview/target resolution through trusted state.                                                                                                                                   |
-| [`lifecycle/mod.rs`](../../src-tauri/src/lifecycle/mod.rs)           | 3     | App lifecycle wiring, tray/window hide-to-tray, shutdown ownership.                                                                                                                                            |
-| [`commands/details.rs`](../../src-tauri/src/commands/details.rs)     | 1     | Detail and folder commands accept only known, length-bounded ids and refuse a folder for a packaged app.                                                                                                       |
-| [`commands/mod.rs`](../../src-tauri/src/commands/mod.rs)             | 1     | `run_blocking` transport adapter runs work off the calling thread.                                                                                                                                             |
-| [`commands/settings.rs`](../../src-tauri/src/commands/settings.rs)   | 1     | Scan-path normalization at the command boundary.                                                                                                                                                               |
+## Core, IPC and lifecycle
 
-## Fixture corpora
+The core suite checks that webview requests remain ID-only, blocking work leaves
+the IPC caller thread, errors never expose local internals, window close hides
+to tray, autostart hides only after tray setup succeeds, and an exact
+`--autostart` argument is required.
 
-`src-tauri/tests/fixtures/` holds the labelled records the classifiers are held to:
+| Module                                                               | Tests |
+| -------------------------------------------------------------------- | ----: |
+| [`app_state.rs`](../../src-tauri/src/app_state.rs)                   |    11 |
+| [`commands/catalog.rs`](../../src-tauri/src/commands/catalog.rs)     |     5 |
+| [`commands/close.rs`](../../src-tauri/src/commands/close.rs)         |     6 |
+| [`commands/details.rs`](../../src-tauri/src/commands/details.rs)     |     1 |
+| [`commands/launch.rs`](../../src-tauri/src/commands/launch.rs)       |     5 |
+| [`commands/mod.rs`](../../src-tauri/src/commands/mod.rs)             |     1 |
+| [`commands/settings.rs`](../../src-tauri/src/commands/settings.rs)   |     3 |
+| [`commands/uninstall.rs`](../../src-tauri/src/commands/uninstall.rs) |     4 |
+| [`error.rs`](../../src-tauri/src/error.rs)                           |     6 |
+| [`lifecycle/mod.rs`](../../src-tauri/src/lifecycle/mod.rs)           |     6 |
 
-| Fixture                        | Used by             | Purpose                                                                                                                                                                                                                                                              |
-| ------------------------------ | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `catalog_categories.json`      | `classify/mod.rs`   | ≥60 labelled "signals → category" records guarding category accuracy.                                                                                                                                                                                                |
-| `catalog_visibility.json`      | `visibility/mod.rs` | Synthetic visibility corpus, deliberately under 100 entries so it is never presented as real-world validation. Each record also asserts the artifact kind it must carry.                                                                                             |
-| `catalog_foreign_machine.json` | `visibility/mod.rs` | Records from machines this project never inspected — other drive letters, another profile, de/fr/it/pl/pt display names, products named `Total Uninstall`, `Universal USB Installer`, `Windows Sandbox`. Enforces that only structural evidence may remove a record. |
+## Refreshing this map
 
-## Notes
+Run this after backend test changes, then update the affected module count and
+the snapshot totals:
 
-- Counts are `#[test]` functions per file. Modules without a `#[cfg(test)]` block are not listed.
-  Refresh the totals after adding tests (PowerShell, since `rg` is not a project dependency):
+```powershell
+$files = rg -l '^\s*#\[test\]' src-tauri/src -g '*.rs'
+$files | ForEach-Object {
+  $count = (Get-Content $_ | Select-String -Pattern '^\s*#\[test\]').Count
+  "{0}: {1}" -f $_, $count
+}
+"Files: $($files.Count)"
+"Tests: $((rg '^\s*#\[test\]' src-tauri/src -g '*.rs' | Measure-Object).Count)"
+```
 
-    ```powershell
-    Get-ChildItem -Recurse -Filter *.rs src-tauri/src |
-      ForEach-Object { (Get-Content $_.FullName | Select-String -Pattern '^\s*#\[test\]').Count } |
-      Measure-Object -Sum
-    ```
-
-- Frontend tests are separate: `tests/frontend/**` (Vitest, 301 tests across 47 files), run with
-  `npm test`; `npm run test:coverage` adds an lcov report.
-- When you change dedup, visibility, cache schema, category rules, or an IPC contract, extend the
-  fixture-backed tests in the matching file above — do not add a parallel test tree.
+Use `cargo test --manifest-path src-tauri/Cargo.toml` as the execution source
+of truth. Run `npm test` separately for the frontend suite.
