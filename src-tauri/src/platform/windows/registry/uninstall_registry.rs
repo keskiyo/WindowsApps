@@ -13,8 +13,15 @@ pub(crate) struct RegistryEntry {
     pub(crate) system_component: bool,
 }
 
-pub(crate) fn entries() -> Vec<RegistryEntry> {
-    [
+pub(crate) struct RegistryEntries {
+    pub(crate) entries: Vec<RegistryEntry>,
+    pub(crate) complete: bool,
+}
+
+pub(crate) fn entries() -> RegistryEntries {
+    let mut entries = Vec::new();
+    let mut complete = true;
+    for (hive, subkey) in [
         (
             HKEY_LOCAL_MACHINE,
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
@@ -27,20 +34,25 @@ pub(crate) fn entries() -> Vec<RegistryEntry> {
             HKEY_CURRENT_USER,
             r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
         ),
-    ]
-    .into_iter()
-    .flat_map(|(hive, subkey)| entries_from(hive, subkey))
-    .collect()
+    ] {
+        match entries_from(hive, subkey) {
+            Ok(root) => entries.extend(root),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => complete = false,
+        }
+    }
+    RegistryEntries { entries, complete }
 }
 
-fn entries_from(hive: winreg::HKEY, subkey: &str) -> Vec<RegistryEntry> {
-    let Ok(uninstall) = RegKey::predef(hive).open_subkey(subkey) else {
-        return Vec::new();
-    };
-    uninstall
-        .enum_keys()
-        .filter_map(Result::ok)
-        .filter_map(|name| uninstall.open_subkey(name).ok())
+fn entries_from(hive: winreg::HKEY, subkey: &str) -> std::io::Result<Vec<RegistryEntry>> {
+    let uninstall = RegKey::predef(hive).open_subkey(subkey)?;
+    let names = uninstall.enum_keys().collect::<std::io::Result<Vec<_>>>()?;
+    let keys = names
+        .into_iter()
+        .map(|name| uninstall.open_subkey(name))
+        .collect::<std::io::Result<Vec<_>>>()?;
+    Ok(keys
+        .into_iter()
         .filter_map(|key| {
             let display_name = key.get_value("DisplayName").ok()?;
             Some(RegistryEntry {
@@ -57,7 +69,7 @@ fn entries_from(hive: winreg::HKEY, subkey: &str) -> Vec<RegistryEntry> {
                     .is_ok_and(|value| value == 1),
             })
         })
-        .collect()
+        .collect())
 }
 
 #[cfg(test)]
@@ -65,13 +77,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_registry_root_that_cannot_be_opened_yields_no_entries_instead_of_failing() {
-        let entries = entries_from(
+    fn a_missing_registry_root_is_not_a_provider_failure() {
+        let result = entries_from(
             HKEY_CURRENT_USER,
             r"Software\WindowsAppsLauncher\NoSuchUninstallRoot",
         );
 
-        assert!(entries.is_empty());
+        assert!(result.is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound));
     }
 
     #[test]
@@ -79,7 +91,8 @@ mod tests {
         let entries = entries_from(
             HKEY_LOCAL_MACHINE,
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-        );
+        )
+        .unwrap();
 
         assert!(!entries.is_empty());
     }

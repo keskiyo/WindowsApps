@@ -359,6 +359,7 @@ describe('MorePage', () => {
 		const dialog = screen.getByRole('dialog', { name: 'All scenarios' })
 		// The dialog shows the whole list, not the three the card previewed.
 		expect(dialog).toHaveTextContent('Work')
+		expect(dialog.parentElement?.parentElement).toBe(document.body)
 	})
 
 	it('omits the preview list for an empty area', () => {

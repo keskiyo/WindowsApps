@@ -1,5 +1,6 @@
 import { ListChecks, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { sortScenariosByNewest } from '../../../../entities/scenario'
 import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
 import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap'
@@ -38,9 +39,9 @@ export function ScenarioRunDialog({
 		)
 	}
 
-	return (
+	return createPortal(
 		<div
-			className="motion-overlay fixed inset-0 z-500 grid place-items-start justify-center bg-slate-700/40 px-4 pt-[7vh] backdrop-blur-[2px]"
+			className="motion-overlay fixed inset-0 z-500 grid place-items-center bg-slate-700/40 px-4 backdrop-blur-[2px]"
 			onMouseDown={event => {
 				if (event.currentTarget === event.target) onClose()
 			}}
@@ -55,7 +56,7 @@ export function ScenarioRunDialog({
 					event.preventDefault()
 					onClose()
 				}}
-				className="motion-panel flex max-h-[min(48rem,calc(100vh-4rem))] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-(--border-neutral) bg-(--surface-panel) shadow-(--shadow-palette)"
+				className="motion-panel flex max-h-[min(48rem,calc(100vh-4rem))] w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-(--border-neutral) bg-(--surface-panel) shadow-(--shadow-palette)"
 			>
 				<div className="flex items-center gap-3 border-b border-(--border-neutral) px-4 py-3">
 					<ListChecks size={18} aria-hidden="true" />
@@ -96,6 +97,7 @@ export function ScenarioRunDialog({
 					</ul>
 				)}
 			</div>
-		</div>
+		</div>,
+		document.body,
 	)
 }

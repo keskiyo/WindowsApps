@@ -9,7 +9,7 @@ export function AdditionalInformation({
 	details,
 	isLoading,
 	hasKnownPackageInstallLocation,
-	hasResolvedStartAppTarget,
+	hasPackageLaunchTarget,
 }: AdditionalInformationProps) {
 	const [expanded, setExpanded] = useState(false)
 	const contentId = useId()
@@ -49,7 +49,7 @@ export function AdditionalInformation({
 		],
 		['Digital signature', signature(details?.signature, isLoading)],
 		[
-			hasResolvedStartAppTarget
+			hasPackageLaunchTarget
 				? 'Launch target found'
 				: 'Executable found',
 			availability(details?.executableExists, isLoading),

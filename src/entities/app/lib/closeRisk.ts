@@ -31,7 +31,11 @@ const BADGES: Record<string, CloseRiskBadge> = {
 type CloseCandidate = Pick<AppInfo, 'closeRisk'>
 
 export function isCloseBlocked(app: CloseCandidate): boolean {
-	return app.closeRisk === CRITICAL || app.closeRisk === NOT_CLOSABLE
+	return (
+		app.closeRisk === CRITICAL ||
+		app.closeRisk === SESSION ||
+		app.closeRisk === NOT_CLOSABLE
+	)
 }
 
 export function closeBlockedMessage(app: CloseCandidate): string {

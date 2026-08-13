@@ -6,6 +6,7 @@ import {
 import {
 	MAX_SCENARIO_ENTRIES,
 	MAX_SCENARIOS,
+	scenarioAppSnapshot,
 	type Scenario,
 	type ScenarioList,
 } from '../../entities/scenario'
@@ -55,6 +56,12 @@ function oppositeListKey(
 	return list === 'launch' ? 'closeIdentities' : 'launchIdentities'
 }
 
+function snapshotKey(
+	list: ScenarioList,
+): 'launchAppSnapshots' | 'closeAppSnapshots' {
+	return list === 'launch' ? 'launchAppSnapshots' : 'closeAppSnapshots'
+}
+
 export function createScenarioActions({
 	set,
 	get,
@@ -90,6 +97,8 @@ export function createScenarioActions({
 						name: value,
 						launchIdentities: [],
 						closeIdentities: [],
+						launchAppSnapshots: {},
+						closeAppSnapshots: {},
 						createdAt: Date.now(),
 					},
 				],
@@ -130,6 +139,8 @@ export function createScenarioActions({
 		addScenarioApp(id, list, identity) {
 			const key = listKey(list)
 			const oppositeKey = oppositeListKey(list)
+			const snapshotsKey = snapshotKey(list)
+			const app = get().apps.find(entry => appIdentity(entry) === identity)
 			const scenario = get().scenarios.find(entry => entry.id === id)
 			if (!scenario) return { ok: false, error: 'Scenario not found' }
 			if (scenario[key].includes(identity))
@@ -142,23 +153,34 @@ export function createScenarioActions({
 					error: `A list holds at most ${MAX_SCENARIO_ENTRIES} apps`,
 				}
 			if (list === 'close') {
-				const app = get().apps.find(
-					entry => appIdentity(entry) === identity,
-				)
 				if (app && isCloseBlocked(app))
 					return { ok: false, error: closeBlockedMessage(app) }
 			}
 			updateScenario(id, entry => ({
 				...entry,
 				[key]: [...entry[key], identity],
+				...(app
+					? {
+						[snapshotsKey]: {
+							...(entry[snapshotsKey] ?? {}),
+							[identity]: scenarioAppSnapshot(app),
+						},
+					}
+					: {}),
 			}))
 			return { ok: true }
 		},
 		removeScenarioApp(id, list, identity) {
 			const key = listKey(list)
+			const snapshotsKey = snapshotKey(list)
 			updateScenario(id, scenario => ({
 				...scenario,
 				[key]: scenario[key].filter(entry => entry !== identity),
+				[snapshotsKey]: Object.fromEntries(
+					Object.entries(scenario[snapshotsKey] ?? {}).filter(
+						([entry]) => entry !== identity,
+					),
+				),
 			}))
 		},
 	}

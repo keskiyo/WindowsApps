@@ -115,8 +115,7 @@ describe('scenario actions', () => {
 		expect(store.getState().scenarios[0]?.closeIdentities).toEqual([])
 	})
 
-	// Ending the desktop shell is disruptive but recoverable, so it stays the user's decision.
-	it('lets the desktop shell into the close list', async () => {
+	it('refuses a process that would end the desktop session', async () => {
 		const explorer = {
 			id: 'explorer',
 			name: 'Проводник',
@@ -136,7 +135,8 @@ describe('scenario actions', () => {
 		const id = created.ok ? created.id : ''
 
 		expect(store.getState().addScenarioApp(id, 'close', 'explorer')).toEqual({
-			ok: true,
+			ok: false,
+			error: 'Windows cannot survive closing this process, so it cannot go in a close list.',
 		})
 	})
 
@@ -176,6 +176,40 @@ describe('scenario actions', () => {
 		expect(store.getState().scenarios[0]?.launchIdentities).toEqual([])
 		// Removing from one list must not touch the other.
 		expect(store.getState().scenarios[0]?.closeIdentities).toEqual(['app:chat'])
+	})
+
+	it('persists and removes the matching app snapshot', () => {
+		const store = createAppStore(client(), memoryStorage().storage, idFactory)
+		store.setState({
+			apps: [
+				{
+					id: 'chat',
+					name: 'ChatGPT',
+					path: 'C:\\Apps\\ChatGPT.exe',
+					iconBase64: 'data:image/png;base64,AAAA',
+					category: 'ai',
+					sourceKind: 'registry',
+					launchKind: 'executable',
+				} as AppInfo,
+			],
+		})
+		const created = store.getState().createScenario('Gaming')
+		const id = created.ok ? created.id : ''
+
+		expect(store.getState().addScenarioApp(id, 'launch', 'chat')).toEqual({
+			ok: true,
+		})
+		expect(store.getState().scenarios[0]).toMatchObject({
+			launchAppSnapshots: {
+				chat: { name: 'ChatGPT', iconBase64: 'data:image/png;base64,AAAA' },
+			},
+		})
+
+		store.getState().removeScenarioApp(id, 'launch', 'chat')
+		expect(store.getState().scenarios[0]).toMatchObject({
+			launchIdentities: [],
+			launchAppSnapshots: {},
+		})
 	})
 
 	it('reports a duplicate rather than adding the same app twice', () => {
@@ -275,6 +309,8 @@ describe('scenario actions', () => {
 				name: 'Gaming',
 				launchIdentities: [],
 				closeIdentities: ['app:chat'],
+				launchAppSnapshots: {},
+				closeAppSnapshots: {},
 				createdAt: expect.any(Number),
 			},
 		])

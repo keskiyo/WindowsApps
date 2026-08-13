@@ -139,14 +139,8 @@ export function buildAppReport(
 	app: AppInfo,
 	details: AppDetails | null,
 ): string {
-	const hasResolvedStartAppTarget =
-		app.sourceKind === 'start_apps' &&
-		app.launchKind === 'app_user_model_id' &&
-		Boolean(app.resolvedPath?.trim())
-	const targetLabel = hasResolvedStartAppTarget
-		? 'Launch target'
-		: 'Executable'
-	const targetPath = hasResolvedStartAppTarget ? app.resolvedPath : app.path
+	const targetLabel =
+		app.launchKind === 'app_user_model_id' ? 'Launch target' : 'Executable'
 	const fileDetails = details ?? {
 		fileSizeBytes: null,
 		fileCreatedAt: null,
@@ -165,7 +159,7 @@ export function buildAppReport(
 		'',
 		'Installation',
 		`Location: ${app.installLocation ?? 'Not available'}`,
-		`${targetLabel}: ${targetPath}`,
+		`${targetLabel}: ${app.path}`,
 		`${targetLabel} found: ${availabilityLabel(fileDetails.executableExists)}`,
 		`Install location found: ${availabilityLabel(fileDetails.installLocationExists)}`,
 		'',

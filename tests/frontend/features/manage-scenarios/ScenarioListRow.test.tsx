@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ScenarioListRow } from '../../../../src/features/manage-scenarios/ui/ScenarioListRow'
 import type { AppInfo } from '../../../../src/entities/app'
+import type { UnavailableScenarioApp } from '../../../../src/entities/scenario'
 
 function app(value: Partial<AppInfo> & Pick<AppInfo, 'id' | 'name'>): AppInfo {
 	return {
@@ -20,14 +21,18 @@ function app(value: Partial<AppInfo> & Pick<AppInfo, 'id' | 'name'>): AppInfo {
 	}
 }
 
-function renderRow(apps: AppInfo[], onRemove = vi.fn()) {
+function renderRow(
+	apps: AppInfo[],
+	unavailable: UnavailableScenarioApp[] = [],
+	onRemove = vi.fn(),
+) {
 	render(
 		<ScenarioListRow
 			list='launch'
 			label='Launch'
 			scenarioName='Gaming'
 			apps={apps}
-			missing={0}
+			unavailable={unavailable}
 			disabled={false}
 			identityOf={entry => entry.id}
 			onAdd={vi.fn()}
@@ -51,6 +56,30 @@ describe('ScenarioListRow', () => {
 		expect(icon).toHaveAttribute('src', 'data:image/png;base64,AAA')
 		// Decorative: the name is right underneath it, so announcing the image would repeat it.
 		expect(icon).toHaveAccessibleName('')
+	})
+
+	it('names and removes an unavailable snapshot', async () => {
+		const onRemove = vi.fn()
+		const { list } = renderRow(
+			[],
+			[
+				{
+					identity: 'preference:chat',
+					name: 'ChatGPT',
+					iconBase64: 'data:image/png;base64,AAAA',
+				},
+			],
+			onRemove,
+		)
+
+		expect(list).toHaveTextContent('ChatGPT')
+		expect(list).toHaveTextContent('Unavailable')
+		await userEvent.click(
+			screen.getByRole('button', {
+				name: 'Remove ChatGPT from the Launch list of Gaming',
+			}),
+		)
+		expect(onRemove).toHaveBeenCalledWith('launch', 'preference:chat')
 	})
 
 	// An icon alone does not say which app it is, and a tile is too narrow for a long name.

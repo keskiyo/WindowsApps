@@ -162,14 +162,27 @@ describe('ScenarioRunDialog', () => {
 		).toBeDisabled()
 	})
 
-	it('reports entries the catalog no longer has instead of shrinking the list', async () => {
-		renderDialog({ apps: [app('game', 'Backpack Battles')] })
+	it('shows the saved names for entries the catalog no longer has', async () => {
+		renderDialog({
+			apps: [app('game', 'Backpack Battles')],
+			scenarios: [
+				scenario({
+					...gaming,
+					closeAppSnapshots: {
+						chat: { name: 'Chat', iconBase64: null },
+						mail: { name: 'Mail', iconBase64: null },
+					},
+				}),
+			],
+		})
 
 		await userEvent.click(screen.getByRole('button', { expanded: false }))
 
-		expect(
-			screen.getByRole('list', { name: 'Close list of Gaming' }),
-		).toHaveTextContent('2 unavailable')
+		const close = screen.getByRole('list', { name: 'Close list of Gaming' })
+		expect(close).toHaveTextContent('Chat')
+		expect(close).toHaveTextContent('Mail')
+		expect(close).toHaveTextContent('Unavailable')
+		expect(screen.queryByRole('button', { name: /^Remove / })).toBeNull()
 	})
 
 	it('closes on Escape and on the close button', async () => {

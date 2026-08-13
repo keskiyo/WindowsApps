@@ -108,7 +108,7 @@ describe('app store', () => {
 		store.getState().toggleCategory('games')
 
 		const source = JSON.stringify({
-			version: 14,
+			version: 15,
 			favoriteAppIds: ['code'],
 			hiddenAppIds: ['chrome'],
 			importedField: 'kept',
@@ -126,7 +126,7 @@ describe('app store', () => {
 		expect(
 			JSON.parse(store.getState().exportPreferences()),
 		).toMatchObject({
-			version: 14,
+			version: 15,
 			favoriteAppIds: ['code'],
 			hiddenAppIds: ['chrome'],
 			importedField: 'kept',
@@ -156,7 +156,7 @@ describe('app store', () => {
 
 	it('refuses import and restore when local preferences use a newer schema', () => {
 		const future = JSON.stringify({
-			version: 15,
+			version: 16,
 			favoriteAppIds: ['keep'],
 		})
 		const values = new Map<string, string>([

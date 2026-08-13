@@ -1,13 +1,14 @@
 import { Plus } from 'lucide-react'
 import type { ScenarioListRowProps } from '../types'
 import { ScenarioAppTile } from './ScenarioAppTile'
+import { UnavailableScenarioAppTile } from './UnavailableScenarioAppTile'
 
 export function ScenarioListRow({
 	list,
 	label,
 	scenarioName,
 	apps,
-	missing,
+	unavailable,
 	disabled,
 	markOf,
 	onAdd,
@@ -35,11 +36,17 @@ export function ScenarioListRow({
 						}}
 					/>
 				))}
-				{missing > 0 && (
-					<li className="text-xs text-(--text-muted)">
-						{missing} unavailable
-					</li>
-				)}
+				{unavailable.map(entry => (
+					<UnavailableScenarioAppTile
+						key={entry.identity}
+						entry={entry}
+						remove={{
+							label: `Remove ${entry.name} from the ${label} list of ${scenarioName}`,
+							disabled,
+							onRemove: () => onRemove(list, entry.identity),
+						}}
+					/>
+				))}
 			</ul>
 			<button
 				type="button"

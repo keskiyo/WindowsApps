@@ -21,6 +21,7 @@ pub(in crate::catalog) struct RegistryScan {
     pub apps: Vec<AppInfo>,
     pub metadata: Vec<RegistryMetadata>,
     pub stop: Option<StageStop>,
+    pub complete: bool,
 }
 
 pub(in crate::catalog) fn scan(budget: &StageBudget) -> RegistryScan {
@@ -30,10 +31,9 @@ pub(in crate::catalog) fn scan(budget: &StageBudget) -> RegistryScan {
         return result;
     }
     let facts = crate::catalog::machine::MachineFacts::current();
-    for values in uninstall_registry::entries()
-        .into_iter()
-        .map(expand_registry_paths)
-    {
+    let entries = uninstall_registry::entries();
+    result.complete = entries.complete;
+    for values in entries.entries.into_iter().map(expand_registry_paths) {
         if !budget.charge_entry() {
             break;
         }

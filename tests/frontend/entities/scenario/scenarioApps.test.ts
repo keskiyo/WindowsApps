@@ -26,17 +26,34 @@ describe('resolveScenarioApps', () => {
 		const resolved = resolveScenarioApps(['c', 'a'], catalog)
 
 		expect(resolved.apps.map(entry => entry.id)).toEqual(['c', 'a'])
-		expect(resolved.missing).toBe(0)
+		expect(resolved.unavailable).toEqual([])
 	})
 
-	it('counts entries the catalog no longer contains instead of dropping them silently', () => {
+	it('returns last known metadata for entries the catalog no longer contains', () => {
 		const resolved = resolveScenarioApps(
 			['gone', 'a', 'also-gone'],
 			[app({ id: 'a' })],
+			{
+				gone: {
+					name: 'ChatGPT',
+					iconBase64: 'data:image/png;base64,AAAA',
+				},
+			},
 		)
 
 		expect(resolved.apps.map(entry => entry.id)).toEqual(['a'])
-		expect(resolved.missing).toBe(2)
+		expect(resolved.unavailable).toEqual([
+			{
+				identity: 'gone',
+				name: 'ChatGPT',
+				iconBase64: 'data:image/png;base64,AAAA',
+			},
+			{
+				identity: 'also-gone',
+				name: 'Unavailable application',
+				iconBase64: null,
+			},
+		])
 	})
 
 	// The durable key is the preference identity, so a rescan that renames the catalog id must
@@ -49,6 +66,6 @@ describe('resolveScenarioApps', () => {
 		const resolved = resolveScenarioApps(['preference:code'], rescanned)
 
 		expect(resolved.apps.map(entry => entry.id)).toEqual(['code-v2'])
-		expect(resolved.missing).toBe(0)
+		expect(resolved.unavailable).toEqual([])
 	})
 })

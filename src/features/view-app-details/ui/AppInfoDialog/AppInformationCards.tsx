@@ -14,14 +14,8 @@ export function AppInformationCards({
 }: AppInformationCardsProps) {
 	const hasKnownPackageInstallLocation =
 		app.sourceKind === 'msix' && Boolean(app.installLocation?.trim())
-	const hasResolvedStartAppTarget =
-		app.sourceKind === 'start_apps' &&
-		app.launchKind === 'app_user_model_id' &&
-		Boolean(app.resolvedPath?.trim())
-	const targetLabel = hasResolvedStartAppTarget
-		? 'Launch target'
-		: 'Executable'
-	const targetPath = hasResolvedStartAppTarget ? app.resolvedPath : app.path
+	const hasPackageLaunchTarget = app.launchKind === 'app_user_model_id'
+	const targetLabel = hasPackageLaunchTarget ? 'Launch target' : 'Executable'
 	return (
 		<div className="grid gap-3 md:grid-cols-2">
 			<InfoCard icon={Box} title="Application">
@@ -37,7 +31,7 @@ export function AppInformationCards({
 				<DetailRows
 					rows={[
 						['Location', valueOrUnavailable(app.installLocation)],
-						[targetLabel, valueOrUnavailable(targetPath)],
+						[targetLabel, valueOrUnavailable(app.path)],
 						['Launch type', app.launchKind.replace(/_/g, ' ')],
 					]}
 				/>
@@ -55,7 +49,7 @@ export function AppInformationCards({
 									),
 						],
 						[
-							hasResolvedStartAppTarget
+							hasPackageLaunchTarget
 								? 'Launch target found'
 								: 'Executable found',
 							availability(details?.executableExists, isLoading),

@@ -3,8 +3,8 @@ use super::hydration::enqueue_hydration;
 use crate::app_state::{cached_details_for_catalog, remember_catalog, AppState};
 use crate::catalog::cache;
 use crate::catalog::scan_coordinator::{ScanJob, Submission};
-use crate::catalog::sync::{compute_delta, SyncRequest};
-use crate::catalog::{self, AppInfo};
+use crate::catalog::sync::{compute_delta, CatalogDeltaDto, SyncRequest};
+use crate::catalog::{self, AppInfo, CatalogAppDto};
 use crate::error::AppError;
 use tauri::{Emitter, Manager};
 
@@ -38,9 +38,9 @@ fn synchronize_catalog_once(
     document.app_details =
         cached_details_for_catalog(state.inner(), &document.apps, document.app_details);
     let delta = compute_delta(document.generation, &previous.apps, &document.apps);
-    remember_catalog(state.inner(), &document.apps);
     cache::write_document(&app_data_dir, &document)
         .map_err(|error| format!("Could not save the application cache: {error}"))?;
+    remember_catalog(state.inner(), &document.apps);
     let live_ids = document
         .apps
         .iter()
@@ -51,11 +51,16 @@ fn synchronize_catalog_once(
         let _ = app.emit("catalog://diagnostics", diagnostics);
     }
     if delta.summary.added + delta.summary.removed + delta.summary.updated > 0 {
-        let _ = app.emit("catalog://delta", &delta);
+        let _ = app.emit("catalog://delta", CatalogDeltaDto::from(&delta));
         let _ = app.emit("catalog://changed", &delta.summary);
     }
     if job.request.is_interactive() {
-        let _ = app.emit("apps://updated", &document.apps);
+        let apps = document
+            .apps
+            .iter()
+            .map(CatalogAppDto::from)
+            .collect::<Vec<_>>();
+        let _ = app.emit("apps://updated", apps);
     }
     let hydration_ids = if job.request == SyncRequest::Watch {
         delta.upserted.iter().map(|app| app.id.clone()).collect()

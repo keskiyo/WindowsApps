@@ -181,7 +181,7 @@ mod tests {
     }
 
     #[test]
-    fn the_desktop_shell_is_still_closable() {
+    fn a_process_that_would_end_the_desktop_session_is_refused() {
         let mut explorer = cached_app("Проводник", r"C:\Windows\explorer.exe");
         explorer.id = "explorer".into();
         let state = AppState::default();
@@ -189,10 +189,7 @@ mod tests {
 
         let request = resolve_close_targets(&state, vec!["explorer".into()]).unwrap();
 
-        assert_eq!(request.blocked, 0);
-        assert_eq!(
-            executables(&request),
-            vec![PathBuf::from(r"C:\Windows\explorer.exe")]
-        );
+        assert_eq!(request.blocked, 1);
+        assert!(request.targets.is_empty());
     }
 }

@@ -1,8 +1,21 @@
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $workflowPath = Join-Path $repoRoot ".github/workflows/release.yml"
+$verifyWorkflowPath = Join-Path $repoRoot ".github/workflows/verify.yml"
+$securityWorkflowPath = Join-Path $repoRoot ".github/workflows/security-audit.yml"
+$nodeVersionPath = Join-Path $repoRoot ".node-version"
+$rustToolchainPath = Join-Path $repoRoot "rust-toolchain.toml"
 if (-not (Test-Path -LiteralPath $workflowPath)) {
   throw "Release workflow not found: $workflowPath"
+}
+if (-not (Test-Path -LiteralPath $verifyWorkflowPath)) {
+  throw "Verification workflow not found: $verifyWorkflowPath"
+}
+if (-not (Test-Path -LiteralPath $securityWorkflowPath)) {
+  throw "Security workflow not found: $securityWorkflowPath"
+}
+if (-not (Test-Path -LiteralPath $nodeVersionPath) -or -not (Test-Path -LiteralPath $rustToolchainPath)) {
+  throw "Pinned toolchain files are missing"
 }
 $lines = [IO.File]::ReadAllLines($workflowPath)
 $workflowDirectory = Join-Path $repoRoot ".github/workflows"
@@ -74,6 +87,72 @@ foreach ($block in $runBlocks) {
 }
 
 $workflowText = [IO.File]::ReadAllText($workflowPath)
+$verifyWorkflowText = [IO.File]::ReadAllText($verifyWorkflowPath)
+$securityWorkflowText = [IO.File]::ReadAllText($securityWorkflowPath)
+$nodeVersion = [IO.File]::ReadAllText($nodeVersionPath, [Text.Encoding]::UTF8).Trim()
+$rustToolchainText = [IO.File]::ReadAllText($rustToolchainPath, [Text.Encoding]::UTF8)
+if ($nodeVersion -ne "22.22.2") {
+  throw "Pinned Node.js version must be 22.22.2"
+}
+if ($rustToolchainText -notmatch '(?m)^channel\s*=\s*"1\.96\.0"\s*$') {
+  throw "Pinned Rust toolchain must be 1.96.0"
+}
+
+foreach ($workflow in @($workflowText, $verifyWorkflowText, $securityWorkflowText)) {
+  if ($workflow -match "Setup Node.js" -and $workflow -notmatch "node-version-file: '.node-version'") {
+    throw "Node.js workflow setup must read .node-version"
+  }
+}
+
+foreach ($workflow in @($workflowText, $verifyWorkflowText, $securityWorkflowText)) {
+  if ($workflow -match "Setup Rust" -and $workflow -notmatch "toolchain: 1.96.0") {
+    throw "Rust workflow setup must pin 1.96.0"
+  }
+}
+
+if ($verifyWorkflowText -notmatch "toolchain: '1.88.0'") {
+  throw "Verification workflow must retain the declared MSRV"
+}
+
+if ($securityWorkflowText -notmatch "cargo install cargo-audit --version 0.22.2 --locked") {
+  throw "Security workflow must pin cargo-audit 0.22.2"
+}
+
+foreach ($workflowPathToCheck in @($workflowPath, $verifyWorkflowPath)) {
+  $workflowLines = [IO.File]::ReadAllLines($workflowPathToCheck)
+  foreach ($block in @(Get-RunBlock -WorkflowLines $workflowLines)) {
+    if ($block.Body -match '(?m)^\s*cargo (test|clippy|check)\b' -and $block.Body -notmatch '--locked') {
+      throw "Cargo verification command at $workflowPathToCheck line $($block.Line) must use --locked"
+    }
+  }
+}
+
+foreach ($scriptName in @(
+  "scripts/test-verify-updater-signature.ps1",
+  "scripts/test-verify-updater-signature-wrapper.ps1",
+  "scripts/verify-updater-signature.ps1"
+)) {
+  if ($workflowText -notmatch [regex]::Escape($scriptName)) {
+    throw "Release workflow does not run $scriptName"
+  }
+}
+
+foreach ($scriptName in @(
+  "scripts/test-verify-updater-signature.ps1",
+  "scripts/test-verify-updater-signature-wrapper.ps1"
+)) {
+  if ($verifyWorkflowText -notmatch [regex]::Escape($scriptName)) {
+    throw "Verification workflow does not run $scriptName"
+  }
+}
+
+$collectAssetsIndex = $workflowText.IndexOf("Collect signed bundle assets", [StringComparison]::Ordinal)
+$verifySignatureIndex = $workflowText.IndexOf("Verify updater signature", [StringComparison]::Ordinal)
+$prepareManifestIndex = $workflowText.IndexOf("Prepare updater manifest", [StringComparison]::Ordinal)
+if ($collectAssetsIndex -lt 0 -or $verifySignatureIndex -lt $collectAssetsIndex -or $prepareManifestIndex -lt $verifySignatureIndex) {
+  throw "Release workflow does not verify the updater signature before preparing latest.json"
+}
+
 foreach ($name in @('RELEASE_TAG', 'REPOSITORY', 'COMMIT_SHA')) {
   $used = $runBlocks | Where-Object { $_.Body -match "\`$env:$name" }
   if (-not $used) {

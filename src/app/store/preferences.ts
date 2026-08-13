@@ -11,12 +11,14 @@ import {
 	MAX_SCENARIO_HISTORY,
 	MAX_SCENARIOS,
 	type Scenario,
+	type ScenarioAppSnapshot,
+	normalizeScenarioAppSnapshot,
 	type ScenarioRunRecord,
 } from '../../entities/scenario'
 
 export const PREFERENCES_KEY = 'windows-apps.preferences.v1'
 
-export const CURRENT_PREFERENCES_VERSION = 14
+export const CURRENT_PREFERENCES_VERSION = 15
 
 export const PREFERENCES_BACKUP_KEY = 'windows-apps.preferences.v1.bak'
 
@@ -28,8 +30,8 @@ export interface LegacyCanonicalPreferences {
 	categoryOverrides: Record<string, AppCategory>
 }
 
-export interface AppPreferencesV14 {
-	version: 14
+export interface AppPreferencesV15 {
+	version: 15
 	categories: CategoryDefinition[]
 	categoryOrder: AppCategory[]
 	favoriteAppIds: string[]
@@ -56,11 +58,11 @@ export type PreferenceTransferResult =
 	| { ok: false; error: string }
 
 export type PreferenceImportResult =
-	| { ok: true; preferences: AppPreferencesV14 }
+	| { ok: true; preferences: AppPreferencesV15 }
 	| { ok: false; error: string }
 
-export const DEFAULT_PREFERENCES: AppPreferencesV14 = {
-	version: 14,
+export const DEFAULT_PREFERENCES: AppPreferencesV15 = {
+	version: 15,
 	categories: DEFAULT_CATEGORIES.map(category => ({ ...category })),
 	categoryOrder: [...CATEGORY_ORDER],
 	favoriteAppIds: [],
@@ -178,6 +180,20 @@ const KNOWN_PREFERENCE_FIELDS = new Set([
 	'legacyCanonicalPreferences',
 ])
 
+function normalizeScenarioSnapshots(
+	value: unknown,
+	identities: string[],
+): Record<string, ScenarioAppSnapshot> {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+	const snapshots = value as Record<string, unknown>
+	return Object.fromEntries(
+		identities.flatMap(identity => {
+			const snapshot = normalizeScenarioAppSnapshot(snapshots[identity])
+			return snapshot ? [[identity, snapshot]] : []
+		}),
+	)
+}
+
 function normalizeScenarios(value: unknown): Scenario[] {
 	if (!Array.isArray(value)) return []
 	const seenIds = new Set<string>()
@@ -194,13 +210,24 @@ function normalizeScenarios(value: unknown): Scenario[] {
 			0,
 			MAX_SCENARIO_ENTRIES,
 		)
+		const launchAppSnapshots = normalizeScenarioSnapshots(
+			raw.launchAppSnapshots,
+			launchIdentities,
+		)
+		const closeIdentities = uniqueStrings(raw.closeIdentities)
+			.filter(identity => !launchIdentities.includes(identity))
+			.slice(0, MAX_SCENARIO_ENTRIES)
+		const closeAppSnapshots = normalizeScenarioSnapshots(
+			raw.closeAppSnapshots,
+			closeIdentities,
+		)
 		scenarios.push({
 			id,
 			name,
 			launchIdentities,
-			closeIdentities: uniqueStrings(raw.closeIdentities)
-				.filter(identity => !launchIdentities.includes(identity))
-				.slice(0, MAX_SCENARIO_ENTRIES),
+			closeIdentities,
+			launchAppSnapshots,
+			closeAppSnapshots,
 			createdAt:
 				typeof createdAt === 'number' &&
 				Number.isFinite(createdAt) &&
@@ -273,7 +300,7 @@ function normalizeTimestampMap(value: unknown): Record<string, number> {
 	) as Record<string, number>
 }
 
-export function normalizePreferences(value: unknown): AppPreferencesV14 {
+export function normalizePreferences(value: unknown): AppPreferencesV15 {
 	if (!value || typeof value !== 'object')
 		return structuredClone(DEFAULT_PREFERENCES)
 	const raw = value as Record<string, unknown>
@@ -335,7 +362,7 @@ export function normalizePreferences(value: unknown): AppPreferencesV14 {
 		),
 	)
 	return {
-		version: 14,
+		version: 15,
 		categories,
 		categoryOrder,
 		favoriteAppIds: uniqueStrings(raw.favoriteAppIds),
@@ -413,7 +440,7 @@ export function parsePreferenceImport(source: string): PreferenceImportResult {
 	}
 }
 
-export function serializePreferences(preferences: AppPreferencesV14): string {
+export function serializePreferences(preferences: AppPreferencesV15): string {
 	const { unknownFields = {}, ...knownFields } = preferences
 	return JSON.stringify({ ...unknownFields, ...knownFields })
 }
@@ -431,7 +458,7 @@ export function readPreferenceBackup(
 	}
 }
 
-export function readPreferences(storage: Storage): AppPreferencesV14 {
+export function readPreferences(storage: Storage): AppPreferencesV15 {
 	return (
 		readSlot(storage, PREFERENCES_KEY) ??
 		readSlot(storage, PREFERENCES_BACKUP_KEY) ??
@@ -439,7 +466,7 @@ export function readPreferences(storage: Storage): AppPreferencesV14 {
 	)
 }
 
-function readSlot(storage: Storage, key: string): AppPreferencesV14 | null {
+function readSlot(storage: Storage, key: string): AppPreferencesV15 | null {
 	try {
 		const value = storage.getItem(key)
 		return value ? normalizePreferences(JSON.parse(value)) : null
@@ -450,7 +477,7 @@ function readSlot(storage: Storage, key: string): AppPreferencesV14 | null {
 
 export function writePreferences(
 	storage: Storage,
-	preferences: AppPreferencesV14,
+	preferences: AppPreferencesV15,
 ): boolean {
 	if (hasNewerStoredPreferences(storage)) {
 		return true

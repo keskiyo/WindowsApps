@@ -7,6 +7,11 @@ pub(in crate::catalog) struct SteamGame {
     pub install_dir: PathBuf,
 }
 
+pub(in crate::catalog) struct SteamLibraryScan {
+    pub games: Vec<SteamGame>,
+    pub complete: bool,
+}
+
 pub(in crate::catalog) fn parse_library_paths(value: &str) -> Vec<PathBuf> {
     let tokens = quoted_values(value);
     let mut paths = tokens
@@ -54,21 +59,37 @@ fn safe_install_dir(value: &str) -> Option<&str> {
     (!rejected).then_some(value)
 }
 
-pub(in crate::catalog) fn scan_library(library: &Path) -> Vec<SteamGame> {
+pub(in crate::catalog) fn scan_library(library: &Path) -> SteamLibraryScan {
     let Ok(entries) = std::fs::read_dir(library.join("steamapps")) else {
-        return Vec::new();
+        return SteamLibraryScan {
+            games: Vec::new(),
+            complete: false,
+        };
     };
-    entries
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.file_name()
-                .and_then(|value| value.to_str())
-                .is_some_and(|name| name.starts_with("appmanifest_") && name.ends_with(".acf"))
-        })
-        .filter_map(|path| std::fs::read_to_string(path).ok())
-        .filter_map(|value| parse_manifest(&value, library))
-        .collect()
+    let mut games = Vec::new();
+    let mut complete = true;
+    for entry in entries {
+        let Ok(entry) = entry else {
+            complete = false;
+            continue;
+        };
+        let path = entry.path();
+        let is_manifest = path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .is_some_and(|name| name.starts_with("appmanifest_") && name.ends_with(".acf"));
+        if !is_manifest {
+            continue;
+        }
+        match std::fs::read_to_string(path)
+            .ok()
+            .and_then(|value| parse_manifest(&value, library))
+        {
+            Some(game) => games.push(game),
+            None => complete = false,
+        }
+    }
+    SteamLibraryScan { games, complete }
 }
 
 pub(in crate::catalog) fn installed_libraries() -> Vec<PathBuf> {
@@ -199,7 +220,21 @@ mod tests {
 
         let games = scan_library(library.path());
 
-        assert_eq!(games.len(), 1);
-        assert_eq!(games[0].name, "Brotato");
+        assert!(games.complete);
+        assert_eq!(games.games.len(), 1);
+        assert_eq!(games.games[0].name, "Brotato");
+    }
+
+    #[test]
+    fn an_invalid_manifest_marks_the_library_incomplete() {
+        let library = tempfile::tempdir().unwrap();
+        let steamapps = library.path().join("steamapps");
+        std::fs::create_dir_all(&steamapps).unwrap();
+        std::fs::write(steamapps.join("appmanifest_1.acf"), [0xFF]).unwrap();
+
+        let scan = scan_library(library.path());
+
+        assert!(!scan.complete);
+        assert!(scan.games.is_empty());
     }
 }

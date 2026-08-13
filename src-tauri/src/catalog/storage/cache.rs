@@ -201,9 +201,6 @@ pub(crate) fn write_document(app_data_dir: &Path, document: &CatalogCache) -> io
         }
         return Err(error);
     }
-    if backup.exists() {
-        fs::remove_file(backup)?;
-    }
     Ok(())
 }
 
@@ -267,6 +264,32 @@ mod tests {
         .unwrap();
 
         assert_eq!(read_document(dir.path()).unwrap().generation, 11);
+    }
+
+    #[test]
+    fn retains_the_previous_valid_cache_as_a_backup_after_replacement() {
+        let dir = tempfile::tempdir().unwrap();
+        write_document(
+            dir.path(),
+            &CatalogCache {
+                generation: 1,
+                ..CatalogCache::default()
+            },
+        )
+        .unwrap();
+        write_document(
+            dir.path(),
+            &CatalogCache {
+                generation: 2,
+                ..CatalogCache::default()
+            },
+        )
+        .unwrap();
+
+        let backup = fs::read(dir.path().join("apps-cache.json.bak")).unwrap();
+
+        assert_eq!(read_document(dir.path()).unwrap().generation, 2);
+        assert_eq!(parse_document(&backup).unwrap().generation, 1);
     }
 
     #[test]

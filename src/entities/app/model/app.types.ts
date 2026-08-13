@@ -45,9 +45,7 @@ export interface AppInfo {
 	productName?: string | null
 	originalFilename?: string | null
 	installLocation: string | null
-	resolvedPath?: string | null
 	canUninstall: boolean
-	launchArguments?: string | null
 	canonicalIdentity?: string | null
 	preferenceIdentity?: string | null
 	userPromoted?: boolean

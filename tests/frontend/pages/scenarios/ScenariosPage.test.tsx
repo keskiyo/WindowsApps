@@ -328,7 +328,7 @@ describe('ScenariosPage', () => {
 	})
 
 	// An entry that stopped resolving must be visible, not quietly gone.
-	it('reports entries the catalog no longer has', () => {
+	it('shows a removable fallback for a legacy unavailable entry', () => {
 		render(
 			<ScenariosPage
 				{...props([
@@ -337,9 +337,14 @@ describe('ScenariosPage', () => {
 			/>,
 		)
 
+		const list = screen.getByRole('list', { name: 'Launch list of Gaming' })
+		expect(list).toHaveTextContent('Unavailable application')
+		expect(list).toHaveTextContent('Unavailable')
 		expect(
-			screen.getByRole('list', { name: 'Launch list of Gaming' }),
-		).toHaveTextContent('1 unavailable')
+			screen.getByRole('button', {
+				name: 'Remove Unavailable application from the Launch list of Gaming',
+			}),
+		).toBeEnabled()
 	})
 
 	it('stars a scenario and reports the one already starred', async () => {

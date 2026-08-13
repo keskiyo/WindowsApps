@@ -73,6 +73,21 @@ project links, update release links, and stale-copy handling. Commands return
 safe messages. Internal paths, commands, registry values and upstream errors
 never reach the webview.
 
+Scenario close actions accept catalog IDs only. The trusted catalog classifies
+close targets; only `Safe` targets may be added or executed. Critical Windows
+processes and session components are counted as blocked rather than terminated.
+
+The native logger starts before application setup and retains `Info`-level
+production diagnostics in Tauri's platform log directory. A root React error
+boundary replaces render failures with a static recovery screen; exception
+details are not displayed in the webview.
+
+Catalog reads, refreshes and catalog-update events use a display DTO. The DTO
+excludes uninstall targets and arguments, launch arguments, resolved execution
+targets and shortcut icon paths. Rust retains those values only in the catalog
+cache and trusted `AppState`; every native action still resolves the catalog ID
+there. Display paths can be shown to the user but never return as action input.
+
 IPC changes update all of these together:
 
 1. Rust request/response type and `#[serde(rename_all = "camelCase")]`;
@@ -103,9 +118,14 @@ one-step backup. A document written by a newer preference schema is never
 overwritten. Import and local-backup restore reject unsupported/newer documents
 and also refuse replacement when the installed app is older than the current
 local schema. Export contains preference-backed data only: never the catalog
-cache, executable paths, icons, or scan folders.
+cache, executable paths, catalog icons, or scan folders. Each Scenario also
+retains a bounded 32 KiB name/icon snapshot per app identity so unavailable
+entries remain identifiable and removable; it is presentation data, never a
+launch target.
 
-Catalog writes retain the only known-good cache until a replacement validates.
+Catalog writes retain the previous known-good cache as `apps-cache.json.bak` after
+an atomic replacement. In-memory catalog state updates only after the replacement
+write succeeds.
 Cache/index and generated icons are separate; clearing icons does not remove the
 catalog, and resetting the catalog does not remove user preferences.
 
@@ -241,7 +261,11 @@ cargo test --manifest-path src-tauri/Cargo.toml
 - backend: tests on `windows-latest` and `windows-2022`, plus format and Clippy;
 - MSRV: compile at the `rust-version` declared in `src-tauri/Cargo.toml`;
 - contracts: frontend/platform boundaries, release-script tests and dependency
-  audit gates.
+  audit gates, including updater-signature fixtures.
+
+Node.js `22.22.2` and Rust `1.96.0` are pinned in `.node-version` and
+`rust-toolchain.toml`. Cargo verification uses `--locked`; the separate MSRV
+job builds with Rust `1.88.0`.
 
 Runtime `npm audit --omit=dev --audit-level=high` admits no exceptions. High or
 critical development-only advisories require dated entries in
@@ -250,8 +274,11 @@ critical development-only advisories require dated entries in
 Release is tag-only: a `v*` tag on the exact `master` SHA triggers
 `release.yml`. Version values must agree across npm/Cargo manifests, lockfiles
 and `tauri.conf.json`. The release workflow reruns critical gates, builds and
-signs the NSIS bundle, creates/verifies `latest.json`, then publishes the draft.
-Published tags are immutable; corrections use a new patch version.
+signs the NSIS bundle, verifies its detached updater signature against the
+configured public key, creates/verifies `latest.json`, then publishes the draft.
+Published tags are immutable; corrections use a new patch version. The project
+source is MIT-licensed; third-party notices are recorded in
+`THIRD_PARTY_NOTICES.md`.
 
 ## 17. Troubleshooting
 

@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.3"><img src="https://img.shields.io/badge/version-0.3.3-7C3AED?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.4"><img src="https://img.shields.io/badge/version-0.3.4-7C3AED?style=flat-square" alt="Version"></a>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows">
   <img src="https://img.shields.io/badge/architecture-x64-334155?style=flat-square" alt="Architecture">
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri">
@@ -93,7 +93,7 @@ Everyday settings stay visible. Scanning, backups and maintenance live under Adv
 
 ## Install
 
-1. Download [**`Windows.Apps_0.3.3_x64-setup.exe`**](https://github.com/keskiyo/WindowsApps/releases/latest).
+1. Download [**`Windows.Apps_0.3.4_x64-setup.exe`**](https://github.com/keskiyo/WindowsApps/releases/latest).
 2. Run the installer.
 3. Start Windows Apps and choose **Scan for apps**.
 
@@ -112,7 +112,7 @@ Everyday settings stay visible. Scanning, backups and maintenance live under Adv
 
 Windows Apps is local-first. It has no telemetry, cloud account, application-inventory uploads or online metadata enrichment; catalog data remains on your machine.
 
-For implementation and security details, see [Technical Documentation](Documentation.md#13-privacy-and-security).
+For implementation and security details, see [Technical Documentation](Documentation.md#13-privacy-and-security). Windows Apps is available under the [MIT License](LICENSE).
 
 ## Known limitations
 

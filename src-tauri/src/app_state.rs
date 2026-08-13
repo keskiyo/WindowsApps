@@ -168,7 +168,7 @@ pub(crate) fn remember_close_targets(state: &AppState, apps: &[AppInfo]) {
         .filter_map(|app| {
             let path = catalog::close_target_of(app)?;
             let blocked = crate::platform::windows::close_risk(Path::new(&path))
-                == crate::platform::windows::CloseRisk::Critical;
+                != crate::platform::windows::CloseRisk::Safe;
             Some((
                 app.id.clone(),
                 CloseTarget {
@@ -411,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    fn a_process_that_would_end_windows_is_remembered_as_blocked() {
+    fn processes_that_would_end_windows_or_the_desktop_session_are_remembered_as_blocked() {
         let mut security = cached_app("Local Security Authority", r"C:\Windows\System32\lsass.exe");
         security.id = "lsass".into();
         let mut explorer = cached_app("Проводник", r"C:\Windows\explorer.exe");
@@ -424,7 +424,7 @@ mod tests {
 
         let stored = state.close_targets.lock().unwrap();
         assert!(stored.get("lsass").unwrap().blocked);
-        assert!(!stored.get("explorer").unwrap().blocked);
+        assert!(stored.get("explorer").unwrap().blocked);
         assert!(!stored.get("editor").unwrap().blocked);
     }
 

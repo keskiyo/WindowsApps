@@ -1,5 +1,9 @@
 import type { AppInfo, CloseRiskBadge } from '../../entities/app'
-import type { Scenario, ScenarioList } from '../../entities/scenario'
+import type {
+	Scenario,
+	ScenarioList,
+	UnavailableScenarioApp,
+} from '../../entities/scenario'
 
 export type ScenarioNameResult = { ok: true } | { ok: false; error: string }
 
@@ -29,6 +33,11 @@ export interface ScenarioAppTileProps {
 	mark?: CloseRiskMark | null
 }
 
+export interface UnavailableScenarioAppTileProps {
+	entry: UnavailableScenarioApp
+	remove?: { label: string; disabled: boolean; onRemove(): void }
+}
+
 export interface ScenarioCardProps {
 	scenario: Scenario
 	apps: AppInfo[]
@@ -53,7 +62,7 @@ export interface ScenarioListRowProps {
 	label: string
 	scenarioName: string
 	apps: AppInfo[]
-	missing: number
+	unavailable: UnavailableScenarioApp[]
 	disabled: boolean
 	markOf?(app: AppInfo): CloseRiskMark | null
 	onAdd(list: ScenarioList): void

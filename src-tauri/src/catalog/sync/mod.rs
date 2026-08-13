@@ -18,7 +18,7 @@ use crate::catalog::source::{
     SourceSnapshot,
 };
 use crate::catalog::sync::scan_control::ScanControl;
-use crate::catalog::{self, AppInfo, ScanProgress};
+use crate::catalog::{self, AppInfo, CatalogAppDto, ScanProgress};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -55,13 +55,32 @@ pub(crate) struct CatalogChangeSummary {
     pub updated: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct CatalogDelta {
     pub generation: u64,
     pub upserted: Vec<AppInfo>,
     pub removed_ids: Vec<String>,
     pub summary: CatalogChangeSummary,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CatalogDeltaDto {
+    generation: u64,
+    upserted: Vec<CatalogAppDto>,
+    removed_ids: Vec<String>,
+    summary: CatalogChangeSummary,
+}
+
+impl From<&CatalogDelta> for CatalogDeltaDto {
+    fn from(delta: &CatalogDelta) -> Self {
+        Self {
+            generation: delta.generation,
+            upserted: delta.upserted.iter().map(CatalogAppDto::from).collect(),
+            removed_ids: delta.removed_ids.clone(),
+            summary: delta.summary.clone(),
+        }
+    }
 }
 
 pub(crate) fn compute_delta(
@@ -136,6 +155,7 @@ fn source_health(
         .iter()
         .find(|snapshot| snapshot.key == key)
         .map_or(0, |snapshot| snapshot.apps.len());
+    let replaced = outcome.replaced && outcome.stop.is_none();
 
     let state = if completed {
         SourceHealthState::Fresh
@@ -169,11 +189,7 @@ fn source_health(
                 .map(SourceErrorKind::from)
                 .or(Some(SourceErrorKind::ProviderFailed))
         },
-        record_count: if outcome.replaced {
-            outcome.records
-        } else {
-            served
-        },
+        record_count: if replaced { outcome.records } else { served },
         key,
     }
 }
@@ -198,22 +214,24 @@ pub(crate) fn synchronize(
 
     let registry_at = Instant::now();
     let registry = catalog::scan_registry(&control);
+    let registry_replaced = registry.stop.is_none() && registry.complete;
     outcomes.push(SourceOutcome {
         key: catalog::source::REGISTRY_SOURCE,
         stop: registry.stop,
-        answered: true,
-        replaced: registry.stop.is_none(),
+        answered: registry.complete,
+        replaced: registry_replaced,
         records: registry.apps.len(),
         duration: registry_at.elapsed(),
     });
 
     let start_menu_at = Instant::now();
     let start_menu = catalog::scan_start_menu(&control);
+    let start_menu_replaced = start_menu.stop.is_none() && start_menu.complete;
     outcomes.push(SourceOutcome {
         key: catalog::source::START_MENU_SOURCE,
         stop: start_menu.stop,
-        answered: true,
-        replaced: start_menu.stop.is_none(),
+        answered: start_menu.complete,
+        replaced: start_menu_replaced,
         records: start_menu.apps.len(),
         duration: start_menu_at.elapsed(),
     });
@@ -263,6 +281,7 @@ pub(crate) fn synchronize(
     let libraries = catalog::steam::installed_libraries();
     let mut steam_apps = Vec::new();
     let mut steam_cancelled = false;
+    let mut steam_complete = true;
     progress(ScanProgress {
         stage: "Steam libraries".into(),
         location: None,
@@ -274,11 +293,9 @@ pub(crate) fn synchronize(
             steam_cancelled = true;
             break;
         }
-        steam_apps.extend(
-            catalog::steam::scan_library(library)
-                .into_iter()
-                .map(catalog::steam_app),
-        );
+        let scan = catalog::steam::scan_library(library);
+        steam_complete &= scan.complete;
+        steam_apps.extend(scan.games.into_iter().map(catalog::steam_app));
         progress(ScanProgress {
             stage: "Steam libraries".into(),
             location: Some(library.to_string_lossy().into_owned()),
@@ -286,11 +303,12 @@ pub(crate) fn synchronize(
             total_roots: libraries.len(),
         });
     }
+    let steam_replaced = !steam_cancelled && steam_complete;
     outcomes.push(SourceOutcome {
         key: "steam",
         stop: steam_cancelled.then_some(scan_control::StageStop::Cancelled),
-        answered: true,
-        replaced: true,
+        answered: steam_complete,
+        replaced: steam_replaced,
         records: steam_apps.len(),
         duration: steam_at.elapsed(),
     });
@@ -340,30 +358,34 @@ pub(crate) fn synchronize(
         &progress,
         &is_cancelled,
     );
+    let portable_replaced = portable.stop.is_none();
     outcomes.push(SourceOutcome {
         key: "portable",
         stop: portable.stop,
         answered: true,
-        replaced: true,
+        replaced: portable_replaced,
         records: portable.apps.len(),
         duration: portable_at.elapsed(),
     });
 
-    let mut updates = vec![
-        SourceSnapshot {
+    let mut updates = Vec::new();
+    if steam_replaced {
+        updates.push(SourceSnapshot {
             key: SourceKey("steam".into()),
             fingerprint: None,
             health: None,
             apps: steam_apps,
-        },
-        SourceSnapshot {
+        });
+    }
+    if portable_replaced {
+        updates.push(SourceSnapshot {
             key: SourceKey("portable".into()),
             fingerprint: None,
             health: None,
             apps: portable.apps,
-        },
-    ];
-    if registry.stop.is_none() {
+        });
+    }
+    if registry_replaced {
         updates.push(SourceSnapshot {
             key: SourceKey(catalog::source::REGISTRY_SOURCE.into()),
             fingerprint: None,
@@ -371,7 +393,7 @@ pub(crate) fn synchronize(
             apps: registry.apps,
         });
     }
-    if start_menu.stop.is_none() {
+    if start_menu_replaced {
         updates.push(SourceSnapshot {
             key: SourceKey(catalog::source::START_MENU_SOURCE.into()),
             fingerprint: None,
@@ -403,7 +425,9 @@ pub(crate) fn synchronize(
     let mut sources = merged.sources;
     apply_health(&mut sources, health.clone());
     let mut apps = merged.apps;
-    catalog::attach_registry_metadata(&mut apps, &registry.metadata);
+    if registry_replaced {
+        catalog::attach_registry_metadata(&mut apps, &registry.metadata);
+    }
     let target_availability = catalog::retain_present_targets(&mut apps, settings);
     apps = catalog::sanitize_reported(apps);
     catalog::demote_console_applications(&mut apps);
@@ -450,7 +474,11 @@ pub(crate) fn synchronize(
         generation: previous.generation.saturating_add(1),
         apps,
         sources,
-        filesystem_index: portable.filesystem_index,
+        filesystem_index: if portable_replaced {
+            portable.filesystem_index
+        } else {
+            previous.filesystem_index.clone()
+        },
         last_successful_sync: Some(completed_at),
         diagnostics: Some(diagnostics),
         app_details,
@@ -462,7 +490,7 @@ mod tests {
     use super::*;
     use crate::catalog::sync::scan_control::StageStop;
     use crate::catalog::StartMenuScan;
-    use crate::catalog::{AppCategory, AppInfo, LaunchKind, SourceKind};
+    use crate::catalog::{AppCategory, AppInfo, LaunchKind, SourceKind, UninstallTarget};
 
     const NOW: u64 = 1_700_000_000;
 
@@ -550,6 +578,31 @@ mod tests {
     }
 
     #[test]
+    fn a_cancelled_steam_scan_keeps_the_previous_record_count() {
+        let previous = vec![SourceSnapshot {
+            key: SourceKey("steam".into()),
+            fingerprint: None,
+            apps: (0..3)
+                .map(|index| app(&format!("app-{index}"), "Served"))
+                .collect(),
+            health: Some(healthy(NOW - 500, 0)),
+        }];
+        let outcome = SourceOutcome {
+            key: "steam",
+            stop: Some(StageStop::Cancelled),
+            answered: true,
+            replaced: true,
+            records: 1,
+            duration: Duration::from_millis(12),
+        };
+
+        let health = source_health(&previous, outcome, NOW);
+
+        assert_eq!(health.state, SourceHealthState::Incomplete);
+        assert_eq!(health.record_count, 3);
+    }
+
+    #[test]
     fn cancellation_does_not_count_as_a_failure() {
         let previous = served(3, Some(healthy(NOW - 500, 2)));
 
@@ -618,6 +671,37 @@ mod tests {
     }
 
     #[test]
+    fn catalog_delta_excludes_execution_metadata_from_webview_json() {
+        let mut current = app("editor", "Editor");
+        current.uninstall = Some(UninstallTarget::Command {
+            executable: "TOP_SECRET_DELTA_UNINSTALL_EXECUTABLE".into(),
+            arguments: "TOP_SECRET_DELTA_UNINSTALL_ARGUMENTS".into(),
+        });
+        current.launch_arguments = Some("TOP_SECRET_DELTA_LAUNCH_ARGUMENTS".into());
+        current.resolved_path = Some("TOP_SECRET_DELTA_RESOLVED_TARGET".into());
+        current.shortcut_icon_path = Some("TOP_SECRET_DELTA_SHORTCUT_ICON".into());
+
+        let delta = compute_delta(1, &[], &[current]);
+        let json = serde_json::to_value(CatalogDeltaDto::from(&delta)).unwrap();
+        let serialized = json.to_string();
+
+        for secret in [
+            "TOP_SECRET_DELTA_UNINSTALL_EXECUTABLE",
+            "TOP_SECRET_DELTA_UNINSTALL_ARGUMENTS",
+            "TOP_SECRET_DELTA_LAUNCH_ARGUMENTS",
+            "TOP_SECRET_DELTA_RESOLVED_TARGET",
+            "TOP_SECRET_DELTA_SHORTCUT_ICON",
+        ] {
+            assert!(!serialized.contains(secret));
+        }
+        let app = &json["upserted"][0];
+        assert!(app.get("uninstall").is_none());
+        assert!(app.get("launchArguments").is_none());
+        assert!(app.get("resolvedPath").is_none());
+        assert!(app.get("shortcutIconPath").is_none());
+    }
+
+    #[test]
     fn a_cancelled_scan_reports_windows_sources_as_incomplete_not_empty() {
         let cancelled = || true;
         let control = ScanControl::new(&cancelled);
@@ -644,6 +728,7 @@ mod tests {
         let incomplete = StartMenuScan {
             apps: Vec::new(),
             stop: Some(StageStop::TimedOut),
+            complete: false,
         };
 
         let mut updates = Vec::new();

@@ -28,10 +28,7 @@ export function AppInfoDialog({
 	const actions = useAppInfoActions({ app, details, appsClient })
 	const hasKnownPackageInstallLocation =
 		app.sourceKind === 'msix' && Boolean(app.installLocation?.trim())
-	const hasResolvedStartAppTarget =
-		app.sourceKind === 'start_apps' &&
-		app.launchKind === 'app_user_model_id' &&
-		Boolean(app.resolvedPath?.trim())
+	const hasPackageLaunchTarget = app.launchKind === 'app_user_model_id'
 	useEffect(() => {
 		closeButton?.focus()
 		function keydown(event: KeyboardEvent) {
@@ -98,7 +95,7 @@ export function AppInfoDialog({
 						hasKnownPackageInstallLocation={
 							hasKnownPackageInstallLocation
 						}
-						hasResolvedStartAppTarget={hasResolvedStartAppTarget}
+						hasPackageLaunchTarget={hasPackageLaunchTarget}
 					/>
 				</div>
 			</section>

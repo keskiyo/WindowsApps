@@ -22,7 +22,7 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
               with:
-                  node-version: '22'
+                  node-version-file: '.node-version'
                   cache: npm
 
             - name: Install dependencies
@@ -60,7 +60,7 @@ jobs:
             - name: Setup Rust
               uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
               with:
-                  toolchain: stable
+                  toolchain: 1.96.0
                   targets: x86_64-pc-windows-msvc
                   components: clippy, rustfmt
 
@@ -70,7 +70,7 @@ jobs:
 
             - name: Lint
               if: matrix.os == 'windows-latest'
-              run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+              run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
             # Split so a failure names its own cause. The first covers the pure decision layers and
             # the filesystem walks; the second is the only module that starts an external process,
@@ -78,10 +78,10 @@ jobs:
             # required: the hosted Windows images do ship PowerShell, so these are not flaky tests
             # to be excused with `continue-on-error`.
             - name: Test catalog and platform
-              run: cargo test --manifest-path src-tauri/Cargo.toml -- --skip catalog::sources::start_apps::tests
+              run: cargo test --locked --manifest-path src-tauri/Cargo.toml -- --skip catalog::sources::start_apps::tests
 
             - name: Test PowerShell-backed source
-              run: cargo test --manifest-path src-tauri/Cargo.toml catalog::sources::start_apps::tests
+              run: cargo test --locked --manifest-path src-tauri/Cargo.toml catalog::sources::start_apps::tests
 
     msrv:
         name: MSRV
@@ -108,7 +108,7 @@ jobs:
                   }
 
             - name: Build at the declared MSRV
-              run: cargo check --manifest-path src-tauri/Cargo.toml --all-targets
+              run: cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
 
     contracts:
         name: Boundaries and release contract
@@ -122,11 +122,17 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
               with:
-                  node-version: '22'
+                  node-version-file: '.node-version'
                   cache: npm
 
             - name: Install dependencies
               run: npm ci
+
+            - name: Setup Rust
+              uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+              with:
+                  toolchain: 1.96.0
+                  targets: x86_64-pc-windows-msvc
 
             - name: Verify frontend dependency boundaries
               shell: pwsh
@@ -151,6 +157,14 @@ jobs:
             - name: Test release notes preparation
               shell: pwsh
               run: powershell -NoProfile -File scripts/test-release-notes.ps1
+
+            - name: Test updater signature verification
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-verify-updater-signature.ps1
+
+            - name: Test updater signature verification wrapper
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-verify-updater-signature-wrapper.ps1
 
             - name: Test npm audit triage gate
               shell: pwsh

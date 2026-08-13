@@ -14,7 +14,7 @@ export interface AdditionalInformationProps {
 	details: AppDetails | null
 	isLoading: boolean
 	hasKnownPackageInstallLocation: boolean
-	hasResolvedStartAppTarget: boolean
+	hasPackageLaunchTarget: boolean
 }
 
 export interface AppIdentityHeaderProps {

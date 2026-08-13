@@ -21,6 +21,12 @@ struct State<T> {
     pending: Option<Pending<T>>,
 }
 
+#[cfg(test)]
+struct CompletionPause {
+    entered: mpsc::Sender<()>,
+    resume: mpsc::Receiver<()>,
+}
+
 struct Active<T> {
     request: SyncRequest,
     cancelled: Arc<AtomicBool>,
@@ -38,6 +44,8 @@ pub(crate) enum Submission<T> {
 
 pub(crate) struct ScanCoordinator<T> {
     state: Mutex<State<T>>,
+    #[cfg(test)]
+    completion_pause: Mutex<Option<CompletionPause>>,
 }
 
 impl<T: Clone> Default for ScanCoordinator<T> {
@@ -47,6 +55,8 @@ impl<T: Clone> Default for ScanCoordinator<T> {
                 active: None,
                 pending: None,
             }),
+            #[cfg(test)]
+            completion_pause: Mutex::new(None),
         }
     }
 }
@@ -115,10 +125,12 @@ impl<T: Clone> ScanCoordinator<T> {
     }
 
     pub(crate) fn complete(&self, job: ScanJob<T>, result: ScanResult<T>) -> Option<ScanJob<T>> {
+        let mut state = self.state.lock().expect("scan coordinator poisoned");
         for waiter in job.waiters.lock().expect("scan waiters poisoned").drain(..) {
             let _ = waiter.send(result.clone());
         }
-        let mut state = self.state.lock().expect("scan coordinator poisoned");
+        #[cfg(test)]
+        self.pause_after_waiters_are_drained();
         state.active = None;
         let pending = state.pending.take()?;
         let cancelled = Arc::new(AtomicBool::new(false));
@@ -133,6 +145,34 @@ impl<T: Clone> ScanCoordinator<T> {
             cancelled,
             waiters,
         })
+    }
+
+    #[cfg(test)]
+    fn pause_after_waiters_are_drained_for_test(&self) -> (mpsc::Receiver<()>, mpsc::Sender<()>) {
+        let (entered_sender, entered_receiver) = mpsc::channel();
+        let (resume_sender, resume_receiver) = mpsc::channel();
+        *self
+            .completion_pause
+            .lock()
+            .expect("completion pause poisoned") = Some(CompletionPause {
+            entered: entered_sender,
+            resume: resume_receiver,
+        });
+        (entered_receiver, resume_sender)
+    }
+
+    #[cfg(test)]
+    fn pause_after_waiters_are_drained(&self) {
+        let Some(pause) = self
+            .completion_pause
+            .lock()
+            .expect("completion pause poisoned")
+            .take()
+        else {
+            return;
+        };
+        let _ = pause.entered.send(());
+        let _ = pause.resume.recv();
     }
 
     pub(crate) fn cancel_all(&self) {
@@ -167,6 +207,32 @@ fn merge_pending<T>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
+    use std::time::Duration;
+
+    #[test]
+    fn completion_keeps_the_state_locked_while_finishing_waiters() {
+        let coordinator = Arc::new(ScanCoordinator::<u32>::default());
+        let Submission::Start { job, .. } = coordinator.submit(SyncRequest::Refresh, false) else {
+            panic!("refresh should start");
+        };
+        let (entered, resume) = coordinator.pause_after_waiters_are_drained_for_test();
+        let completing = {
+            let coordinator = Arc::clone(&coordinator);
+            thread::spawn(move || coordinator.complete(job, Ok(7)))
+        };
+
+        entered
+            .recv_timeout(Duration::from_secs(1))
+            .expect("completion should pause after draining waiters");
+        let state_is_locked = coordinator.state.try_lock().is_err();
+        resume.send(()).expect("completion should still be waiting");
+        assert!(completing
+            .join()
+            .expect("completion should not panic")
+            .is_none());
+        assert!(state_is_locked);
+    }
 
     #[test]
     fn interactive_refresh_cancels_background_scan_and_runs_next() {

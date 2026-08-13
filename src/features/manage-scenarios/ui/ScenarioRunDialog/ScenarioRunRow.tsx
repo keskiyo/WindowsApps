@@ -14,8 +14,16 @@ export function ScenarioRunRow({
 	onRun,
 }: ScenarioRunRowProps) {
 	const panelId = `scenario-contents-${scenario.id}`
-	const launch = resolveScenarioApps(scenario.launchIdentities, apps)
-	const close = resolveScenarioApps(scenario.closeIdentities, apps)
+	const launch = resolveScenarioApps(
+		scenario.launchIdentities,
+		apps,
+		scenario.launchAppSnapshots,
+	)
+	const close = resolveScenarioApps(
+		scenario.closeIdentities,
+		apps,
+		scenario.closeAppSnapshots,
+	)
 	const blocked = isScenarioRunning && !running
 	const runLabel = blocked
 		? `Run ${scenario.name} unavailable while another scenario is running`
@@ -63,13 +71,13 @@ export function ScenarioRunRow({
 						label="Launch"
 						scenarioName={scenario.name}
 						apps={launch.apps}
-						missing={launch.missing}
+						unavailable={launch.unavailable}
 					/>
 					<ScenarioRunList
 						label="Close"
 						scenarioName={scenario.name}
 						apps={close.apps}
-						missing={close.missing}
+						unavailable={close.unavailable}
 					/>
 				</div>
 			</CollapsiblePanel>

@@ -12,11 +12,11 @@ import { createPreferenceTransferActions } from './preferenceTransferActions'
 import { createScenarioActions } from './scenarioActions'
 import { createScenarioHistoryActions } from './scenarioHistoryActions'
 import { readPreferences } from './preferences'
-import type { AppPreferencesV14 } from './preferences'
+import type { AppPreferencesV15 } from './preferences'
 import type { AppsClient } from '../../entities/app'
 import type { AppState } from './types'
 
-function initialState(preferences: AppPreferencesV14) {
+function initialState(preferences: AppPreferencesV15) {
 	return {
 		apps: [],
 		query: '',

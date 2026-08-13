@@ -20,7 +20,11 @@ pub fn run() {
     let starts_hidden_from_autostart = lifecycle::starts_hidden_from_autostart(std::env::args_os());
     let close_lifecycle = Arc::clone(&lifecycle);
     let tray_lifecycle = Arc::clone(&lifecycle);
-    let mut builder = tauri::Builder::default();
+    let mut builder = tauri::Builder::default().plugin(
+        tauri_plugin_log::Builder::default()
+            .level(log::LevelFilter::Info)
+            .build(),
+    );
     #[cfg(desktop)]
     {
         builder = builder
@@ -85,13 +89,6 @@ pub fn run() {
                 if autostart::is_enabled().unwrap_or(false) {
                     let _ = autostart::set_enabled(true);
                 }
-            }
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
             }
             Ok(())
         })

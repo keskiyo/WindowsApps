@@ -1,8 +1,15 @@
+export interface ScenarioAppSnapshot {
+	name: string
+	iconBase64: string | null
+}
+
 export interface Scenario {
 	id: string
 	name: string
 	launchIdentities: string[]
 	closeIdentities: string[]
+	launchAppSnapshots?: Record<string, ScenarioAppSnapshot>
+	closeAppSnapshots?: Record<string, ScenarioAppSnapshot>
 	createdAt: number | null
 }
 

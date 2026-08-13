@@ -32,13 +32,13 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
               with:
-                  node-version: '22'
+                  node-version-file: '.node-version'
                   cache: npm
 
             - name: Setup Rust
               uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
               with:
-                  toolchain: stable
+                  toolchain: 1.96.0
                   targets: x86_64-pc-windows-msvc
 
             - name: Install dependencies
@@ -66,6 +66,14 @@ jobs:
               shell: pwsh
               run: powershell -NoProfile -File scripts/test-release-notes.ps1
 
+            - name: Test updater signature verification
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-verify-updater-signature.ps1
+
+            - name: Test updater signature verification wrapper
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-verify-updater-signature-wrapper.ps1
+
             - name: Lint frontend
               run: npm run lint
 
@@ -79,13 +87,13 @@ jobs:
               run: npm run build
 
             - name: Run Rust tests
-              run: cargo test --manifest-path src-tauri/Cargo.toml
+              run: cargo test --locked --manifest-path src-tauri/Cargo.toml
 
             - name: Check Rust formatting
               run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
 
             - name: Lint Rust
-              run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+              run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
             # A failed tag build can leave a draft release with an orphaned tag after a
             # release tag is corrected. Remove only this version's draft before Tauri
@@ -142,12 +150,23 @@ jobs:
             - name: Collect signed bundle assets
               shell: pwsh
               env:
-                  RELEASE_TAG: ${{ github.ref_name }}
+                RELEASE_TAG: ${{ github.ref_name }}
               run: |
                   $version = $env:RELEASE_TAG.TrimStart('v')
                   New-Item -ItemType Directory -Force -Path release-assets | Out-Null
                   Copy-Item -LiteralPath "src-tauri/target/release/bundle/nsis/Windows Apps_${version}_x64-setup.exe" -Destination release-assets
                   Copy-Item -LiteralPath "src-tauri/target/release/bundle/nsis/Windows Apps_${version}_x64-setup.exe.sig" -Destination release-assets
+
+            - name: Verify updater signature
+              shell: pwsh
+              env:
+                RELEASE_TAG: ${{ github.ref_name }}
+              run: |
+                  $version = $env:RELEASE_TAG.TrimStart('v')
+                  $setupPath = "release-assets/Windows Apps_${version}_x64-setup.exe"
+                  powershell -NoProfile -File scripts/verify-updater-signature.ps1 `
+                    -InstallerPath $setupPath `
+                    -SignaturePath "$setupPath.sig"
 
             - name: Prepare updater manifest
               shell: pwsh

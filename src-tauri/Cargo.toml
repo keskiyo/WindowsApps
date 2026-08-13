@@ -1,9 +1,9 @@
 [package]
 name = "app"
-version = "0.3.3"
+version = "0.3.4"
 description = "A private application catalog and launcher for Windows 10 and 11"
 authors = ["keskiyo"]
-license = ""
+license = "MIT"
 repository = "https://github.com/keskiyo/WindowsApps"
 edition = "2021"
 # Floor imposed by the locked dependency tree, not a preference: `image 0.25.10` (direct) and
@@ -56,6 +56,7 @@ windows = { version = "0.61", features = [
 ] }
 
 [dev-dependencies]
+minisign-verify = "=0.2.5"
 tempfile = "3.20"
 
 [target."cfg(any(target_os = \"macos\", windows, target_os = \"linux\"))".dependencies]

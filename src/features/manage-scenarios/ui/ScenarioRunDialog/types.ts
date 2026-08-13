@@ -1,5 +1,6 @@
 import type { AppInfo } from '../../../../entities/app'
 import type { Scenario } from '../../../../entities/scenario'
+import type { UnavailableScenarioApp } from '../../../../entities/scenario'
 
 export interface ScenarioRunDialogProps {
 	scenarios: Scenario[]
@@ -24,5 +25,5 @@ export interface ScenarioRunListProps {
 	label: string
 	scenarioName: string
 	apps: AppInfo[]
-	missing: number
+	unavailable: UnavailableScenarioApp[]
 }

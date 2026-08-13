@@ -24,7 +24,7 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
               with:
-                  node-version: '22'
+                  node-version-file: '.node-version'
                   cache: npm
 
             - name: Install dependencies
@@ -50,10 +50,10 @@ jobs:
             - name: Setup Rust
               uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
               with:
-                  toolchain: stable
+                  toolchain: 1.96.0
 
             - name: Install cargo-audit
-              run: cargo install cargo-audit --locked
+              run: cargo install cargo-audit --version 0.22.2 --locked
 
             # Run from src-tauri so cargo-audit picks up src-tauri/.cargo/audit.toml, where each
             # accepted advisory is documented with its chain, owner and review date.

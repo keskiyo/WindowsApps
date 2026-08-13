@@ -7,6 +7,7 @@ mod artifact;
 mod classify;
 mod dedup;
 mod details;
+mod display;
 mod fields;
 mod filters;
 #[cfg(test)]
@@ -27,6 +28,7 @@ pub(crate) use details::{
     can_open_folder, details_fingerprint, folder_target, read_cached_details, read_details,
     AppDetailsTarget,
 };
+pub(crate) use display::CatalogAppDto;
 pub(crate) use model::{
     AppCategory, AppDetails, AppInfo, ArtifactKind, LaunchKind, ScanProgress, SourceKind,
     UninstallTarget,
@@ -329,6 +331,12 @@ pub(super) fn icon_source(app: &AppInfo) -> Option<String> {
 pub(crate) struct StartMenuScan {
     pub apps: Vec<AppInfo>,
     pub stop: Option<StageStop>,
+    pub complete: bool,
+}
+
+struct StartMenuWalk {
+    apps: Vec<AppInfo>,
+    complete: bool,
 }
 
 fn scan_start_menu(control: &ScanControl) -> StartMenuScan {
@@ -347,13 +355,15 @@ fn scan_start_menu(control: &ScanControl) -> StartMenuScan {
         return StartMenuScan {
             apps: Vec::new(),
             stop: budget.stop(),
+            complete: false,
         };
     }
-    let apps = walk_start_menu_shortcuts(roots, &budget, &machine::MachineFacts::current());
+    let walked = walk_start_menu_shortcuts(roots, &budget, &machine::MachineFacts::current());
 
     StartMenuScan {
-        apps,
+        apps: walked.apps,
         stop: budget.stop(),
+        complete: walked.complete,
     }
 }
 
@@ -361,8 +371,9 @@ fn walk_start_menu_shortcuts(
     roots: Vec<PathBuf>,
     budget: &StageBudget,
     facts: &machine::MachineFacts,
-) -> Vec<AppInfo> {
-    roots
+) -> StartMenuWalk {
+    let mut complete = true;
+    let apps = roots
         .into_iter()
         .flat_map(|root| {
             WalkDir::new(root)
@@ -371,7 +382,13 @@ fn walk_start_menu_shortcuts(
                 .into_iter()
         })
         .take_while(|_| budget.charge_entry())
-        .filter_map(Result::ok)
+        .filter_map(|entry| match entry {
+            Ok(entry) => Some(entry),
+            Err(_) => {
+                complete = false;
+                None
+            }
+        })
         .filter(|entry| entry.file_type().is_file())
         .filter(|entry| {
             entry.path().extension().is_some_and(|extension| {
@@ -430,7 +447,8 @@ fn walk_start_menu_shortcuts(
             }
             (!is_url || app.artifact_kind == ArtifactKind::Documentation).then_some(app)
         })
-        .collect()
+        .collect();
+    StartMenuWalk { apps, complete }
 }
 
 fn make_app(name: String, path: PathBuf) -> AppInfo {
@@ -766,7 +784,22 @@ mod tests {
     }
 
     fn walk_start_menu_shortcuts(roots: Vec<PathBuf>, budget: &StageBudget) -> Vec<AppInfo> {
-        super::walk_start_menu_shortcuts(roots, budget, &facts())
+        super::walk_start_menu_shortcuts(roots, budget, &facts()).apps
+    }
+
+    #[test]
+    fn an_unreadable_start_menu_root_is_not_an_empty_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let never = || false;
+        let control = ScanControl::new(&never);
+        let budget = control.stage_with(DEFAULT_STAGE_TIMEOUT, usize::MAX, START_MENU_MAX_DEPTH);
+
+        let scan =
+            super::walk_start_menu_shortcuts(vec![dir.path().join("missing")], &budget, &facts());
+
+        assert!(scan.apps.is_empty());
+        assert!(!scan.complete);
+        assert_eq!(budget.stop(), None);
     }
 
     fn nested_shortcuts(root: &Path, folders: usize) {

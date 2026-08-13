@@ -26,8 +26,16 @@ export function ScenarioCard({
 }: ScenarioCardProps) {
 	const [renaming, setRenaming] = useState(false)
 	const picker = useScenarioAppPicker({ scenarioId: scenario.id, onAddApp })
-	const launch = resolveScenarioApps(scenario.launchIdentities, apps)
-	const close = resolveScenarioApps(scenario.closeIdentities, apps)
+	const launch = resolveScenarioApps(
+		scenario.launchIdentities,
+		apps,
+		scenario.launchAppSnapshots,
+	)
+	const close = resolveScenarioApps(
+		scenario.closeIdentities,
+		apps,
+		scenario.closeAppSnapshots,
+	)
 	const blocked = isScenarioRunning && !running
 	const runLabel = blocked
 		? `Run ${scenario.name} unavailable while another scenario is running`
@@ -98,7 +106,7 @@ export function ScenarioCard({
 				label="Launch"
 				scenarioName={scenario.name}
 				apps={launch.apps}
-				missing={launch.missing}
+				unavailable={launch.unavailable}
 				disabled={running}
 				identityOf={appIdentity}
 				onAdd={picker.open}
@@ -111,7 +119,7 @@ export function ScenarioCard({
 				label="Close"
 				scenarioName={scenario.name}
 				apps={close.apps}
-				missing={close.missing}
+				unavailable={close.unavailable}
 				disabled={running}
 				markOf={picker.markOf}
 				identityOf={appIdentity}

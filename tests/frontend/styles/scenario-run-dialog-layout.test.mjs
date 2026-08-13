@@ -7,8 +7,8 @@ const dialog = readFileSync(
 )
 
 describe('scenario run dialog layout', () => {
-	it('fits inside the supported minimum window width', () => {
-		expect(dialog).toContain('w-full max-w-xl')
+	it('uses a desktop width that still fits the supported minimum window width', () => {
+		expect(dialog).toContain('w-[min(42rem,calc(100vw-2rem))]')
 		expect(dialog).not.toContain('min-w-xl')
 	})
 })

@@ -2,7 +2,7 @@ use super::run_blocking;
 use crate::app_state::{known_catalog_ids, remember_catalog, AppState};
 use crate::catalog::sync::SyncRequest;
 use crate::catalog::sync::{enqueue_hydration, load_sanitized_document, run_coordinated_scan};
-use crate::catalog::{self, cache, AppInfo};
+use crate::catalog::{self, cache, CatalogAppDto};
 use crate::error::AppError;
 use serde::Serialize;
 use tauri::Manager;
@@ -10,7 +10,7 @@ use tauri::Manager;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CatalogSnapshot {
-    apps: Vec<AppInfo>,
+    apps: Vec<CatalogAppDto>,
     has_cache: bool,
     generation: u64,
     diagnostics: Option<cache::CatalogDiagnostics>,
@@ -48,15 +48,15 @@ pub(crate) async fn get_apps(app: tauri::AppHandle) -> Result<CatalogSnapshot, A
     );
     Ok(CatalogSnapshot {
         has_cache,
-        apps,
+        apps: apps.iter().map(CatalogAppDto::from).collect(),
         generation,
         diagnostics,
     })
 }
 
 #[tauri::command]
-pub(crate) async fn refresh_apps(app: tauri::AppHandle) -> Result<Vec<AppInfo>, AppError> {
-    tauri::async_runtime::spawn_blocking(move || {
+pub(crate) async fn refresh_apps(app: tauri::AppHandle) -> Result<Vec<CatalogAppDto>, AppError> {
+    let apps = tauri::async_runtime::spawn_blocking(move || {
         run_coordinated_scan(&app, SyncRequest::Refresh, true)?.ok_or(AppError::Coalesced {
             what: "Application refresh",
         })
@@ -65,12 +65,13 @@ pub(crate) async fn refresh_apps(app: tauri::AppHandle) -> Result<Vec<AppInfo>, 
     .map_err(|error| AppError::Interrupted {
         context: "Application scanning",
         source: error.to_string(),
-    })?
+    })??;
+    Ok(apps.iter().map(CatalogAppDto::from).collect())
 }
 
 #[tauri::command]
-pub(crate) async fn force_full_scan(app: tauri::AppHandle) -> Result<Vec<AppInfo>, AppError> {
-    tauri::async_runtime::spawn_blocking(move || {
+pub(crate) async fn force_full_scan(app: tauri::AppHandle) -> Result<Vec<CatalogAppDto>, AppError> {
+    let apps = tauri::async_runtime::spawn_blocking(move || {
         run_coordinated_scan(&app, SyncRequest::Force, true)?.ok_or(AppError::Coalesced {
             what: "Application scan",
         })
@@ -79,12 +80,15 @@ pub(crate) async fn force_full_scan(app: tauri::AppHandle) -> Result<Vec<AppInfo
     .map_err(|error| AppError::Interrupted {
         context: "Application scanning",
         source: error.to_string(),
-    })?
+    })??;
+    Ok(apps.iter().map(CatalogAppDto::from).collect())
 }
 
 #[tauri::command]
-pub(crate) async fn reset_catalog_cache(app: tauri::AppHandle) -> Result<Vec<AppInfo>, AppError> {
-    tauri::async_runtime::spawn_blocking(move || {
+pub(crate) async fn reset_catalog_cache(
+    app: tauri::AppHandle,
+) -> Result<Vec<CatalogAppDto>, AppError> {
+    let apps = tauri::async_runtime::spawn_blocking(move || {
         let app_data_dir = app
             .path()
             .app_data_dir()
@@ -108,7 +112,8 @@ pub(crate) async fn reset_catalog_cache(app: tauri::AppHandle) -> Result<Vec<App
     .map_err(|error| AppError::Interrupted {
         context: "Catalog reset",
         source: error.to_string(),
-    })?
+    })??;
+    Ok(apps.iter().map(CatalogAppDto::from).collect())
 }
 
 #[tauri::command]
@@ -178,6 +183,7 @@ pub(crate) fn start_background_sync(app: tauri::AppHandle) {
 mod tests {
     use super::*;
     use crate::app_state::{cached_app, remember_catalog};
+    use crate::catalog::UninstallTarget;
 
     #[test]
     fn hydration_ids_are_deduplicated_and_limited_to_the_trusted_catalog() {
@@ -240,5 +246,42 @@ mod tests {
             validate_hydration_ids(&state, vec!["я".repeat(MAX_HYDRATION_ID_LENGTH + 1)]),
             Err(AppError::InvalidHydrationRequest)
         ));
+    }
+
+    #[test]
+    fn catalog_snapshot_excludes_execution_metadata_from_webview_json() {
+        let mut app = cached_app("Editor", r"C:\Editor\editor.exe");
+        app.id = "editor".into();
+        app.uninstall = Some(UninstallTarget::Command {
+            executable: "TOP_SECRET_UNINSTALL_EXECUTABLE".into(),
+            arguments: "TOP_SECRET_UNINSTALL_ARGUMENTS".into(),
+        });
+        app.launch_arguments = Some("TOP_SECRET_LAUNCH_ARGUMENTS".into());
+        app.resolved_path = Some("TOP_SECRET_RESOLVED_TARGET".into());
+        app.shortcut_icon_path = Some("TOP_SECRET_SHORTCUT_ICON".into());
+
+        let json = serde_json::to_value(CatalogSnapshot {
+            apps: vec![CatalogAppDto::from(&app)],
+            has_cache: true,
+            generation: 1,
+            diagnostics: None,
+        })
+        .unwrap();
+        let serialized = json.to_string();
+
+        for secret in [
+            "TOP_SECRET_UNINSTALL_EXECUTABLE",
+            "TOP_SECRET_UNINSTALL_ARGUMENTS",
+            "TOP_SECRET_LAUNCH_ARGUMENTS",
+            "TOP_SECRET_RESOLVED_TARGET",
+            "TOP_SECRET_SHORTCUT_ICON",
+        ] {
+            assert!(!serialized.contains(secret));
+        }
+        let app = &json["apps"][0];
+        assert!(app.get("uninstall").is_none());
+        assert!(app.get("launchArguments").is_none());
+        assert!(app.get("resolvedPath").is_none());
+        assert!(app.get("shortcutIconPath").is_none());
     }
 }
