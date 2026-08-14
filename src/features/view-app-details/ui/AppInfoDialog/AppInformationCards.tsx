@@ -1,6 +1,6 @@
 import { Box, FolderOpen, Search, ShieldCheck } from 'lucide-react'
 import { categoryLabel } from '../../../../entities/category'
-import { buildDetectionRows } from './data'
+import { buildDetectionRows, launchTargetValue, launchTypeLabel } from './data'
 import { DetailRows } from './DetailRows'
 import { availability, signature, valueOrUnavailable } from './detailValues'
 import { InfoCard } from './InfoCard'
@@ -31,8 +31,8 @@ export function AppInformationCards({
 				<DetailRows
 					rows={[
 						['Location', valueOrUnavailable(app.installLocation)],
-						[targetLabel, valueOrUnavailable(app.path)],
-						['Launch type', app.launchKind.replace(/_/g, ' ')],
+						[targetLabel, valueOrUnavailable(launchTargetValue(app))],
+						['Launch type', launchTypeLabel(app)],
 					]}
 				/>
 			</InfoCard>

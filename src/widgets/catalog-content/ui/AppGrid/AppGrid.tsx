@@ -4,6 +4,7 @@ import { HiddenGrid } from '../HiddenGrid'
 import { InstallersDocsGrid } from '../InstallersDocsGrid/InstallersDocsGrid'
 import { CategoryList } from './CategoryList'
 import { EmptyState } from './EmptyState'
+import { SearchScopeHint } from '../SearchScopeHint/SearchScopeHint'
 import { Skeleton } from './Skeleton'
 import type { AppGridProps } from './types'
 
@@ -76,6 +77,19 @@ export function AppGrid(props: AppGridProps) {
 		)
 	if (props.activeView === 'installers_docs')
 		return <InstallersDocsGrid {...props} />
-	if (!props.apps.length) return <EmptyState hasQuery={props.hasQuery} />
-	return <CategoryList {...props} />
+	return (
+		<>
+			{props.apps.length ? (
+				<CategoryList {...props} />
+			) : (
+				<EmptyState hasQuery={props.hasQuery} />
+			)}
+			{props.hasQuery && (
+				<SearchScopeHint
+					counts={props.searchScopeCounts}
+					onSelectView={props.onSelectView}
+				/>
+			)}
+		</>
+	)
 }

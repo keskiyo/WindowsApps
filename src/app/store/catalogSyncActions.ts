@@ -1,4 +1,4 @@
-import { mergeIcon, reconcileFirstSeen } from './reconciliation'
+import { mergeIcon, reconcileFirstSeen, reconcileMarks } from './reconciliation'
 import type { AppsClient } from '../../entities/app'
 import type {
 	AppState,
@@ -45,10 +45,13 @@ export function createCatalogSyncActions({
 					firstSeenAt,
 				}
 			})
-			if (firstSeenAt !== previousFirstSeen) persist()
+			const marks = reconcileMarks(get(), get().apps)
+			if (marks) set(marks)
+			if (firstSeenAt !== previousFirstSeen || marks) persist()
 		},
 		applyDelta(delta) {
 			if (delta.generation < get().catalogGeneration) return
+			const previousFirstSeen = get().firstSeenAt
 			set(state => {
 				const removed = new Set(delta.removedIds)
 				const apps = new Map(
@@ -58,11 +61,20 @@ export function createCatalogSyncActions({
 				)
 				for (const app of delta.upserted)
 					apps.set(app.id, mergeIcon(apps.get(app.id), app))
+				const merged = [...apps.values()]
 				return {
-					apps: [...apps.values()],
+					apps: merged,
 					catalogGeneration: delta.generation,
+					firstSeenAt: reconcileFirstSeen(
+						merged,
+						state.firstSeenAt,
+						Date.now(),
+					),
 				}
 			})
+			const marks = reconcileMarks(get(), get().apps)
+			if (marks) set(marks)
+			if (get().firstSeenAt !== previousFirstSeen || marks) persist()
 		},
 		applyPatches(patches) {
 			const generation = get().catalogGeneration
@@ -74,7 +86,9 @@ export function createCatalogSyncActions({
 			set(state => ({
 				apps: state.apps.map(app => {
 					const patch = byId.get(app.id)
-					return patch ? { ...app, ...patch, id: app.id } : app
+					if (!patch) return app
+					const { id: _id, generation: _generation, ...fields } = patch
+					return { ...app, ...fields }
 				}),
 			}))
 		},

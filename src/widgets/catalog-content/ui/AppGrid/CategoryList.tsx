@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import {
 	groupAppsByCategory,
 	sortFavoritesFirst,
@@ -6,12 +7,24 @@ import { CategorySection } from '../CategorySection/CategorySection'
 import type { AppGridProps } from './types'
 
 export function CategoryList(props: AppGridProps) {
-	const groups = groupAppsByCategory(props.apps)
-	const visibleCategories = props.categoryOrder.filter(
-		category =>
-			groups.has(category) ||
-			props.categories.find(item => item.id === category)?.builtIn ===
-				false,
+	const groups = useMemo(
+		() => groupAppsByCategory(props.apps),
+		[props.apps],
+	)
+	const favoriteIds = useMemo(
+		() => new Set(props.favoriteAppIds),
+		[props.favoriteAppIds],
+	)
+	const visibleCategories = useMemo(
+		() =>
+			props.categoryOrder.filter(
+				category =>
+					groups.has(category) ||
+					(!props.hasQuery &&
+						props.categories.find(item => item.id === category)
+							?.builtIn === false),
+			),
+		[groups, props.categoryOrder, props.categories, props.hasQuery],
 	)
 	return (
 		<div aria-label="Applications by category" className="space-y-5">
@@ -31,11 +44,11 @@ export function CategoryList(props: AppGridProps) {
 							groups.get(category) ?? [],
 							props.favoriteAppIds,
 						)}
+						favoriteIds={favoriteIds}
 						collapsed={
 							!props.hasQuery &&
 							props.collapsedCategories.includes(category)
 						}
-						favoriteAppIds={props.favoriteAppIds}
 						onToggle={() => props.onToggleCategory(category)}
 						onToggleFavorite={props.onToggleFavorite}
 						onLaunch={props.onLaunch}

@@ -11,7 +11,7 @@ export interface CategorySectionProps {
 	categoryOrder: AppCategory[]
 	apps: AppInfo[]
 	collapsed: boolean
-	favoriteAppIds: string[]
+	favoriteIds: ReadonlySet<string>
 	onToggle(): void
 	onToggleFavorite(id: string): void
 	onLaunch(app: AppInfo): Promise<void>

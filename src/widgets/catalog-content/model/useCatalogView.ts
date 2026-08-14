@@ -1,12 +1,16 @@
 import { useDeferredValue, useMemo } from 'react'
 import {
+	appIdentity,
 	type AppView,
 	type CategorizedAppsState,
+	createMarkLookup,
 	filterVisibleApps,
 	isCatalogArtifact,
 	rankAppsByQuery,
 	selectCatalogCounts,
 	selectCategorizedApps,
+	selectRecentApps,
+	selectSearchScopeCounts,
 } from '../../../entities/app'
 import { resolveScenarioApps, type Scenario } from '../../../entities/scenario'
 import { buildMorePreview } from '../lib/morePreview'
@@ -14,12 +18,15 @@ import { buildMorePreview } from '../lib/morePreview'
 export type { MorePreview, MorePreviewItem } from '../lib/morePreview'
 
 const HYDRATION_WINDOW = 48
+const PALETTE_SUGGESTIONS = 12
 
 interface CatalogViewState extends CategorizedAppsState {
 	activeView: AppView
 	favoriteAppIds: string[]
+	favoriteAppIdentities: string[]
 	firstSeenAt: Record<string, number>
 	hiddenAppIds: string[]
+	hiddenAppIdentities: string[]
 	query: string
 	scenarios: Scenario[]
 }
@@ -46,44 +53,66 @@ export function useCatalogView(state: CatalogViewState) {
 			state.installerAppIdentities,
 		],
 	)
+	const isHidden = useMemo(
+		() => createMarkLookup(state.hiddenAppIds, state.hiddenAppIdentities),
+		[state.hiddenAppIds, state.hiddenAppIdentities],
+	)
+	const isFavorite = useMemo(
+		() =>
+			createMarkLookup(state.favoriteAppIds, state.favoriteAppIdentities),
+		[state.favoriteAppIds, state.favoriteAppIdentities],
+	)
 	const visibleApps = useMemo(
 		() =>
 			filterVisibleApps(
 				categorizedApps,
 				state.activeView,
-				state.hiddenAppIds,
-				state.favoriteAppIds,
+				isHidden,
+				isFavorite,
 			),
-		[
-			categorizedApps,
-			state.activeView,
-			state.hiddenAppIds,
-			state.favoriteAppIds,
-		],
+		[categorizedApps, state.activeView, isHidden, isFavorite],
 	)
-	const catalogApps = useMemo(() => {
-		const hidden = new Set(state.hiddenAppIds)
-		return categorizedApps.filter(
-			app => !hidden.has(app.id) && !isCatalogArtifact(app),
-		)
-	}, [categorizedApps, state.hiddenAppIds])
+	const catalogApps = useMemo(
+		() =>
+			categorizedApps.filter(
+				app => !isHidden(app) && !isCatalogArtifact(app),
+			),
+		[categorizedApps, isHidden],
+	)
 	const paletteApps = useMemo(
 		() => catalogApps.filter(app => app.visibilityClass !== 'auxiliary'),
 		[catalogApps],
 	)
+	const paletteSuggestions = useMemo(() => {
+		const favorites = new Set(state.favoriteAppIds)
+		const starred = paletteApps.filter(app => favorites.has(app.id))
+		const rest = paletteApps.filter(app => !favorites.has(app.id))
+		return [
+			...starred,
+			...selectRecentApps(
+				rest,
+				app => state.firstSeenAt[appIdentity(app)] ?? 0,
+				PALETTE_SUGGESTIONS,
+			),
+		].slice(0, PALETTE_SUGGESTIONS)
+	}, [paletteApps, state.favoriteAppIds, state.firstSeenAt])
 	const deferredQuery = useDeferredValue(state.query)
 	const filteredApps = useMemo(
 		() => rankAppsByQuery(visibleApps, deferredQuery),
 		[visibleApps, deferredQuery],
 	)
 	const counts = useMemo(
+		() => selectCatalogCounts(categorizedApps, isHidden, isFavorite),
+		[categorizedApps, isHidden, isFavorite],
+	)
+	const searchScopeCounts = useMemo(
 		() =>
-			selectCatalogCounts(
+			selectSearchScopeCounts(
 				categorizedApps,
+				deferredQuery,
 				state.hiddenAppIds,
-				state.favoriteAppIds,
 			),
-		[categorizedApps, state.hiddenAppIds, state.favoriteAppIds],
+		[categorizedApps, deferredQuery, state.hiddenAppIds],
 	)
 	const morePreview = useMemo(
 		() =>
@@ -141,6 +170,8 @@ export function useCatalogView(state: CatalogViewState) {
 		filteredApps,
 		morePreview,
 		paletteApps,
+		paletteSuggestions,
+		searchScopeCounts,
 		visibleHydrationIds,
 	}
 }

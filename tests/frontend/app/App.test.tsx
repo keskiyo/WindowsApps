@@ -242,6 +242,43 @@ describe('App', () => {
 		).toBeInTheDocument()
 	})
 
+	// Progress, the refresh outcome and the catalog-change summary are three separate channels;
+	// a manual refresh must still leave exactly one success notice behind.
+	it('reports a manual refresh once', async () => {
+		const success = vi.spyOn(toast, 'success').mockClear()
+		const { client } = renderApp()
+		await screen.findByRole('heading', { name: 'Games' })
+
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Scan for apps' }),
+		)
+
+		await waitFor(() => expect(client.refreshApps).toHaveBeenCalled())
+		await waitFor(() => expect(success).toHaveBeenCalledTimes(1))
+	})
+
+	// The search field is part of the shell, so it accepted input on pages that never filter
+	// anything: the status line answered "0 matches" and the query silently waited for a return
+	// to the catalog.
+	it('returns to the catalog when a query is typed on another page', async () => {
+		setDesktopNavigation(true)
+		renderApp()
+		await screen.findByRole('heading', { name: 'Games' })
+		await userEvent.click(screen.getByRole('button', { name: /^More/ }))
+		expect(
+			screen.getByRole('heading', { name: 'More' }),
+		).toBeInTheDocument()
+
+		await userEvent.type(
+			screen.getByRole('textbox', { name: 'Search applications' }),
+			'steam',
+		)
+
+		expect(
+			await screen.findByRole('button', { name: 'Launch Steam' }),
+		).toBeInTheDocument()
+	})
+
 	it('exposes full app and category names when visible labels are truncated', async () => {
 		renderApp()
 		const steam = await screen.findByText('Steam')

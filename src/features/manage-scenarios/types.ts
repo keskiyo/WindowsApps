@@ -38,11 +38,6 @@ export interface UnavailableScenarioAppTileProps {
 	remove?: { label: string; disabled: boolean; onRemove(): void }
 }
 
-export interface ScenarioStopButtonProps {
-	scenarioName: string
-	onCancel(): void
-}
-
 export interface ScenarioCardProps {
 	scenario: Scenario
 	apps: AppInfo[]
@@ -50,7 +45,6 @@ export interface ScenarioCardProps {
 	isScenarioRunning: boolean
 	runningStatus?: string
 	isFavorite: boolean
-	onCancel?(): void
 	onToggleFavorite(id: string): void
 	onRename(id: string, name: string): ScenarioNameResult
 	onDelete(id: string): void

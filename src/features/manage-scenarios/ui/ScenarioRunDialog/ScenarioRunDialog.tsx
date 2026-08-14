@@ -14,7 +14,6 @@ export function ScenarioRunDialog({
 	runningId,
 	isScenarioRunning,
 	onRun,
-	onCancel,
 	onClose,
 }: ScenarioRunDialogProps) {
 	useBodyScrollLock()
@@ -93,7 +92,6 @@ export function ScenarioRunDialog({
 								isScenarioRunning={isScenarioRunning}
 								onToggle={toggle}
 								onRun={onRun}
-								onCancel={onCancel}
 							/>
 						))}
 					</ul>

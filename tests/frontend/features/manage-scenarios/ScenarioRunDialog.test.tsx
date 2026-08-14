@@ -44,11 +44,9 @@ function renderDialog(value: {
 	apps?: AppInfo[]
 	runningId?: string | null
 	isScenarioRunning?: boolean
-	withCancel?: boolean
 } = {}) {
 	const onRun = vi.fn()
 	const onClose = vi.fn()
-	const onCancel = vi.fn()
 	render(
 		<ScenarioRunDialog
 			scenarios={value.scenarios ?? [gaming]}
@@ -62,26 +60,13 @@ function renderDialog(value: {
 			runningId={value.runningId ?? null}
 			isScenarioRunning={value.isScenarioRunning ?? false}
 			onRun={onRun}
-			onCancel={value.withCancel ? onCancel : undefined}
 			onClose={onClose}
 		/>,
 	)
-	return { onRun, onClose, onCancel }
+	return { onRun, onClose }
 }
 
 describe('ScenarioRunDialog', () => {
-	it('stops the scenario it is running', async () => {
-		const { onCancel } = renderDialog({
-			runningId: 'gaming',
-			isScenarioRunning: true,
-			withCancel: true,
-		})
-
-		await userEvent.click(screen.getByRole('button', { name: 'Stop Gaming' }))
-
-		expect(onCancel).toHaveBeenCalledOnce()
-	})
-
 	it('is a modal dialog over the page', () => {
 		renderDialog()
 

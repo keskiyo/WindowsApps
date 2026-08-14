@@ -1,7 +1,18 @@
 import type { LucideIcon } from 'lucide-react'
-import type { AppInfo } from '../../entities/app'
+import type { AppInfo, AppView, SearchScopeCounts } from '../../entities/app'
 import type { AppCategory, CategoryDefinition } from '../../entities/category'
 import type { Scenario } from '../../entities/scenario'
+
+export interface SearchScopeArea {
+	key: keyof SearchScopeCounts
+	view: AppView
+	label: string
+}
+
+export interface SearchScopeHintProps {
+	counts: SearchScopeCounts
+	onSelectView(view: AppView): void
+}
 
 export interface CatalogViewHeaderProps {
 	icon: LucideIcon
@@ -49,7 +60,6 @@ export interface FavoriteScenariosPanel {
 	runningId: string | null
 	isScenarioRunning: boolean
 	onRun(id: string): void
-	onCancel?(): void
 	onToggleFavorite(id: string): void
 }
 

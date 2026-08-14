@@ -8,12 +8,10 @@ import {
 } from '../../entities/category'
 import {
 	MAX_SCENARIO_ENTRIES,
-	MAX_SCENARIO_HISTORY,
 	MAX_SCENARIOS,
 	type Scenario,
 	type ScenarioAppSnapshot,
 	normalizeScenarioAppSnapshot,
-	type ScenarioRunRecord,
 } from '../../entities/scenario'
 
 export const PREFERENCES_KEY = 'windows-apps.preferences.v1'
@@ -47,7 +45,6 @@ export interface AppPreferencesV15 {
 	installerAppIdentities: string[]
 	scenarios: Scenario[]
 	favoriteScenarioIds: string[]
-	scenarioHistory: ScenarioRunRecord[]
 	firstSeenAt: Record<string, number>
 	legacyCanonicalPreferences: LegacyCanonicalPreferences
 	unknownFields?: Record<string, unknown>
@@ -78,7 +75,6 @@ export const DEFAULT_PREFERENCES: AppPreferencesV15 = {
 	installerAppIdentities: [],
 	scenarios: [],
 	favoriteScenarioIds: [],
-	scenarioHistory: [],
 	firstSeenAt: {},
 	legacyCanonicalPreferences: {
 		favorite: [],
@@ -175,7 +171,6 @@ const KNOWN_PREFERENCE_FIELDS = new Set([
 	'installerAppIdentities',
 	'scenarios',
 	'favoriteScenarioIds',
-	'scenarioHistory',
 	'firstSeenAt',
 	'legacyCanonicalPreferences',
 ])
@@ -239,54 +234,6 @@ function normalizeScenarios(value: unknown): Scenario[] {
 	return scenarios
 }
 
-function normalizeScenarioHistory(value: unknown): ScenarioRunRecord[] {
-	if (!Array.isArray(value)) return []
-	const records: ScenarioRunRecord[] = []
-	const seen = new Set<string>()
-	for (const item of value) {
-		if (!item || typeof item !== 'object' || Array.isArray(item)) continue
-		const raw = item as Record<string, unknown>
-		const id = typeof raw.id === 'string' ? raw.id.trim() : ''
-		const scenarioId = typeof raw.scenarioId === 'string' ? raw.scenarioId.trim() : ''
-		const scenarioName = typeof raw.scenarioName === 'string' ? raw.scenarioName.trim() : ''
-		const numbers = [
-			raw.startedAt,
-			raw.finishedAt,
-			raw.launched,
-			raw.closed,
-			raw.notRunning,
-			raw.unavailable,
-			raw.blocked,
-			raw.failed,
-		]
-		if (
-			!id ||
-			!scenarioId ||
-			!scenarioName ||
-			seen.has(id) ||
-			numbers.some(value => typeof value !== 'number' || !Number.isFinite(value)) ||
-			typeof raw.cancelled !== 'boolean'
-		)
-			continue
-		seen.add(id)
-		records.push({
-			id,
-			scenarioId,
-			scenarioName,
-			startedAt: raw.startedAt as number,
-			finishedAt: raw.finishedAt as number,
-			launched: raw.launched as number,
-			closed: raw.closed as number,
-			notRunning: raw.notRunning as number,
-			unavailable: raw.unavailable as number,
-			blocked: raw.blocked as number,
-			failed: raw.failed as number,
-			cancelled: raw.cancelled,
-		})
-	}
-	return records.sort((left, right) => right.finishedAt - left.finishedAt).slice(0, MAX_SCENARIO_HISTORY)
-}
-
 function normalizeTimestampMap(value: unknown): Record<string, number> {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
 	return Object.fromEntries(
@@ -325,7 +272,6 @@ export function normalizePreferences(value: unknown): AppPreferencesV15 {
 	const hasInstallerMarks = version >= 9
 	const hasFirstSeen = version >= 10
 	const hasScenarios = version >= 11
-	const hasScenarioHistory = version >= 14
 	const rawLegacy =
 		hasDurableIdentities &&
 		raw.legacyCanonicalPreferences &&
@@ -394,9 +340,6 @@ export function normalizePreferences(value: unknown): AppPreferencesV15 {
 		favoriteScenarioIds: uniqueStrings(raw.favoriteScenarioIds).filter(id =>
 			scenarios.some(scenario => scenario.id === id),
 		),
-		scenarioHistory: hasScenarioHistory
-			? normalizeScenarioHistory(raw.scenarioHistory)
-			: [],
 		firstSeenAt: hasFirstSeen ? normalizeTimestampMap(raw.firstSeenAt) : {},
 		legacyCanonicalPreferences,
 		...(Object.keys(unknownFields).length > 0 ? { unknownFields } : {}),

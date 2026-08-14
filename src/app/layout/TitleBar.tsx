@@ -6,19 +6,8 @@ export function TitleBar() {
 	return (
 		<div
 			data-tauri-drag-region
-			className="app-titlebar flex h-9 shrink-0 items-center justify-between pr-0.5 pl-3 select-none"
+			className="app-titlebar flex h-9 shrink-0 items-center justify-end pr-0.5 select-none"
 		>
-			<div
-				data-tauri-drag-region
-				className="pointer-events-none flex items-center gap-2 text-xs font-medium text-slate-600"
-			>
-				<img
-					src="/app-icon.png"
-					alt=""
-					className="size-4 rounded-[0.3rem]"
-				/>
-				<span>Windows Apps</span>
-			</div>
 			<div className="flex items-center">
 				<button
 					type="button"

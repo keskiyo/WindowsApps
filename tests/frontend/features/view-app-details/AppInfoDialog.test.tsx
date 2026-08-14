@@ -226,9 +226,9 @@ describe('AppInfoDialog', () => {
 		})
 
 		await screen.findByText('Application')
-		expect(screen.getByText('Shown in Auxiliary tools')).toBeVisible()
-		expect(screen.getByText('Why shown here')).toBeVisible()
-		expect(screen.getByText('Maintenance executable')).toBeVisible()
+		expect(
+			screen.getByText('Auxiliary tools — Maintenance executable'),
+		).toBeVisible()
 		expect(screen.getByText('Launch target check')).toBeVisible()
 		expect(screen.getByText('Not checked — access denied')).toBeVisible()
 	})
@@ -264,11 +264,10 @@ describe('AppInfoDialog', () => {
 		const detection = within(
 			screen.getByRole('heading', { name: 'Detection' }).closest('section')!,
 		)
-		expect(screen.getByText('Catalog visibility')).toBeVisible()
-		expect(screen.getByText('Shown in Auxiliary tools')).toBeVisible()
+		expect(screen.getByText('Shown as')).toBeVisible()
 		expect(
 			screen.getByText(
-				'This executable has no reliable product metadata yet.',
+				'Auxiliary tools — This executable has no reliable product metadata yet.',
 			),
 		).toBeVisible()
 		expect(detection.getByText('Category')).toBeVisible()
@@ -294,7 +293,7 @@ describe('AppInfoDialog', () => {
 			screen.getByRole('heading', { name: 'Detection' }).closest('section')!,
 		)
 		expect(screen.getByText('example-editor.exe')).toBeVisible()
-		expect(screen.getByText('Shown in the main catalog')).toBeVisible()
+		expect(screen.getByText('Main catalog')).toBeVisible()
 		expect(detection.getByText('Category')).toBeVisible()
 		expect(screen.queryByText('Why shown here')).not.toBeInTheDocument()
 	})

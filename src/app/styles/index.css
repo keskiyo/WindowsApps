@@ -192,7 +192,8 @@
 	.lucide-shield-check,
 	.lucide-plus,
 	.lucide-folder-plus,
-	.lucide-circle-arrow-right {
+	.lucide-circle-arrow-right,
+	.lucide-circle-arrow-up {
 		color: var(--category-green);
 	}
 
@@ -212,6 +213,8 @@
 	.lucide-file-text,
 	.lucide-external-link,
 	.lucide-download,
+	.lucide-upload,
+	.lucide-database-backup,
 	.lucide-hard-drive,
 	.lucide-table-properties,
 	.lucide-grid2x2,
@@ -605,7 +608,6 @@ button {
 	) !important;
 	border-color: oklch(0.62 0.018 274 / 0.3) !important;
 	box-shadow:
-		0 16px 38px oklch(0.15 0.014 270 / 0.28),
 		0 0 0 1px oklch(0.74 0.05 292 / 0.06),
 		0 0 18px oklch(0.62 0.045 292 / 0.08);
 }

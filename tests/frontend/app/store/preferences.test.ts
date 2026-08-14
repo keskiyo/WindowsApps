@@ -6,6 +6,7 @@ import {
 	normalizePreferences,
 	parsePreferenceImport,
 	readPreferences,
+	serializePreferences,
 	writePreferences,
 } from '../../../../src/app/store/preferences'
 import { stableCustomCategoryAccent } from '../../../../src/entities/category/lib/categoryAccents'
@@ -486,15 +487,16 @@ describe('preferences', () => {
 		expect(normalized.favoriteScenarioIds).toEqual(['work'])
 	})
 
-	it('keeps the newest fifty valid scenario run records', () => {
-		const normalized = normalizePreferences({
-			version: 15,
-			scenarioHistory: Array.from({ length: 55 }, (_, index) => ({
-				id: `run-${index}`,
+	// Scenario run history was written by 0.3.4 and is no longer read. Dropping the reader must not
+	// drop the data: it has to survive as an unknown root field so a later version can still use it.
+	it('retains scenario run history written by an earlier version', () => {
+		const history = [
+			{
+				id: 'run-1',
 				scenarioId: 'work',
 				scenarioName: 'Work',
-				startedAt: 1000 + index,
-				finishedAt: 2000 + index,
+				startedAt: 1000,
+				finishedAt: 2000,
 				launched: 1,
 				closed: 0,
 				notRunning: 0,
@@ -502,11 +504,20 @@ describe('preferences', () => {
 				blocked: 0,
 				failed: 0,
 				cancelled: false,
-			})),
+			},
+		]
+		const normalized = normalizePreferences({
+			version: 15,
+			favoriteAppIds: ['code'],
+			scenarioHistory: history,
 		})
 
-		expect(normalized.scenarioHistory).toHaveLength(50)
-		expect(normalized.scenarioHistory[0]?.id).toBe('run-54')
+		expect(normalized).not.toHaveProperty('scenarioHistory')
+		expect(normalized.unknownFields).toEqual({ scenarioHistory: history })
+		expect(JSON.parse(serializePreferences(normalized))).toMatchObject({
+			favoriteAppIds: ['code'],
+			scenarioHistory: history,
+		})
 	})
 
 	it('rejects a malformed creation date instead of showing it', () => {
@@ -589,7 +600,6 @@ describe('preferences', () => {
 			installerAppIdentities: [],
 			scenarios: [],
 		favoriteScenarioIds: [],
-		scenarioHistory: [],
 			firstSeenAt: {},
 			legacyCanonicalPreferences: {
 				favorite: [],

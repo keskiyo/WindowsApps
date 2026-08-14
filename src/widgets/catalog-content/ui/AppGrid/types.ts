@@ -1,4 +1,8 @@
-import type { AppInfo, AppView } from '../../../../entities/app'
+import type {
+	AppInfo,
+	AppView,
+	SearchScopeCounts,
+} from '../../../../entities/app'
 import type {
 	AppCategory,
 	CategoryDefinition,
@@ -15,6 +19,8 @@ export interface AppGridProps {
 	collapsedCategories: AppCategory[]
 	favoriteAppIds: string[]
 	favoriteScenarios: FavoriteScenariosPanel
+	searchScopeCounts: SearchScopeCounts
+	onSelectView(view: AppView): void
 	onBack(): void
 	onToggleCategory(category: AppCategory): void
 	onToggleFavorite(id: string): void

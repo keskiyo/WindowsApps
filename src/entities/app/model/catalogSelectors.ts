@@ -4,14 +4,26 @@ import {
 	INSTALLERS_DOCS_CATEGORY,
 	isCatalogArtifact,
 } from '../lib/catalogArtifacts'
+import { filterAppsByQuery } from '../lib/catalogSearch'
 import type { AppInfo, AppView } from './app.types'
 import type { AppCategory } from '../../category'
+
+export type AppPredicate = (app: AppInfo) => boolean
+
+export function createMarkLookup(
+	ids: string[],
+	identities: string[],
+): AppPredicate {
+	const byId = new Set(ids)
+	const byIdentity = new Set(identities)
+	return app => byId.has(app.id) || byIdentity.has(appIdentity(app))
+}
 
 export function filterVisibleApps(
 	categorized: AppInfo[],
 	activeView: AppView,
-	hiddenAppIds: string[],
-	favoriteAppIds: string[],
+	isHidden: AppPredicate,
+	isFavorite: AppPredicate,
 ): AppInfo[] {
 	if (
 		activeView === 'settings' ||
@@ -19,29 +31,59 @@ export function filterVisibleApps(
 		activeView === 'scenarios'
 	)
 		return []
-	const hidden = new Set(hiddenAppIds)
 	if (activeView === 'installers_docs')
-		return categorized.filter(
-			app => isCatalogArtifact(app) && !hidden.has(app.id),
-		)
+		return categorized.filter(app => isCatalogArtifact(app) && !isHidden(app))
 	if (activeView === 'auxiliary')
 		return categorized.filter(
 			app =>
 				!isCatalogArtifact(app) &&
 				app.visibilityClass === 'auxiliary' &&
-				!hidden.has(app.id),
+				!isHidden(app),
 		)
-	if (activeView === 'hidden')
-		return categorized.filter(app => hidden.has(app.id))
+	if (activeView === 'hidden') return categorized.filter(isHidden)
 	const visible = categorized.filter(
 		app =>
 			!isCatalogArtifact(app) &&
 			app.visibilityClass !== 'auxiliary' &&
-			!hidden.has(app.id),
+			!isHidden(app),
 	)
-	if (activeView !== 'favorites') return visible
-	const favorites = new Set(favoriteAppIds)
-	return visible.filter(app => favorites.has(app.id))
+	return activeView === 'favorites' ? visible.filter(isFavorite) : visible
+}
+
+export interface SearchScopeCounts {
+	auxiliary: number
+	hidden: number
+	installersDocs: number
+}
+
+const NO_SCOPE_MATCHES: SearchScopeCounts = {
+	auxiliary: 0,
+	hidden: 0,
+	installersDocs: 0,
+}
+
+export function selectSearchScopeCounts(
+	categorized: AppInfo[],
+	query: string,
+	hiddenAppIds: string[],
+): SearchScopeCounts {
+	if (!query.trim()) return NO_SCOPE_MATCHES
+	const hidden = new Set(hiddenAppIds)
+	const buckets: Record<keyof SearchScopeCounts, AppInfo[]> = {
+		auxiliary: [],
+		hidden: [],
+		installersDocs: [],
+	}
+	for (const app of categorized) {
+		if (hidden.has(app.id)) buckets.hidden.push(app)
+		else if (isCatalogArtifact(app)) buckets.installersDocs.push(app)
+		else if (app.visibilityClass === 'auxiliary') buckets.auxiliary.push(app)
+	}
+	return {
+		auxiliary: filterAppsByQuery(buckets.auxiliary, query).length,
+		hidden: filterAppsByQuery(buckets.hidden, query).length,
+		installersDocs: filterAppsByQuery(buckets.installersDocs, query).length,
+	}
 }
 
 export function selectRecentApps(
@@ -72,11 +114,9 @@ export interface CatalogCounts {
 
 export function selectCatalogCounts(
 	categorized: AppInfo[],
-	hiddenAppIds: string[],
-	favoriteAppIds: string[],
+	isHidden: AppPredicate,
+	isFavorite: AppPredicate,
 ): CatalogCounts {
-	const hidden = new Set(hiddenAppIds)
-	const favorites = new Set(favoriteAppIds)
 	const visibleCategorizedApps: AppInfo[] = []
 	const navigationCounts = new Map<string, number>()
 	let favoriteCount = 0
@@ -84,10 +124,10 @@ export function selectCatalogCounts(
 	let auxiliaryCount = 0
 	let classifiedAuxiliaryCount = 0
 	for (const app of categorized) {
-		const isHidden = hidden.has(app.id)
-		if (isHidden) hiddenCount += 1
+		const hidden = isHidden(app)
+		if (hidden) hiddenCount += 1
 		if (isCatalogArtifact(app)) {
-			if (!isHidden)
+			if (!hidden)
 				navigationCounts.set(
 					INSTALLERS_DOCS_CATEGORY,
 					(navigationCounts.get(INSTALLERS_DOCS_CATEGORY) ?? 0) + 1,
@@ -96,16 +136,16 @@ export function selectCatalogCounts(
 		}
 		if (app.visibilityClass === 'auxiliary') {
 			classifiedAuxiliaryCount += 1
-			if (!isHidden) auxiliaryCount += 1
+			if (!hidden) auxiliaryCount += 1
 			continue
 		}
-		if (isHidden) continue
+		if (hidden) continue
 		visibleCategorizedApps.push(app)
 		navigationCounts.set(
 			app.category,
 			(navigationCounts.get(app.category) ?? 0) + 1,
 		)
-		if (favorites.has(app.id)) favoriteCount += 1
+		if (isFavorite(app)) favoriteCount += 1
 	}
 	return {
 		visibleCategorizedApps,

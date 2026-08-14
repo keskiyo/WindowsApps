@@ -1,4 +1,5 @@
-import { UpdateDialog } from '../../features/update-app'
+import { useState } from 'react'
+import { UpdateBanner, UpdateDialog } from '../../features/update-app'
 import { GlobalActivityBar } from './GlobalActivityBar'
 import { PreferencesNotSavedBanner } from './PreferencesNotSavedBanner'
 import { StaleCopyBanner } from '../../features/stale-copy'
@@ -14,6 +15,10 @@ export function AppShellChrome({
 	updater,
 	onDismissStaleCopy,
 }: AppShellChromeProps) {
+	const [reviewingUpdate, setReviewingUpdate] = useState(false)
+	const showDialog = Boolean(
+		updater.update && (reviewingUpdate || updater.installing),
+	)
 	return (
 		<>
 			<TitleBar />
@@ -28,7 +33,14 @@ export function AppShellChrome({
 				/>
 			)}
 			{!preferencesPersisted && <PreferencesNotSavedBanner />}
-			{updater.update && (
+			{updater.update && !showDialog && (
+				<UpdateBanner
+					version={updater.update.version}
+					onOpen={() => setReviewingUpdate(true)}
+					onDismiss={updater.dismiss}
+				/>
+			)}
+			{updater.update && showDialog && (
 				<UpdateDialog
 					version={updater.update.version}
 					date={updater.update.date}
@@ -42,7 +54,7 @@ export function AppShellChrome({
 					phase={updater.phase}
 					error={updater.error}
 					onInstall={() => void updater.install()}
-					onDismiss={updater.dismiss}
+					onDismiss={() => setReviewingUpdate(false)}
 					onOpenRelease={() =>
 						void (
 							systemClient.openRelease?.(

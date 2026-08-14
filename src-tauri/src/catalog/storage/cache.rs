@@ -178,7 +178,23 @@ fn promote_artifact(app: &mut AppInfo, places: &crate::catalog::machine::Machine
     crate::catalog::visibility::apply_visibility(app);
 }
 
+fn stored_schema_version(app_data_dir: &Path) -> Option<u32> {
+    let bytes = fs::read(app_data_dir.join(CACHE_FILE)).ok()?;
+    serde_json::from_slice::<serde_json::Value>(&bytes)
+        .ok()?
+        .get("schemaVersion")?
+        .as_u64()
+        .and_then(|version| u32::try_from(version).ok())
+}
+
+pub(crate) fn has_newer_schema(app_data_dir: &Path) -> bool {
+    stored_schema_version(app_data_dir).is_some_and(|version| version > CACHE_SCHEMA_VERSION)
+}
+
 pub(crate) fn write_document(app_data_dir: &Path, document: &CatalogCache) -> io::Result<()> {
+    if has_newer_schema(app_data_dir) {
+        return Ok(());
+    }
     fs::create_dir_all(app_data_dir)?;
     let cache = app_data_dir.join(CACHE_FILE);
     let temporary = app_data_dir.join("apps-cache.json.tmp");
@@ -229,6 +245,58 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("apps-cache.json"), "not json").unwrap();
         assert_eq!(read_document(dir.path()), None);
+    }
+
+    // A downgrade must degrade to a rescan, never destroy the document a newer build wrote. The
+    // preference store already refuses this; the catalog cache used to overwrite it silently.
+    #[test]
+    fn refuses_to_overwrite_a_cache_written_by_a_newer_schema() {
+        let dir = tempfile::tempdir().unwrap();
+        let newer = serde_json::json!({
+            "schemaVersion": CACHE_SCHEMA_VERSION + 1,
+            "generation": 42,
+            "apps": [],
+        });
+        std::fs::write(
+            dir.path().join(CACHE_FILE),
+            serde_json::to_vec(&newer).unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(read_document(dir.path()), None);
+        write_document(dir.path(), &CatalogCache::default()).unwrap();
+
+        let on_disk: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(dir.path().join(CACHE_FILE)).unwrap()).unwrap();
+        assert_eq!(on_disk["schemaVersion"], CACHE_SCHEMA_VERSION + 1);
+        assert_eq!(on_disk["generation"], 42);
+        assert!(!dir.path().join("apps-cache.json.bak").exists());
+    }
+
+    #[test]
+    fn writes_normally_when_the_stored_schema_is_current_or_older() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join(CACHE_FILE),
+            serde_json::to_vec(&serde_json::json!({
+                "schemaVersion": CACHE_SCHEMA_VERSION - 1,
+                "generation": 1,
+                "apps": [],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        write_document(
+            dir.path(),
+            &CatalogCache {
+                generation: 7,
+                ..CatalogCache::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(read_document(dir.path()).unwrap().generation, 7);
     }
 
     #[test]

@@ -1,9 +1,5 @@
 import { toAppClientError } from '../../shared/api/tauri/errors'
-import {
-	reconcileFirstSeen,
-	reconcileOverrides,
-	reconcileSelection,
-} from './reconciliation'
+import { reconcileFirstSeen, reconcileMarks } from './reconciliation'
 import type { AppInfo, AppsClient } from '../../entities/app'
 import type {
 	AppState,
@@ -44,8 +40,9 @@ export function createCatalogActions({
 	function commitScan(apps: AppInfo[]) {
 		const previous = get().firstSeenAt
 		const firstSeenAt = reconcileFirstSeen(apps, previous, Date.now())
-		set({ apps, hasCache: true, firstSeenAt })
-		if (firstSeenAt !== previous) persist()
+		const marks = reconcileMarks(get(), apps)
+		set({ apps, hasCache: true, firstSeenAt, ...marks })
+		if (firstSeenAt !== previous || marks) persist()
 	}
 
 	return {
@@ -53,37 +50,6 @@ export function createCatalogActions({
 			set({ isLoading: true, error: null })
 			try {
 				const snapshot = await client.getApps()
-				const legacy = get().legacyCanonicalPreferences
-				const favorites = reconcileSelection(
-					snapshot.apps,
-					get().favoriteAppIds,
-					get().favoriteAppIdentities,
-					legacy.favorite,
-				)
-				const hidden = reconcileSelection(
-					snapshot.apps,
-					get().hiddenAppIds,
-					get().hiddenAppIdentities,
-					legacy.hidden,
-				)
-				const promoted = reconcileSelection(
-					snapshot.apps,
-					get().promotedAppIds,
-					get().promotedAppIdentities,
-					legacy.promoted,
-				)
-				const installers = reconcileSelection(
-					snapshot.apps,
-					get().installerAppIds,
-					get().installerAppIdentities,
-					legacy.installer,
-				)
-				const overrides = reconcileOverrides(
-					snapshot.apps,
-					get().categoryOverrides,
-					get().categoryOverrideIdentities,
-					legacy.categoryOverrides,
-				)
 				set({
 					apps: snapshot.apps,
 					firstSeenAt: reconcileFirstSeen(
@@ -94,23 +60,7 @@ export function createCatalogActions({
 					hasCache: snapshot.hasCache,
 					catalogGeneration: snapshot.generation ?? 0,
 					catalogDiagnostics: snapshot.diagnostics ?? null,
-					promotedAppIds: promoted.ids,
-					promotedAppIdentities: promoted.identities,
-					installerAppIds: installers.ids,
-					installerAppIdentities: installers.identities,
-					favoriteAppIds: favorites.ids,
-					favoriteAppIdentities: favorites.identities,
-					hiddenAppIds: hidden.ids,
-					hiddenAppIdentities: hidden.identities,
-					categoryOverrides: overrides.overrides,
-					categoryOverrideIdentities: overrides.overrideIdentities,
-					legacyCanonicalPreferences: {
-						favorite: favorites.unresolvedLegacy,
-						hidden: hidden.unresolvedLegacy,
-						promoted: promoted.unresolvedLegacy,
-						installer: installers.unresolvedLegacy,
-						categoryOverrides: overrides.unresolvedLegacy,
-					},
+					...reconcileMarks(get(), snapshot.apps),
 				})
 				persist()
 			} catch (error) {

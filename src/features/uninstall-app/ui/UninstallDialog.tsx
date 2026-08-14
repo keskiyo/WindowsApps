@@ -1,7 +1,8 @@
-import { AlertTriangle, Loader2, X } from 'lucide-react'
+import { AlertTriangle, Loader2, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
 import { useFocusTrap } from '../../../shared/hooks/useFocusTrap'
+import { DANGER_VARIANT } from '../../../shared/ui/buttonVariants'
 import { SOURCE_LABELS } from '../../../entities/app'
 import { METHOD_LABELS } from '../data'
 import type { UninstallDialogProps } from '../types'
@@ -118,8 +119,9 @@ export function UninstallDialog({
 							!!previewError
 						}
 						onClick={() => void confirm()}
-						className="rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-400 focus-visible:outline-2 focus-visible:outline-red-300 disabled:opacity-60"
+						className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 ${DANGER_VARIANT}`}
 					>
+						<Trash2 size={16} aria-hidden="true" />
 						{pending ? 'Starting…' : 'Confirm uninstall'}
 					</button>
 				</div>

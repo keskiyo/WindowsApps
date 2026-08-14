@@ -101,19 +101,13 @@ export function createCategoryActions({
 					category => category !== id,
 				),
 				categoryOverrides: Object.fromEntries(
-					Object.entries(state.categoryOverrides).map(
-						([appId, category]) => [
-							appId,
-							category === id ? 'other' : category,
-						],
+					Object.entries(state.categoryOverrides).filter(
+						([, category]) => category !== id,
 					),
 				),
 				categoryOverrideIdentities: Object.fromEntries(
-					Object.entries(state.categoryOverrideIdentities).map(
-						([identity, category]) => [
-							identity,
-							category === id ? 'other' : category,
-						],
+					Object.entries(state.categoryOverrideIdentities).filter(
+						([, category]) => category !== id,
 					),
 				),
 			}))

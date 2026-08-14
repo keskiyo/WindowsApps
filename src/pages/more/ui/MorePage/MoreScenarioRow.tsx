@@ -1,5 +1,4 @@
 import { ListChecks, Play } from 'lucide-react'
-import { ScenarioStopButton } from '../../../../features/manage-scenarios'
 import type { MoreScenarioRowProps } from './types'
 
 export function MoreScenarioRow({
@@ -7,7 +6,6 @@ export function MoreScenarioRow({
 	running,
 	isScenarioRunning,
 	onRun,
-	onCancel,
 }: MoreScenarioRowProps) {
 	const blocked = isScenarioRunning && !running
 	const runLabel = blocked
@@ -37,12 +35,6 @@ export function MoreScenarioRow({
 				<Play size={14} aria-hidden="true" />
 				{running ? 'Running…' : 'Run'}
 			</button>
-			{running && onCancel && (
-				<ScenarioStopButton
-					scenarioName={scenario.name}
-					onCancel={onCancel}
-				/>
-			)}
 		</li>
 	)
 }

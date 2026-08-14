@@ -10,4 +10,5 @@ export interface ScanPromptProps {
 	isScanning: boolean
 	onScan(): Promise<void>
 	onDismiss(): void
+	onConfigureFolders?(): void
 }

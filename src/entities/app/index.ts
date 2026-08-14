@@ -24,12 +24,16 @@ export type {
 	UninstallPreview,
 } from './model/app.types'
 export {
+	type AppPredicate,
 	type CatalogCounts,
 	type CategorizedAppsState,
+	createMarkLookup,
 	filterVisibleApps,
 	selectCatalogCounts,
 	selectCategorizedApps,
 	selectRecentApps,
+	selectSearchScopeCounts,
+	type SearchScopeCounts,
 } from './model/catalogSelectors'
 export { appIdentity } from './lib/appIdentity'
 export { useIconRecovery } from './model/useIconRecovery'

@@ -67,6 +67,8 @@ function renderGrid(size: number) {
 			isLoading={false}
 			hasQuery={false}
 			activeView='all'
+			searchScopeCounts={{ auxiliary: 0, hidden: 0, installersDocs: 0 }}
+			onSelectView={vi.fn()}
 			categoryOrder={['utilities']}
 			categories={categories}
 			collapsedCategories={[]}

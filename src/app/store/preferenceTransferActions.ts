@@ -6,6 +6,7 @@ import {
 	type AppPreferencesV15,
 	type PreferenceTransferResult,
 } from './preferences'
+import { reconcileMarks } from './reconciliation'
 import type {
 	AppState,
 	GetAppState,
@@ -46,7 +47,6 @@ function preferencesFromState(state: AppState): AppPreferencesV15 {
 		installerAppIdentities: state.installerAppIdentities,
 		scenarios: state.scenarios,
 		favoriteScenarioIds: state.favoriteScenarioIds,
-		scenarioHistory: state.scenarioHistory,
 		firstSeenAt: state.firstSeenAt,
 		legacyCanonicalPreferences: state.legacyCanonicalPreferences,
 		unknownFields: state.unknownPreferenceFields,
@@ -70,7 +70,6 @@ function preferenceState(preferences: AppPreferencesV15) {
 		installerAppIdentities: preferences.installerAppIdentities,
 		scenarios: preferences.scenarios,
 		favoriteScenarioIds: preferences.favoriteScenarioIds,
-		scenarioHistory: preferences.scenarioHistory,
 		firstSeenAt: preferences.firstSeenAt,
 		legacyCanonicalPreferences: preferences.legacyCanonicalPreferences,
 		unknownPreferenceFields: preferences.unknownFields ?? {},
@@ -91,6 +90,7 @@ export function createPreferenceTransferActions({
 			}
 		}
 		set(preferenceState(preferences))
+		set(reconcileMarks(get(), get().apps) ?? {})
 		persist()
 		return { ok: true }
 	}

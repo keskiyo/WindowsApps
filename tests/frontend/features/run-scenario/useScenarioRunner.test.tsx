@@ -49,23 +49,21 @@ function setup(options: {
 	const closeApps = vi.fn(
 		options.closeApps ?? (async (ids: string[]) => closed(ids.length)),
 	)
-	const onFinished = vi.fn()
 	const view = renderHook(() =>
 		useScenarioRunner({
 			apps: options.apps,
 			scenarios: options.scenarios ?? [],
 			launch,
 			closeApps,
-			onFinished,
 		}),
 	)
-	return { view, launch, closeApps, onFinished }
+	return { view, launch, closeApps }
 }
 
 describe('useScenarioRunner', () => {
 	it('launches the launch list, then closes the close list', async () => {
 		const order: string[] = []
-		const { view, onFinished } = setup({
+		const { view } = setup({
 			apps: [app('game'), app('chat')],
 			launch: vi.fn(async (entry: AppInfo) => {
 				order.push(`launch:${entry.id}`)
@@ -83,46 +81,6 @@ describe('useScenarioRunner', () => {
 		})
 
 		expect(order).toEqual(['launch:game', 'close:chat'])
-		expect(onFinished).toHaveBeenCalledWith(
-			expect.objectContaining({ id: 'gaming' }),
-			expect.objectContaining({
-				launched: 1,
-				closed: 1,
-				notRunning: 0,
-				unavailable: 0,
-				blocked: 0,
-				failed: 0,
-			}),
-		)
-	})
-
-	// A scenario can hold many heavy applications; without a stop the user could only watch.
-	it('stops a running scenario and reports the run as cancelled', async () => {
-		const launched: string[] = []
-		const { view, closeApps, onFinished } = setup({
-			apps: [app('game'), app('chat'), app('music')],
-			launch: vi.fn(async (entry: AppInfo) => {
-				launched.push(entry.id)
-				view.result.current.cancel()
-			}),
-		})
-
-		await act(async () => {
-			await view.result.current.run(
-				scenario({
-					launchIdentities: ['game', 'chat'],
-					closeIdentities: ['music'],
-				}),
-			)
-		})
-
-		expect(launched).toEqual(['game'])
-		expect(closeApps).not.toHaveBeenCalled()
-		expect(view.result.current.isRunning).toBe(false)
-		expect(onFinished).toHaveBeenCalledWith(
-			expect.objectContaining({ id: 'gaming' }),
-			expect.objectContaining({ launched: 1, cancelled: true }),
-		)
 	})
 
 	// The backend enumerates once and waits out a single grace period, so the whole close list has
@@ -152,39 +110,9 @@ describe('useScenarioRunner', () => {
 		expect(closeApps).not.toHaveBeenCalled()
 	})
 
-	// "It was already closed" is the outcome the scenario wanted, not a failure to report.
-	it('reports apps that were not running apart from failures', async () => {
-		const { view, onFinished } = setup({
-			apps: [app('chat'), app('store-app')],
-			closeApps: vi.fn(async () => ({
-				closed: 0,
-				notRunning: 1,
-				unavailable: 1,
-		blocked: 0,
-		failed: 0,
-			})),
-		})
-
-		await act(async () => {
-			await view.result.current.run(
-				scenario({ closeIdentities: ['chat', 'store-app'] }),
-			)
-		})
-
-		expect(onFinished).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-			launched: 0,
-			closed: 0,
-			notRunning: 1,
-			unavailable: 1,
-		blocked: 0,
-		failed: 0,
-		}))
-	})
-
-	it('counts entries the catalog no longer has as unavailable', async () => {
-		const { view, launch, closeApps, onFinished } = setup({
-			apps: [app('game')],
-		})
+	// An entry the catalog no longer resolves is skipped, never guessed at or sent as a raw string.
+	it('skips entries the catalog no longer has', async () => {
+		const { view, launch, closeApps } = setup({ apps: [app('game')] })
 
 		await act(async () => {
 			await view.result.current.run(
@@ -195,21 +123,16 @@ describe('useScenarioRunner', () => {
 			)
 		})
 
+		expect(launch).toHaveBeenCalledWith(
+			expect.objectContaining({ id: 'game' }),
+		)
 		expect(launch).toHaveBeenCalledTimes(1)
 		expect(closeApps).not.toHaveBeenCalled()
-		expect(onFinished).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-			launched: 1,
-			closed: 0,
-			notRunning: 0,
-			unavailable: 2,
-		blocked: 0,
-		failed: 0,
-		}))
 	})
 
 	// A scenario is a batch: one app that refuses to start must not abort the rest of it.
-	it('keeps going when one entry fails and reports it', async () => {
-		const { view, onFinished } = setup({
+	it('keeps going when one entry fails', async () => {
+		const { view, launch } = setup({
 			apps: [app('broken'), app('game')],
 			launch: vi.fn(async (entry: AppInfo) => {
 				if (entry.id === 'broken') throw new Error('no')
@@ -222,18 +145,16 @@ describe('useScenarioRunner', () => {
 			)
 		})
 
-		expect(onFinished).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-			launched: 1,
-			closed: 0,
-			notRunning: 0,
-			unavailable: 1,
-			blocked: 0,
-		}))
+		expect(launch).toHaveBeenCalledTimes(2)
+		expect(launch).toHaveBeenLastCalledWith(
+			expect.objectContaining({ id: 'game' }),
+		)
+		expect(view.result.current.isRunning).toBe(false)
 	})
 
-	// A failed close request is one failure per app it was supposed to close, not one overall.
-	it('reports every app of a close request that could not be made', async () => {
-		const { view, onFinished } = setup({
+	// A close request that throws must still release the run, or the card stays stuck on "Running".
+	it('settles the run when the close request throws', async () => {
+		const { view, closeApps } = setup({
 			apps: [app('chat'), app('mail')],
 			closeApps: vi.fn(async () => {
 				throw new Error('no')
@@ -246,13 +167,9 @@ describe('useScenarioRunner', () => {
 			)
 		})
 
-		expect(onFinished).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-			launched: 0,
-			closed: 0,
-			notRunning: 0,
-			unavailable: 2,
-			blocked: 0,
-		}))
+		expect(closeApps).toHaveBeenCalledOnce()
+		expect(view.result.current.runningId).toBeNull()
+		expect(view.result.current.isRunning).toBe(false)
 	})
 
 	it('never starts more than the entry cap, whatever the scenario holds', async () => {

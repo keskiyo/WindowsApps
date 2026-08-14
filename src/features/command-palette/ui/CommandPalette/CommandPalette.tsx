@@ -9,6 +9,7 @@ import type { CommandPaletteProps } from './types'
 
 export function CommandPalette({
 	apps,
+	suggestions,
 	onLaunch,
 	onClose,
 }: CommandPaletteProps) {
@@ -21,8 +22,11 @@ export function CommandPalette({
 	useFocusTrap(dialogRef)
 
 	const results = useMemo(
-		() => rankAppsByQueryTop(apps, query, MAX_RESULTS),
-		[apps, query],
+		() =>
+			query.trim()
+				? rankAppsByQueryTop(apps, query, MAX_RESULTS)
+				: suggestions.slice(0, MAX_RESULTS),
+		[apps, query, suggestions],
 	)
 
 	useEffect(() => {

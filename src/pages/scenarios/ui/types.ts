@@ -25,6 +25,5 @@ export interface ScenariosPageProps {
 	): { ok: true } | { ok: false; error: string }
 	onRemoveApp(id: string, list: ScenarioList, identity: string): void
 	onRun(scenario: Scenario): void
-	onCancel?(): void
 	onToggleFavorite(id: string): void
 }

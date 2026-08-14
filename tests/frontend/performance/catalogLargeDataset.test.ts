@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+	createMarkLookup,
 	filterAppsByQuery,
 	filterVisibleApps,
 	selectCategorizedApps,
@@ -30,8 +31,8 @@ describe('large catalog selector behavior', () => {
 		const visible = filterVisibleApps(
 			apps,
 			'all',
-			['app-1', 'app-9999'],
-			['app-100', 'app-200'],
+			createMarkLookup(['app-1', 'app-9999'], []),
+			createMarkLookup(['app-100', 'app-200'], []),
 		)
 		expect(visible).toHaveLength(9998)
 

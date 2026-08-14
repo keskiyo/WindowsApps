@@ -17,7 +17,7 @@ export function CategorySection({
 	categoryOrder,
 	apps,
 	collapsed,
-	favoriteAppIds,
+	favoriteIds,
 	onToggle,
 	onToggleFavorite,
 	onLaunch,
@@ -80,7 +80,7 @@ export function CategorySection({
 							<CatalogAppCard
 								key={app.id}
 								app={app}
-								isFavorite={favoriteAppIds.includes(app.id)}
+								isFavorite={favoriteIds.has(app.id)}
 								categories={categories}
 								categoryOrder={categoryOrder}
 								onToggleFavorite={onToggleFavorite}

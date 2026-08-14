@@ -11,7 +11,12 @@ interface ProgressiveCards<T> {
 
 export function useProgressiveCards<T>(items: T[]): ProgressiveCards<T> {
 	const [count, setCount] = useState(INITIAL_CARDS)
+	const [knownLength, setKnownLength] = useState(items.length)
 	const observerRef = useRef<IntersectionObserver | null>(null)
+	if (items.length !== knownLength) {
+		setKnownLength(items.length)
+		if (items.length < knownLength) setCount(INITIAL_CARDS)
+	}
 	const hasMore = count < items.length
 
 	useEffect(

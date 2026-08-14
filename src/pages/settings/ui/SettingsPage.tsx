@@ -1,4 +1,7 @@
-import { useSystemSettings } from '../../../features/edit-settings'
+import {
+	type SettingsArea,
+	useSystemSettings,
+} from '../../../features/edit-settings'
 import { useUpdater } from '../../../features/update-app'
 import { CatalogMaintenance } from './sections/CatalogMaintenance'
 import { AdvancedSettings } from './sections/AdvancedSettings'
@@ -22,6 +25,7 @@ export function SettingsPage({
 	const {
 		settings,
 		error,
+		errorArea,
 		saving,
 		confirming,
 		setConfirming,
@@ -36,6 +40,12 @@ export function SettingsPage({
 	} = useSystemSettings({ client, onForceFullScan, onResetCatalogCache })
 	const localUpdater = useUpdater({ autoCheck: false })
 	const updater = sharedUpdater ?? localUpdater
+	const areaError = (area: SettingsArea) =>
+		error && errorArea === area ? (
+			<p role="alert" className="mt-3 text-sm text-red-700">
+				{error}
+			</p>
+		) : null
 	return (
 		<section aria-labelledby="settings-title" className="mx-auto max-w-3xl">
 			<div className="mb-8 flex items-center gap-4">
@@ -64,6 +74,8 @@ export function SettingsPage({
 				onOpenTelegram={client.openTelegram}
 				onOpenAppsSettings={client.openAppsSettings}
 			/>
+			{areaError('settings')}
+			{areaError('startup')}
 			<AdvancedSettings>
 				<SettingsDiscoveryControls
 					settings={settings}
@@ -73,6 +85,7 @@ export function SettingsPage({
 					onRemovePath={removePath}
 					onPickFolder={client.pickFolder}
 				/>
+				{areaError('discovery')}
 				{onExportPreferences &&
 					onValidatePreferencesImport &&
 					onImportPreferences &&
@@ -97,13 +110,9 @@ export function SettingsPage({
 						onResetCatalogCache={resetCatalogCache}
 					/>
 				)}
+				{areaError('maintenance')}
 				<UninstallHistory client={client} />
 			</AdvancedSettings>
-			{error && (
-				<p role="alert" className="mt-4 text-sm text-red-700">
-					{error}
-				</p>
-			)}
 		</section>
 	)
 }

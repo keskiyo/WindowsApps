@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.4"><img src="https://img.shields.io/badge/version-0.3.4-7C3AED?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.5"><img src="https://img.shields.io/badge/version-0.3.5-7C3AED?style=flat-square" alt="Version"></a>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows">
   <img src="https://img.shields.io/badge/architecture-x64-334155?style=flat-square" alt="Architecture">
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri">
@@ -48,6 +48,8 @@ When the same application is discovered from more than one source, it appears on
 ### Search the catalog
 
 Find applications by name, publisher, description or path, including typo-tolerant search.
+Typing a name in Russian letters finds the Latin one, and when a match sits in another
+section the results say so and link straight to it.
 
 ### Keep one card per application
 
@@ -72,7 +74,6 @@ Star applications for quick access, or run a Scenario that opens one group of ap
 ![Scenarios page with launch and close lists](.github/images/scenarios.png)
 
 Each Scenario shows the applications it will launch and the applications it will close before you run it.
-A running Scenario can be stopped: the remaining applications are not started and nothing is closed.
 If an application later disappears from Windows, its saved name and icon remain visible as
 **Unavailable** so it can be removed without deleting the whole Scenario.
 
@@ -99,7 +100,7 @@ restored data. When Windows startup is enabled, Windows Apps starts in the syste
 
 ## Install
 
-1. Download [**`Windows.Apps_0.3.4_x64-setup.exe`**](https://github.com/keskiyo/WindowsApps/releases/latest).
+1. Download [**`Windows.Apps_0.3.5_x64-setup.exe`**](https://github.com/keskiyo/WindowsApps/releases/latest).
 2. Run the installer.
 3. Start Windows Apps and choose **Scan for apps**.
 

@@ -62,6 +62,35 @@ describe('catalog search layout correction', () => {
 	})
 })
 
+// Letter-for-letter only. A phonetic spelling such as "гугл" maps to "gugl" and will not reach
+// "Google"; matching that would need pronunciation rules and invites false positives.
+describe('catalog search transliteration', () => {
+	const chrome = app({ id: 'chrome', name: 'Google Chrome' })
+	const telegram = app({ id: 'telegram', name: 'Telegram Desktop' })
+
+	it.each([
+		['хром', chrome],
+		['телеграм', telegram],
+	])('finds an English name from the transliterated query %s', (query, expected) => {
+		expect(rankAppsByQuery([chrome, telegram], query as string)).toEqual([
+			expected,
+		])
+	})
+
+	it('ranks a literal match above a transliterated one', () => {
+		const cyrillic = app({ id: 'cyrillic', name: 'Хром' })
+
+		expect(rankAppsByQuery([cyrillic, chrome], 'хром')).toEqual([
+			cyrillic,
+			chrome,
+		])
+	})
+
+	it('leaves a query that needs no transliteration alone', () => {
+		expect(filterAppsByQuery([chrome], 'chrome')).toEqual([chrome])
+	})
+})
+
 describe('Windows Terminal cmd alias', () => {
 	const commandPrompt = app({
 		id: 'command-prompt',

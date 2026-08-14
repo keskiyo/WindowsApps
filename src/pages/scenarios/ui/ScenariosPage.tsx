@@ -22,7 +22,6 @@ export function ScenariosPage({
 	onAddApp,
 	onRemoveApp,
 	onRun,
-	onCancel,
 	onToggleFavorite,
 }: ScenariosPageProps) {
 	const [creating, setCreating] = useState(false)
@@ -92,7 +91,6 @@ export function ScenariosPage({
 							onAddApp={onAddApp}
 							onRemoveApp={onRemoveApp}
 							onRun={onRun}
-							onCancel={onCancel}
 						/>
 					))}
 				</div>

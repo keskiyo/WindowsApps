@@ -71,6 +71,9 @@ describe('incremental app store updates', () => {
 			iconBase64: 'data:image/png;base64,x',
 			publisher: 'Microsoft',
 		})
+		// The patch envelope carries a generation for staleness checks; only its fields belong
+		// on the catalog record.
+		expect(store.getState().apps[0]).not.toHaveProperty('generation')
 	})
 
 	it('ignores stale patches and patches for removed applications', async () => {
@@ -99,5 +102,22 @@ describe('incremental app store updates', () => {
 
 		expect(store.getState().apps[0].version).toBe('2.0')
 		expect(store.getState().favoriteAppIds).toEqual(['code'])
+	})
+
+	// A watcher-driven scan arrives as a delta, so an application first seen that way was missing
+	// from "Recently added" until the next full load.
+	it('stamps applications that arrive through a delta', async () => {
+		const store = createAppStore(client())
+		await store.getState().load()
+		const discovered = { ...code, id: 'new-tool', name: 'New Tool' }
+
+		store.getState().applyDelta({
+			generation: 3,
+			upserted: [discovered],
+			removedIds: [],
+			summary: { added: 1, removed: 0, updated: 0 },
+		})
+
+		expect(store.getState().firstSeenAt['new-tool']).toBeGreaterThan(0)
 	})
 })

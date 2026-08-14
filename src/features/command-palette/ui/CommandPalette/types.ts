@@ -2,6 +2,7 @@ import type { AppInfo } from '../../../../entities/app'
 
 export interface CommandPaletteProps {
 	apps: AppInfo[]
+	suggestions: AppInfo[]
 	onLaunch(app: AppInfo): Promise<void>
 	onClose(): void
 }

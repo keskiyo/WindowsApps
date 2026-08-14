@@ -39,7 +39,8 @@ export function DeleteCategoryDialog({
 					<div className="flex-1">
 						<h2 className="font-semibold">Delete {name}?</h2>
 						<p className="mt-2 text-sm leading-6 text-slate-600">
-							Applications in this category will move to Other.
+							Applications in this category will return to their
+							detected category.
 						</p>
 					</div>
 					<button

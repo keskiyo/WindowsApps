@@ -4,11 +4,11 @@ The Rust backend has no external integration-test crate. Tests live next to the
 modules they exercise in `#[cfg(test)]` blocks so they can validate private and
 `pub(crate)` behaviour without widening production APIs.
 
-Snapshot: `v0.3.4`.
+Snapshot: `v0.3.5`.
 
-- Rust: **578 test entries** in **71 source files**; one developer-only timing
-  test is ignored in the normal run, so a green suite reports 577 passed.
-- Frontend: **525 Vitest tests** in **71 files**; it is documented here only to
+- Rust: **580 test entries** in **74 source files**; one developer-only timing
+  test is ignored in the normal run, so a green suite reports 579 passed.
+- Frontend: **549 Vitest tests** in **74 files**; it is documented here only to
   distinguish the two suites.
 - Backend tests must be deterministic. Filesystem/cache tests use
   `tempfile::tempdir()` and never inspect real user directories, registry data,
@@ -33,14 +33,19 @@ failure. The release gate also runs `cargo fmt --check` and Clippy with
 The catalog suite protects source discovery, installer/document separation,
 classification, conservative visibility, duplicate merging, trusted target
 resolution, cache migration, bounded scans, source-snapshot retention, icon
-hydration and deterministic catalog output.
+hydration and deterministic catalog output. `catalog/mod.rs` keeps the model and
+assembly; Start Menu traversal, close-scope classification and stable identity
+moved to `catalog/start_menu.rs`, `catalog/close.rs` and `catalog/identity.rs`,
+and their tests moved with them. Cache tests also cover refusing to overwrite a
+document written by a newer schema version.
 
 | Module                                                                                           |     Tests |
 | ------------------------------------------------------------------------------------------------ | --------: |
-| [`catalog/mod.rs`](../../src-tauri/src/catalog/mod.rs)                                           |        81 |
+| [`catalog/mod.rs`](../../src-tauri/src/catalog/mod.rs)                                           |        64 |
 | [`catalog/artifact/documentation.rs`](../../src-tauri/src/catalog/artifact/documentation.rs)     |         6 |
 | [`catalog/artifact/installer.rs`](../../src-tauri/src/catalog/artifact/installer.rs)             |        14 |
 | [`catalog/classify/mod.rs`](../../src-tauri/src/catalog/classify/mod.rs)                         |         7 |
+| [`catalog/close.rs`](../../src-tauri/src/catalog/close.rs)                                       |         6 |
 | [`catalog/dedup/merge.rs`](../../src-tauri/src/catalog/dedup/merge.rs)                           |         4 |
 | [`catalog/dedup/mod.rs`](../../src-tauri/src/catalog/dedup/mod.rs)                               |        72 |
 | [`catalog/details/cache.rs`](../../src-tauri/src/catalog/details/cache.rs)                       |         1 |
@@ -49,6 +54,7 @@ hydration and deterministic catalog output.
 | [`catalog/golden/mod.rs`](../../src-tauri/src/catalog/golden/mod.rs)                             |         5 |
 | [`catalog/golden/properties.rs`](../../src-tauri/src/catalog/golden/properties.rs)               |         7 |
 | [`catalog/golden/timings.rs`](../../src-tauri/src/catalog/golden/timings.rs)                     | 1 ignored |
+| [`catalog/identity.rs`](../../src-tauri/src/catalog/identity.rs)                                 |         4 |
 | [`catalog/machine.rs`](../../src-tauri/src/catalog/machine.rs)                                   |         2 |
 | [`catalog/model.rs`](../../src-tauri/src/catalog/model.rs)                                       |         1 |
 | [`catalog/place.rs`](../../src-tauri/src/catalog/place.rs)                                       |         3 |
@@ -62,7 +68,8 @@ hydration and deterministic catalog output.
 | [`catalog/sources/source.rs`](../../src-tauri/src/catalog/sources/source.rs)                     |         4 |
 | [`catalog/sources/start_apps.rs`](../../src-tauri/src/catalog/sources/start_apps.rs)             |        15 |
 | [`catalog/sources/steam.rs`](../../src-tauri/src/catalog/sources/steam.rs)                       |         7 |
-| [`catalog/storage/cache.rs`](../../src-tauri/src/catalog/storage/cache.rs)                       |        16 |
+| [`catalog/start_menu.rs`](../../src-tauri/src/catalog/start_menu.rs)                             |         7 |
+| [`catalog/storage/cache.rs`](../../src-tauri/src/catalog/storage/cache.rs)                       |        18 |
 | [`catalog/storage/icon_cache.rs`](../../src-tauri/src/catalog/storage/icon_cache.rs)             |        13 |
 | [`catalog/sync/document.rs`](../../src-tauri/src/catalog/sync/document.rs)                       |         5 |
 | [`catalog/sync/hydration.rs`](../../src-tauri/src/catalog/sync/hydration.rs)                     |         1 |

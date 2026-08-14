@@ -2,6 +2,7 @@ import {
 	type AppInfo,
 	type AppView,
 	appIdentity,
+	createMarkLookup,
 	filterVisibleApps,
 	selectRecentApps,
 } from '../../../entities/app'
@@ -42,8 +43,10 @@ export function buildMorePreview({
 	hiddenAppIds,
 	scenarios,
 }: PreviewInput): MorePreview {
+	const isHidden = createMarkLookup(hiddenAppIds, [])
+	const isFavorite = createMarkLookup(favoriteAppIds, [])
 	const area = (view: AppView) =>
-		filterVisibleApps(categorizedApps, view, hiddenAppIds, favoriteAppIds)
+		filterVisibleApps(categorizedApps, view, isHidden, isFavorite)
 	const seenAt = (app: AppInfo): number | null => {
 		const value = firstSeenAt[appIdentity(app)]
 		return Number.isFinite(value) && value > 0 ? value : null

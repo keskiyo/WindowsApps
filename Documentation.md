@@ -74,10 +74,7 @@ interface-failure reporting. Commands return
 safe messages. Internal paths, commands, registry values and upstream errors
 never reach the webview.
 
-A running Scenario can be stopped from any surface that started it. The stop is
-cooperative: the launch loop ends at the next entry, the close phase is skipped,
-and the recorded run is marked cancelled. Scenario close actions accept catalog
-IDs only. The trusted catalog classifies
+Scenario close actions accept catalog IDs only. The trusted catalog classifies
 close targets; only `Safe` targets may be added or executed. Critical Windows
 processes and session components are counted as blocked rather than terminated.
 
@@ -106,6 +103,8 @@ IPC changes update all of these together:
 Events use `namespace://name`. Catalog synchronization emits full updates,
 deltas, change counts, hydration patches, diagnostics and coarse scan progress.
 Progress is coalesced; icon and metadata patches are emitted in bounded batches.
+The synchronization lock is released before any event leaves the backend, so a
+listener that calls back into the catalog cannot meet a writer still holding it.
 
 ## 5. Persisted data
 
@@ -120,7 +119,10 @@ Persisted-format changes must bump the appropriate version, upgrade every
 supported version, default new fields, preserve unknown data, safely handle
 malformed input, and test migration paths.
 
-Preferences preserve unknown root fields. Invalid primary data falls back to a
+Preferences preserve unknown root fields, which is also how a field this version
+stopped reading survives: scenario run history is no longer collected or parsed,
+and the records an earlier version wrote are carried through the document
+untouched rather than dropped. Invalid primary data falls back to a
 one-step backup. A document written by a newer preference schema is never
 overwritten. Import and local-backup restore reject unsupported/newer documents
 and also refuse replacement when the installed app is older than the current
@@ -130,9 +132,28 @@ retains a bounded 32 KiB name/icon snapshot per app identity so unavailable
 entries remain identifiable and removable; it is presentation data, never a
 launch target.
 
+Marks — favorites, hidden, promoted and installer placements — and category
+overrides are reconciled against the catalog on every full replacement, not only
+at startup. The initial load, a refresh, a forced scan, an `apps://updated`
+snapshot, a `catalog://delta` and a preferences import all run the same
+reconciliation. A mark matches a record by catalog ID **or** by its durable
+identity, so a rescan that reassigns IDs cannot silently clear favorites or
+reveal hidden applications. Reconciliation persists only when a set actually
+changed, and an empty catalog leaves the stored sets untouched instead of
+treating absence as removal. First-seen timestamps follow the same path, so an
+application discovered by a background delta appears in Recently added without
+waiting for the next startup.
+
+Deleting a user category removes that category's overrides rather than
+rewriting them to another category. The affected applications return to the
+category the classifier detected for them.
+
 Catalog writes retain the previous known-good cache as `apps-cache.json.bak` after
 an atomic replacement. In-memory catalog state updates only after the replacement
-write succeeds.
+write succeeds. A cache file written by a newer schema version is never
+overwritten by an older build: the catalog treats it as absent, scans into
+memory, and skips the write so the file survives intact for the newer build.
+This mirrors the equivalent preference rule above.
 Cache/index and generated icons are separate; clearing icons does not remove the
 catalog, and resetting the catalog does not remove user preferences.
 
@@ -155,7 +176,30 @@ bounded; no stale result may overwrite a newer generation.
 | Deduplication  | Canonical identity and launch evidence prevent unrelated same-name applications from merging.              |
 | Cache          | Source-aware generation document; invalid data degrades safely.                                            |
 | Hydration      | Icons/details are lazy, size-limited, trusted-ID-only and processed in bounded batches.                    |
-| Search         | Current view/category only; literal matches rank above corrected and fuzzy matches.                        |
+| Search         | Current view/category only; literal matches rank above corrected, transliterated and fuzzy matches.        |
+
+A query token expands into variants before matching: the literal token, the
+token remapped between the English and Russian keyboard layouts, and a
+Cyrillic-to-Latin transliteration. Ranking keeps the literal variant above the
+rest, so a transliterated hit never displaces an exact one. Transliteration is
+letter-for-letter and does not resolve loanwords whose spelling diverges.
+
+Search stays inside the active view, and a query that also matches records
+outside it reports those counts for Tools, Hidden and Installers & docs with a
+direct link to the owning view, rather than leaving the matches invisible.
+Typing into search from Settings, More or Scenarios switches to the catalog.
+Empty user categories are not rendered while a query is active. The command
+palette opened with an empty query lists favorites first, then recently added
+applications.
+
+Before the first scan the catalog shows what will be scanned, that nothing runs
+automatically at startup, and that the data stays on the device, with the scan
+action and a link to folder settings on the same card.
+
+Classification decisions are explainable in the interface, not only in source:
+the application information dialog reports the discovery source, where the
+record is shown and why, the recorded launch-target check where one applies,
+and the signal that chose its category.
 
 The golden catalog harness under `src-tauri/src/catalog/golden/` protects
 identity, launch descriptor, category, visibility and dedup contracts with
@@ -196,8 +240,11 @@ Rust-owned target. History excludes paths, command lines and internal errors.
   A normal launch remains visible, and a tray initialization failure keeps the
   window visible.
 - WebView2 uses Tauri's silent bootstrapper when missing.
-- The updater checks the signed release manifest on startup; the user chooses
-  whether to download and restart.
+- The updater checks the signed release manifest on startup. An available
+  version is announced by a dismissible banner in the shell notice area beside
+  the stale-copy and preference-write notices; it never opens a dialog by
+  itself. The update dialog opens only from the banner's action, and download,
+  verification, installation and restart remain modal from that point.
 - Updater signatures are verified with the public key in `tauri.conf.json`.
   The private key exists only in CI secrets.
 - Download progress reports real bytes/percentage; verification, installation
@@ -280,7 +327,7 @@ Node.js `22.22.2` and Rust `1.96.0` are pinned in `.node-version` and
 `rust-toolchain.toml`. Cargo verification uses `--locked`; the separate MSRV
 job builds with Rust `1.88.0`.
 
-The v0.3.4 release preparation also provides `scripts/run-release-soak.ps1`.
+Release preparation also provides `scripts/run-release-soak.ps1`.
 It binds to one exact application PID and executable path, records operator-confirmed
 Refresh/Cancel outcomes, samples memory during the idle/watcher window, and writes
 local evidence under `.1localDocuments`. It never controls or terminates the target
@@ -302,16 +349,16 @@ source is MIT-licensed; third-party notices are recorded in
 
 ## 17. Troubleshooting
 
-| Problem                    | First action                                                                                             |
-| -------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Catalog empty              | Use **Scan for apps**; the first complete scan is explicit.                                              |
-| Duplicate or stale entries | Refresh; then use **Settings → Advanced → Catalog maintenance → Reset catalog cache**.                   |
-| Missing application        | Check permanent local drive/exclusions; add a folder in **Settings → Advanced → Application discovery**. |
-| Old version or icon        | Refresh; missing icons can be repaired from catalog maintenance without losing preferences.              |
-| Shortcut/startup fails     | Re-enable it in Settings; Windows policy or another process can block registration.                      |
-| Uninstall unavailable      | The catalog record has no trusted, parseable uninstall target.                                           |
-| Catalog stays on placeholders | The event connection failed; use **Retry** in the notice. Refresh and launch keep working without it. |
-| A panel closes by itself   | That dialog failed to render; the failure is in the application log and the catalog is unaffected.        |
-| Scenario runs too long     | Use **Stop** next to the running Scenario; started applications stay open and nothing is closed.          |
-| Update/download failure    | Retry from the update dialog or use the linked GitHub release.                                           |
-| SmartScreen warning        | Expected for the unsigned NSIS installer; verify the release source and updater signature.               |
+| Problem                       | First action                                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Catalog empty                 | Use **Scan for apps**; the first complete scan is explicit.                                              |
+| Duplicate or stale entries    | Refresh; then use **Settings → Advanced → Catalog maintenance → Reset catalog cache**.                   |
+| Missing application           | Check permanent local drive/exclusions; add a folder in **Settings → Advanced → Application discovery**. |
+| Old version or icon           | Refresh; missing icons can be repaired from catalog maintenance without losing preferences.              |
+| Shortcut/startup fails        | Re-enable it in Settings; Windows policy or another process can block registration.                      |
+| Uninstall unavailable         | The catalog record has no trusted, parseable uninstall target.                                           |
+| Catalog stays on placeholders | The event connection failed; use **Retry** in the notice. Refresh and launch keep working without it.    |
+| A panel closes by itself      | That dialog failed to render; the failure is in the application log and the catalog is unaffected.       |
+| Search finds nothing here     | Check the counts under the results; a match may live in Tools, Hidden or Installers & docs.              |
+| Update/download failure       | Retry from the update dialog or use the linked GitHub release.                                           |
+| SmartScreen warning           | Expected for the unsigned NSIS installer; verify the release source and updater signature.               |

@@ -14,12 +14,63 @@ function remapToken(token: string, from: string, to: string): string | null {
 	return changed ? mapped : null
 }
 
+const TRANSLITERATION: Record<string, string> = {
+	а: 'a',
+	б: 'b',
+	в: 'v',
+	г: 'g',
+	д: 'd',
+	е: 'e',
+	ё: 'e',
+	ж: 'zh',
+	з: 'z',
+	и: 'i',
+	й: 'y',
+	к: 'k',
+	л: 'l',
+	м: 'm',
+	н: 'n',
+	о: 'o',
+	п: 'p',
+	р: 'r',
+	с: 's',
+	т: 't',
+	у: 'u',
+	ф: 'f',
+	х: 'h',
+	ц: 'ts',
+	ч: 'ch',
+	ш: 'sh',
+	щ: 'sch',
+	ъ: '',
+	ы: 'y',
+	ь: '',
+	э: 'e',
+	ю: 'yu',
+	я: 'ya',
+}
+
+function transliterate(token: string): string | null {
+	let changed = false
+	const latin = [...token]
+		.map(character => {
+			const replacement = TRANSLITERATION[character]
+			if (replacement === undefined) return character
+			changed = true
+			return replacement
+		})
+		.join('')
+	return changed && latin.length > 0 ? latin : null
+}
+
 export function queryTokenVariants(token: string): string[] {
 	const variants = new Set([token])
 	const russian = remapToken(token, ENGLISH_KEYS, RUSSIAN_KEYS)
 	const english = remapToken(token, RUSSIAN_KEYS, ENGLISH_KEYS)
 	if (russian) variants.add(russian)
 	if (english) variants.add(english)
+	const latin = transliterate(token)
+	if (latin) variants.add(latin)
 	return [...variants]
 }
 

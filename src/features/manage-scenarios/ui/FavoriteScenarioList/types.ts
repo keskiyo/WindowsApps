@@ -7,7 +7,6 @@ export interface FavoriteScenarioListProps {
 	runningId: string | null
 	isScenarioRunning: boolean
 	onRun(id: string): void
-	onCancel?(): void
 	onToggleFavorite(id: string): void
 }
 
@@ -19,6 +18,5 @@ export interface FavoriteScenarioCardProps {
 	isScenarioRunning: boolean
 	onToggle(id: string): void
 	onRun(id: string): void
-	onCancel?(): void
 	onToggleFavorite(id: string): void
 }

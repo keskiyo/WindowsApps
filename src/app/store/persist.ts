@@ -31,7 +31,6 @@ export function createPersist({
 			installerAppIdentities: state.installerAppIdentities,
 			scenarios: state.scenarios,
 			favoriteScenarioIds: state.favoriteScenarioIds,
-			scenarioHistory: state.scenarioHistory,
 			firstSeenAt: state.firstSeenAt,
 			legacyCanonicalPreferences: state.legacyCanonicalPreferences,
 			unknownFields: state.unknownPreferenceFields,

@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Windows Apps v0.3.4 distribution notices. Generated from `npm ls --omit=dev --all --json` and the locked Windows x64 Cargo normal/build dependency graph on 2026-08-13. Each listed package must retain its upstream license and any required notice.
+Windows Apps v0.3.5 distribution notices. Generated from `npm ls --omit=dev --all --json` and the locked Windows x64 Cargo normal/build dependency graph on 2026-08-13, and unchanged since: v0.3.5 adds, removes and upgrades no runtime dependency, so both lockfiles differ from v0.3.4 only in this package's own version field. Each listed package must retain its upstream license and any required notice.
 
 ## npm runtime dependencies
 

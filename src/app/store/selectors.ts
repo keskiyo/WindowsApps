@@ -1,5 +1,6 @@
 import {
 	type AppInfo,
+	createMarkLookup,
 	filterAppsByQuery,
 	filterVisibleApps,
 	selectCategorizedApps,
@@ -7,6 +8,7 @@ import {
 import type { AppState } from './types'
 
 export {
+	createMarkLookup,
 	filterAppsByQuery,
 	filterVisibleApps,
 	rankAppsByQuery,
@@ -20,8 +22,8 @@ export function selectVisibleApps(state: AppState): AppInfo[] {
 	return filterVisibleApps(
 		selectCategorizedApps(state),
 		state.activeView,
-		state.hiddenAppIds,
-		state.favoriteAppIds,
+		createMarkLookup(state.hiddenAppIds, state.hiddenAppIdentities),
+		createMarkLookup(state.favoriteAppIds, state.favoriteAppIdentities),
 	)
 }
 

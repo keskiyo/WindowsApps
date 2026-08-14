@@ -1,7 +1,9 @@
 import type { StoreApi } from 'zustand/vanilla'
-import type { AppsClient } from '../entities/app'
+import type { AppInfo, AppsClient } from '../entities/app'
+import type { CategoryDefinition } from '../entities/category'
 import type { StaleCopyInfo, SystemClient } from '../entities/system'
 import type { useUpdater } from '../features/update-app'
+import type { useCatalogDialogs } from './model/useCatalogDialogs'
 import type { AppState } from './store/appStore'
 
 export interface AppProps {
@@ -21,6 +23,16 @@ export interface AppShellChromeProps {
 	>
 	updater: ReturnType<typeof useUpdater>
 	onDismissStaleCopy: () => void
+}
+
+export interface AppDialogsProps {
+	appsClient: Pick<AppsClient, 'getAppDetails' | 'openAppFolder'>
+	categories: CategoryDefinition[]
+	dialogs: ReturnType<typeof useCatalogDialogs>
+	paletteApps: AppInfo[]
+	paletteSuggestions: AppInfo[]
+	onConfirmUninstall(): Promise<void>
+	onError(kind: string, detail: string): void
 }
 
 export interface GlobalActivityBarProps {

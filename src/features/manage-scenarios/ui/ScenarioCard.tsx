@@ -9,7 +9,6 @@ import { AppPickerDialog } from './AppPickerDialog'
 import { ScenarioCloseWarning } from './ScenarioCloseWarning'
 import { ScenarioListRow } from './ScenarioListRow'
 import { ScenarioNameEditor } from './ScenarioNameEditor'
-import { ScenarioStopButton } from './ScenarioStopButton'
 
 export function ScenarioCard({
 	scenario,
@@ -24,7 +23,6 @@ export function ScenarioCard({
 	onAddApp,
 	onRemoveApp,
 	onRun,
-	onCancel,
 }: ScenarioCardProps) {
 	const [renaming, setRenaming] = useState(false)
 	const picker = useScenarioAppPicker({ scenarioId: scenario.id, onAddApp })
@@ -91,12 +89,6 @@ export function ScenarioCard({
 						{runningStatus && <span>{runningStatus}</span>}
 						{running ? 'Running…' : 'Run'}
 						</button>
-						{running && onCancel && (
-							<ScenarioStopButton
-								scenarioName={scenario.name}
-								onCancel={onCancel}
-							/>
-						)}
 						<button
 							type="button"
 							aria-label={`Delete ${scenario.name}`}

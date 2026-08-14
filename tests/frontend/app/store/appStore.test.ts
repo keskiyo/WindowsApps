@@ -629,11 +629,13 @@ describe('app store', () => {
 		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
 			'new-shortcut',
 		])
+		// The identity carries the mark; the id set now follows the live card instead of keeping
+		// the replaced one, so views that filter by id cannot drift away from the catalog.
 		expect(JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? '{}')).toMatchObject({
-			promotedAppIds: ['old-launcher'],
+			promotedAppIds: ['new-shortcut'],
 			promotedAppIdentities: ['identity:example'],
 		})
-		expect(store.getState().promotedAppIds).toEqual(['old-launcher'])
+		expect(store.getState().promotedAppIds).toEqual(['new-shortcut'])
 	})
 
 	it('moves a promoted tool back to auxiliary and removes its favorite', () => {
@@ -1170,6 +1172,108 @@ describe('app store', () => {
 		expect(hydrateVisibleIcons).toHaveBeenLastCalledWith(['app-128'])
 	})
 
+	// Marks are stored twice: by catalog id and by durable identity. The id is derived from the
+	// path, so a reinstall, a moved shortcut or a source change gives the same application a new
+	// one. Reconciling only in `load()` meant every rescan — including the background scan the
+	// watcher starts whenever anything is installed — silently unfavourited and unhid entries.
+	describe('marks survive a rescan that changes catalog ids', () => {
+		const moved = app({
+			id: 'code-moved',
+			name: 'Visual Studio Code',
+			path: 'D:\\Code\\Code.exe',
+			category: 'development',
+			preferenceIdentity: 'code-identity',
+		})
+		const original = app({
+			id: 'code',
+			name: 'Visual Studio Code',
+			path: 'C:\\Code.exe',
+			category: 'development',
+			preferenceIdentity: 'code-identity',
+		})
+
+		function movedStore() {
+			const values = new Map<string, string>()
+			const storage = {
+				getItem: (key: string) => values.get(key) ?? null,
+				setItem: (key: string, value: string) =>
+					void values.set(key, value),
+				removeItem: (key: string) => void values.delete(key),
+			} as unknown as Storage
+			return createAppStore(
+				client({
+					getApps: vi
+						.fn()
+						.mockResolvedValue({ apps: [original], hasCache: true }),
+					refreshApps: vi.fn().mockResolvedValue([moved]),
+				}),
+				storage,
+			)
+		}
+
+		it('keeps a favorite in the Favorites view after a refresh', async () => {
+			const store = movedStore()
+			await store.getState().load()
+			store.getState().toggleFavorite('code')
+
+			await store.getState().refresh()
+
+			store.setState({ activeView: 'favorites' })
+			expect(
+				selectVisibleApps(store.getState()).map(entry => entry.id),
+			).toEqual(['code-moved'])
+		})
+
+		it('keeps a hidden application hidden after a refresh', async () => {
+			const store = movedStore()
+			await store.getState().load()
+			store.getState().hideApp('code')
+
+			await store.getState().refresh()
+
+			store.setState({ activeView: 'all' })
+			expect(selectVisibleApps(store.getState())).toEqual([])
+		})
+
+		it('keeps a favorite visible after a catalog delta replaces its id', async () => {
+			const store = movedStore()
+			await store.getState().load()
+			store.getState().toggleFavorite('code')
+
+			store.getState().applyDelta({
+				generation: 1,
+				upserted: [moved],
+				removedIds: ['code'],
+				summary: { added: 1, removed: 1, updated: 0 },
+			})
+
+			store.setState({ activeView: 'favorites' })
+			expect(
+				selectVisibleApps(store.getState()).map(entry => entry.id),
+			).toEqual(['code-moved'])
+		})
+
+		it('shows imported favorites against the local catalog without a restart', async () => {
+			const store = movedStore()
+			await store.getState().load()
+
+			expect(
+				store.getState().importPreferences(
+					JSON.stringify({
+						version: 15,
+						favoriteAppIdentities: ['code-identity'],
+						favoriteAppIds: ['id-from-another-machine'],
+					}),
+				),
+			).toEqual({ ok: true })
+
+			store.setState({ activeView: 'favorites' })
+			expect(
+				selectVisibleApps(store.getState()).map(entry => entry.id),
+			).toEqual(['code'])
+		})
+	})
+
 	it('searches publisher and description', () => {
 		const store = createAppStore(client())
 		store.setState({ apps, query: 'openai' })
@@ -1390,8 +1494,31 @@ describe('app store', () => {
 		expect(store.getState().deleteCategory('custom:work')).toEqual({
 			ok: true,
 		})
-		expect(store.getState().categoryOverrides.code).toBe('other')
 		expect(store.getState().categoryOrder).not.toContain('custom:work')
+	})
+
+	// Rewriting the override to "other" threw away the classifier's own answer, so an application
+	// could never find its way back after its custom category was removed.
+	it('returns applications to their detected category when a custom one is deleted', () => {
+		const store = createAppStore(client(), undefined, () => 'custom:work')
+		store.setState({ apps })
+		store.getState().createCategory('Work')
+		store.getState().moveApp('code', 'custom:work')
+		expect(selectVisibleApps(store.getState())[0]).toMatchObject({
+			id: 'code',
+			category: 'custom:work',
+		})
+
+		expect(store.getState().deleteCategory('custom:work')).toEqual({
+			ok: true,
+		})
+
+		expect(store.getState().categoryOverrides.code).toBeUndefined()
+		expect(
+			selectVisibleApps(store.getState()).find(
+				entry => entry.id === 'code',
+			)?.category,
+		).toBe('development')
 	})
 
 	it('launches and uninstalls through source-aware client calls', async () => {

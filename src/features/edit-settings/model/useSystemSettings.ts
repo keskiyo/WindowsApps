@@ -16,6 +16,8 @@ type PathKind = 'includedPaths' | 'excludedPaths'
 
 export type MaintenanceConfirmation = 'force' | 'reset' | null
 
+export type SettingsArea = 'settings' | 'startup' | 'discovery' | 'maintenance'
+
 export function useSystemSettings({
 	client,
 	onForceFullScan,
@@ -23,6 +25,17 @@ export function useSystemSettings({
 }: Options) {
 	const [settings, setSettings] = useState<SystemSettings | null>(null)
 	const [error, setError] = useState<string | null>(null)
+	const [errorArea, setErrorArea] = useState<SettingsArea | null>(null)
+
+	function reportError(area: SettingsArea, message: string) {
+		setError(message)
+		setErrorArea(area)
+	}
+
+	function clearError() {
+		setError(null)
+		setErrorArea(null)
+	}
 	const [saving, setSaving] = useState(false)
 	const [confirming, setConfirming] = useState<MaintenanceConfirmation>(null)
 	const [forcing, setForcing] = useState(false)
@@ -37,7 +50,8 @@ export function useSystemSettings({
 				if (active) setSettings(value)
 			})
 			.catch(reason => {
-				if (active) setError(toAppClientError(reason).message)
+				if (active)
+					reportError('settings', toAppClientError(reason).message)
 			})
 		return () => {
 			active = false
@@ -48,12 +62,12 @@ export function useSystemSettings({
 		if (!settings || saving) return
 		const enabled = !settings.autostartEnabled
 		setSaving(true)
-		setError(null)
+		clearError()
 		try {
 			await client.setAutostart(enabled)
 			setSettings({ ...settings, autostartEnabled: enabled })
 		} catch (reason) {
-			setError(toAppClientError(reason).message)
+			reportError('startup', toAppClientError(reason).message)
 		} finally {
 			setSaving(false)
 		}
@@ -62,12 +76,12 @@ export function useSystemSettings({
 	async function saveScanSettings(next: ScanSettings) {
 		if (!settings || saving) return
 		setSaving(true)
-		setError(null)
+		clearError()
 		try {
 			const scanSettings = await client.setScanSettings(next)
 			setSettings({ ...settings, scanSettings })
 		} catch (reason) {
-			setError(toAppClientError(reason).message)
+			reportError('discovery', toAppClientError(reason).message)
 		} finally {
 			setSaving(false)
 		}
@@ -100,14 +114,14 @@ export function useSystemSettings({
 		if (!onForceFullScan || maintenanceInFlight.current) return
 		maintenanceInFlight.current = true
 		setForcing(true)
-		setError(null)
+		clearError()
 		try {
 			await onForceFullScan()
 			setConfirming(null)
 		} catch (reason) {
 			const clientError = toAppClientError(reason)
 			if (clientError.code !== 'SCAN_CANCELLED')
-				setError(clientError.message)
+				reportError('maintenance', clientError.message)
 		} finally {
 			maintenanceInFlight.current = false
 			setForcing(false)
@@ -118,14 +132,14 @@ export function useSystemSettings({
 		if (!onResetCatalogCache || maintenanceInFlight.current) return
 		maintenanceInFlight.current = true
 		setResetting(true)
-		setError(null)
+		clearError()
 		try {
 			await onResetCatalogCache()
 			setConfirming(null)
 		} catch (reason) {
 			const clientError = toAppClientError(reason)
 			if (clientError.code !== 'SCAN_CANCELLED')
-				setError(clientError.message)
+				reportError('maintenance', clientError.message)
 		} finally {
 			maintenanceInFlight.current = false
 			setResetting(false)
@@ -135,6 +149,7 @@ export function useSystemSettings({
 	return {
 		settings,
 		error,
+		errorArea,
 		saving,
 		confirming,
 		setConfirming,

@@ -5,12 +5,6 @@ import {
 	catalogChangeMessage,
 	useCatalogView,
 } from '../widgets/catalog-content'
-import { AppInfoDialog, useAppInfoDialog } from '../features/view-app-details'
-import {
-	InstallerLaunchDialog,
-	useInstallerLaunch,
-} from '../features/launch-app'
-import { UninstallDialog, useUninstallFlow } from '../features/uninstall-app'
 import {
 	AppDrawer,
 	AppSidebar,
@@ -24,16 +18,18 @@ import { SettingsPage } from '../pages/settings'
 import { useScenarioRunner } from '../features/run-scenario'
 import { filterFavoriteScenarios } from '../entities/scenario'
 import { AppShellChrome } from './layout/AppShellChrome'
-import { CommandPalette } from '../features/command-palette'
 import { Header } from '../widgets/app-header'
 import { useAppFeedback } from './model/useAppFeedback'
+import { useActivityStatus } from './model/useActivityStatus'
+import { useCatalogDialogs } from './model/useCatalogDialogs'
+import { AppDialogs } from './layout/AppDialogs'
+import { useCatalogBootstrap } from './model/useCatalogBootstrap'
+import { useDrawer } from './model/useDrawer'
 
 import { INSTALLERS_DOCS_CATEGORY, useIconRecovery } from '../entities/app'
 import { useGlobalShortcuts } from './model/useGlobalShortcuts'
 import { useStaleCopy } from '../features/stale-copy'
 import { useUpdater } from '../features/update-app'
-import { toAppClientError } from '../shared/api/tauri/errors'
-import { AppErrorBoundary } from './AppErrorBoundary'
 import { AppStoreProvider } from './store/storeContext'
 import type { AppProps } from './types'
 
@@ -58,14 +54,13 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		filteredApps,
 		morePreview,
 		paletteApps,
+		paletteSuggestions,
+		searchScopeCounts,
 		visibleHydrationIds,
 	} = useCatalogView(state)
-	const [drawerOpen, setDrawerOpen] = useState(false)
-	const [drawerMounted, setDrawerMounted] = useState(false)
-	const appInfoDialog = useAppInfoDialog()
-	const uninstall = useUninstallFlow(getUninstallPreview)
+	const desktopNavigation = useDesktopNavigation()
+	const drawer = useDrawer(desktopNavigation)
 	const [scanPromptDismissed, setScanPromptDismissed] = useState(false)
-	const [paletteOpen, setPaletteOpen] = useState(false)
 	const recentApps = useMemo(
 		() =>
 			catalogApps
@@ -85,40 +80,29 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 	)
 	const menuButtonRef = useRef<HTMLButtonElement>(null)
 	const searchInputRef = useRef<HTMLInputElement>(null)
-	const desktopNavigation = useDesktopNavigation()
-	const animateDrawer = import.meta.env.MODE !== 'test'
-	const closeDrawer = useCallback(() => {
-		setDrawerOpen(false)
-		if (!animateDrawer) setDrawerMounted(false)
-	}, [animateDrawer])
 	const feedback = useAppFeedback({
 		onLaunch: state.launch,
 		onRefresh: state.refresh,
 		onUninstall: state.uninstall,
 	})
-	const installerLaunch = useInstallerLaunch(feedback.launch)
-	const reportDialogFailure = useCallback(
-		(kind: string, detail: string) => {
-			toast.error('That panel could not be shown. Try again.')
-			void systemClient
-				.logClientError?.(kind, detail)
-				.catch(() => undefined)
-		},
-		[systemClient],
-	)
+	const dialogs = useCatalogDialogs({
+		systemClient,
+		getUninstallPreview,
+		onLaunch: feedback.launch,
+	})
 	const navigation = useCatalogNavigation({
 		collapsedCategories: state.collapsedCategories,
 		activeView,
 		setActiveView: state.setActiveView,
 		toggleCategory: state.toggleCategory,
-		closeDrawer,
+		closeDrawer: drawer.close,
 		isCatalogReady: !isLoading && activeView === 'all',
 	})
 	async function confirmUninstall() {
-		if (!uninstall.app) return
-		const result = await feedback.uninstall(uninstall.app)
+		if (!dialogs.uninstall.app) return
+		const result = await feedback.uninstall(dialogs.uninstall.app)
 		if (!result.ok) return
-		uninstall.select(null)
+		dialogs.uninstall.select(null)
 		try {
 			await state.refresh()
 		} catch (ignored) {
@@ -126,40 +110,16 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		}
 	}
 
-	useEffect(() => {
-		let dispose: (() => void) | undefined
-		let cancelled = false
-		function connect() {
-			void initialize()
-				.then(value => {
-					if (cancelled) value()
-					else dispose = value
-				})
-				.catch(error => {
-					if (cancelled) return
-					toast.error(toAppClientError(error).message, {
-						action: { label: 'Retry', onClick: () => connect() },
-					})
-				})
-		}
-		connect()
-		return () => {
-			cancelled = true
-			dispose?.()
-		}
-	}, [initialize])
-
-	useEffect(() => {
-		if (error) {
-			toast.error(error)
-		}
-	}, [error])
+	useCatalogBootstrap({
+		initialize,
+		error,
+		isLoading,
+		visibleHydrationIds,
+		hydrateVisibleIcons,
+	})
 
 	useGlobalShortcuts({
-		onToggleQuickLaunch: useCallback(
-			() => setPaletteOpen(value => !value),
-			[],
-		),
+		onToggleQuickLaunch: dialogs.palette.toggle,
 		onSearchFromShortcut: useCallback(() => {
 			searchInputRef.current?.focus()
 			searchInputRef.current?.select()
@@ -176,38 +136,23 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		clearCatalogChange()
 	}, [catalogChange, clearCatalogChange, isRefreshing])
 
-	useEffect(() => {
-		if (desktopNavigation) setDrawerOpen(false)
-	}, [desktopNavigation])
-
-	useEffect(() => {
-		if (drawerOpen) setDrawerMounted(true)
-	}, [drawerOpen])
-
 	const isCatalogView =
 		activeView !== 'settings' &&
 		activeView !== 'more' &&
 		activeView !== 'scenarios'
+	const changeQuery = useCallback(
+		(value: string) => {
+			state.setQuery(value)
+			if (value.trim() && !isCatalogView) navigation.selectView('all')
+		},
+		[isCatalogView, navigation, state],
+	)
 	const scenarioRunner = useScenarioRunner({
 		apps: catalogApps,
 		scenarios: state.scenarios,
 		launch: state.launch,
 		closeApps: state.closeApps,
-		onFinished: useCallback((scenario, summary) => {
-			state.recordScenarioRun({
-				id: crypto.randomUUID(),
-				scenarioId: scenario.id,
-				scenarioName: scenario.name,
-				...summary,
-			})
-		}, [state]),
 	})
-
-	useEffect(() => {
-		if (isLoading) return
-		const ids = visibleHydrationIds.split('|').filter(Boolean)
-		if (ids.length) void hydrateVisibleIcons(ids)
-	}, [hydrateVisibleIcons, isLoading, visibleHydrationIds])
 
 	const {
 		auxiliaryCount,
@@ -231,19 +176,11 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		onCreateCategory: state.createCategory,
 	}
 
-	const launchingName =
-		state.launchingIds.length === 1
-			? state.apps.find(app => app.id === state.launchingIds[0])?.name
-			: undefined
-	const activityLabel =
-		state.launchingIds.length > 1
-			? `Launching ${state.launchingIds.length} apps…`
-			: launchingName
-				? `Launching ${launchingName}…`
-				: state.isRefreshing
-					? 'Scanning applications…'
-					: ''
-	const activityActive = state.launchingIds.length > 0 || state.isRefreshing
+	const activity = useActivityStatus({
+		apps: state.apps,
+		launchingIds: state.launchingIds,
+		isRefreshing: state.isRefreshing,
+	})
 	const updater = useUpdater()
 	useIconRecovery(state.repairMissingIcons)
 	const { dismiss: dismissStaleCopy, staleCopy } = useStaleCopy(systemClient)
@@ -252,8 +189,8 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		<AppStoreProvider store={store}>
 			<div className="app-shell theme-graphite-surface flex h-screen flex-col overflow-hidden">
 				<AppShellChrome
-					activityActive={activityActive}
-					activityLabel={activityLabel}
+					activityActive={activity.active}
+					activityLabel={activity.label}
 					preferencesPersisted={preferencesPersisted}
 					staleCopy={staleCopy}
 					systemClient={systemClient}
@@ -278,12 +215,12 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 							query={state.query}
 							isRefreshing={state.isRefreshing}
 							scanProgress={state.scanProgress}
-							onQueryChange={state.setQuery}
+							onQueryChange={changeQuery}
 							onRefresh={feedback.refresh}
 							onCancelScan={state.cancelScan}
 							menuButtonRef={menuButtonRef}
 							searchInputRef={searchInputRef}
-							onOpenNavigation={() => setDrawerOpen(true)}
+							onOpenNavigation={drawer.onOpen}
 							showMenu={!desktopNavigation}
 						/>
 						<main
@@ -307,7 +244,6 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 										runningId: scenarioRunner.runningId,
 										isScenarioRunning: scenarioRunner.isRunning,
 										onRun: scenarioRunner.runById,
-										onCancel: scenarioRunner.cancel,
 									}}
 									onSelectView={navigation.selectView}
 								/>
@@ -329,7 +265,6 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									onAddApp={state.addScenarioApp}
 									onRemoveApp={state.removeScenarioApp}
 									onRun={scenarioRunner.run}
-									onCancel={scenarioRunner.cancel}
 									onToggleFavorite={
 										state.toggleFavoriteScenario
 									}
@@ -369,12 +304,16 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 										onDismiss: () =>
 											setScanPromptDismissed(true),
 										onScan: feedback.refresh,
+										onConfigureFolders: () =>
+											navigation.selectView('settings'),
 									}}
 									grid={{
 										apps: filteredApps,
 										isLoading: state.isLoading,
 										hasQuery,
 										activeView: state.activeView,
+										searchScopeCounts,
+										onSelectView: navigation.selectView,
 										onBack: () =>
 											navigation.selectView('more'),
 										categoryOrder: state.categoryOrder,
@@ -389,16 +328,15 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 											isScenarioRunning:
 												scenarioRunner.isRunning,
 											onRun: scenarioRunner.runById,
-											onCancel: scenarioRunner.cancel,
 											onToggleFavorite:
 												state.toggleFavoriteScenario,
 										},
 										onToggleCategory: state.toggleCategory,
 										onToggleFavorite: state.toggleFavorite,
 										onMoveApp: state.moveApp,
-										onLaunch: installerLaunch.requestLaunch,
-										onInfo: appInfoDialog.open,
-										onUninstall: uninstall.select,
+										onLaunch: dialogs.installerLaunch.requestLaunch,
+										onInfo: dialogs.appInfo.open,
+										onUninstall: dialogs.uninstall.select,
 										onHide: state.hideApp,
 										onRestore: state.restoreApp,
 										onPromoteAuxiliary:
@@ -413,9 +351,9 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 						</main>
 					</div>
 				</div>
-				{drawerMounted && !desktopNavigation && (
+				{drawer.mounted && !desktopNavigation && (
 					<AppDrawer
-						open={drawerOpen}
+						open={drawer.open}
 						counts={navigationCounts}
 						categoryOrder={state.categoryOrder}
 						categories={state.categories}
@@ -429,48 +367,19 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 						onSelectCategory={navigation.selectCategory}
 						onReorderCategory={state.reorderCategory}
 						onCreateCategory={state.createCategory}
-						onClose={closeDrawer}
-						onExited={() => setDrawerMounted(false)}
+						onClose={drawer.close}
+						onExited={drawer.onExited}
 					/>
 				)}
-				<AppErrorBoundary
-					fallback={null}
-					onError={reportDialogFailure}
-				>
-					{paletteOpen && (
-						<CommandPalette
-							apps={paletteApps}
-							onLaunch={installerLaunch.requestLaunch}
-							onClose={() => setPaletteOpen(false)}
-						/>
-					)}
-					{appInfoDialog.app && (
-						<AppInfoDialog
-							app={appInfoDialog.app}
-							categories={state.categories}
-							appsClient={appsClient}
-							onClose={appInfoDialog.close}
-						/>
-					)}
-					{uninstall.app && (
-						<UninstallDialog
-							appName={uninstall.app.name}
-							preview={uninstall.preview}
-							isPreviewLoading={uninstall.isPreviewLoading}
-							previewError={uninstall.previewError}
-							onClose={uninstall.close}
-							onConfirm={confirmUninstall}
-						/>
-					)}
-					{installerLaunch.app && (
-						<InstallerLaunchDialog
-							app={installerLaunch.app}
-							pending={installerLaunch.pending}
-							onCancel={installerLaunch.cancel}
-							onConfirm={installerLaunch.confirm}
-						/>
-					)}
-				</AppErrorBoundary>
+				<AppDialogs
+					appsClient={appsClient}
+					categories={state.categories}
+					dialogs={dialogs}
+					paletteApps={paletteApps}
+					paletteSuggestions={paletteSuggestions}
+					onConfirmUninstall={confirmUninstall}
+					onError={dialogs.reportFailure}
+				/>
 				<Toaster
 					className="app-toaster"
 					theme="dark"

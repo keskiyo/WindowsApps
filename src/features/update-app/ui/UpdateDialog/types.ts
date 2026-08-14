@@ -1,6 +1,12 @@
 import type { RefObject } from 'react'
 import type { UpdateInstallPhase } from '../../model/useUpdater'
 
+export interface UpdateBannerProps {
+	version: string
+	onOpen(): void
+	onDismiss(): void
+}
+
 export interface UpdateDialogProps {
 	version: string
 	date: string | null

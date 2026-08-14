@@ -47,6 +47,29 @@ describe('useSystemSettings', () => {
 		)
 	})
 
+	// One shared error line at the bottom of the page left the user hunting for which control
+	// failed; the area lets the page put the message under the section that produced it.
+	it('reports which settings area produced the failure', async () => {
+		const { result } = renderHook(() =>
+			useSystemSettings({
+				client: {
+					...client,
+					setAutostart: vi
+						.fn()
+						.mockRejectedValue(
+							new AppClientError('INTERNAL', 'Startup denied.'),
+						),
+				},
+			}),
+		)
+		await waitFor(() => expect(result.current.settings).not.toBeNull())
+
+		await act(() => result.current.toggleAutostart())
+
+		expect(result.current.error).toBe('Startup denied.')
+		expect(result.current.errorArea).toBe('startup')
+	})
+
 	// A stale message used to survive under a later successful action.
 	it('clears an earlier failure once the startup toggle succeeds', async () => {
 		const setAutostart = vi

@@ -27,7 +27,6 @@ export function MorePage({
 			runningId: scenarioRun.runningId,
 			isScenarioRunning: scenarioRun.isScenarioRunning,
 			onRun: scenarioRun.onRun,
-			onCancel: scenarioRun.onCancel,
 			onViewAll: () => setViewingScenarios(true),
 		},
 	})
@@ -77,7 +76,6 @@ export function MorePage({
 					runningId={scenarioRun.runningId}
 					isScenarioRunning={scenarioRun.isScenarioRunning}
 					onRun={scenarioRun.onRun}
-					onCancel={scenarioRun.onCancel}
 					onClose={() => setViewingScenarios(false)}
 				/>
 			)}

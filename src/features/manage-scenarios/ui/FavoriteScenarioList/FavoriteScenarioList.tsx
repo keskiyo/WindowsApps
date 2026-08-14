@@ -11,7 +11,6 @@ export function FavoriteScenarioList({
 	runningId,
 	isScenarioRunning,
 	onRun,
-	onCancel,
 	onToggleFavorite,
 }: FavoriteScenarioListProps) {
 	const [expanded, setExpanded] = useState<string[]>([])
@@ -47,7 +46,6 @@ export function FavoriteScenarioList({
 						isScenarioRunning={isScenarioRunning}
 						onToggle={toggle}
 						onRun={onRun}
-						onCancel={onCancel}
 						onToggleFavorite={onToggleFavorite}
 					/>
 				))}

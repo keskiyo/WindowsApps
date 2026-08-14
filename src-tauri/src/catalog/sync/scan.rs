@@ -8,10 +8,18 @@ use crate::catalog::{self, AppInfo, CatalogAppDto};
 use crate::error::AppError;
 use tauri::{Emitter, Manager};
 
-fn synchronize_catalog_once(
+struct ScanOutcome {
+    apps: Vec<AppInfo>,
+    generation: u64,
+    diagnostics: Option<crate::catalog::cache::CatalogDiagnostics>,
+    delta: crate::catalog::sync::CatalogDelta,
+    app_data_dir: std::path::PathBuf,
+}
+
+fn write_catalog_under_lock(
     app: &tauri::AppHandle,
     job: &ScanJob<Vec<AppInfo>>,
-) -> Result<Vec<AppInfo>, AppError> {
+) -> Result<ScanOutcome, AppError> {
     let state = app.state::<AppState>();
     let _guard = state
         .sync_lock
@@ -47,15 +55,30 @@ fn synchronize_catalog_once(
         .map(|app| app.id.clone())
         .collect::<Vec<_>>();
     catalog::icon_cache::retain_only(&app_data_dir, &live_ids);
-    if let Some(diagnostics) = &document.diagnostics {
+    Ok(ScanOutcome {
+        apps: document.apps,
+        generation: document.generation,
+        diagnostics: document.diagnostics,
+        delta,
+        app_data_dir,
+    })
+}
+
+fn synchronize_catalog_once(
+    app: &tauri::AppHandle,
+    job: &ScanJob<Vec<AppInfo>>,
+) -> Result<Vec<AppInfo>, AppError> {
+    let outcome = write_catalog_under_lock(app, job)?;
+    if let Some(diagnostics) = &outcome.diagnostics {
         let _ = app.emit("catalog://diagnostics", diagnostics);
     }
-    if delta.summary.added + delta.summary.removed + delta.summary.updated > 0 {
-        let _ = app.emit("catalog://delta", CatalogDeltaDto::from(&delta));
-        let _ = app.emit("catalog://changed", &delta.summary);
+    let summary = &outcome.delta.summary;
+    if summary.added + summary.removed + summary.updated > 0 {
+        let _ = app.emit("catalog://delta", CatalogDeltaDto::from(&outcome.delta));
+        let _ = app.emit("catalog://changed", summary);
     }
     if job.request.is_interactive() {
-        let apps = document
+        let apps = outcome
             .apps
             .iter()
             .map(CatalogAppDto::from)
@@ -63,18 +86,23 @@ fn synchronize_catalog_once(
         let _ = app.emit("apps://updated", apps);
     }
     let hydration_ids = if job.request == SyncRequest::Watch {
-        delta.upserted.iter().map(|app| app.id.clone()).collect()
+        outcome
+            .delta
+            .upserted
+            .iter()
+            .map(|app| app.id.clone())
+            .collect()
     } else {
-        document.apps.iter().map(|app| app.id.clone()).collect()
+        outcome.apps.iter().map(|app| app.id.clone()).collect()
     };
     enqueue_hydration(
         app.clone(),
-        app_data_dir,
-        document.generation,
+        outcome.app_data_dir,
+        outcome.generation,
         hydration_ids,
         false,
     );
-    Ok(document.apps)
+    Ok(outcome.apps)
 }
 
 pub(crate) fn run_coordinated_scan(

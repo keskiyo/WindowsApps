@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
+	createMarkLookup,
 	filterAppsByQuery,
 	filterVisibleApps,
 	rankAppsByQuery,
 	selectCatalogCounts,
 	selectCategorizedApps,
 } from '../../../../src/app/store/selectors'
-import { selectRecentApps } from '../../../../src/entities/app'
+import {
+	selectRecentApps,
+	selectSearchScopeCounts,
+} from '../../../../src/entities/app'
 import type { AppInfo } from '../../../../src/entities/app'
 import type { AppCategory } from '../../../../src/entities/category'
 
@@ -27,6 +31,9 @@ function app(
 		...value,
 	} as AppInfo
 }
+
+const marks = (ids: string[]) => createMarkLookup(ids, [])
+const none = createMarkLookup([], [])
 
 function state(
 	apps: AppInfo[],
@@ -52,6 +59,53 @@ const catalog = [
 	app({ id: 'code', name: 'Visual Studio Code', category: 'development' }),
 	app({ id: 'notepad', name: 'Notepad', category: 'utilities' }),
 ]
+
+// A query that matches nothing in the main catalog used to render "No apps found" even when the
+// application was sitting one view away, so the user concluded the scanner had missed it.
+describe('search matches outside the current view', () => {
+	const tool = app({
+		id: 'tool',
+		name: 'Backup Tool',
+		visibilityClass: 'auxiliary',
+	})
+	const hiddenApp = app({ id: 'buried', name: 'Backup Buried' })
+	const installer = app({
+		id: 'setup',
+		name: 'Backup Setup',
+		artifactKind: 'installer',
+	})
+	const everything = [...catalog, tool, hiddenApp, installer]
+
+	it('counts matches per area that the main catalog does not show', () => {
+		expect(
+			selectSearchScopeCounts(everything, 'backup', ['buried']),
+		).toEqual({ auxiliary: 1, hidden: 1, installersDocs: 1 })
+	})
+
+	it('reports nothing without a query', () => {
+		expect(selectSearchScopeCounts(everything, '   ', ['buried'])).toEqual({
+			auxiliary: 0,
+			hidden: 0,
+			installersDocs: 0,
+		})
+	})
+
+	it('excludes applications the main catalog already shows', () => {
+		expect(selectSearchScopeCounts(everything, 'steam', [])).toEqual({
+			auxiliary: 0,
+			hidden: 0,
+			installersDocs: 0,
+		})
+	})
+
+	it('counts a hidden auxiliary tool once, as hidden', () => {
+		expect(selectSearchScopeCounts([tool], 'backup', ['tool'])).toEqual({
+			auxiliary: 0,
+			hidden: 1,
+			installersDocs: 0,
+		})
+	})
+})
 
 describe('categorized app identity', () => {
 	it('returns the original records when nothing applies to them', () => {
@@ -104,10 +158,12 @@ describe('categorized app identity', () => {
 		expect(result[2].artifactKind).toBe('installer')
 		expect(result[2].category).toBe('installers_docs')
 		expect(result[2].userInstaller).toBe(true)
-		expect(filterVisibleApps(result, 'installers_docs', [], [])).toEqual([
+		expect(filterVisibleApps(result, 'installers_docs', none, none)).toEqual([
 			result[2],
 		])
-		expect(filterVisibleApps(result, 'all', [], [])).not.toContain(result[2])
+		expect(filterVisibleApps(result, 'all', none, none)).not.toContain(
+			result[2],
+		)
 	})
 
 	it('follows a manual installer mark by canonical identity after a rescan', () => {
@@ -217,8 +273,8 @@ describe('selectCatalogCounts', () => {
 		view => {
 			const counts = selectCatalogCounts(
 				mixed,
-				hiddenAppIds,
-				favoriteAppIds,
+				marks(hiddenAppIds),
+				marks(favoriteAppIds),
 			)
 			const badge = {
 				favorites: counts.favoriteCount,
@@ -227,14 +283,19 @@ describe('selectCatalogCounts', () => {
 			}[view]
 
 			expect(badge).toBe(
-				filterVisibleApps(mixed, view, hiddenAppIds, favoriteAppIds)
+				filterVisibleApps(
+				mixed,
+				view,
+				marks(hiddenAppIds),
+				marks(favoriteAppIds),
+			)
 					.length,
 			)
 		},
 	)
 
 	it('excludes auxiliary and hidden apps from the visible set and its category counts', () => {
-		const counts = selectCatalogCounts(mixed, hiddenAppIds, favoriteAppIds)
+		const counts = selectCatalogCounts(mixed, marks(hiddenAppIds), marks(favoriteAppIds))
 
 		expect(counts.visibleCategorizedApps.map(entry => entry.id)).toEqual([
 			'steam',
@@ -247,7 +308,7 @@ describe('selectCatalogCounts', () => {
 
 	// The settings page reports what the scanner classified, so hiding an app must not change it.
 	it('keeps classification totals independent of what the user hid', () => {
-		const counts = selectCatalogCounts(mixed, hiddenAppIds, favoriteAppIds)
+		const counts = selectCatalogCounts(mixed, marks(hiddenAppIds), marks(favoriteAppIds))
 
 		expect(counts.classifiedAuxiliaryCount).toBe(2)
 		expect(counts.classifiedPrimaryCount).toBe(3)
@@ -257,7 +318,7 @@ describe('selectCatalogCounts', () => {
 	})
 
 	it('preserves record identity in the visible set', () => {
-		const counts = selectCatalogCounts(mixed, [], [])
+		const counts = selectCatalogCounts(mixed, none, none)
 
 		expect(counts.visibleCategorizedApps[0]).toBe(mixed[0])
 	})
@@ -277,16 +338,16 @@ describe('selectCatalogCounts', () => {
 		})
 		const apps = [catalog[0]!, installer, docs]
 
-		expect(filterVisibleApps(apps, 'all', [], ['setup'])).toEqual([
+		expect(filterVisibleApps(apps, 'all', none, marks(['setup']))).toEqual([
 			catalog[0],
 		])
-		expect(filterVisibleApps(apps, 'favorites', [], ['setup'])).toEqual([])
-		expect(filterVisibleApps(apps, 'auxiliary', [], ['setup'])).toEqual([])
-		expect(filterVisibleApps(apps, 'installers_docs', [], [])).toEqual([
+		expect(filterVisibleApps(apps, 'favorites', none, marks(['setup']))).toEqual([])
+		expect(filterVisibleApps(apps, 'auxiliary', none, marks(['setup']))).toEqual([])
+		expect(filterVisibleApps(apps, 'installers_docs', none, none)).toEqual([
 			installer,
 			docs,
 		])
-		const counts = selectCatalogCounts(apps, [], ['setup'])
+		const counts = selectCatalogCounts(apps, none, marks(['setup']))
 		expect(counts.visibleCategorizedApps).toEqual([catalog[0]])
 		expect(counts.navigationCounts.get('installers_docs')).toBe(2)
 		expect(counts.favoriteCount).toBe(0)

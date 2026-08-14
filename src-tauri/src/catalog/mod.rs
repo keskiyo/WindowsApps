@@ -1,10 +1,10 @@
 use sha2::{Digest, Sha256};
 use std::env;
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 
 mod artifact;
 mod classify;
+mod close;
 mod dedup;
 mod details;
 mod display;
@@ -12,23 +12,30 @@ mod fields;
 mod filters;
 #[cfg(test)]
 mod golden;
+mod identity;
 mod machine;
 mod model;
 mod naming;
 mod place;
 mod scan;
 mod sources;
+mod start_menu;
 mod storage;
 pub(crate) mod sync;
 pub(crate) mod target_availability;
 mod tree;
 mod visibility;
 
+pub(crate) use close::{
+    attach_close_risk, close_scope_of, close_target_of, demote_console_applications,
+};
 pub(crate) use details::{
     can_open_folder, details_fingerprint, folder_target, read_cached_details, read_details,
     AppDetailsTarget,
 };
 pub(crate) use display::CatalogAppDto;
+pub(crate) use identity::path_is_within;
+use identity::{find_executable, find_executable_named, is_launchable, stable_id};
 pub(crate) use model::{
     AppCategory, AppDetails, AppInfo, ArtifactKind, LaunchKind, ScanProgress, SourceKind,
     UninstallTarget,
@@ -38,6 +45,9 @@ pub(crate) use scan::{
 };
 pub(crate) use sources::source;
 use sources::{installer_cache, portable, registry, start_apps, steam};
+use start_menu::scan_start_menu;
+#[cfg(test)]
+pub(crate) use start_menu::StartMenuScan;
 pub(crate) use storage::{cache, icon_cache};
 use sync::scan_control::{
     ScanControl, StageBudget, StageStop, DEFAULT_STAGE_TIMEOUT, START_MENU_MAX_DEPTH,
@@ -328,130 +338,7 @@ pub(super) fn icon_source(app: &AppInfo) -> Option<String> {
     icon_source_candidates(app).into_iter().next()
 }
 
-pub(crate) struct StartMenuScan {
-    pub apps: Vec<AppInfo>,
-    pub stop: Option<StageStop>,
-    pub complete: bool,
-}
-
-struct StartMenuWalk {
-    apps: Vec<AppInfo>,
-    complete: bool,
-}
-
-fn scan_start_menu(control: &ScanControl) -> StartMenuScan {
-    let mut roots = vec![PathBuf::from(
-        r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs",
-    )];
-    if let Some(appdata) = env::var_os("APPDATA") {
-        roots.push(PathBuf::from(appdata).join(r"Microsoft\Windows\Start Menu\Programs"));
-    }
-    let budget = control.stage_with(
-        DEFAULT_STAGE_TIMEOUT,
-        START_MENU_MAX_ENTRIES,
-        START_MENU_MAX_DEPTH,
-    );
-    if budget.should_stop() {
-        return StartMenuScan {
-            apps: Vec::new(),
-            stop: budget.stop(),
-            complete: false,
-        };
-    }
-    let walked = walk_start_menu_shortcuts(roots, &budget, &machine::MachineFacts::current());
-
-    StartMenuScan {
-        apps: walked.apps,
-        stop: budget.stop(),
-        complete: walked.complete,
-    }
-}
-
-fn walk_start_menu_shortcuts(
-    roots: Vec<PathBuf>,
-    budget: &StageBudget,
-    facts: &machine::MachineFacts,
-) -> StartMenuWalk {
-    let mut complete = true;
-    let apps = roots
-        .into_iter()
-        .flat_map(|root| {
-            WalkDir::new(root)
-                .follow_links(false)
-                .max_depth(budget.max_depth())
-                .into_iter()
-        })
-        .take_while(|_| budget.charge_entry())
-        .filter_map(|entry| match entry {
-            Ok(entry) => Some(entry),
-            Err(_) => {
-                complete = false;
-                None
-            }
-        })
-        .filter(|entry| entry.file_type().is_file())
-        .filter(|entry| {
-            entry.path().extension().is_some_and(|extension| {
-                extension.eq_ignore_ascii_case("lnk") || extension.eq_ignore_ascii_case("url")
-            })
-        })
-        .filter_map(|entry| {
-            let path = entry.into_path();
-            let name = path.file_stem()?.to_string_lossy().trim().to_string();
-            if name.is_empty() {
-                return None;
-            }
-            let is_url = path
-                .extension()
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("url"));
-            let details = if is_url {
-                Default::default()
-            } else {
-                crate::platform::windows::shortcut::resolve(&path)
-            };
-            let target = details
-                .target
-                .as_ref()
-                .map(|value| value.to_string_lossy().into_owned());
-            if !is_url
-                && filters::is_maintenance_entry(&name, &path.to_string_lossy(), target.as_deref())
-            {
-                return None;
-            }
-            let mut app = make_app(name, path);
-            app.source_kind = SourceKind::StartMenu;
-            if is_url {
-                app.launch_kind = LaunchKind::Shortcut;
-            }
-            app.resolved_path = target;
-            app.shortcut_icon_path = details
-                .icon_location
-                .map(|value| value.to_string_lossy().into_owned());
-            app.launch_arguments = details.arguments;
-            if let Some(target) = app.resolved_path.as_deref() {
-                let metadata =
-                    crate::platform::windows::executable_metadata::read(Path::new(target));
-                let internal_name = metadata.internal_name.clone();
-                app.product_name = metadata.product_name;
-                app.original_filename = metadata.original_filename;
-                app.description = metadata.description;
-                app.version = metadata.version;
-                app.publisher = metadata.publisher;
-                app.artifact_kind = artifact::classify(&app, internal_name.as_deref(), facts);
-            }
-            if app.artifact_kind == ArtifactKind::Application {
-                app.artifact_kind = artifact::classify(&app, None, facts);
-            }
-            if app.artifact_kind != ArtifactKind::Application {
-                app.category = AppCategory::InstallersDocs;
-            }
-            (!is_url || app.artifact_kind == ArtifactKind::Documentation).then_some(app)
-        })
-        .collect();
-    StartMenuWalk { apps, complete }
-}
-
-fn make_app(name: String, path: PathBuf) -> AppInfo {
+pub(super) fn make_app(name: String, path: PathBuf) -> AppInfo {
     let path = path.to_string_lossy().to_string();
     let normalized = path.to_lowercase();
     let id = format!("{:x}", Sha256::digest(normalized.as_bytes()));
@@ -495,77 +382,6 @@ fn make_app(name: String, path: PathBuf) -> AppInfo {
     }
 }
 
-fn stable_id(identity: &str) -> String {
-    format!(
-        "{:x}",
-        Sha256::digest(identity.trim().to_lowercase().as_bytes())
-    )
-}
-
-fn find_executable(location: &str) -> Option<PathBuf> {
-    find_executable_named(location, None)
-}
-
-fn find_executable_named(location: &str, name: Option<&str>) -> Option<PathBuf> {
-    let root = PathBuf::from(location.trim().trim_matches('"'));
-    if is_launchable(&root) {
-        return Some(root);
-    }
-    if !root.is_dir() {
-        return None;
-    }
-    let target = name
-        .map(naming::normalized_portable_name)
-        .filter(|key| !key.is_empty());
-    WalkDir::new(&root)
-        .max_depth(2)
-        .into_iter()
-        .filter_map(Result::ok)
-        .map(|entry| entry.into_path())
-        .filter(|path| {
-            is_launchable(path) && !filters::is_maintenance_path(&path.to_string_lossy())
-        })
-        .min_by_key(|path| {
-            let stem = path
-                .file_stem()
-                .map(|value| naming::normalized_portable_name(&value.to_string_lossy()))
-                .unwrap_or_default();
-            let name_score = match &target {
-                Some(target) if stem == *target => 0u8,
-                Some(target)
-                    if !stem.is_empty() && (stem.contains(target) || target.contains(&stem)) =>
-                {
-                    1
-                }
-                Some(_) => 3,
-                None => 2,
-            };
-            let depth = path
-                .strip_prefix(&root)
-                .map(|relative| relative.components().count())
-                .unwrap_or(usize::MAX);
-            (name_score, depth, path.to_string_lossy().into_owned())
-        })
-}
-
-pub(super) fn path_is_within(path: &str, root: &str) -> bool {
-    let root = root.trim_end_matches(['\\', '/']);
-    if root.is_empty() {
-        return false;
-    }
-    let Some(rest) = path.strip_prefix(root) else {
-        return false;
-    };
-    rest.is_empty() || rest.starts_with('\\') || rest.starts_with('/')
-}
-
-fn is_launchable(path: &Path) -> bool {
-    path.is_file()
-        && path.extension().is_some_and(|extension| {
-            extension.eq_ignore_ascii_case("exe") || extension.eq_ignore_ascii_case("lnk")
-        })
-}
-
 pub(crate) fn retain_present_targets(
     apps: &mut Vec<AppInfo>,
     settings: &scan_settings::ScanSettings,
@@ -590,58 +406,6 @@ pub(crate) fn attach_category_reasons(apps: &mut [AppInfo]) {
     }
 }
 
-pub(crate) fn attach_close_risk(apps: &mut [AppInfo]) {
-    for app in apps {
-        app.close_risk = match close_target_of(app) {
-            Some(target) => crate::platform::windows::close_risk(Path::new(&target))
-                .id()
-                .map(str::to_owned),
-            None => Some("close.not_closable".to_owned()),
-        };
-    }
-}
-
-pub(crate) fn close_scope_of(app: &AppInfo) -> Option<String> {
-    let target = close_target_of(app);
-    if target.as_deref().is_some_and(is_steam_client_target) {
-        return None;
-    }
-    target
-        .as_deref()
-        .and_then(|target| {
-            Path::new(target)
-                .parent()
-                .map(|parent| parent.to_string_lossy().into_owned())
-        })
-        .or_else(|| {
-            app.install_location
-                .as_deref()
-                .map(str::trim)
-                .filter(|location| !location.is_empty())
-                .map(str::to_owned)
-        })
-}
-
-fn is_steam_client_target(path: &str) -> bool {
-    Path::new(path)
-        .file_name()
-        .is_some_and(|name| name.eq_ignore_ascii_case("steam.exe"))
-}
-
-pub(crate) fn close_target_of(app: &AppInfo) -> Option<String> {
-    let path = app.resolved_path.clone().or_else(|| {
-        matches!(
-            app.launch_kind,
-            LaunchKind::Executable | LaunchKind::Shortcut
-        )
-        .then(|| app.path.clone())
-    })?;
-    Path::new(&path)
-        .extension()
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
-        .then_some(path)
-}
-
 fn legacy_target_is_present(app: &AppInfo) -> bool {
     if app.launch_kind == LaunchKind::AppUserModelId {
         return true;
@@ -656,51 +420,6 @@ fn legacy_target_is_present(app: &AppInfo) -> bool {
     }
     let drive_present = path.ancestors().last().is_some_and(|root| root.exists());
     !drive_present || path.exists()
-}
-
-fn is_plain_windows_powershell(app: &AppInfo, target: &Path) -> bool {
-    if app.source_kind != SourceKind::StartMenu
-        || app.launch_kind != LaunchKind::Shortcut
-        || app
-            .launch_arguments
-            .as_deref()
-            .is_some_and(|arguments| !arguments.trim().is_empty())
-    {
-        return false;
-    }
-    target
-        .file_name()
-        .and_then(|file| file.to_str())
-        .is_some_and(|file| file.eq_ignore_ascii_case("powershell.exe"))
-}
-
-pub(crate) fn demote_console_applications(apps: &mut [AppInfo]) {
-    for app in apps.iter_mut() {
-        if app.visibility_class != VisibilityClass::Primary
-            || app.launch_kind == LaunchKind::AppUserModelId
-        {
-            continue;
-        }
-        let target = app.resolved_path.as_deref().unwrap_or(&app.path);
-        let path = Path::new(target);
-        if is_plain_windows_powershell(app, path) {
-            continue;
-        }
-        if path
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
-            && crate::platform::windows::is_console_subsystem(path)
-        {
-            app.visibility_class = VisibilityClass::Auxiliary;
-            if !app
-                .visibility_reasons
-                .contains(&VisibilityReason::ConsoleApplication)
-            {
-                app.visibility_reasons
-                    .push(VisibilityReason::ConsoleApplication);
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -719,7 +438,6 @@ mod tests {
     use super::naming::*;
     use super::*;
     use std::path::PathBuf;
-    use std::time::Duration;
 
     fn facts() -> machine::MachineFacts {
         machine::MachineFacts::empty()
@@ -727,184 +445,6 @@ mod tests {
 
     fn portable_app(path: PathBuf) -> Option<AppInfo> {
         super::portable_app(path, &facts())
-    }
-
-    #[test]
-    fn each_record_carries_the_risk_of_closing_it() {
-        let mut explorer = app("Проводник", r"C:\Menu\Проводник.lnk");
-        explorer.launch_kind = LaunchKind::Shortcut;
-        explorer.resolved_path = Some(r"C:\Windows\explorer.exe".into());
-        let mut security = app("Local Security Authority", r"C:\Windows\System32\lsass.exe");
-        security.launch_kind = LaunchKind::Executable;
-        let mut editor = app("Editor", r"C:\Editor\editor.exe");
-        editor.launch_kind = LaunchKind::Executable;
-        let mut packaged = app("Camera", "Microsoft.WindowsCamera_8wek!App");
-        packaged.launch_kind = LaunchKind::AppUserModelId;
-        let mut apps = vec![explorer, security, editor, packaged];
-
-        attach_close_risk(&mut apps);
-
-        assert_eq!(apps[0].close_risk.as_deref(), Some("close.session"));
-        assert_eq!(apps[1].close_risk.as_deref(), Some("close.critical"));
-        assert_eq!(apps[2].close_risk, None);
-        assert_eq!(apps[3].close_risk.as_deref(), Some("close.not_closable"));
-    }
-
-    #[test]
-    fn a_shell_location_reports_that_there_is_nothing_to_close() {
-        let mut explorer = app("Проводник", "Microsoft.Windows.Explorer");
-        explorer.launch_kind = LaunchKind::AppUserModelId;
-        explorer.resolved_path = Some("::{52205FD8-5DFB-447D-801A-D0B52F2E83E1}".into());
-        let mut apps = vec![explorer];
-
-        attach_close_risk(&mut apps);
-
-        assert_eq!(apps[0].close_risk.as_deref(), Some("close.not_closable"));
-    }
-
-    #[test]
-    fn close_scope_uses_the_executable_parent_over_a_shared_vendor_root() {
-        let mut app = app(
-            "Product A",
-            r"C:\Program Files\Vendor\Product A\launcher.exe",
-        );
-        app.install_location = Some(r"C:\Program Files\Vendor".into());
-
-        assert_eq!(
-            close_scope_of(&app).as_deref(),
-            Some(r"C:\Program Files\Vendor\Product A")
-        );
-    }
-
-    #[test]
-    fn steam_client_does_not_expand_close_scope_to_installed_games() {
-        let steam = app("Steam", r"C:\Program Files (x86)\Steam\steam.exe");
-
-        assert_eq!(close_scope_of(&steam), None);
-    }
-
-    fn walk_start_menu_shortcuts(roots: Vec<PathBuf>, budget: &StageBudget) -> Vec<AppInfo> {
-        super::walk_start_menu_shortcuts(roots, budget, &facts()).apps
-    }
-
-    #[test]
-    fn an_unreadable_start_menu_root_is_not_an_empty_success() {
-        let dir = tempfile::tempdir().unwrap();
-        let never = || false;
-        let control = ScanControl::new(&never);
-        let budget = control.stage_with(DEFAULT_STAGE_TIMEOUT, usize::MAX, START_MENU_MAX_DEPTH);
-
-        let scan =
-            super::walk_start_menu_shortcuts(vec![dir.path().join("missing")], &budget, &facts());
-
-        assert!(scan.apps.is_empty());
-        assert!(!scan.complete);
-        assert_eq!(budget.stop(), None);
-    }
-
-    fn nested_shortcuts(root: &Path, folders: usize) {
-        let mut current = root.to_path_buf();
-        for index in 0..folders {
-            current = current.join(format!("Level {index}"));
-            std::fs::create_dir_all(&current).unwrap();
-            std::fs::write(current.join(format!("Tool {index}.lnk")), []).unwrap();
-        }
-    }
-
-    #[test]
-    fn the_start_menu_traversal_stops_at_its_depth_limit() {
-        let dir = tempfile::tempdir().unwrap();
-        nested_shortcuts(dir.path(), 6);
-        let never = || false;
-        let control = ScanControl::new(&never);
-        let budget = control.stage_with(DEFAULT_STAGE_TIMEOUT, usize::MAX, 2);
-
-        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
-
-        assert_eq!(apps.len(), 1);
-        assert_eq!(apps[0].name, "Tool 0");
-        assert_eq!(budget.stop(), None);
-    }
-
-    #[test]
-    fn the_start_menu_traversal_stops_at_its_entry_limit() {
-        let dir = tempfile::tempdir().unwrap();
-        nested_shortcuts(dir.path(), 6);
-        let never = || false;
-        let control = ScanControl::new(&never);
-        let budget = control.stage_with(DEFAULT_STAGE_TIMEOUT, 3, START_MENU_MAX_DEPTH);
-
-        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
-
-        assert!(apps.len() < 6);
-        assert_eq!(budget.stop(), Some(StageStop::EntryLimit));
-    }
-
-    #[test]
-    fn the_start_menu_traversal_stops_at_its_deadline() {
-        let dir = tempfile::tempdir().unwrap();
-        nested_shortcuts(dir.path(), 6);
-        let never = || false;
-        let control = ScanControl::new(&never);
-        let budget = control.stage_with(Duration::ZERO, usize::MAX, START_MENU_MAX_DEPTH);
-
-        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
-
-        assert!(apps.is_empty());
-        assert_eq!(budget.stop(), Some(StageStop::TimedOut));
-    }
-
-    #[test]
-    fn the_start_menu_traversal_stops_when_the_scan_is_cancelled() {
-        let dir = tempfile::tempdir().unwrap();
-        nested_shortcuts(dir.path(), 6);
-        let cancelled = || true;
-        let control = ScanControl::new(&cancelled);
-        let budget = control.stage_with(DEFAULT_STAGE_TIMEOUT, usize::MAX, START_MENU_MAX_DEPTH);
-
-        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
-
-        assert!(apps.is_empty());
-        assert_eq!(budget.stop(), Some(StageStop::Cancelled));
-    }
-
-    #[test]
-    fn an_ordinary_start_menu_tree_is_walked_completely() {
-        let dir = tempfile::tempdir().unwrap();
-        nested_shortcuts(dir.path(), 4);
-        let never = || false;
-        let control = ScanControl::new(&never);
-        let budget = control.stage_with(
-            DEFAULT_STAGE_TIMEOUT,
-            START_MENU_MAX_ENTRIES,
-            START_MENU_MAX_DEPTH,
-        );
-
-        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
-
-        assert_eq!(apps.len(), 4);
-        assert_eq!(budget.stop(), None);
-    }
-
-    #[test]
-    fn start_menu_url_documentation_is_discovered_without_scanning_arbitrary_docs() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
-            dir.path().join("Node.js website.url"),
-            b"[InternetShortcut]",
-        )
-        .unwrap();
-        std::fs::write(dir.path().join("Unrelated.url"), b"[InternetShortcut]").unwrap();
-        std::fs::write(dir.path().join("Manual.pdf"), b"fixture").unwrap();
-        let never = || false;
-        let control = ScanControl::new(&never);
-        let budget = control.stage_with(DEFAULT_STAGE_TIMEOUT, 50, 4);
-
-        let apps = walk_start_menu_shortcuts(vec![dir.path().to_path_buf()], &budget);
-
-        assert_eq!(apps.len(), 1);
-        assert_eq!(apps[0].name, "Node.js website");
-        assert_eq!(apps[0].artifact_kind, ArtifactKind::Documentation);
     }
 
     fn app(name: &str, path: &str) -> AppInfo {
@@ -978,18 +518,6 @@ mod tests {
     }
 
     #[test]
-    fn path_containment_stops_at_component_boundaries() {
-        assert!(path_is_within(r"c:\prog\app.exe", r"c:\prog"));
-        assert!(path_is_within(r"c:\prog\app.exe", r"c:\prog\"));
-        assert!(path_is_within(r"c:\prog", r"c:\prog"));
-        assert!(path_is_within("c:/prog/app.exe", "c:/prog"));
-        assert!(!path_is_within(r"c:\program files\app.exe", r"c:\prog"));
-        assert!(!path_is_within(r"c:\progbackup", r"c:\prog"));
-        assert!(!path_is_within(r"c:\prog\app.exe", ""));
-        assert!(!path_is_within(r"c:\prog\app.exe", r"\"));
-    }
-
-    #[test]
     fn retaining_targets_records_why_each_one_was_accepted() {
         let settings = scan_settings::ScanSettings::default();
         let dir = tempfile::tempdir().unwrap();
@@ -1054,77 +582,6 @@ mod tests {
             apps.iter().map(|app| app.name.as_str()).collect::<Vec<_>>(),
             vec!["App", "Store App", "Game"]
         );
-    }
-
-    fn minimal_pe(subsystem: u16) -> Vec<u8> {
-        let mut buffer = vec![0_u8; 64];
-        buffer[0] = b'M';
-        buffer[1] = b'Z';
-        buffer[60..64].copy_from_slice(&64_u32.to_le_bytes());
-        buffer.extend_from_slice(b"PE\0\0");
-        buffer.extend_from_slice(&[0_u8; 20]);
-        buffer.extend_from_slice(&[0_u8; 68]);
-        buffer.extend_from_slice(&subsystem.to_le_bytes());
-        buffer
-    }
-
-    #[test]
-    fn console_executables_are_demoted_to_auxiliary() {
-        let dir = tempfile::tempdir().unwrap();
-        let cli = dir.path().join("7z.exe");
-        std::fs::write(&cli, minimal_pe(3)).unwrap();
-        let gui = dir.path().join("game.exe");
-        std::fs::write(&gui, minimal_pe(2)).unwrap();
-
-        let mut console = app("7-Zip Console", &cli.to_string_lossy());
-        console.source_kind = SourceKind::Portable;
-        let mut window = app("Game", &gui.to_string_lossy());
-        window.source_kind = SourceKind::Portable;
-
-        let mut apps = vec![console, window];
-        demote_console_applications(&mut apps);
-
-        assert_eq!(apps[0].visibility_class, VisibilityClass::Auxiliary);
-        assert!(apps[0]
-            .visibility_reasons
-            .contains(&VisibilityReason::ConsoleApplication));
-        assert_eq!(apps[1].visibility_class, VisibilityClass::Primary);
-    }
-
-    #[test]
-    fn command_prompt_is_auxiliary_but_plain_powershell_stays_primary() {
-        let dir = tempfile::tempdir().unwrap();
-        let cmd = dir.path().join("cmd.exe");
-        let powershell = dir.path().join("powershell.exe");
-        std::fs::write(&cmd, minimal_pe(3)).unwrap();
-        std::fs::write(&powershell, minimal_pe(3)).unwrap();
-
-        let mut command_prompt = app("Command Prompt", r"C:\Menu\Command Prompt.lnk");
-        command_prompt.source_kind = SourceKind::StartMenu;
-        command_prompt.launch_kind = LaunchKind::Shortcut;
-        command_prompt.resolved_path = Some(cmd.to_string_lossy().into_owned());
-        let mut windows_powershell = app("Windows PowerShell", r"C:\Menu\Windows PowerShell.lnk");
-        windows_powershell.source_kind = SourceKind::StartMenu;
-        windows_powershell.launch_kind = LaunchKind::Shortcut;
-        windows_powershell.resolved_path = Some(powershell.to_string_lossy().into_owned());
-        let mut developer_prompt = app("Developer Command Prompt", r"C:\Menu\Developer Prompt.lnk");
-        developer_prompt.source_kind = SourceKind::StartMenu;
-        developer_prompt.launch_kind = LaunchKind::Shortcut;
-        developer_prompt.resolved_path = Some(cmd.to_string_lossy().into_owned());
-        developer_prompt.launch_arguments = Some("/k setup.bat".into());
-
-        let mut apps = vec![command_prompt, windows_powershell, developer_prompt];
-        demote_console_applications(&mut apps);
-
-        assert_eq!(apps[0].visibility_class, VisibilityClass::Auxiliary);
-        assert!(apps[0]
-            .visibility_reasons
-            .contains(&VisibilityReason::ConsoleApplication));
-        assert_eq!(apps[1].visibility_class, VisibilityClass::Primary);
-        assert_eq!(apps[2].visibility_class, VisibilityClass::Auxiliary);
-        assert!(apps[2]
-            .visibility_reasons
-            .contains(&VisibilityReason::ConsoleApplication));
     }
 
     #[test]
@@ -1393,32 +850,6 @@ mod tests {
         assert!(!is_noise("Microsoft Visual C++ Update", r"C:\update.exe"));
         assert!(!is_noise("Editor Uninstall", r"C:\uninstall.exe"));
         assert!(!is_noise("Visual Studio Code", r"C:\Code.exe"));
-    }
-
-    #[test]
-    fn finds_executable_inside_registered_install_location() {
-        let dir = tempfile::tempdir().unwrap();
-        let executable = dir.path().join("Warhammer 40000 Space Marine 2.exe");
-        std::fs::write(&executable, []).unwrap();
-
-        assert_eq!(
-            find_executable(&dir.path().to_string_lossy()),
-            Some(executable)
-        );
-    }
-
-    #[test]
-    fn prefers_named_executable_over_bundled_helpers() {
-        let dir = tempfile::tempdir().unwrap();
-        let main = dir.path().join("Docker Desktop.exe");
-        let bundled = dir.path().join("courgette64.exe");
-        std::fs::write(&bundled, []).unwrap();
-        std::fs::write(&main, []).unwrap();
-
-        assert_eq!(
-            find_executable_named(&dir.path().to_string_lossy(), Some("Docker Desktop")),
-            Some(main)
-        );
     }
 
     #[test]
@@ -2109,14 +1540,6 @@ mod tests {
             a.publisher = Some(publisher.into());
             assert_eq!(classify_app(&a), want, "{publisher}");
         }
-    }
-
-    #[test]
-    fn stable_ids_ignore_windows_path_case() {
-        assert_eq!(
-            stable_id(r"C:\Apps\Codex.exe"),
-            stable_id(r"c:\apps\CODEX.exe")
-        );
     }
 
     #[test]
