@@ -1,7 +1,4 @@
-import type {
-	DragEndEvent,
-	DragStartEvent,
-} from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { act, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -15,8 +12,8 @@ const dragContext = vi.hoisted(() => ({
 	onDragStart: undefined as ((event: DragStartEvent) => void) | undefined,
 	onDragEnd: undefined as ((event: DragEndEvent) => void) | undefined,
 	onDragCancel: undefined as (() => void) | undefined,
-	cancelDrop:
-		undefined as ((event: DragEndEvent) => boolean | Promise<boolean>) | undefined,
+	cancelDrop: undefined as
+		((event: DragEndEvent) => boolean | Promise<boolean>) | undefined,
 }))
 
 vi.mock('@dnd-kit/core', async importOriginal => {
@@ -60,7 +57,7 @@ vi.mock(
 	'../../../../src/widgets/sidebar-navigation/ui/SortableNavigationCategory/SortableNavigationCategory',
 	() => ({
 		SortableNavigationCategory: ({ label }: { label: string }) => (
-			<button type='button'>{label}</button>
+			<button type="button">{label}</button>
 		),
 	}),
 )
@@ -75,7 +72,7 @@ function renderNavigation() {
 			categoryOrder={['games']}
 			categories={categories}
 			counts={new Map<AppCategory, number>([['games', 2]])}
-			activeView='all'
+			activeView="all"
 			appCount={3}
 			favoriteCount={0}
 			onSelectView={vi.fn()}

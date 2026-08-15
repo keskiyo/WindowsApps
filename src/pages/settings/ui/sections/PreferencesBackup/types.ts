@@ -1,6 +1,5 @@
 export type PreferenceTransferResult =
-	| { ok: true }
-	| { ok: false; error: string }
+	{ ok: true } | { ok: false; error: string }
 
 export interface PreferencesBackupProps {
 	onExport(): string

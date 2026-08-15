@@ -1,4 +1,4 @@
 {
-  "$comment": "Temporary, reviewed exceptions for scripts/verify-npm-audit.ps1. Runtime dependencies are never eligible: they are gated separately by `npm audit --omit=dev --audit-level=high`, which accepts no exceptions. An entry that no longer matches a reported advisory, or whose reviewBy date has passed, fails the gate. The list is empty because the tree is clean — that is the intended steady state, not a placeholder.",
-  "exceptions": []
+	"$comment": "Temporary, reviewed exceptions for scripts/verify-npm-audit.ps1. Runtime dependencies are never eligible: they are gated separately by `npm audit --omit=dev --audit-level=high`, which accepts no exceptions. An entry that no longer matches a reported advisory, or whose reviewBy date has passed, fails the gate. The list is empty because the tree is clean — that is the intended steady state, not a placeholder.",
+	"exceptions": []
 }

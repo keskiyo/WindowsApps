@@ -34,7 +34,9 @@ describe('catalog card grid', () => {
 			'repeat(auto-fill, var(--app-card-width))',
 		)
 		expect(rule('.app-card-tile')).toContain('width: var(--app-card-width)')
-		expect(rule('.app-card-tile')).toContain('height: var(--app-card-height)')
+		expect(rule('.app-card-tile')).toContain(
+			'height: var(--app-card-height)',
+		)
 	})
 
 	it('centers fixed tracks with a compact shared gap', () => {
@@ -48,16 +50,16 @@ describe('catalog card grid', () => {
 	// smeared across the full width of an auxiliary row. Elevation is the rim plus one faint glow.
 	it('lifts cards without a plate behind them', () => {
 		expect(rule('.app-card-glass')).not.toContain('oklch(0.14')
-		expect(rule('.app-card-tile.app-card-glass')).not.toContain('oklch(0.14')
+		expect(rule('.app-card-tile.app-card-glass')).not.toContain(
+			'oklch(0.14',
+		)
 		expect(stylesheet).not.toContain('.app-card-glass::after')
 	})
 
 	it('uses a single quiet edge and a thinner interactive spotlight', () => {
 		const glass = rule('.app-card-tile.app-card-glass')
 		expect(glass).not.toContain('0 0 0 1px')
-		expect(glass).toContain(
-			'0 8px 22px oklch(0.58 0.14 292 / 0.06)',
-		)
+		expect(glass).toContain('0 8px 22px oklch(0.58 0.14 292 / 0.06)')
 		expect(rule('.app-card-tile .spotlight::before')).toContain(
 			'padding: 1.4px',
 		)
@@ -84,7 +86,9 @@ describe('catalog card grid', () => {
 		const offenders = [
 			...sourceFiles('src/widgets/catalog-content'),
 			...sourceFiles('src/entities/app'),
-		].filter(file => /\b(sm|md|lg|xl):grid-cols-/.test(readFileSync(file, 'utf8')))
+		].filter(file =>
+			/\b(sm|md|lg|xl):grid-cols-/.test(readFileSync(file, 'utf8')),
+		)
 
 		expect(offenders).toEqual([])
 	})

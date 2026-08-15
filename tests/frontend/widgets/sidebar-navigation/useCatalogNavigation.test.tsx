@@ -55,7 +55,9 @@ describe('useCatalogNavigation', () => {
 			writable: true,
 		})
 		Object.defineProperty(scroller, 'scrollTo', { value: scrollTo })
-		vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(rect(100, 600))
+		vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(
+			rect(100, 600),
+		)
 		vi.spyOn(header, 'getBoundingClientRect').mockReturnValue(rect(100, 86))
 		vi.spyOn(category, 'getBoundingClientRect')
 			.mockReturnValueOnce(rect(420, 200))
@@ -105,7 +107,9 @@ describe('useCatalogNavigation', () => {
 			writable: true,
 		})
 		Object.defineProperty(scroller, 'scrollTo', { value: scrollTo })
-		vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(rect(100, 600))
+		vi.spyOn(scroller, 'getBoundingClientRect').mockReturnValue(
+			rect(100, 600),
+		)
 		vi.spyOn(header, 'getBoundingClientRect').mockReturnValue(rect(100, 86))
 		vi.spyOn(category, 'getBoundingClientRect')
 			.mockReturnValueOnce(rect(420, 200))

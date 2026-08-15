@@ -1,0 +1,12 @@
+package-lock.json
+
+# Recorded by `serde_json::to_string_pretty` whenever a baseline is re-recorded,
+# so formatting them here would fail the next legitimate update.
+src-tauri/tests/fixtures/golden/
+
+# Generated documents: reformatting them drifts from their generator.
+THIRD_PARTY_NOTICES.md
+.github/release-notes.md
+
+# CI definitions are SHA-pinned and hand-maintained.
+.github/workflows/

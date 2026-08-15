@@ -101,7 +101,11 @@ export function useCatalogView(state: CatalogViewState) {
 	const deferredQuery = useDeferredValue(state.query)
 	const filteredApps = useMemo(
 		() =>
-			rankAppsByQueryAndCategory(visibleApps, deferredQuery, state.categories),
+			rankAppsByQueryAndCategory(
+				visibleApps,
+				deferredQuery,
+				state.categories,
+			),
 		[visibleApps, deferredQuery, state.categories],
 	)
 	const counts = useMemo(

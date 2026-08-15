@@ -5,7 +5,8 @@ export function scenarioRunSummaryMessage(
 ): string | null {
 	const parts: string[] = []
 	if (summary.launched) parts.push(`${summary.launched} launched`)
-	if (summary.launchFailed) parts.push(`${summary.launchFailed} could not start`)
+	if (summary.launchFailed)
+		parts.push(`${summary.launchFailed} could not start`)
 	if (summary.closed) parts.push(`${summary.closed} closed`)
 	if (summary.notRunning) parts.push(`${summary.notRunning} already closed`)
 	if (summary.blocked) parts.push(`${summary.blocked} refused to close`)

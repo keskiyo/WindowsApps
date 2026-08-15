@@ -26,8 +26,7 @@ export interface SettingsPageProps {
 		source: string,
 	) => { ok: true } | { ok: false; error: string }
 	onRestorePreferencesBackup?: () =>
-		| { ok: true }
-		| { ok: false; error: string }
+		{ ok: true } | { ok: false; error: string }
 	onForceFullScan?: () => Promise<void>
 	onResetCatalogCache?: () => Promise<void>
 	catalogDiagnostics?: CatalogDiagnostics | null

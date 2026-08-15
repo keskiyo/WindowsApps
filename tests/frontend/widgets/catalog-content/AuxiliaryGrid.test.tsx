@@ -12,7 +12,7 @@ vi.mock(
 	'../../../../src/widgets/catalog-content/ui/AuxiliaryToolRow/AuxiliaryToolRow',
 	() => ({
 		AuxiliaryToolRow: ({ app }: { app: AppInfo }) => (
-			<button type='button' aria-label={`Launch ${app.name}`}>
+			<button type="button" aria-label={`Launch ${app.name}`}>
 				{app.name}
 			</button>
 		),
@@ -85,7 +85,9 @@ describe('AuxiliaryGrid', () => {
 
 		const view = screen.getByRole('region', { name: 'Auxiliary tools' })
 		expect(view).toHaveTextContent('2 tools')
-		await userEvent.click(screen.getByRole('button', { name: 'Back to More' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Back to More' }),
+		)
 		expect(onBack).toHaveBeenCalled()
 	})
 
@@ -93,25 +95,20 @@ describe('AuxiliaryGrid', () => {
 		render(<AuxiliaryGrid {...props()} />)
 
 		expect(
-			screen
-				.getByRole('button', { name: 'Launch Alpha' })
-				.parentElement,
+			screen.getByRole('button', { name: 'Launch Alpha' }).parentElement,
 		).toHaveClass('min-[1601px]:grid-cols-3')
 	})
 
 	it('keeps the way back when no tool matches the search', async () => {
 		const onBack = vi.fn()
 		render(
-			<AuxiliaryGrid
-				{...props()}
-				apps={[]}
-				hasQuery
-				onBack={onBack}
-			/>,
+			<AuxiliaryGrid {...props()} apps={[]} hasQuery onBack={onBack} />,
 		)
 
 		expect(screen.getByText('No matching auxiliary tools')).toBeVisible()
-		await userEvent.click(screen.getByRole('button', { name: 'Back to More' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Back to More' }),
+		)
 		expect(onBack).toHaveBeenCalled()
 	})
 })

@@ -97,12 +97,12 @@ describe('AppPickerDialog', () => {
 	it('names the category each app sits in, custom categories included', () => {
 		setup({ apps: [...catalog, app('notes', 'Notes', 'evening')] })
 
-		expect(screen.getByRole('switch', { name: /Discord/ })).toHaveAccessibleName(
-			/Communication/,
-		)
-		expect(screen.getByRole('switch', { name: /Notes/ })).toHaveAccessibleName(
-			/Evening/,
-		)
+		expect(
+			screen.getByRole('switch', { name: /Discord/ }),
+		).toHaveAccessibleName(/Communication/)
+		expect(
+			screen.getByRole('switch', { name: /Notes/ }),
+		).toHaveAccessibleName(/Evening/)
 	})
 
 	// Typing a category is how a reader who remembers "it was a browser" finds the entry whose
@@ -110,7 +110,10 @@ describe('AppPickerDialog', () => {
 	it('answers a category name with the apps in that category', async () => {
 		setup({ apps: [...catalog, app('notes', 'Notes', 'evening')] })
 
-		await userEvent.type(screen.getByRole('searchbox', { name: LABEL }), 'brow')
+		await userEvent.type(
+			screen.getByRole('searchbox', { name: LABEL }),
+			'brow',
+		)
 
 		expect(screen.getAllByRole('switch')).toHaveLength(1)
 		expect(screen.getByRole('switch')).toHaveAccessibleName(/Firefox/)
@@ -124,7 +127,10 @@ describe('AppPickerDialog', () => {
 			],
 		})
 
-		await userEvent.type(screen.getByRole('searchbox', { name: LABEL }), 'media')
+		await userEvent.type(
+			screen.getByRole('searchbox', { name: LABEL }),
+			'media',
+		)
 
 		expect(
 			screen.getAllByRole('switch').map(row => row.textContent),
@@ -134,7 +140,10 @@ describe('AppPickerDialog', () => {
 	it('filters by the catalog ranking as the user types', async () => {
 		setup()
 
-		await userEvent.type(screen.getByRole('searchbox', { name: LABEL }), 'fire')
+		await userEvent.type(
+			screen.getByRole('searchbox', { name: LABEL }),
+			'fire',
+		)
 
 		expect(screen.getAllByRole('switch')).toHaveLength(1)
 		expect(screen.getByRole('switch')).toHaveAccessibleName(/Firefox/)
@@ -151,10 +160,9 @@ describe('AppPickerDialog', () => {
 		)
 
 		expect(onConfirm).toHaveBeenCalledTimes(1)
-		expect(onConfirm.mock.calls[0][0].map((entry: AppInfo) => entry.id)).toEqual([
-			'discord',
-			'firefox',
-		])
+		expect(
+			onConfirm.mock.calls[0][0].map((entry: AppInfo) => entry.id),
+		).toEqual(['discord', 'firefox'])
 	})
 
 	it('keeps a switched-on app on while the query narrows and widens', async () => {
@@ -200,7 +208,10 @@ describe('AppPickerDialog', () => {
 	it('says so when nothing matches', async () => {
 		setup()
 
-		await userEvent.type(screen.getByRole('searchbox', { name: LABEL }), 'zzz')
+		await userEvent.type(
+			screen.getByRole('searchbox', { name: LABEL }),
+			'zzz',
+		)
 
 		expect(screen.queryAllByRole('switch')).toEqual([])
 		expect(screen.getByText(/No apps match/)).toBeVisible()
@@ -217,10 +228,14 @@ describe('AppPickerDialog', () => {
 			'0 selected of 400',
 		)
 
-		await userEvent.click(screen.getByRole('button', { name: 'Show 352 more' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Show 352 more' }),
+		)
 
 		expect(screen.getAllByRole('switch')).toHaveLength(96)
-		expect(screen.getByRole('button', { name: 'Show 304 more' })).toBeVisible()
+		expect(
+			screen.getByRole('button', { name: 'Show 304 more' }),
+		).toBeVisible()
 	})
 
 	// Scrolling to the end must load the next batch on its own; the button is the fallback, not
@@ -236,10 +251,14 @@ describe('AppPickerDialog', () => {
 	it('stops offering more once the whole list is rendered', async () => {
 		setup({ apps: manyApps(60) })
 
-		await userEvent.click(screen.getByRole('button', { name: 'Show 12 more' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Show 12 more' }),
+		)
 
 		expect(screen.getAllByRole('switch')).toHaveLength(60)
-		expect(screen.queryByRole('button', { name: /Show \d+ more/ })).toBeNull()
+		expect(
+			screen.queryByRole('button', { name: /Show \d+ more/ }),
+		).toBeNull()
 	})
 
 	// Catalog order put whatever the scan found first at the top, which is unreadable in a list

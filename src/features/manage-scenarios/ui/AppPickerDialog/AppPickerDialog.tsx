@@ -96,7 +96,8 @@ export function AppPickerDialog({
 								key={app.id}
 								app={app}
 								caption={
-									note ?? categoryLabel(categories, app.category)
+									note ??
+									categoryLabel(categories, app.category)
 								}
 								checked={selection.isSelected(app)}
 								disabled={note !== null}
@@ -118,7 +119,10 @@ export function AppPickerDialog({
 					)}
 				</ul>
 				<div className="flex items-center justify-between gap-3 border-t border-(--border-neutral) px-4 py-3">
-					<p aria-live="polite" className="text-xs text-(--text-muted)">
+					<p
+						aria-live="polite"
+						className="text-xs text-(--text-muted)"
+					>
 						{count} selected of {results.length}
 					</p>
 					<div className="flex shrink-0 gap-2">

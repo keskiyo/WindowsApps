@@ -89,7 +89,9 @@ export function ScenariosPage({
 							running={runningId === scenario.id}
 							isScenarioRunning={isScenarioRunning}
 							runningStatus={
-								runningId === scenario.id ? runningStatus : undefined
+								runningId === scenario.id
+									? runningStatus
+									: undefined
 							}
 							isFavorite={favoriteScenarioIds.includes(
 								scenario.id,

@@ -51,9 +51,9 @@ describe('CatalogAppCard', () => {
 			/>,
 		)
 
-		expect(screen.getByRole('button', { name: 'Manage Claude' })).toContainHTML(
-			'lucide-ellipsis-vertical',
-		)
+		expect(
+			screen.getByRole('button', { name: 'Manage Claude' }),
+		).toContainHTML('lucide-ellipsis-vertical')
 		const favorite = screen.getByRole('button', {
 			name: 'Add Claude to favorites',
 		})

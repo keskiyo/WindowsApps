@@ -69,7 +69,9 @@ export function buildMorePreview({
 		installersDocs: previewItems(
 			selectRecentApps(area('installers_docs'), firstSeen, MORE_PREVIEW),
 		),
-		scenarios: sortScenariosByNewest(scenarios.map(summarizeScenario)).slice(
+		scenarios: sortScenariosByNewest(
+			scenarios.map(summarizeScenario),
+		).slice(
 			0,
 			scenarios.length > MORE_PREVIEW ? MORE_PREVIEW - 1 : MORE_PREVIEW,
 		),

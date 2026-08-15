@@ -18,15 +18,15 @@ describe('SortableNavigationCategory', () => {
 	it('keeps the active source inside the sidebar layout without a transform', () => {
 		render(
 			<SortableNavigationCategory
-				category='games'
+				category="games"
 				count={11}
-				label='Games'
+				label="Games"
 				onSelect={vi.fn()}
 			/>,
 		)
 
-		expect(screen.getByRole('button', { name: 'Games' }).style.transform).toBe(
-			'',
-		)
+		expect(
+			screen.getByRole('button', { name: 'Games' }).style.transform,
+		).toBe('')
 	})
 })

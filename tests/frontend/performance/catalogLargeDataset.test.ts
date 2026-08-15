@@ -8,7 +8,12 @@ import {
 import type { AppInfo } from '../../../src/entities/app'
 
 function app(index: number): AppInfo {
-	const category = index % 3 === 0 ? 'development' : index % 3 === 1 ? 'games' : 'utilities'
+	const category =
+		index % 3 === 0
+			? 'development'
+			: index % 3 === 1
+				? 'games'
+				: 'utilities'
 	return {
 		id: `app-${index}`,
 		name: `Sample App ${index}`,

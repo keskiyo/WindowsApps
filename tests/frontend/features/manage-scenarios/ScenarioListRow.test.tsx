@@ -28,9 +28,9 @@ function renderRow(
 ) {
 	render(
 		<ScenarioListRow
-			list='launch'
-			label='Launch'
-			scenarioName='Gaming'
+			list="launch"
+			label="Launch"
+			scenarioName="Gaming"
 			apps={apps}
 			unavailable={unavailable}
 			disabled={false}
@@ -39,7 +39,10 @@ function renderRow(
 			onRemove={onRemove}
 		/>,
 	)
-	return { onRemove, list: screen.getByRole('list', { name: 'Launch list of Gaming' }) }
+	return {
+		onRemove,
+		list: screen.getByRole('list', { name: 'Launch list of Gaming' }),
+	}
 }
 
 describe('ScenarioListRow', () => {
@@ -111,7 +114,9 @@ describe('ScenarioListRow', () => {
 
 	// An app whose icon has not been hydrated yet must still be a readable tile.
 	it('falls back to a placeholder when no icon is loaded', () => {
-		const { list } = renderRow([app({ id: 'game', name: 'Backpack Battles' })])
+		const { list } = renderRow([
+			app({ id: 'game', name: 'Backpack Battles' }),
+		])
 
 		expect(within(list).queryByRole('presentation')).not.toBeInTheDocument()
 		expect(list).toHaveTextContent('Backpack Battles')

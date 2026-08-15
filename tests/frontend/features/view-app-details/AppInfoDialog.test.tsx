@@ -262,7 +262,9 @@ describe('AppInfoDialog', () => {
 
 		await screen.findByText('Application')
 		const detection = within(
-			screen.getByRole('heading', { name: 'Detection' }).closest('section')!,
+			screen
+				.getByRole('heading', { name: 'Detection' })
+				.closest('section')!,
 		)
 		expect(screen.getByText('Shown as')).toBeVisible()
 		expect(
@@ -290,7 +292,9 @@ describe('AppInfoDialog', () => {
 
 		await screen.findByText('Application')
 		const detection = within(
-			screen.getByRole('heading', { name: 'Detection' }).closest('section')!,
+			screen
+				.getByRole('heading', { name: 'Detection' })
+				.closest('section')!,
 		)
 		expect(screen.getByText('example-editor.exe')).toBeVisible()
 		expect(screen.getByText('Main catalog')).toBeVisible()
@@ -310,7 +314,9 @@ describe('AppInfoDialog', () => {
 
 		await screen.findByText('Application')
 		const detection = within(
-			screen.getByRole('heading', { name: 'Detection' }).closest('section')!,
+			screen
+				.getByRole('heading', { name: 'Detection' })
+				.closest('section')!,
 		)
 		expect(detection.getByText('Category')).toBeVisible()
 		expect(

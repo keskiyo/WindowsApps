@@ -59,14 +59,12 @@ function renderApp(
 		refreshApps: vi.fn().mockResolvedValue(apps),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
-		closeApps: vi
-			.fn()
-			.mockResolvedValue({
-				closed: 0,
-				notRunning: 0,
-				unavailable: 0,
-				failed: 0,
-			}),
+		closeApps: vi.fn().mockResolvedValue({
+			closed: 0,
+			notRunning: 0,
+			unavailable: 0,
+			failed: 0,
+		}),
 		getUninstallPreview: vi.fn().mockResolvedValue({
 			appName: 'Visual Studio Code',
 			publisher: 'Microsoft',
@@ -242,7 +240,9 @@ describe('App', () => {
 		const retry = calls[calls.length - 1]?.[1]?.action
 		expect(retry).toMatchObject({ label: 'Retry' })
 		await act(async () => {
-			;(retry as { onClick(event: unknown): void }).onClick(new MouseEvent('click'))
+			;(retry as { onClick(event: unknown): void }).onClick(
+				new MouseEvent('click'),
+			)
 		})
 
 		expect(

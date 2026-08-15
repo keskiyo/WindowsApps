@@ -35,7 +35,7 @@ describe('Header', () => {
 				primaryAppCount={12}
 				auxiliaryToolCount={3}
 				visibleCount={12}
-				query=''
+				query=""
 				isRefreshing={false}
 				scanProgress={null}
 				menuButtonRef={createRef()}
@@ -90,7 +90,7 @@ describe('Header', () => {
 				primaryAppCount={12}
 				auxiliaryToolCount={3}
 				visibleCount={12}
-				query=''
+				query=""
 				isRefreshing
 				scanProgress={{
 					stage: 'Portable applications',

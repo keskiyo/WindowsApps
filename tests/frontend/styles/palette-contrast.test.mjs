@@ -8,7 +8,9 @@ const resultItem = readFileSync(
 )
 
 function token(name) {
-	const value = stylesheet.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`))?.[1]
+	const value = stylesheet.match(
+		new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`),
+	)?.[1]
 	expect(value, `${name} must be an opaque hex token`).toBeTruthy()
 	return value
 }
@@ -21,9 +23,7 @@ function luminance(hex) {
 			? value / 12.92
 			: ((value + 0.055) / 1.055) ** 2.4
 	})
-	return (
-		0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
-	)
+	return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
 }
 
 function contrastRatio(foreground, background) {
@@ -48,7 +48,8 @@ describe('command palette selected-result contrast', () => {
 
 	it('applies the checked token pair rather than a translucent overlay', () => {
 		const rule =
-			stylesheet.match(/\.palette-result-selected\s*\{([^}]*)\}/)?.[1] ?? ''
+			stylesheet.match(/\.palette-result-selected\s*\{([^}]*)\}/)?.[1] ??
+			''
 		expect(rule).toContain('var(--color-palette-selected)')
 		expect(rule).toContain('var(--color-palette-selected-text)')
 

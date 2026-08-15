@@ -41,7 +41,9 @@ describe('useAppFeedback', () => {
 			useAppFeedback({
 				onLaunch: vi.fn().mockResolvedValue(undefined),
 				onRefresh: vi.fn().mockResolvedValue(undefined),
-				onUninstall: vi.fn().mockRejectedValue(new Error('private failure')),
+				onUninstall: vi
+					.fn()
+					.mockRejectedValue(new Error('private failure')),
 			}),
 		)
 

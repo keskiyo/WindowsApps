@@ -60,7 +60,9 @@ export function MorePage({
 			{recentApps.length > 0 && (
 				<section className="mt-6 overflow-hidden rounded-2xl border border-(--border-neutral) bg-(--surface-panel)">
 					<header className="px-5 py-4">
-						<h2 className="text-base font-semibold">Recently added</h2>
+						<h2 className="text-base font-semibold">
+							Recently added
+						</h2>
 					</header>
 					<ul className="border-t border-(--border-neutral)">
 						{recentApps.map(entry => (

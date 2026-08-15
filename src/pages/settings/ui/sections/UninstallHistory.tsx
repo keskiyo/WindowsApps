@@ -137,7 +137,6 @@ export function UninstallHistory({ client }: UninstallHistoryProps) {
 					No uninstall history yet.
 				</p>
 			)}
-
 		</div>
 	)
 }

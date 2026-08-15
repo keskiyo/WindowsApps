@@ -58,9 +58,7 @@ export function usePreferencesBackup({
 	function confirmPending() {
 		if (!pending) return
 		const result =
-			pending.kind === 'import'
-				? onImport(pending.source)
-				: onRestore()
+			pending.kind === 'import' ? onImport(pending.source) : onRestore()
 		setPending(null)
 		if (result.ok) {
 			setMessage(

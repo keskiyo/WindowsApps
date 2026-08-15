@@ -17,7 +17,9 @@ describe('SearchScopeHint', () => {
 			screen.getByRole('button', { name: '3 matches in Tools' }),
 		).toBeInTheDocument()
 		expect(
-			screen.getByRole('button', { name: '1 match in Installers & docs' }),
+			screen.getByRole('button', {
+				name: '1 match in Installers & docs',
+			}),
 		).toBeInTheDocument()
 		expect(screen.queryByRole('button', { name: /Hidden/ })).toBeNull()
 

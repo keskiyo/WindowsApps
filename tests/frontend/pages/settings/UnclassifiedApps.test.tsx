@@ -65,7 +65,10 @@ describe('UnclassifiedApps', () => {
 		const writeText = vi.fn().mockResolvedValue(undefined)
 		vi.stubGlobal('navigator', { clipboard: { writeText } })
 		renderPanel([
-			app({ publisher: 'Unknown Vendor', categoryReasons: ['default=no-signal'] }),
+			app({
+				publisher: 'Unknown Vendor',
+				categoryReasons: ['default=no-signal'],
+			}),
 			app({ id: 'app-2', name: 'Second Tool' }),
 		])
 
@@ -90,7 +93,9 @@ describe('UnclassifiedApps', () => {
 
 	it('reports a clipboard that refused the report', async () => {
 		vi.stubGlobal('navigator', {
-			clipboard: { writeText: vi.fn().mockRejectedValue(new Error('no')) },
+			clipboard: {
+				writeText: vi.fn().mockRejectedValue(new Error('no')),
+			},
 		})
 		renderPanel([app({})])
 

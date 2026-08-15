@@ -51,12 +51,10 @@ export interface AppPreferencesV15 {
 }
 
 export type PreferenceTransferResult =
-	| { ok: true }
-	| { ok: false; error: string }
+	{ ok: true } | { ok: false; error: string }
 
 export type PreferenceImportResult =
-	| { ok: true; preferences: AppPreferencesV15 }
-	| { ok: false; error: string }
+	{ ok: true; preferences: AppPreferencesV15 } | { ok: false; error: string }
 
 export const DEFAULT_PREFERENCES: AppPreferencesV15 = {
 	version: 15,
@@ -366,9 +364,7 @@ export function parsePreferenceImport(source: string): PreferenceImportResult {
 				error: 'The selected file is not a Windows Apps backup.',
 			}
 		}
-		if (
-			version > CURRENT_PREFERENCES_VERSION
-		) {
+		if (version > CURRENT_PREFERENCES_VERSION) {
 			return {
 				ok: false,
 				error: 'This backup was created by a newer version of Windows Apps.',
@@ -388,9 +384,7 @@ export function serializePreferences(preferences: AppPreferencesV15): string {
 	return JSON.stringify({ ...unknownFields, ...knownFields })
 }
 
-export function readPreferenceBackup(
-	storage: Storage,
-): PreferenceImportResult {
+export function readPreferenceBackup(storage: Storage): PreferenceImportResult {
 	try {
 		const source = storage.getItem(PREFERENCES_BACKUP_KEY)
 		if (!source)
@@ -427,10 +421,7 @@ export function writePreferences(
 	}
 	rotateBackup(storage)
 	try {
-		storage.setItem(
-			PREFERENCES_KEY,
-			serializePreferences(preferences),
-		)
+		storage.setItem(PREFERENCES_KEY, serializePreferences(preferences))
 		return true
 	} catch {
 		return false

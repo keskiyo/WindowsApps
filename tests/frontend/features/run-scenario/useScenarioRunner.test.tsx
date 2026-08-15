@@ -41,7 +41,13 @@ function scenario(value: Partial<Scenario> = {}): Scenario {
 }
 
 function closed(count: number): CloseAppsResult {
-	return { closed: count, notRunning: 0, unavailable: 0, blocked: 0, failed: 0 }
+	return {
+		closed: count,
+		notRunning: 0,
+		unavailable: 0,
+		blocked: 0,
+		failed: 0,
+	}
 }
 
 function setup(options: {
@@ -87,7 +93,10 @@ describe('useScenarioRunner', () => {
 
 		await act(async () => {
 			await view.result.current.run(
-				scenario({ launchIdentities: ['game'], closeIdentities: ['chat'] }),
+				scenario({
+					launchIdentities: ['game'],
+					closeIdentities: ['chat'],
+				}),
 			)
 		})
 
@@ -164,7 +173,9 @@ describe('useScenarioRunner', () => {
 		})
 
 		await act(async () => {
-			await view.result.current.run(scenario({ closeIdentities: ['chat'] }))
+			await view.result.current.run(
+				scenario({ closeIdentities: ['chat'] }),
+			)
 		})
 
 		expect(summaries[0].closeUnavailable).toBe(true)
@@ -222,7 +233,9 @@ describe('useScenarioRunner', () => {
 		const { view, closeApps } = setup({ apps: [app('game')] })
 
 		await act(async () => {
-			await view.result.current.run(scenario({ launchIdentities: ['game'] }))
+			await view.result.current.run(
+				scenario({ launchIdentities: ['game'] }),
+			)
 		})
 
 		expect(closeApps).not.toHaveBeenCalled()
@@ -291,8 +304,9 @@ describe('useScenarioRunner', () => {
 	})
 
 	it('never starts more than the entry cap, whatever the scenario holds', async () => {
-		const apps = Array.from({ length: MAX_SCENARIO_ENTRIES + 5 }, (_, index) =>
-			app(`a${index}`),
+		const apps = Array.from(
+			{ length: MAX_SCENARIO_ENTRIES + 5 },
+			(_, index) => app(`a${index}`),
 		)
 		const { view, launch } = setup({ apps })
 
@@ -317,12 +331,18 @@ describe('useScenarioRunner', () => {
 
 		let first: Promise<void> | undefined
 		act(() => {
-			first = view.result.current.run(scenario({ launchIdentities: ['game'] }))
+			first = view.result.current.run(
+				scenario({ launchIdentities: ['game'] }),
+			)
 		})
-		await waitFor(() => expect(view.result.current.runningId).toBe('gaming'))
+		await waitFor(() =>
+			expect(view.result.current.runningId).toBe('gaming'),
+		)
 		// A second click while apps are still starting would double every launch.
 		await act(async () => {
-			await view.result.current.run(scenario({ launchIdentities: ['game'] }))
+			await view.result.current.run(
+				scenario({ launchIdentities: ['game'] }),
+			)
 		})
 		expect(launch).toHaveBeenCalledTimes(1)
 
@@ -377,7 +397,10 @@ describe('useScenarioRunner', () => {
 		// The More card previews a snapshot of the list; a scenario deleted in between must not
 		// make the button throw.
 		it('does nothing for an id the list no longer holds', async () => {
-			const { view, launch } = setup({ apps: [app('game')], scenarios: [] })
+			const { view, launch } = setup({
+				apps: [app('game')],
+				scenarios: [],
+			})
 
 			await act(async () => {
 				view.result.current.runById('gaming')

@@ -71,7 +71,10 @@ export const tauriAppsClient: AppsClient = {
 		return listenIfTauri<CatalogChangeSummary>('catalog://changed', handler)
 	},
 	async onCatalogDiagnostics(handler) {
-		return listenIfTauri<CatalogDiagnostics>('catalog://diagnostics', handler)
+		return listenIfTauri<CatalogDiagnostics>(
+			'catalog://diagnostics',
+			handler,
+		)
 	},
 	async onScanProgress(handler) {
 		return listenIfTauri<ScanProgress>('scan://progress', handler)

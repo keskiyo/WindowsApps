@@ -111,7 +111,9 @@ describe('ScenariosPage', () => {
 
 		const page = screen.getByRole('region', { name: 'Scenarios' })
 		expect(page).toHaveTextContent('1 scenario')
-		await userEvent.click(screen.getByRole('button', { name: 'Back to More' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Back to More' }),
+		)
 		expect(view.onBack).toHaveBeenCalled()
 	})
 
@@ -131,7 +133,9 @@ describe('ScenariosPage', () => {
 		const view = props()
 		render(<ScenariosPage {...view} />)
 
-		await userEvent.click(screen.getByRole('button', { name: 'Add scenario' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Add scenario' }),
+		)
 		await userEvent.type(
 			screen.getByRole('textbox', { name: 'New scenario name' }),
 			'Focus',
@@ -147,7 +151,9 @@ describe('ScenariosPage', () => {
 		const view = props([gaming])
 		render(<ScenariosPage {...view} />)
 
-		await userEvent.click(screen.getByRole('button', { name: 'Rename Gaming' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Rename Gaming' }),
+		)
 		const field = screen.getByRole('textbox', { name: 'Rename Gaming' })
 		await userEvent.clear(field)
 		await userEvent.type(field, 'Evening{Enter}')
@@ -281,7 +287,11 @@ describe('ScenariosPage', () => {
 	// Closing the shell is recoverable but never something to trigger by accident, so it costs one
 	// deliberate confirmation and nothing reaches the scenario until that is given.
 	it('asks before putting a Windows desktop component in the close list', async () => {
-		const view = { ...props([gaming]), apps: catalogWithShell, selectableApps: catalogWithShell }
+		const view = {
+			...props([gaming]),
+			apps: catalogWithShell,
+			selectableApps: catalogWithShell,
+		}
 		render(<ScenariosPage {...view} />)
 
 		const picker = await openPicker('Close', 'Gaming')
@@ -297,11 +307,19 @@ describe('ScenariosPage', () => {
 		await userEvent.click(
 			within(warning).getByRole('button', { name: 'Add anyway' }),
 		)
-		expect(view.onAddApp).toHaveBeenCalledWith('gaming', 'close', 'explorer')
+		expect(view.onAddApp).toHaveBeenCalledWith(
+			'gaming',
+			'close',
+			'explorer',
+		)
 	})
 
 	it('leaves the list untouched when the warning is dismissed', async () => {
-		const view = { ...props([gaming]), apps: catalogWithShell, selectableApps: catalogWithShell }
+		const view = {
+			...props([gaming]),
+			apps: catalogWithShell,
+			selectableApps: catalogWithShell,
+		}
 		render(<ScenariosPage {...view} />)
 
 		const picker = await openPicker('Close', 'Gaming')
@@ -354,7 +372,11 @@ describe('ScenariosPage', () => {
 
 	// Starting Explorer is ordinary; only ending it is not.
 	it('adds the same component to the launch list without asking', async () => {
-		const view = { ...props([gaming]), apps: catalogWithShell, selectableApps: catalogWithShell }
+		const view = {
+			...props([gaming]),
+			apps: catalogWithShell,
+			selectableApps: catalogWithShell,
+		}
 		render(<ScenariosPage {...view} />)
 
 		const picker = await openPicker('Launch', 'Gaming')
@@ -362,7 +384,11 @@ describe('ScenariosPage', () => {
 		await confirmPicker(picker)
 
 		expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-		expect(view.onAddApp).toHaveBeenCalledWith('gaming', 'launch', 'explorer')
+		expect(view.onAddApp).toHaveBeenCalledWith(
+			'gaming',
+			'launch',
+			'explorer',
+		)
 	})
 
 	// Delete sits next to Rename and wipes a configured scenario outright, so a mis-click on the
@@ -371,14 +397,18 @@ describe('ScenariosPage', () => {
 		const view = props([gaming])
 		render(<ScenariosPage {...view} />)
 
-		await userEvent.click(screen.getByRole('button', { name: 'Delete Gaming' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Delete Gaming' }),
+		)
 
 		const confirm = screen.getByRole('alertdialog', {
 			name: 'Delete Gaming scenario',
 		})
 		expect(view.onDelete).not.toHaveBeenCalled()
 
-		await userEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }))
+		await userEvent.click(
+			within(confirm).getByRole('button', { name: 'Cancel' }),
+		)
 		expect(view.onDelete).not.toHaveBeenCalled()
 		expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
 	})
@@ -387,7 +417,9 @@ describe('ScenariosPage', () => {
 		const view = props([gaming])
 		render(<ScenariosPage {...view} />)
 
-		await userEvent.click(screen.getByRole('button', { name: 'Delete Gaming' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Delete Gaming' }),
+		)
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Delete scenario' }),
 		)
@@ -455,7 +487,11 @@ describe('ScenariosPage', () => {
 			}),
 		)
 
-		expect(view.onRemoveApp).toHaveBeenCalledWith('gaming', 'launch', 'game')
+		expect(view.onRemoveApp).toHaveBeenCalledWith(
+			'gaming',
+			'launch',
+			'game',
+		)
 	})
 
 	it('locks the active scenario configuration without locking its favorite control', () => {
@@ -467,8 +503,12 @@ describe('ScenariosPage', () => {
 			/>,
 		)
 
-		expect(screen.getByRole('button', { name: 'Rename Gaming' })).toBeDisabled()
-		expect(screen.getByRole('button', { name: 'Delete Gaming' })).toBeDisabled()
+		expect(
+			screen.getByRole('button', { name: 'Rename Gaming' }),
+		).toBeDisabled()
+		expect(
+			screen.getByRole('button', { name: 'Delete Gaming' }),
+		).toBeDisabled()
 		expect(
 			screen.getByRole('button', {
 				name: 'Add an app to the Launch list of Gaming',
@@ -519,7 +559,9 @@ describe('ScenariosPage', () => {
 
 		rerender(<ScenariosPage {...props([gaming], ['gaming'])} />)
 		expect(
-			screen.getByRole('button', { name: 'Remove Gaming from favorites' }),
+			screen.getByRole('button', {
+				name: 'Remove Gaming from favorites',
+			}),
 		).toHaveAttribute('aria-pressed', 'true')
 	})
 
@@ -534,9 +576,19 @@ describe('ScenariosPage', () => {
 		render(
 			<ScenariosPage
 				{...props([
-					{ ...gaming, id: 'legacy', name: 'Legacy', createdAt: null },
+					{
+						...gaming,
+						id: 'legacy',
+						name: 'Legacy',
+						createdAt: null,
+					},
 					{ ...gaming, id: 'older', name: 'Older', createdAt: 1_000 },
-					{ ...gaming, id: 'newest', name: 'Newest', createdAt: 2_000 },
+					{
+						...gaming,
+						id: 'newest',
+						name: 'Newest',
+						createdAt: 2_000,
+					},
 				])}
 			/>,
 		)

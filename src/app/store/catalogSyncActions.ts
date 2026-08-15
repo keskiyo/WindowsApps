@@ -87,7 +87,11 @@ export function createCatalogSyncActions({
 				apps: state.apps.map(app => {
 					const patch = byId.get(app.id)
 					if (!patch) return app
-					const { id: _id, generation: _generation, ...fields } = patch
+					const {
+						id: _id,
+						generation: _generation,
+						...fields
+					} = patch
 					return { ...app, ...fields }
 				}),
 			}))

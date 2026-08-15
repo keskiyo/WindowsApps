@@ -82,7 +82,9 @@ export function createPreferenceTransferActions({
 	persist,
 	storage,
 }: PreferenceTransferOptions): PreferenceTransferActions {
-	function applyPreferences(preferences: AppPreferencesV15): PreferenceTransferResult {
+	function applyPreferences(
+		preferences: AppPreferencesV15,
+	): PreferenceTransferResult {
 		if (hasNewerStoredPreferences(storage)) {
 			return {
 				ok: false,

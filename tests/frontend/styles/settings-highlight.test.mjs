@@ -20,9 +20,9 @@ function rule(selector) {
  */
 describe('violet highlight compatibility rule', () => {
 	it('only paints while the pointer is on the control', () => {
-		expect(rule(`.theme-graphite-surface [class*='bg-violet-100']:hover`)).toContain(
-			'background-color',
-		)
+		expect(
+			rule(`.theme-graphite-surface [class*='bg-violet-100']:hover`),
+		).toContain('background-color')
 		expect(stylesheet).not.toMatch(
 			/\.theme-graphite-surface \[class\*='bg-violet-100'\]\s*\{/,
 		)

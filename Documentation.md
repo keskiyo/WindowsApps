@@ -297,7 +297,7 @@ signals carry records the table has never seen:
   persisted, so no cached record can go stale against it.
 - **What the vendor wrote about itself.** `catalog::classify::vocabulary` holds
   plain purpose words in Russian and English — `media player`, `графический
-  редактор`, `terminal emulator` — matched against the description and the
+редактор`, `terminal emulator` — matched against the description and the
   ProductName of the binary. Its weight sits between the threshold and a
   product-name match: a description alone leaves `Other`, but never outranks a
   named product. Two independent generic matches do.

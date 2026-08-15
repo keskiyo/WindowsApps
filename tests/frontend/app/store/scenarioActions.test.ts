@@ -13,9 +13,12 @@ function client(): AppsClient {
 		refreshApps: vi.fn().mockResolvedValue([]),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
-		closeApps: vi
-			.fn()
-			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0, failed: 0 }),
+		closeApps: vi.fn().mockResolvedValue({
+			closed: 0,
+			notRunning: 0,
+			unavailable: 0,
+			failed: 0,
+		}),
 		getAppDetails: vi.fn(),
 		openAppFolder: vi.fn().mockResolvedValue(undefined),
 		getUninstallPreview: vi.fn(),
@@ -31,7 +34,8 @@ function memoryStorage() {
 		values,
 		storage: {
 			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => void values.set(key, value),
+			setItem: (key: string, value: string) =>
+				void values.set(key, value),
 		} as unknown as Storage,
 	}
 }
@@ -41,7 +45,11 @@ const idFactory = () => `scenario-${(counter += 1)}`
 
 describe('scenario actions', () => {
 	it('creates, renames and deletes a scenario', () => {
-		const store = createAppStore(client(), memoryStorage().storage, idFactory)
+		const store = createAppStore(
+			client(),
+			memoryStorage().storage,
+			idFactory,
+		)
 
 		const created = store.getState().createScenario('  Gaming  ')
 		expect(created).toEqual({ ok: true, id: expect.any(String) })
@@ -50,7 +58,9 @@ describe('scenario actions', () => {
 		expect(store.getState().scenarios[0]?.createdAt).toBeGreaterThan(0)
 
 		const id = created.ok ? created.id : ''
-		expect(store.getState().renameScenario(id, 'Focus')).toEqual({ ok: true })
+		expect(store.getState().renameScenario(id, 'Focus')).toEqual({
+			ok: true,
+		})
 		expect(store.getState().scenarios[0]?.name).toBe('Focus')
 
 		store.getState().deleteScenario(id)
@@ -73,7 +83,11 @@ describe('scenario actions', () => {
 		withApp.getApps = vi
 			.fn()
 			.mockResolvedValue({ apps: [security], hasCache: true })
-		const store = createAppStore(withApp, memoryStorage().storage, idFactory)
+		const store = createAppStore(
+			withApp,
+			memoryStorage().storage,
+			idFactory,
+		)
 		await store.getState().load()
 		const created = store.getState().createScenario('Gaming')
 		const id = created.ok ? created.id : ''
@@ -103,7 +117,11 @@ describe('scenario actions', () => {
 		withApp.getApps = vi
 			.fn()
 			.mockResolvedValue({ apps: [shell], hasCache: true })
-		const store = createAppStore(withApp, memoryStorage().storage, idFactory)
+		const store = createAppStore(
+			withApp,
+			memoryStorage().storage,
+			idFactory,
+		)
 		await store.getState().load()
 		const created = store.getState().createScenario('Gaming')
 		const id = created.ok ? created.id : ''
@@ -129,19 +147,29 @@ describe('scenario actions', () => {
 		withApp.getApps = vi
 			.fn()
 			.mockResolvedValue({ apps: [explorer], hasCache: true })
-		const store = createAppStore(withApp, memoryStorage().storage, idFactory)
+		const store = createAppStore(
+			withApp,
+			memoryStorage().storage,
+			idFactory,
+		)
 		await store.getState().load()
 		const created = store.getState().createScenario('Reset shell')
 		const id = created.ok ? created.id : ''
 
-		expect(store.getState().addScenarioApp(id, 'close', 'explorer')).toEqual({
+		expect(
+			store.getState().addScenarioApp(id, 'close', 'explorer'),
+		).toEqual({
 			ok: false,
 			error: 'Windows cannot survive closing this process, so it cannot go in a close list.',
 		})
 	})
 
 	it('refuses a blank or duplicate name', () => {
-		const store = createAppStore(client(), memoryStorage().storage, idFactory)
+		const store = createAppStore(
+			client(),
+			memoryStorage().storage,
+			idFactory,
+		)
 		store.getState().createScenario('Gaming')
 
 		expect(store.getState().createScenario('   ')).toEqual({
@@ -157,14 +185,22 @@ describe('scenario actions', () => {
 	})
 
 	it('adds an app to each list and removes it again', () => {
-		const store = createAppStore(client(), memoryStorage().storage, idFactory)
+		const store = createAppStore(
+			client(),
+			memoryStorage().storage,
+			idFactory,
+		)
 		const created = store.getState().createScenario('Gaming')
 		const id = created.ok ? created.id : ''
 
-		expect(store.getState().addScenarioApp(id, 'launch', 'app:game')).toEqual({
+		expect(
+			store.getState().addScenarioApp(id, 'launch', 'app:game'),
+		).toEqual({
 			ok: true,
 		})
-		expect(store.getState().addScenarioApp(id, 'close', 'app:chat')).toEqual({
+		expect(
+			store.getState().addScenarioApp(id, 'close', 'app:chat'),
+		).toEqual({
 			ok: true,
 		})
 		expect(store.getState().scenarios[0]).toMatchObject({
@@ -175,11 +211,17 @@ describe('scenario actions', () => {
 		store.getState().removeScenarioApp(id, 'launch', 'app:game')
 		expect(store.getState().scenarios[0]?.launchIdentities).toEqual([])
 		// Removing from one list must not touch the other.
-		expect(store.getState().scenarios[0]?.closeIdentities).toEqual(['app:chat'])
+		expect(store.getState().scenarios[0]?.closeIdentities).toEqual([
+			'app:chat',
+		])
 	})
 
 	it('persists and removes the matching app snapshot', () => {
-		const store = createAppStore(client(), memoryStorage().storage, idFactory)
+		const store = createAppStore(
+			client(),
+			memoryStorage().storage,
+			idFactory,
+		)
 		store.setState({
 			apps: [
 				{
@@ -201,7 +243,10 @@ describe('scenario actions', () => {
 		})
 		expect(store.getState().scenarios[0]).toMatchObject({
 			launchAppSnapshots: {
-				chat: { name: 'ChatGPT', iconBase64: 'data:image/png;base64,AAAA' },
+				chat: {
+					name: 'ChatGPT',
+					iconBase64: 'data:image/png;base64,AAAA',
+				},
 			},
 		})
 
@@ -213,12 +258,18 @@ describe('scenario actions', () => {
 	})
 
 	it('reports a duplicate rather than adding the same app twice', () => {
-		const store = createAppStore(client(), memoryStorage().storage, idFactory)
+		const store = createAppStore(
+			client(),
+			memoryStorage().storage,
+			idFactory,
+		)
 		const created = store.getState().createScenario('Gaming')
 		const id = created.ok ? created.id : ''
 		store.getState().addScenarioApp(id, 'launch', 'app:game')
 
-		expect(store.getState().addScenarioApp(id, 'launch', 'app:game')).toEqual({
+		expect(
+			store.getState().addScenarioApp(id, 'launch', 'app:game'),
+		).toEqual({
 			ok: false,
 			error: 'Already in this list',
 		})
@@ -228,12 +279,18 @@ describe('scenario actions', () => {
 	})
 
 	it('refuses an app already assigned to the opposite action list', () => {
-		const store = createAppStore(client(), memoryStorage().storage, idFactory)
+		const store = createAppStore(
+			client(),
+			memoryStorage().storage,
+			idFactory,
+		)
 		const created = store.getState().createScenario('Gaming')
 		const id = created.ok ? created.id : ''
 		store.getState().addScenarioApp(id, 'launch', 'app:game')
 
-		expect(store.getState().addScenarioApp(id, 'close', 'app:game')).toEqual({
+		expect(
+			store.getState().addScenarioApp(id, 'close', 'app:game'),
+		).toEqual({
 			ok: false,
 			error: 'An app cannot both launch and close',
 		})
@@ -241,13 +298,19 @@ describe('scenario actions', () => {
 
 	// One click runs the whole list, so what a list can hold is bounded at the source too.
 	it('caps a list and the number of scenarios', () => {
-		const store = createAppStore(client(), memoryStorage().storage, idFactory)
+		const store = createAppStore(
+			client(),
+			memoryStorage().storage,
+			idFactory,
+		)
 		const created = store.getState().createScenario('Gaming')
 		const id = created.ok ? created.id : ''
 		for (let entry = 0; entry < MAX_SCENARIO_ENTRIES; entry += 1)
 			store.getState().addScenarioApp(id, 'launch', `app:${entry}`)
 
-		expect(store.getState().addScenarioApp(id, 'launch', 'app:extra')).toEqual({
+		expect(
+			store.getState().addScenarioApp(id, 'launch', 'app:extra'),
+		).toEqual({
 			ok: false,
 			error: `A list holds at most ${MAX_SCENARIO_ENTRIES} apps`,
 		})
@@ -282,7 +345,11 @@ describe('scenario actions', () => {
 
 	// A star left behind would reappear on the scenario that later reuses the id.
 	it('drops the star with the scenario and ignores an unknown id', () => {
-		const store = createAppStore(client(), memoryStorage().storage, idFactory)
+		const store = createAppStore(
+			client(),
+			memoryStorage().storage,
+			idFactory,
+		)
 		const created = store.getState().createScenario('Gaming')
 		const id = created.ok ? created.id : ''
 		store.getState().toggleFavoriteScenario(id)

@@ -49,7 +49,7 @@ describe('AppNavigation', () => {
 				categoryOrder={['games', 'ai', 'other']}
 				categories={categories}
 				counts={counts}
-				activeView='all'
+				activeView="all"
 				appCount={3}
 				favoriteCount={0}
 				onSelectView={vi.fn()}
@@ -65,7 +65,9 @@ describe('AppNavigation', () => {
 		expect(
 			screen.queryByRole('button', { name: 'Reorder Games category' }),
 		).not.toBeInTheDocument()
-		expect(screen.queryByTestId('category-drag-icon')).not.toBeInTheDocument()
+		expect(
+			screen.queryByTestId('category-drag-icon'),
+		).not.toBeInTheDocument()
 		expect(
 			screen.queryByRole('button', { name: 'Other' }),
 		).not.toBeInTheDocument()
@@ -80,7 +82,7 @@ describe('AppNavigation', () => {
 				categoryOrder={[]}
 				categories={categories}
 				counts={new Map()}
-				activeView='all'
+				activeView="all"
 				appCount={3}
 				favoriteCount={0}
 				onSelectView={onSelectView}
@@ -128,7 +130,7 @@ describe('AppNavigation', () => {
 						['installers_docs', 9],
 					])
 				}
-				activeView='all'
+				activeView="all"
 				appCount={3}
 				favoriteCount={0}
 				onSelectView={vi.fn()}
@@ -138,7 +140,9 @@ describe('AppNavigation', () => {
 			/>,
 		)
 
-		expect(screen.getByRole('button', { name: 'Games' })).toBeInTheDocument()
+		expect(
+			screen.getByRole('button', { name: 'Games' }),
+		).toBeInTheDocument()
 		expect(
 			screen.queryByRole('button', { name: 'Installers & Docs' }),
 		).not.toBeInTheDocument()
@@ -155,7 +159,7 @@ describe('AppNavigation', () => {
 				categoryOrder={['custom-tools']}
 				categories={[...categories, custom]}
 				counts={new Map([['custom-tools', 1]])}
-				activeView='all'
+				activeView="all"
 				appCount={3}
 				favoriteCount={0}
 				onSelectView={vi.fn()}
@@ -182,7 +186,7 @@ describe('AppNavigation', () => {
 				categoryOrder={['custom-tools']}
 				categories={[...categories, custom]}
 				counts={new Map([['custom-tools', 1]])}
-				activeView='all'
+				activeView="all"
 				appCount={3}
 				favoriteCount={0}
 				onSelectView={vi.fn()}
@@ -203,7 +207,7 @@ describe('AppNavigation', () => {
 				categoryOrder={['games']}
 				categories={categories}
 				counts={new Map([['games', 2]])}
-				activeView='all'
+				activeView="all"
 				appCount={3}
 				favoriteCount={0}
 				onSelectView={vi.fn()}

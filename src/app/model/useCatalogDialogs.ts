@@ -25,7 +25,9 @@ export function useCatalogDialogs({
 	const reportFailure = useCallback(
 		(kind: string, detail: string) => {
 			toast.error('That panel could not be shown. Try again.')
-			void systemClient.logClientError?.(kind, detail).catch(() => undefined)
+			void systemClient
+				.logClientError?.(kind, detail)
+				.catch(() => undefined)
 		},
 		[systemClient],
 	)

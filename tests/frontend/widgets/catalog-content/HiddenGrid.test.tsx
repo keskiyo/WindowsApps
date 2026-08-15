@@ -78,7 +78,9 @@ describe('HiddenGrid', () => {
 		const onBack = vi.fn()
 		render(<HiddenGrid {...props([hidden('a', 'Alpha')], onBack)} />)
 
-		await userEvent.click(screen.getByRole('button', { name: 'Back to More' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Back to More' }),
+		)
 		expect(onBack).toHaveBeenCalled()
 	})
 
@@ -87,10 +89,12 @@ describe('HiddenGrid', () => {
 		render(<HiddenGrid {...props([], onBack)} />)
 
 		expect(screen.getByText('No hidden apps')).toBeVisible()
-		expect(screen.getByRole('region', { name: 'Hidden' })).toHaveTextContent(
-			'0 applications',
+		expect(
+			screen.getByRole('region', { name: 'Hidden' }),
+		).toHaveTextContent('0 applications')
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Back to More' }),
 		)
-		await userEvent.click(screen.getByRole('button', { name: 'Back to More' }))
 		expect(onBack).toHaveBeenCalled()
 	})
 })

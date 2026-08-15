@@ -140,13 +140,18 @@ export function createScenarioActions({
 			const key = listKey(list)
 			const oppositeKey = oppositeListKey(list)
 			const snapshotsKey = snapshotKey(list)
-			const app = get().apps.find(entry => appIdentity(entry) === identity)
+			const app = get().apps.find(
+				entry => appIdentity(entry) === identity,
+			)
 			const scenario = get().scenarios.find(entry => entry.id === id)
 			if (!scenario) return { ok: false, error: 'Scenario not found' }
 			if (scenario[key].includes(identity))
 				return { ok: false, error: 'Already in this list' }
 			if (scenario[oppositeKey].includes(identity))
-				return { ok: false, error: 'An app cannot both launch and close' }
+				return {
+					ok: false,
+					error: 'An app cannot both launch and close',
+				}
 			if (scenario[key].length >= MAX_SCENARIO_ENTRIES)
 				return {
 					ok: false,
@@ -161,11 +166,11 @@ export function createScenarioActions({
 				[key]: [...entry[key], identity],
 				...(app
 					? {
-						[snapshotsKey]: {
-							...(entry[snapshotsKey] ?? {}),
-							[identity]: scenarioAppSnapshot(app),
-						},
-					}
+							[snapshotsKey]: {
+								...(entry[snapshotsKey] ?? {}),
+								[identity]: scenarioAppSnapshot(app),
+							},
+						}
 					: {}),
 			}))
 			return { ok: true }

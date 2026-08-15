@@ -39,12 +39,14 @@ const gaming = scenario({
 	closeIdentities: ['chat', 'mail'],
 })
 
-function renderDialog(value: {
-	scenarios?: Scenario[]
-	apps?: AppInfo[]
-	runningId?: string | null
-	isScenarioRunning?: boolean
-} = {}) {
+function renderDialog(
+	value: {
+		scenarios?: Scenario[]
+		apps?: AppInfo[]
+		runningId?: string | null
+		isScenarioRunning?: boolean
+	} = {},
+) {
 	const onRun = vi.fn()
 	const onClose = vi.fn()
 	render(
@@ -56,7 +58,7 @@ function renderDialog(value: {
 					app('chat', 'Chat'),
 					app('mail', 'Mail'),
 				]
-		}
+			}
 			runningId={value.runningId ?? null}
 			isScenarioRunning={value.isScenarioRunning ?? false}
 			onRun={onRun}
@@ -91,7 +93,9 @@ describe('ScenarioRunDialog', () => {
 
 		await userEvent.click(screen.getByRole('button', { expanded: false }))
 
-		expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument()
+		expect(
+			screen.getByRole('button', { expanded: true }),
+		).toBeInTheDocument()
 		expect(
 			screen.getByRole('list', { name: 'Launch list of Gaming' }),
 		).toHaveTextContent('Backpack Battles')
@@ -123,7 +127,9 @@ describe('ScenarioRunDialog', () => {
 	it('runs the scenario it was asked to run', async () => {
 		const { onRun } = renderDialog()
 
-		await userEvent.click(screen.getByRole('button', { name: 'Run Gaming' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Run Gaming' }),
+		)
 
 		expect(onRun).toHaveBeenCalledWith('gaming')
 	})

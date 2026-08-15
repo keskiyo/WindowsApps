@@ -39,7 +39,9 @@ export function isCloseBlocked(app: CloseCandidate): boolean {
 }
 
 export function closeBlockedMessage(app: CloseCandidate): string {
-	return app.closeRisk === NOT_CLOSABLE ? NOT_CLOSABLE_MESSAGE : BLOCKED_MESSAGE
+	return app.closeRisk === NOT_CLOSABLE
+		? NOT_CLOSABLE_MESSAGE
+		: BLOCKED_MESSAGE
 }
 
 export function closeRiskBadge(app: CloseCandidate): CloseRiskBadge | null {

@@ -116,14 +116,22 @@ describe('MorePage', () => {
 		renderPage(vi.fn(), {
 			auxiliary: [
 				previewEntry(
-					app({ id: 'upd', name: 'Adobe Updater', publisher: 'Adobe' }),
+					app({
+						id: 'upd',
+						name: 'Adobe Updater',
+						publisher: 'Adobe',
+					}),
 				),
 			],
 			hidden: [previewEntry(app({ id: 'old', name: 'Old launcher' }))],
 			scenarios: [],
 			installersDocs: [
 				previewEntry(
-					app({ id: 'setup', name: 'setup.msi', artifactKind: 'installer' }),
+					app({
+						id: 'setup',
+						name: 'setup.msi',
+						artifactKind: 'installer',
+					}),
 				),
 				previewEntry(
 					app({
@@ -143,7 +151,9 @@ describe('MorePage', () => {
 		expect(artifacts).toHaveTextContent('Installer')
 		expect(artifacts).toHaveTextContent('Documentation')
 		expect(
-			screen.getByRole('list', { name: 'Recently added to Auxiliary tools' }),
+			screen.getByRole('list', {
+				name: 'Recently added to Auxiliary tools',
+			}),
 		).toHaveTextContent('Adobe')
 		expect(
 			screen.getByRole('list', { name: 'Recently added to Hidden' }),
@@ -189,14 +199,12 @@ describe('MorePage', () => {
 			],
 		})
 
-		for (const label of [
-			'Auxiliary tools',
-			'Hidden',
-			'Installers & Docs',
-		])
+		for (const label of ['Auxiliary tools', 'Hidden', 'Installers & Docs'])
 			expect(
 				within(
-					screen.getByRole('list', { name: `Recently added to ${label}` }),
+					screen.getByRole('list', {
+						name: `Recently added to ${label}`,
+					}),
 				).queryByLabelText(/^First seen in catalog /),
 			).not.toBeInTheDocument()
 	})
@@ -222,7 +230,9 @@ describe('MorePage', () => {
 		// What a scenario has instead of a publisher: the size of each of its two lists.
 		expect(preview).toHaveTextContent('3 launch · 2 close')
 
-		await userEvent.click(screen.getByRole('button', { name: 'Scenarios 2' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Scenarios 2' }),
+		)
 		expect(onSelectView).toHaveBeenCalledWith('scenarios')
 	})
 
@@ -247,7 +257,9 @@ describe('MorePage', () => {
 			runControl({ onRun }),
 		)
 
-		await userEvent.click(screen.getByRole('button', { name: 'Run Gaming' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Run Gaming' }),
+		)
 
 		expect(onRun).toHaveBeenCalledWith('gaming')
 	})
@@ -353,7 +365,9 @@ describe('MorePage', () => {
 			}),
 		)
 
-		expect(screen.getAllByRole('button', { name: /^View all/ })).toHaveLength(1)
+		expect(
+			screen.getAllByRole('button', { name: /^View all/ }),
+		).toHaveLength(1)
 		await userEvent.click(screen.getByRole('button', { name: /^View all/ }))
 
 		const dialog = screen.getByRole('dialog', { name: 'All scenarios' })

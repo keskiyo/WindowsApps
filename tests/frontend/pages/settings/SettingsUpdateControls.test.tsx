@@ -34,7 +34,9 @@ describe('SettingsUpdateControls', () => {
 			/>,
 		)
 
-		await userEvent.click(screen.getByRole('button', { name: 'Check updates' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Check updates' }),
+		)
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Open Windows Apps on GitHub' }),
 		)

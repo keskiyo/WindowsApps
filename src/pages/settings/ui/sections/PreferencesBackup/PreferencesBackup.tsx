@@ -29,8 +29,9 @@ export function PreferencesBackup(props: PreferencesBackupProps) {
 				<div className="min-w-0 flex-1">
 					<h2 className="font-medium">Backup &amp; restore</h2>
 					<p className="mt-1 text-sm leading-6 text-slate-600">
-						Export categories, Favorites, Hidden apps, and scenarios. A
-						local fallback copy is created before each saved change.
+						Export categories, Favorites, Hidden apps, and
+						scenarios. A local fallback copy is created before each
+						saved change.
 					</p>
 				</div>
 			</div>
@@ -92,7 +93,9 @@ export function PreferencesBackup(props: PreferencesBackupProps) {
 							onClick={confirmPending}
 							className="utility-accent-button rounded-lg px-4 py-2 text-sm font-medium text-white focus-visible:outline-2 focus-visible:outline-violet-500"
 						>
-							{pending.kind === 'import' ? 'Import backup' : 'Restore backup'}
+							{pending.kind === 'import'
+								? 'Import backup'
+								: 'Restore backup'}
 						</button>
 					</div>
 				</div>

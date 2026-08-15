@@ -75,10 +75,15 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 			catalogApps
 				.map(app => ({
 					app,
-					firstSeenAt: state.firstSeenAt[app.preferenceIdentity ?? app.id] ?? null,
+					firstSeenAt:
+						state.firstSeenAt[app.preferenceIdentity ?? app.id] ??
+						null,
 				}))
 				.filter(entry => entry.firstSeenAt !== null)
-				.sort((left, right) => (right.firstSeenAt ?? 0) - (left.firstSeenAt ?? 0))
+				.sort(
+					(left, right) =>
+						(right.firstSeenAt ?? 0) - (left.firstSeenAt ?? 0),
+				)
 				.slice(0, 20),
 		[catalogApps, state.firstSeenAt],
 	)
@@ -235,9 +240,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 							onOpenNavigation={drawer.onOpen}
 							showMenu={!desktopNavigation}
 						/>
-						<main
-							className="mx-auto w-full max-w-375 px-5 pt-7 pb-12 sm:px-8"
-						>
+						<main className="mx-auto w-full max-w-375 px-5 pt-7 pb-12 sm:px-8">
 							{state.activeView === 'more' && (
 								<MorePage
 									auxiliaryCount={auxiliaryCount}
@@ -254,7 +257,8 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 										scenarios: state.scenarios,
 										apps: catalogApps,
 										runningId: scenarioRunner.runningId,
-										isScenarioRunning: scenarioRunner.isRunning,
+										isScenarioRunning:
+											scenarioRunner.isRunning,
 										onRun: scenarioRunner.runById,
 									}}
 									onSelectView={navigation.selectView}
@@ -287,11 +291,15 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 							{state.activeView === 'settings' && (
 								<SettingsPage
 									client={systemClient}
-									onExportPreferences={state.exportPreferences}
+									onExportPreferences={
+										state.exportPreferences
+									}
 									onValidatePreferencesImport={
 										state.validatePreferencesImport
 									}
-									onImportPreferences={state.importPreferences}
+									onImportPreferences={
+										state.importPreferences
+									}
 									onRestorePreferencesBackup={
 										state.restorePreferencesBackup
 									}
@@ -352,7 +360,9 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 										onToggleCategory: state.toggleCategory,
 										onToggleFavorite: state.toggleFavorite,
 										onMoveApp: state.moveApp,
-										onLaunch: dialogs.installerLaunch.requestLaunch,
+										onLaunch:
+											dialogs.installerLaunch
+												.requestLaunch,
 										onInfo: dialogs.appInfo.open,
 										onUninstall: dialogs.uninstall.select,
 										onHide: state.hideApp,

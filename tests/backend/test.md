@@ -136,12 +136,12 @@ argument is required.
 | [`commands/close.rs`](../../src-tauri/src/commands/close.rs)             |     6 |
 | [`commands/details.rs`](../../src-tauri/src/commands/details.rs)         |     1 |
 | [`commands/diagnostics.rs`](../../src-tauri/src/commands/diagnostics.rs) |     3 |
-| [`commands/launch.rs`](../../src-tauri/src/commands/launch.rs)       |     5 |
-| [`commands/mod.rs`](../../src-tauri/src/commands/mod.rs)             |     1 |
-| [`commands/settings.rs`](../../src-tauri/src/commands/settings.rs)   |     3 |
-| [`commands/uninstall.rs`](../../src-tauri/src/commands/uninstall.rs) |     4 |
-| [`error.rs`](../../src-tauri/src/error.rs)                           |     6 |
-| [`lifecycle/mod.rs`](../../src-tauri/src/lifecycle/mod.rs)           |     6 |
+| [`commands/launch.rs`](../../src-tauri/src/commands/launch.rs)           |     5 |
+| [`commands/mod.rs`](../../src-tauri/src/commands/mod.rs)                 |     1 |
+| [`commands/settings.rs`](../../src-tauri/src/commands/settings.rs)       |     3 |
+| [`commands/uninstall.rs`](../../src-tauri/src/commands/uninstall.rs)     |     4 |
+| [`error.rs`](../../src-tauri/src/error.rs)                               |     6 |
+| [`lifecycle/mod.rs`](../../src-tauri/src/lifecycle/mod.rs)               |     6 |
 
 ## Refreshing this map
 

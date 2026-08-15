@@ -33,8 +33,8 @@ export function ScanPrompt({
 					Find your applications
 				</h2>
 				<p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-600">
-					Scan Windows to build your catalog. Nothing runs automatically at
-					startup.
+					Scan Windows to build your catalog. Nothing runs
+					automatically at startup.
 				</p>
 				<ul className="mx-auto mt-5 max-w-xs space-y-1.5 text-left text-sm text-slate-600">
 					{SCAN_SOURCES.map(source => (
@@ -49,8 +49,8 @@ export function ScanPrompt({
 					))}
 				</ul>
 				<p className="mx-auto mt-4 max-w-xs text-xs leading-5 text-slate-500">
-					The first scan usually takes under a minute. Everything stays on
-					this device.
+					The first scan usually takes under a minute. Everything
+					stays on this device.
 				</p>
 				<button
 					type="button"

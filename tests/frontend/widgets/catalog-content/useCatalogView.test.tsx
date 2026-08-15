@@ -33,7 +33,11 @@ function scenario(value: Partial<Scenario> & Pick<Scenario, 'id'>): Scenario {
 	}
 }
 
-function view(state: { activeView?: AppView; apps?: AppInfo[]; scenarios?: Scenario[] }) {
+function view(state: {
+	activeView?: AppView
+	apps?: AppInfo[]
+	scenarios?: Scenario[]
+}) {
 	return renderHook(() =>
 		useCatalogView({
 			activeView: state.activeView ?? 'all',
@@ -66,7 +70,9 @@ describe('useCatalogView', () => {
 			],
 		})
 
-		expect(result.current.primaryApps.map(item => item.id)).toEqual(['Editor'])
+		expect(result.current.primaryApps.map(item => item.id)).toEqual([
+			'Editor',
+		])
 	})
 
 	describe('icon hydration', () => {
@@ -85,10 +91,9 @@ describe('useCatalogView', () => {
 				],
 			})
 
-			expect(result.current.visibleHydrationIds.split('|').sort()).toEqual([
-				'Chat',
-				'Editor',
-			])
+			expect(
+				result.current.visibleHydrationIds.split('|').sort(),
+			).toEqual(['Chat', 'Editor'])
 		})
 
 		it('asks for one app once when both lists hold it', () => {
@@ -113,20 +118,23 @@ describe('useCatalogView', () => {
 			const { result } = view({
 				activeView: 'more',
 				apps: [app('Editor'), app('Setup', 'installer')],
-				scenarios: [scenario({ id: 'work', launchIdentities: ['Editor'] })],
+				scenarios: [
+					scenario({ id: 'work', launchIdentities: ['Editor'] }),
+				],
 			})
 
-			expect(result.current.visibleHydrationIds.split('|').sort()).toEqual([
-				'Editor',
-				'Setup',
-			])
+			expect(
+				result.current.visibleHydrationIds.split('|').sort(),
+			).toEqual(['Editor', 'Setup'])
 		})
 
 		it('asks for nothing on a page that shows no apps', () => {
 			const { result } = view({
 				activeView: 'settings',
 				apps: [app('Editor')],
-				scenarios: [scenario({ id: 'work', launchIdentities: ['Editor'] })],
+				scenarios: [
+					scenario({ id: 'work', launchIdentities: ['Editor'] }),
+				],
 			})
 
 			expect(result.current.visibleHydrationIds).toBe('')

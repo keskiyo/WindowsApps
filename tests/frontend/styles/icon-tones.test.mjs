@@ -46,7 +46,9 @@ function renderedIconClass(name) {
 
 function tonedClasses() {
 	return new Set(
-		[...stylesheet.matchAll(/\.(lucide-[a-z0-9-]+)/g)].map(match => match[1]),
+		[...stylesheet.matchAll(/\.(lucide-[a-z0-9-]+)/g)].map(
+			match => match[1],
+		),
 	)
 }
 

@@ -16,7 +16,11 @@ describe('closeStageLabel', () => {
 			closeStageLabel({ stage: 'waiting', running: 0, secondsLeft: 3 }),
 		).toBe('waiting 3 s before force-closing')
 		expect(
-			closeStageLabel({ stage: 'terminating', running: 0, secondsLeft: 0 }),
+			closeStageLabel({
+				stage: 'terminating',
+				running: 0,
+				secondsLeft: 0,
+			}),
 		).toBe('force-closing what stayed open')
 	})
 })

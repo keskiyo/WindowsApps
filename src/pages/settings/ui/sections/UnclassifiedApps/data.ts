@@ -13,10 +13,9 @@ export function buildDiagnosticsReport(apps: AppInfo[]): string {
 			`Reasons: ${app.categoryReasons?.join(', ') ?? 'none'}`,
 		].join('\n'),
 	)
-	return [
-		`Unrecognised applications: ${apps.length}`,
-		...records,
-	].join('\n\n')
+	return [`Unrecognised applications: ${apps.length}`, ...records].join(
+		'\n\n',
+	)
 }
 
 export function buildSignalRows(app: AppInfo): SignalRow[] {

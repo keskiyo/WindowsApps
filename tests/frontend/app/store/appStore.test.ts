@@ -67,9 +67,12 @@ function client(overrides: Partial<AppsClient> = {}): AppsClient {
 		hydrateVisibleIcons: vi.fn().mockResolvedValue(undefined),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
-		closeApps: vi
-			.fn()
-			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0, failed: 0 }),
+		closeApps: vi.fn().mockResolvedValue({
+			closed: 0,
+			notRunning: 0,
+			unavailable: 0,
+			failed: 0,
+		}),
 		getUninstallPreview: vi.fn().mockResolvedValue({
 			appName: 'Visual Studio Code',
 			publisher: 'Microsoft',
@@ -101,7 +104,8 @@ describe('app store', () => {
 		const values = new Map<string, string>()
 		const storage = {
 			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => void values.set(key, value),
+			setItem: (key: string, value: string) =>
+				void values.set(key, value),
 		} as unknown as Storage
 		const store = createAppStore(client(), storage)
 		store.setState({ favoriteAppIds: ['before'] })
@@ -120,12 +124,10 @@ describe('app store', () => {
 		expect(store.getState().importPreferences(source)).toEqual({ ok: true })
 		expect(store.getState().favoriteAppIds).toEqual(['code'])
 		expect(store.getState().hiddenAppIds).toEqual(['chrome'])
-		expect(
-			JSON.parse(values.get(PREFERENCES_KEY) ?? '{}'),
-		).toMatchObject({ importedField: 'kept' })
-		expect(
-			JSON.parse(store.getState().exportPreferences()),
-		).toMatchObject({
+		expect(JSON.parse(values.get(PREFERENCES_KEY) ?? '{}')).toMatchObject({
+			importedField: 'kept',
+		})
+		expect(JSON.parse(store.getState().exportPreferences())).toMatchObject({
 			version: 15,
 			favoriteAppIds: ['code'],
 			hiddenAppIds: ['chrome'],
@@ -138,7 +140,10 @@ describe('app store', () => {
 
 	it('restores the rotating local preference backup', () => {
 		const values = new Map<string, string>([
-			[PREFERENCES_KEY, JSON.stringify({ version: 14, favoriteAppIds: ['now'] })],
+			[
+				PREFERENCES_KEY,
+				JSON.stringify({ version: 14, favoriteAppIds: ['now'] }),
+			],
 			[
 				PREFERENCES_BACKUP_KEY,
 				JSON.stringify({ version: 14, favoriteAppIds: ['before'] }),
@@ -146,11 +151,14 @@ describe('app store', () => {
 		])
 		const storage = {
 			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => void values.set(key, value),
+			setItem: (key: string, value: string) =>
+				void values.set(key, value),
 		} as unknown as Storage
 		const store = createAppStore(client(), storage)
 
-		expect(store.getState().restorePreferencesBackup()).toEqual({ ok: true })
+		expect(store.getState().restorePreferencesBackup()).toEqual({
+			ok: true,
+		})
 		expect(store.getState().favoriteAppIds).toEqual(['before'])
 	})
 
@@ -168,7 +176,8 @@ describe('app store', () => {
 		])
 		const storage = {
 			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => void values.set(key, value),
+			setItem: (key: string, value: string) =>
+				void values.set(key, value),
 		} as unknown as Storage
 		const store = createAppStore(client(), storage)
 		const expected = {
@@ -179,7 +188,9 @@ describe('app store', () => {
 		expect(
 			store
 				.getState()
-				.importPreferences('{"version":14,"favoriteAppIds":["imported"]}'),
+				.importPreferences(
+					'{"version":14,"favoriteAppIds":["imported"]}',
+				),
 		).toEqual(expected)
 		expect(store.getState().favoriteAppIds).toEqual(['keep'])
 		expect(store.getState().restorePreferencesBackup()).toEqual(expected)
@@ -223,14 +234,17 @@ describe('app store', () => {
 
 		expect(store.getState().installerAppIds).toEqual([])
 		expect(store.getState().installerAppIdentities).toEqual([])
-		expect(store.getState().categoryOverrides).toEqual({ code: 'utilities' })
+		expect(store.getState().categoryOverrides).toEqual({
+			code: 'utilities',
+		})
 	})
 
 	it('persists a manual installer mark and reloads it', () => {
 		const values = new Map<string, string>()
 		const storage = {
 			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => void values.set(key, value),
+			setItem: (key: string, value: string) =>
+				void values.set(key, value),
 		} as unknown as Storage
 		const store = createAppStore(client(), storage)
 		store.setState({ apps })
@@ -240,9 +254,9 @@ describe('app store', () => {
 		expect(
 			JSON.parse(values.get(PREFERENCES_KEY) ?? '{}').installerAppIds,
 		).toEqual(['code'])
-		expect(createAppStore(client(), storage).getState().installerAppIds).toEqual(
-			['code'],
-		)
+		expect(
+			createAppStore(client(), storage).getState().installerAppIds,
+		).toEqual(['code'])
 	})
 
 	it('stamps a newly discovered app and prunes what the catalog dropped', async () => {
@@ -283,7 +297,8 @@ describe('app store', () => {
 		const values = new Map<string, string>()
 		const storage = {
 			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => void values.set(key, value),
+			setItem: (key: string, value: string) =>
+				void values.set(key, value),
 		} as unknown as Storage
 
 		await createAppStore(client(), storage).getState().load()
@@ -293,9 +308,9 @@ describe('app store', () => {
 
 		// Survives a restart: a stamp re-derived on every start would make the whole catalog
 		// look brand new after each launch.
-		expect(createAppStore(client(), storage).getState().firstSeenAt).toEqual(
-			stored,
-		)
+		expect(
+			createAppStore(client(), storage).getState().firstSeenAt,
+		).toEqual(stored)
 	})
 
 	it('keeps auxiliary tools out of the normal catalog and search', () => {
@@ -316,9 +331,9 @@ describe('app store', () => {
 			query: 'iconv',
 		})
 
-		expect(selectVisibleApps(store.getState()).map(item => item.id)).not.toContain(
-			'iconv',
-		)
+		expect(
+			selectVisibleApps(store.getState()).map(item => item.id),
+		).not.toContain('iconv')
 		expect(selectFilteredApps(store.getState())).toEqual([])
 	})
 
@@ -339,9 +354,9 @@ describe('app store', () => {
 
 		expect(selectVisibleApps(store.getState())).toEqual([])
 		store.setState({ activeView: 'hidden' })
-		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
-			'iconv',
-		])
+		expect(
+			selectVisibleApps(store.getState()).map(item => item.id),
+		).toEqual(['iconv'])
 	})
 
 	// Favorites are keyed by canonicalIdentity, so a favorite survives a release that changes an
@@ -357,29 +372,39 @@ describe('app store', () => {
 			canonicalIdentity: 'identity:editor',
 		})
 		const store = createAppStore(
-			client({ getApps: vi.fn().mockResolvedValue({ apps: [before], hasCache: true }) }),
+			client({
+				getApps: vi
+					.fn()
+					.mockResolvedValue({ apps: [before], hasCache: true }),
+			}),
 			storage,
 		)
 		store.setState({ apps: [before] })
 		store.getState().toggleFavorite('target:old')
 
 		expect(
-			JSON.parse(storage.getItem(PREFERENCES_KEY) ?? '{}').favoriteAppIdentities,
+			JSON.parse(storage.getItem(PREFERENCES_KEY) ?? '{}')
+				.favoriteAppIdentities,
 		).toEqual(['identity:editor'])
 
 		// A later release loads the same app under a different id.
 		const after = { ...before, id: 'target:new' }
 		const reopened = createAppStore(
-			client({ getApps: vi.fn().mockResolvedValue({ apps: [after], hasCache: true }) }),
+			client({
+				getApps: vi
+					.fn()
+					.mockResolvedValue({ apps: [after], hasCache: true }),
+			}),
 			storage,
 		)
 		await reopened.getState().load()
 
 		expect(reopened.getState().favoriteAppIds).toEqual(['target:new'])
 		expect(
-			selectVisibleApps({ ...reopened.getState(), activeView: 'favorites' }).map(
-				item => item.id,
-			),
+			selectVisibleApps({
+				...reopened.getState(),
+				activeView: 'favorites',
+			}).map(item => item.id),
 		).toEqual(['target:new'])
 	})
 
@@ -394,7 +419,11 @@ describe('app store', () => {
 			canonicalIdentity: 'identity:helper',
 		})
 		const store = createAppStore(
-			client({ getApps: vi.fn().mockResolvedValue({ apps: [before], hasCache: true }) }),
+			client({
+				getApps: vi
+					.fn()
+					.mockResolvedValue({ apps: [before], hasCache: true }),
+			}),
 			storage,
 		)
 		store.setState({ apps: [before] })
@@ -402,7 +431,11 @@ describe('app store', () => {
 
 		const after = { ...before, id: 'target:new' }
 		const reopened = createAppStore(
-			client({ getApps: vi.fn().mockResolvedValue({ apps: [after], hasCache: true }) }),
+			client({
+				getApps: vi
+					.fn()
+					.mockResolvedValue({ apps: [after], hasCache: true }),
+			}),
 			storage,
 		)
 		await reopened.getState().load()
@@ -423,7 +456,11 @@ describe('app store', () => {
 			canonicalIdentity: 'identity:toolbox',
 		})
 		const store = createAppStore(
-			client({ getApps: vi.fn().mockResolvedValue({ apps: [before], hasCache: true }) }),
+			client({
+				getApps: vi
+					.fn()
+					.mockResolvedValue({ apps: [before], hasCache: true }),
+			}),
 			storage,
 		)
 		store.setState({ apps: [before] })
@@ -437,7 +474,11 @@ describe('app store', () => {
 		// A rescan loads the same app under a different id; the override must still apply.
 		const after = { ...before, id: 'target:new' }
 		const reopened = createAppStore(
-			client({ getApps: vi.fn().mockResolvedValue({ apps: [after], hasCache: true }) }),
+			client({
+				getApps: vi
+					.fn()
+					.mockResolvedValue({ apps: [after], hasCache: true }),
+			}),
 			storage,
 		)
 		await reopened.getState().load()
@@ -561,10 +602,12 @@ describe('app store', () => {
 
 		store.getState().promoteAuxiliary('iconv')
 
-		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
-			'iconv',
-		])
-		expect(JSON.parse(storage.getItem(PREFERENCES_KEY) ?? '{}')).toMatchObject({
+		expect(
+			selectVisibleApps(store.getState()).map(item => item.id),
+		).toEqual(['iconv'])
+		expect(
+			JSON.parse(storage.getItem(PREFERENCES_KEY) ?? '{}'),
+		).toMatchObject({
 			promotedAppIdentities: ['iconv'],
 		})
 	})
@@ -619,19 +662,25 @@ describe('app store', () => {
 			sourceKind: 'start_menu',
 		})
 		const store = createAppStore(
-			client({ getApps: vi.fn().mockResolvedValue({ apps: [first], hasCache: true }) }),
+			client({
+				getApps: vi
+					.fn()
+					.mockResolvedValue({ apps: [first], hasCache: true }),
+			}),
 			localStorage,
 		)
 
 		await store.getState().load()
 		store.getState().replaceApps([replacement])
 
-		expect(selectVisibleApps(store.getState()).map(item => item.id)).toEqual([
-			'new-shortcut',
-		])
+		expect(
+			selectVisibleApps(store.getState()).map(item => item.id),
+		).toEqual(['new-shortcut'])
 		// The identity carries the mark; the id set now follows the live card instead of keeping
 		// the replaced one, so views that filter by id cannot drift away from the catalog.
-		expect(JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? '{}')).toMatchObject({
+		expect(
+			JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? '{}'),
+		).toMatchObject({
 			promotedAppIds: ['new-shortcut'],
 			promotedAppIdentities: ['identity:example'],
 		})
@@ -804,7 +853,9 @@ describe('app store', () => {
 			onCatalogChanged: vi.fn().mockResolvedValue(disposers[2]),
 			onAppsUpdated: vi.fn().mockResolvedValue(disposers[3]),
 			onScanProgress: vi.fn().mockResolvedValue(disposers[4]),
-			onLaunchStatus: vi.fn().mockRejectedValue(new Error('late failure')),
+			onLaunchStatus: vi
+				.fn()
+				.mockRejectedValue(new Error('late failure')),
 		})
 		const store = createAppStore(api)
 
@@ -1161,9 +1212,7 @@ describe('app store', () => {
 			.fn()
 			.mockRejectedValueOnce(new Error('first batch failed'))
 			.mockResolvedValue(undefined)
-		const store = createAppStore(
-			client({ hydrateVisibleIcons }),
-		)
+		const store = createAppStore(client({ hydrateVisibleIcons }))
 		store.setState({ apps: catalog })
 
 		await store.getState().repairMissingIcons()
@@ -1202,9 +1251,10 @@ describe('app store', () => {
 			} as unknown as Storage
 			return createAppStore(
 				client({
-					getApps: vi
-						.fn()
-						.mockResolvedValue({ apps: [original], hasCache: true }),
+					getApps: vi.fn().mockResolvedValue({
+						apps: [original],
+						hasCache: true,
+					}),
 					refreshApps: vi.fn().mockResolvedValue([moved]),
 				}),
 				storage,
@@ -1329,7 +1379,9 @@ describe('app store', () => {
 	it('rejects a failed refresh without also writing the background error state', async () => {
 		const store = createAppStore(
 			client({
-				refreshApps: vi.fn().mockRejectedValue(new Error('scan failed')),
+				refreshApps: vi
+					.fn()
+					.mockRejectedValue(new Error('scan failed')),
 			}),
 		)
 		await expect(store.getState().refresh()).rejects.toThrow('scan failed')
@@ -1353,7 +1405,9 @@ describe('app store', () => {
 	it('still surfaces a background load failure through the error state', async () => {
 		const store = createAppStore(
 			client({
-				getApps: vi.fn().mockRejectedValue(new Error('cache unreadable')),
+				getApps: vi
+					.fn()
+					.mockRejectedValue(new Error('cache unreadable')),
 			}),
 		)
 

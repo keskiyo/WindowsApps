@@ -55,7 +55,9 @@ describe('useWindowControls', () => {
 		const stop = vi.fn()
 		mocks.appWindow.onResized.mockResolvedValue(stop)
 		const { unmount } = renderHook(() => useWindowControls())
-		await waitFor(() => expect(mocks.appWindow.onResized).toHaveBeenCalled())
+		await waitFor(() =>
+			expect(mocks.appWindow.onResized).toHaveBeenCalled(),
+		)
 
 		unmount()
 

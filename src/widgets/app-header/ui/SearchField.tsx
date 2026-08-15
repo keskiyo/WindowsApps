@@ -13,7 +13,8 @@ export function SearchField({
 	return (
 		<div className="min-w-0 flex-1">
 			<span id="search-hint" className="sr-only">
-				Searches app name, publisher, version, description, and install path
+				Searches app name, publisher, version, description, and install
+				path
 			</span>
 			<label
 				className="group relative flex w-full items-center rounded-xl"

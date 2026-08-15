@@ -35,7 +35,7 @@ export function FavoriteScenarioList({
 				noun="scenario"
 				description="Run your configured scenarios"
 			/>
-			<ul className="grid items-start grid-cols-1 gap-3 min-[781px]:grid-cols-2 min-[1601px]:grid-cols-3">
+			<ul className="grid grid-cols-1 items-start gap-3 min-[781px]:grid-cols-2 min-[1601px]:grid-cols-3">
 				{sortScenariosByNewest(scenarios).map(scenario => (
 					<FavoriteScenarioCard
 						key={scenario.id}

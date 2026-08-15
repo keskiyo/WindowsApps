@@ -36,6 +36,9 @@ describe('SettingsDiscoveryControls', () => {
 		)
 
 		expect(onPickFolder).toHaveBeenCalledOnce()
-		expect(onAddPath).toHaveBeenCalledWith('includedPaths', String.raw`F:\Tools`)
+		expect(onAddPath).toHaveBeenCalledWith(
+			'includedPaths',
+			String.raw`F:\Tools`,
+		)
 	})
 })

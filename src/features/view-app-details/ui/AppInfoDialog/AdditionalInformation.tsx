@@ -49,9 +49,7 @@ export function AdditionalInformation({
 		],
 		['Digital signature', signature(details?.signature, isLoading)],
 		[
-			hasPackageLaunchTarget
-				? 'Launch target found'
-				: 'Executable found',
+			hasPackageLaunchTarget ? 'Launch target found' : 'Executable found',
 			availability(details?.executableExists, isLoading),
 		],
 		[

@@ -14,9 +14,7 @@ import {
 import type { AppInfo } from '../../../../src/entities/app'
 import type { AppCategory } from '../../../../src/entities/category'
 
-function app(
-	value: Partial<AppInfo> & Pick<AppInfo, 'id' | 'name'>,
-): AppInfo {
+function app(value: Partial<AppInfo> & Pick<AppInfo, 'id' | 'name'>): AppInfo {
 	return {
 		path: `C:\\Program Files\\${value.id}\\app.exe`,
 		category: 'other',
@@ -158,9 +156,9 @@ describe('categorized app identity', () => {
 		expect(result[2].artifactKind).toBe('installer')
 		expect(result[2].category).toBe('installers_docs')
 		expect(result[2].userInstaller).toBe(true)
-		expect(filterVisibleApps(result, 'installers_docs', none, none)).toEqual([
-			result[2],
-		])
+		expect(
+			filterVisibleApps(result, 'installers_docs', none, none),
+		).toEqual([result[2]])
 		expect(filterVisibleApps(result, 'all', none, none)).not.toContain(
 			result[2],
 		)
@@ -233,9 +231,7 @@ describe('categorized app identity', () => {
 				visibilityClass: 'auxiliary',
 			}),
 		]
-		const result = selectCategorizedApps(
-			state(auxiliary, {}, ['helper']),
-		)
+		const result = selectCategorizedApps(state(auxiliary, {}, ['helper']))
 		expect(result[0]).not.toBe(auxiliary[0])
 		expect(result[0].visibilityClass).toBe('primary')
 		expect(result[0].userPromoted).toBe(true)
@@ -284,18 +280,21 @@ describe('selectCatalogCounts', () => {
 
 			expect(badge).toBe(
 				filterVisibleApps(
-				mixed,
-				view,
-				marks(hiddenAppIds),
-				marks(favoriteAppIds),
-			)
-					.length,
+					mixed,
+					view,
+					marks(hiddenAppIds),
+					marks(favoriteAppIds),
+				).length,
 			)
 		},
 	)
 
 	it('excludes auxiliary and hidden apps from the visible set and its category counts', () => {
-		const counts = selectCatalogCounts(mixed, marks(hiddenAppIds), marks(favoriteAppIds))
+		const counts = selectCatalogCounts(
+			mixed,
+			marks(hiddenAppIds),
+			marks(favoriteAppIds),
+		)
 
 		expect(counts.visibleCategorizedApps.map(entry => entry.id)).toEqual([
 			'steam',
@@ -308,7 +307,11 @@ describe('selectCatalogCounts', () => {
 
 	// The settings page reports what the scanner classified, so hiding an app must not change it.
 	it('keeps classification totals independent of what the user hid', () => {
-		const counts = selectCatalogCounts(mixed, marks(hiddenAppIds), marks(favoriteAppIds))
+		const counts = selectCatalogCounts(
+			mixed,
+			marks(hiddenAppIds),
+			marks(favoriteAppIds),
+		)
 
 		expect(counts.classifiedAuxiliaryCount).toBe(2)
 		expect(counts.classifiedPrimaryCount).toBe(3)
@@ -341,8 +344,12 @@ describe('selectCatalogCounts', () => {
 		expect(filterVisibleApps(apps, 'all', none, marks(['setup']))).toEqual([
 			catalog[0],
 		])
-		expect(filterVisibleApps(apps, 'favorites', none, marks(['setup']))).toEqual([])
-		expect(filterVisibleApps(apps, 'auxiliary', none, marks(['setup']))).toEqual([])
+		expect(
+			filterVisibleApps(apps, 'favorites', none, marks(['setup'])),
+		).toEqual([])
+		expect(
+			filterVisibleApps(apps, 'auxiliary', none, marks(['setup'])),
+		).toEqual([])
 		expect(filterVisibleApps(apps, 'installers_docs', none, none)).toEqual([
 			installer,
 			docs,

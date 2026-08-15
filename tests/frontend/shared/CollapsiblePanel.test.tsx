@@ -85,7 +85,7 @@ describe('CollapsiblePanel', () => {
 	})
 
 	it('makes closing content inert before its transition ends', () => {
-	render(<Example />)
+		render(<Example />)
 		fireEvent.click(screen.getByRole('button', { name: 'Toggle details' }))
 		const panel = screen.getByText('Details').parentElement?.parentElement
 

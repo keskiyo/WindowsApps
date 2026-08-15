@@ -49,9 +49,12 @@ export class AppErrorBoundary extends Component<
 					className="grid min-h-screen place-items-center bg-(--surface-base) p-6 text-center text-(--text-primary)"
 				>
 					<div className="max-w-sm space-y-3 rounded-2xl border border-(--border-neutral) bg-(--surface-panel) p-6 shadow-(--shadow-summary)">
-						<h1 className="text-lg font-semibold">Something went wrong</h1>
+						<h1 className="text-lg font-semibold">
+							Something went wrong
+						</h1>
 						<p className="text-sm text-(--text-secondary)">
-							Reload the app to recover. Your saved settings are still on this device.
+							Reload the app to recover. Your saved settings are
+							still on this device.
 						</p>
 						<button
 							type="button"

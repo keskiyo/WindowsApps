@@ -13,9 +13,12 @@ function emptyClient(): AppsClient {
 		refreshApps: vi.fn().mockResolvedValue([]),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
-		closeApps: vi
-			.fn()
-			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0, failed: 0 }),
+		closeApps: vi.fn().mockResolvedValue({
+			closed: 0,
+			notRunning: 0,
+			unavailable: 0,
+			failed: 0,
+		}),
 		getAppDetails: vi.fn().mockResolvedValue({
 			fileSizeBytes: null,
 			fileCreatedAt: null,
@@ -62,39 +65,43 @@ const categories: CategoryDefinition[] = [
 function renderGrid(size: number) {
 	render(
 		<AppStoreProvider store={createAppStore(emptyClient(), localStorage)}>
-		<AppGrid
-			apps={Array.from({ length: size }, (_, index) => app(index))}
-			isLoading={false}
-			hasQuery={false}
-			activeView='all'
-			searchScopeCounts={{ auxiliary: 0, hidden: 0, installersDocs: 0 }}
-			onSelectView={vi.fn()}
-			categoryOrder={['utilities']}
-			categories={categories}
-			collapsedCategories={[]}
-			favoriteAppIds={[]}
-			favoriteScenarios={{
-				scenarios: [],
-				apps: [],
-				runningId: null,
-				isScenarioRunning: false,
-				onRun: vi.fn(),
-				onToggleFavorite: vi.fn(),
-			}}
-			onBack={vi.fn()}
-			onToggleCategory={vi.fn()}
-			onToggleFavorite={vi.fn()}
-			onMoveApp={vi.fn()}
-			onLaunch={vi.fn().mockResolvedValue(undefined)}
-			onInfo={vi.fn()}
-			onUninstall={vi.fn()}
-			onHide={vi.fn()}
-			onRestore={vi.fn()}
-			onPromoteAuxiliary={vi.fn()}
-			onDemoteAuxiliary={vi.fn()}
-			onRenameCategory={vi.fn().mockReturnValue({ ok: true })}
-			onDeleteCategory={vi.fn().mockReturnValue({ ok: true })}
-		/>
+			<AppGrid
+				apps={Array.from({ length: size }, (_, index) => app(index))}
+				isLoading={false}
+				hasQuery={false}
+				activeView="all"
+				searchScopeCounts={{
+					auxiliary: 0,
+					hidden: 0,
+					installersDocs: 0,
+				}}
+				onSelectView={vi.fn()}
+				categoryOrder={['utilities']}
+				categories={categories}
+				collapsedCategories={[]}
+				favoriteAppIds={[]}
+				favoriteScenarios={{
+					scenarios: [],
+					apps: [],
+					runningId: null,
+					isScenarioRunning: false,
+					onRun: vi.fn(),
+					onToggleFavorite: vi.fn(),
+				}}
+				onBack={vi.fn()}
+				onToggleCategory={vi.fn()}
+				onToggleFavorite={vi.fn()}
+				onMoveApp={vi.fn()}
+				onLaunch={vi.fn().mockResolvedValue(undefined)}
+				onInfo={vi.fn()}
+				onUninstall={vi.fn()}
+				onHide={vi.fn()}
+				onRestore={vi.fn()}
+				onPromoteAuxiliary={vi.fn()}
+				onDemoteAuxiliary={vi.fn()}
+				onRenameCategory={vi.fn().mockReturnValue({ ok: true })}
+				onDeleteCategory={vi.fn().mockReturnValue({ ok: true })}
+			/>
 		</AppStoreProvider>,
 	)
 }

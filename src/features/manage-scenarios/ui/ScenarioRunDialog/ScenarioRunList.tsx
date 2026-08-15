@@ -24,7 +24,10 @@ export function ScenarioRunList({
 						<ScenarioAppTile key={app.id} app={app} />
 					))}
 					{unavailable.map(entry => (
-						<UnavailableScenarioAppTile key={entry.identity} entry={entry} />
+						<UnavailableScenarioAppTile
+							key={entry.identity}
+							entry={entry}
+						/>
 					))}
 				</ul>
 			)}

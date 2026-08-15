@@ -8,8 +8,16 @@ import type { AppInfo } from '../../../../src/entities/app'
 import { DEFAULT_CATEGORIES } from '../../../../src/entities/category'
 
 describe('rankAppsByQueryAndCategory', () => {
-	const browser = app({ id: 'firefox', name: 'Firefox', category: 'browsers' })
-	const chat = app({ id: 'discord', name: 'Discord', category: 'communication' })
+	const browser = app({
+		id: 'firefox',
+		name: 'Firefox',
+		category: 'browsers',
+	})
+	const chat = app({
+		id: 'discord',
+		name: 'Discord',
+		category: 'communication',
+	})
 
 	// A reader who remembers the shelf but not the label should still find the app.
 	it('answers a category name with the apps filed under it', () => {
@@ -23,8 +31,16 @@ describe('rankAppsByQueryAndCategory', () => {
 	})
 
 	it('keeps name matches ahead of the apps the category name pulls in', () => {
-		const named = app({ id: 'player', name: 'Media Player', category: 'other' })
-		const filed = app({ id: 'songbird', name: 'Songbird', category: 'media' })
+		const named = app({
+			id: 'player',
+			name: 'Media Player',
+			category: 'other',
+		})
+		const filed = app({
+			id: 'songbird',
+			name: 'Songbird',
+			category: 'media',
+		})
 
 		expect(
 			rankAppsByQueryAndCategory(
@@ -37,14 +53,16 @@ describe('rankAppsByQueryAndCategory', () => {
 
 	it('leaves an empty query alone', () => {
 		expect(
-			rankAppsByQueryAndCategory([browser, chat], '  ', DEFAULT_CATEGORIES),
+			rankAppsByQueryAndCategory(
+				[browser, chat],
+				'  ',
+				DEFAULT_CATEGORIES,
+			),
 		).toEqual([browser, chat])
 	})
 })
 
-function app(
-	value: Partial<AppInfo> & Pick<AppInfo, 'id' | 'name'>,
-): AppInfo {
+function app(value: Partial<AppInfo> & Pick<AppInfo, 'id' | 'name'>): AppInfo {
 	return {
 		path: `C:\\Apps\\${value.id}\\app.exe`,
 		category: 'other',
@@ -108,11 +126,14 @@ describe('catalog search transliteration', () => {
 	it.each([
 		['хром', chrome],
 		['телеграм', telegram],
-	])('finds an English name from the transliterated query %s', (query, expected) => {
-		expect(rankAppsByQuery([chrome, telegram], query as string)).toEqual([
-			expected,
-		])
-	})
+	])(
+		'finds an English name from the transliterated query %s',
+		(query, expected) => {
+			expect(
+				rankAppsByQuery([chrome, telegram], query as string),
+			).toEqual([expected])
+		},
+	)
 
 	it('ranks a literal match above a transliterated one', () => {
 		const cyrillic = app({ id: 'cyrillic', name: 'Хром' })
@@ -203,9 +224,7 @@ describe('catalog search typo tolerance', () => {
 	})
 
 	it('keeps AND semantics across corrected and literal tokens', () => {
-		expect(filterAppsByQuery([docker], 'вщслук desktop')).toEqual([
-			docker,
-		])
+		expect(filterAppsByQuery([docker], 'вщслук desktop')).toEqual([docker])
 		expect(filterAppsByQuery([docker], 'вщслук missing')).toEqual([])
 	})
 })

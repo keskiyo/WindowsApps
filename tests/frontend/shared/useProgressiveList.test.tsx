@@ -13,7 +13,9 @@ beforeEach(() => {
 	vi.stubGlobal(
 		'IntersectionObserver',
 		class {
-			constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
+			constructor(
+				callback: (entries: { isIntersecting: boolean }[]) => void,
+			) {
 				reveal = () => callback([{ isIntersecting: true }])
 			}
 			observe() {}
@@ -51,7 +53,9 @@ describe('useProgressiveList', () => {
 		const view = renderHook(({ items }) => useProgressiveList(items), {
 			initialProps: { items: list(500) },
 		})
-		act(() => view.result.current.sentinelRef(document.createElement('div')))
+		act(() =>
+			view.result.current.sentinelRef(document.createElement('div')),
+		)
 		act(() => reveal?.())
 		act(() => reveal?.())
 		expect(view.result.current.visible).toHaveLength(144)

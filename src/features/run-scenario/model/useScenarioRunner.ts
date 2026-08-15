@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AppInfo, CloseAppsResult, CloseProgress } from '../../../entities/app'
+import type {
+	AppInfo,
+	CloseAppsResult,
+	CloseProgress,
+} from '../../../entities/app'
 import {
 	MAX_SCENARIO_ENTRIES,
 	resolveScenarioApps,

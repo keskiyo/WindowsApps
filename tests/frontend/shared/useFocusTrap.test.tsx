@@ -9,15 +9,20 @@ function Trapped({ disabledMiddle = false }: { disabledMiddle?: boolean }) {
 	useFocusTrap(dialog)
 	return (
 		<>
-			<button type='button'>outside before</button>
-			<div ref={dialog} role='dialog' aria-modal='true' aria-label='Trapped'>
-				<button type='button'>first</button>
-				<button type='button' disabled={disabledMiddle}>
+			<button type="button">outside before</button>
+			<div
+				ref={dialog}
+				role="dialog"
+				aria-modal="true"
+				aria-label="Trapped"
+			>
+				<button type="button">first</button>
+				<button type="button" disabled={disabledMiddle}>
 					middle
 				</button>
-				<button type='button'>last</button>
+				<button type="button">last</button>
 			</div>
-			<button type='button'>outside after</button>
+			<button type="button">outside after</button>
 		</>
 	)
 }

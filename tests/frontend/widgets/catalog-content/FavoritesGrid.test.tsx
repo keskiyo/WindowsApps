@@ -13,7 +13,7 @@ vi.mock(
 	'../../../../src/widgets/catalog-content/ui/CatalogAppCard/CatalogAppCard',
 	() => ({
 		CatalogAppCard: ({ app }: { app: AppInfo }) => (
-			<button type='button' aria-label={`Launch ${app.name}`}>
+			<button type="button" aria-label={`Launch ${app.name}`}>
 				{app.name}
 			</button>
 		),
@@ -104,7 +104,11 @@ describe('FavoritesGrid', () => {
 	})
 
 	it('names both blocks of the view and what each one holds', () => {
-		render(<FavoritesGrid {...props([favorite('steam', 'Steam')], [gaming])} />)
+		render(
+			<FavoritesGrid
+				{...props([favorite('steam', 'Steam')], [gaming])}
+			/>,
+		)
 
 		const scenarios = screen.getByRole('region', { name: 'Scenarios' })
 		expect(scenarios).toHaveTextContent('1 scenario')
@@ -157,7 +161,9 @@ describe('FavoritesGrid', () => {
 	it('shows the scenarios section even when no app is starred', () => {
 		render(<FavoritesGrid {...props([], [gaming])} />)
 
-		expect(screen.getByRole('region', { name: 'Scenarios' })).toBeInTheDocument()
+		expect(
+			screen.getByRole('region', { name: 'Scenarios' }),
+		).toBeInTheDocument()
 		expect(screen.queryByText('No favorites yet')).not.toBeInTheDocument()
 	})
 
@@ -166,10 +172,14 @@ describe('FavoritesGrid', () => {
 		render(<FavoritesGrid {...view} />)
 
 		await userEvent.click(
-			screen.getByRole('button', { name: 'Remove Gaming from favorites' }),
+			screen.getByRole('button', {
+				name: 'Remove Gaming from favorites',
+			}),
 		)
 
-		expect(view.favoriteScenarios.onToggleFavorite).toHaveBeenCalledWith('gaming')
+		expect(view.favoriteScenarios.onToggleFavorite).toHaveBeenCalledWith(
+			'gaming',
+		)
 	})
 
 	it('blocks every favorite scenario action until the active run finishes', () => {

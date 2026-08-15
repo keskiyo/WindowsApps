@@ -15,7 +15,7 @@ describe('UninstallDialog', () => {
 
 		render(
 			<UninstallDialog
-				appName='Editor'
+				appName="Editor"
 				preview={preview}
 				isPreviewLoading={false}
 				previewError={null}

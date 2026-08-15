@@ -14,7 +14,11 @@ describe('ScanPrompt', () => {
 			/>,
 		)
 
-		expect(screen.getByText('Scan Windows to build your catalog. Nothing runs automatically at startup.')).toBeInTheDocument()
+		expect(
+			screen.getByText(
+				'Scan Windows to build your catalog. Nothing runs automatically at startup.',
+			),
+		).toBeInTheDocument()
 		await userEvent.click(
 			screen.getByRole('button', { name: 'Dismiss scan prompt' }),
 		)

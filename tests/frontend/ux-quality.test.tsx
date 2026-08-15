@@ -56,9 +56,12 @@ function renderApp(
 		refreshApps: vi.fn().mockResolvedValue(apps),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
-		closeApps: vi
-			.fn()
-			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0, failed: 0 }),
+		closeApps: vi.fn().mockResolvedValue({
+			closed: 0,
+			notRunning: 0,
+			unavailable: 0,
+			failed: 0,
+		}),
 		getUninstallPreview: vi.fn().mockResolvedValue({
 			appName: 'Visual Studio Code',
 			publisher: 'Microsoft',
@@ -198,8 +201,8 @@ describe('UX quality — first impressions', () => {
 		await userEvent.click(
 			screen.getByRole('menuitem', { name: 'Uninstall' }),
 		)
-		const before = (client.refreshApps as ReturnType<typeof vi.fn>).mock.calls
-			.length
+		const before = (client.refreshApps as ReturnType<typeof vi.fn>).mock
+			.calls.length
 
 		await userEvent.click(
 			await screen.findByRole('button', { name: 'Confirm uninstall' }),
@@ -227,15 +230,17 @@ describe('UX quality — first impressions', () => {
 		await userEvent.click(
 			screen.getByRole('menuitem', { name: 'Uninstall' }),
 		)
-		const before = (client.refreshApps as ReturnType<typeof vi.fn>).mock.calls
-			.length
+		const before = (client.refreshApps as ReturnType<typeof vi.fn>).mock
+			.calls.length
 
 		await userEvent.click(
 			await screen.findByRole('button', { name: 'Confirm uninstall' }),
 		)
 
 		expect(
-			await screen.findByText('Uninstall of Visual Studio Code cancelled'),
+			await screen.findByText(
+				'Uninstall of Visual Studio Code cancelled',
+			),
 		).toBeInTheDocument()
 		expect(client.refreshApps).toHaveBeenCalledTimes(before)
 	})
@@ -430,7 +435,9 @@ describe('UX quality — keyboard & native (round 3)', () => {
 		renderApp({
 			launchApp: vi
 				.fn()
-				.mockRejectedValue(new Error('C:\\Users\\Example\\private-launch-detail')),
+				.mockRejectedValue(
+					new Error('C:\\Users\\Example\\private-launch-detail'),
+				),
 		})
 		await userEvent.click(
 			await screen.findByRole('button', { name: 'Launch Steam' }),

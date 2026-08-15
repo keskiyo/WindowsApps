@@ -86,12 +86,19 @@ describe('PreferencesBackup', () => {
 			value: () => Promise.resolve('{"version":14}'),
 		})
 
-		await userEvent.click(screen.getByRole('button', { name: 'Import settings' }))
-		await userEvent.upload(screen.getByLabelText('Choose settings backup'), file)
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Import settings' }),
+		)
+		await userEvent.upload(
+			screen.getByLabelText('Choose settings backup'),
+			file,
+		)
 
 		expect(onValidateImport).toHaveBeenCalledWith('{"version":14}')
 		expect(onImport).not.toHaveBeenCalled()
-		await userEvent.click(screen.getByRole('button', { name: 'Import backup' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Import backup' }),
+		)
 		expect(onImport).toHaveBeenCalledWith('{"version":14}')
 	})
 
@@ -113,8 +120,13 @@ describe('PreferencesBackup', () => {
 		Object.defineProperty(file, 'size', { value: 1_048_577 })
 		Object.defineProperty(file, 'text', { value: readText })
 
-		await userEvent.click(screen.getByRole('button', { name: 'Import settings' }))
-		await userEvent.upload(screen.getByLabelText('Choose settings backup'), file)
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Import settings' }),
+		)
+		await userEvent.upload(
+			screen.getByLabelText('Choose settings backup'),
+			file,
+		)
 
 		expect(readText).not.toHaveBeenCalled()
 		expect(onValidateImport).not.toHaveBeenCalled()
@@ -139,7 +151,9 @@ describe('PreferencesBackup', () => {
 			screen.getByRole('button', { name: 'Restore local backup' }),
 		)
 		expect(onRestore).not.toHaveBeenCalled()
-		await userEvent.click(screen.getByRole('button', { name: 'Restore backup' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Restore backup' }),
+		)
 		expect(onRestore).toHaveBeenCalledOnce()
 	})
 })

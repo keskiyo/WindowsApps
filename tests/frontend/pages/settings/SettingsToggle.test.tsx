@@ -7,7 +7,11 @@ describe('SettingsToggle', () => {
 	it('reports its state and toggles', async () => {
 		const onToggle = vi.fn()
 		render(
-			<SettingsToggle label='Launch at startup' checked onToggle={onToggle} />,
+			<SettingsToggle
+				label="Launch at startup"
+				checked
+				onToggle={onToggle}
+			/>,
 		)
 
 		const toggle = screen.getByRole('switch', { name: 'Launch at startup' })
@@ -20,7 +24,7 @@ describe('SettingsToggle', () => {
 		const onToggle = vi.fn()
 		render(
 			<SettingsToggle
-				label='Launch at startup'
+				label="Launch at startup"
 				checked={false}
 				disabled
 				onToggle={onToggle}
@@ -40,7 +44,11 @@ describe('SettingsToggle', () => {
 	 */
 	it('keeps the knob out of the reach of the dark-theme override', () => {
 		render(
-			<SettingsToggle label='Launch at startup' checked onToggle={vi.fn()} />,
+			<SettingsToggle
+				label="Launch at startup"
+				checked
+				onToggle={vi.fn()}
+			/>,
 		)
 
 		const knob = screen

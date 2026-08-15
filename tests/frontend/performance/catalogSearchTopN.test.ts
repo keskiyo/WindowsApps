@@ -56,7 +56,10 @@ describe('bounded command-palette ranking', () => {
 	it.each(['app', 'a', 'tool', 'sample app', 'zebra'])(
 		'returns exactly the first %o results of a full sort',
 		query => {
-			const expected = rankAppsByQuery(apps, query).slice(0, PALETTE_LIMIT)
+			const expected = rankAppsByQuery(apps, query).slice(
+				0,
+				PALETTE_LIMIT,
+			)
 
 			const actual = rankAppsByQueryTop(apps, query, PALETTE_LIMIT)
 
@@ -74,7 +77,9 @@ describe('bounded command-palette ranking', () => {
 
 		const actual = rankAppsByQueryTop(apps, 'zebra 9999', PALETTE_LIMIT)
 
-		expect(actual.map(item => item.id)).toEqual(expected.map(item => item.id))
+		expect(actual.map(item => item.id)).toEqual(
+			expected.map(item => item.id),
+		)
 		expect(actual.length).toBeLessThan(PALETTE_LIMIT)
 	})
 
@@ -104,8 +109,8 @@ describe('bounded command-palette ranking', () => {
 		expect(
 			rankAppsByQueryTop(catalog, 'вщсйук', PALETTE_LIMIT)[0]?.name,
 		).toBe('Docker Desktop')
-		expect(rankAppsByQueryTop(catalog, 'doker', PALETTE_LIMIT)[0]?.name).toBe(
-			'Docker Desktop',
-		)
+		expect(
+			rankAppsByQueryTop(catalog, 'doker', PALETTE_LIMIT)[0]?.name,
+		).toBe('Docker Desktop')
 	})
 })

@@ -6,9 +6,9 @@ import {
 
 describe('category accents', () => {
 	it('uses an available accent before repeating one', () => {
-		expect(
-			chooseCustomCategoryAccent(['yellow', 'cyan'], () => 0),
-		).toBe('pink')
+		expect(chooseCustomCategoryAccent(['yellow', 'cyan'], () => 0)).toBe(
+			'pink',
+		)
 	})
 
 	it('derives the same accent for a migrated category id', () => {

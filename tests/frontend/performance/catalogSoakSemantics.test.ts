@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createAppStore, selectFilteredApps } from '../../../src/app/store/appStore'
+import {
+	createAppStore,
+	selectFilteredApps,
+} from '../../../src/app/store/appStore'
 import type { AppInfo, AppsClient } from '../../../src/entities/app'
 
 function app(index: number): AppInfo {
@@ -30,13 +33,18 @@ function app(index: number): AppInfo {
 
 function client(apps: AppInfo[]): AppsClient {
 	return {
-		getApps: vi.fn().mockResolvedValue({ apps, hasCache: true, generation: 3 }),
+		getApps: vi
+			.fn()
+			.mockResolvedValue({ apps, hasCache: true, generation: 3 }),
 		refreshApps: vi.fn().mockResolvedValue(apps),
 		cancelScan: vi.fn().mockResolvedValue(undefined),
 		launchApp: vi.fn().mockResolvedValue(undefined),
-		closeApps: vi
-			.fn()
-			.mockResolvedValue({ closed: 0, notRunning: 0, unavailable: 0, failed: 0 }),
+		closeApps: vi.fn().mockResolvedValue({
+			closed: 0,
+			notRunning: 0,
+			unavailable: 0,
+			failed: 0,
+		}),
 		getAppDetails: vi.fn().mockResolvedValue({
 			fileSizeBytes: null,
 			fileCreatedAt: null,
@@ -66,17 +74,23 @@ describe('catalog soak semantics', () => {
 		const store = createAppStore(appsClient)
 		await store.getState().load()
 
-		const queries = ['windows', 'кириллица', 'duplicate', 'metadata', 'missing']
+		const queries = [
+			'windows',
+			'кириллица',
+			'duplicate',
+			'metadata',
+			'missing',
+		]
 		for (const query of queries) {
 			store.getState().setQuery(query)
-			expect(selectFilteredApps(store.getState()).length).toBeLessThanOrEqual(
-				apps.length,
-			)
+			expect(
+				selectFilteredApps(store.getState()).length,
+			).toBeLessThanOrEqual(apps.length)
 		}
 
-		store.getState().applyPatches([
-			{ id: 'app-1', generation: 2, publisher: 'Stale' },
-		])
+		store
+			.getState()
+			.applyPatches([{ id: 'app-1', generation: 2, publisher: 'Stale' }])
 
 		expect(store.getState().apps).toHaveLength(10000)
 		expect(store.getState().apps[1].publisher).not.toBe('Stale')
@@ -87,12 +101,18 @@ describe('catalog soak semantics', () => {
 		const store = createAppStore(client(apps))
 		await store.getState().load()
 
-		const queries = ['windows', 'кириллица', 'duplicate', 'metadata', 'missing']
+		const queries = [
+			'windows',
+			'кириллица',
+			'duplicate',
+			'metadata',
+			'missing',
+		]
 		for (let index = 0; index < 1000; index += 1) {
 			store.getState().setQuery(queries[index % queries.length])
-			expect(selectFilteredApps(store.getState()).length).toBeLessThanOrEqual(
-				apps.length,
-			)
+			expect(
+				selectFilteredApps(store.getState()).length,
+			).toBeLessThanOrEqual(apps.length)
 		}
 	})
 

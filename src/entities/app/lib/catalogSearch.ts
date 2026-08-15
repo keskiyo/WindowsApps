@@ -163,7 +163,9 @@ export function rankAppsByQueryAndCategory(
 	if (!needle) return ranked
 	const named = new Set(
 		categories
-			.filter(category => category.label.toLocaleLowerCase().includes(needle))
+			.filter(category =>
+				category.label.toLocaleLowerCase().includes(needle),
+			)
 			.map(category => category.id),
 	)
 	if (named.size === 0) return ranked

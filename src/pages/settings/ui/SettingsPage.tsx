@@ -116,14 +116,17 @@ export function SettingsPage({
 					/>
 				)}
 				{areaError('maintenance')}
-				{unclassifiedApps && categories && categoryOrder && onMoveApp && (
-					<UnclassifiedApps
-						apps={unclassifiedApps}
-						categories={categories}
-						categoryOrder={categoryOrder}
-						onMoveApp={onMoveApp}
-					/>
-				)}
+				{unclassifiedApps &&
+					categories &&
+					categoryOrder &&
+					onMoveApp && (
+						<UnclassifiedApps
+							apps={unclassifiedApps}
+							categories={categories}
+							categoryOrder={categoryOrder}
+							onMoveApp={onMoveApp}
+						/>
+					)}
 				<UninstallHistory client={client} />
 			</AdvancedSettings>
 		</section>

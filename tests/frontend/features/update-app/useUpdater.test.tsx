@@ -63,9 +63,7 @@ describe('useUpdater', () => {
 	// unrecognised wording must still leave a safe message and a usable retry.
 	it('keeps a recoverable failure state for unrecognised install errors', async () => {
 		const available = update('0.2.2')
-		available.download = vi
-			.fn()
-			.mockRejectedValue(new Error('Ошибка 42'))
+		available.download = vi.fn().mockRejectedValue(new Error('Ошибка 42'))
 		check.mockResolvedValue(available)
 		const { result } = renderHook(() => useUpdater())
 		await waitFor(() => expect(result.current.update).not.toBeNull())

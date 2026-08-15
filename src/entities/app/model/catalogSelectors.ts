@@ -32,7 +32,9 @@ export function filterVisibleApps(
 	)
 		return []
 	if (activeView === 'installers_docs')
-		return categorized.filter(app => isCatalogArtifact(app) && !isHidden(app))
+		return categorized.filter(
+			app => isCatalogArtifact(app) && !isHidden(app),
+		)
 	if (activeView === 'auxiliary')
 		return categorized.filter(
 			app =>
@@ -77,7 +79,8 @@ export function selectSearchScopeCounts(
 	for (const app of categorized) {
 		if (hidden.has(app.id)) buckets.hidden.push(app)
 		else if (isCatalogArtifact(app)) buckets.installersDocs.push(app)
-		else if (app.visibilityClass === 'auxiliary') buckets.auxiliary.push(app)
+		else if (app.visibilityClass === 'auxiliary')
+			buckets.auxiliary.push(app)
 	}
 	return {
 		auxiliary: filterAppsByQuery(buckets.auxiliary, query).length,

@@ -30,7 +30,8 @@ describe('hover fills that the theme layer would make permanent', () => {
 				const value = classes ?? ''
 				const tokens = value.split(/\s+/).filter(Boolean)
 				const hovered = tokens.filter(
-					token => token.startsWith('hover:') && REWRITTEN.test(token),
+					token =>
+						token.startsWith('hover:') && REWRITTEN.test(token),
 				)
 				const resting = tokens.some(
 					token => !token.includes(':') && REWRITTEN.test(token),

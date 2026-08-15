@@ -25,15 +25,21 @@ describe('toaster theme', () => {
 		)
 		expect(toast).toContain('background: var(--surface-raised) !important')
 		expect(toast).toContain('color: var(--text-primary) !important')
-		expect(toast).toContain('border: 1px solid var(--border-neutral) !important')
+		expect(toast).toContain(
+			'border: 1px solid var(--border-neutral) !important',
+		)
 	})
 
 	it('keeps semantic colour on the status icon instead of the whole toast', () => {
 		expect(
-			rule(`.app-toaster [data-sonner-toast][data-type='success'] [data-icon]`),
+			rule(
+				`.app-toaster [data-sonner-toast][data-type='success'] [data-icon]`,
+			),
 		).toContain('var(--category-green)')
 		expect(
-			rule(`.app-toaster [data-sonner-toast][data-type='error'] [data-icon]`),
+			rule(
+				`.app-toaster [data-sonner-toast][data-type='error'] [data-icon]`,
+			),
 		).toContain('var(--category-red)')
 	})
 })

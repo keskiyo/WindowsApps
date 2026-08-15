@@ -59,7 +59,9 @@ export function MoreCard({ destination, onSelect }: MoreCardProps) {
 									key={scenario.id}
 									scenario={scenario}
 									running={preview.runningId === scenario.id}
-									isScenarioRunning={preview.isScenarioRunning}
+									isScenarioRunning={
+										preview.isScenarioRunning
+									}
 									onRun={preview.onRun}
 								/>
 							))}

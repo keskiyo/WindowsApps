@@ -7,10 +7,7 @@ import { CategorySection } from '../CategorySection/CategorySection'
 import type { AppGridProps } from './types'
 
 export function CategoryList(props: AppGridProps) {
-	const groups = useMemo(
-		() => groupAppsByCategory(props.apps),
-		[props.apps],
-	)
+	const groups = useMemo(() => groupAppsByCategory(props.apps), [props.apps])
 	const favoriteIds = useMemo(
 		() => new Set(props.favoriteAppIds),
 		[props.favoriteAppIds],

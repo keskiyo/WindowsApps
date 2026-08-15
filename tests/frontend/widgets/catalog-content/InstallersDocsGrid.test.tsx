@@ -4,9 +4,14 @@ import { describe, expect, it, vi } from 'vitest'
 import { InstallersDocsGrid } from '../../../../src/widgets/catalog-content/ui/InstallersDocsGrid/InstallersDocsGrid'
 import type { AppInfo } from '../../../../src/entities/app'
 
-vi.mock('../../../../src/widgets/catalog-content/ui/CatalogAppCard/CatalogAppCard', () => ({
-	CatalogAppCard: ({ app }: { app: AppInfo }) => <article>{app.name}</article>,
-}))
+vi.mock(
+	'../../../../src/widgets/catalog-content/ui/CatalogAppCard/CatalogAppCard',
+	() => ({
+		CatalogAppCard: ({ app }: { app: AppInfo }) => (
+			<article>{app.name}</article>
+		),
+	}),
+)
 
 function app(id: string, artifactKind: 'installer' | 'documentation'): AppInfo {
 	return {
@@ -60,7 +65,9 @@ describe('InstallersDocsGrid', () => {
 			/>,
 		)
 
-		expect(screen.getByRole('heading', { name: 'Installers 1' })).toBeVisible()
+		expect(
+			screen.getByRole('heading', { name: 'Installers 1' }),
+		).toBeVisible()
 		expect(screen.getByRole('heading', { name: 'Docs 1' })).toBeVisible()
 		expect(screen.getByText('Visual Studio Setup')).toBeVisible()
 		expect(screen.getByText('Application Verifier Help')).toBeVisible()
@@ -107,7 +114,9 @@ describe('InstallersDocsGrid', () => {
 		expect(
 			screen.getByRole('region', { name: 'Installers & Docs' }),
 		).toHaveTextContent('0 items')
-		await userEvent.click(screen.getByRole('button', { name: 'Back to More' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Back to More' }),
+		)
 		expect(onBack).toHaveBeenCalled()
 	})
 })

@@ -31,7 +31,10 @@ export function AppInformationCards({
 				<DetailRows
 					rows={[
 						['Location', valueOrUnavailable(app.installLocation)],
-						[targetLabel, valueOrUnavailable(launchTargetValue(app))],
+						[
+							targetLabel,
+							valueOrUnavailable(launchTargetValue(app)),
+						],
 						['Launch type', launchTypeLabel(app)],
 					]}
 				/>

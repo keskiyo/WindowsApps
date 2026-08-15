@@ -9,6 +9,11 @@ const config = {
 	useTabs: true,
 	tabWidth: 4,
 
+	// core.autocrlf=true возвращает CRLF при каждом checkout на Windows, а
+	// значение по умолчанию 'lf' роняло бы на этом format:check у всех локально,
+	// проходя при этом на Linux-раннере.
+	endOfLine: 'auto',
+
 	// Tailwind CSS v4
 	tailwindStylesheet: './src/app/styles/index.css',
 	tailwindFunctions: ['cn', 'clsx', 'cva', 'cx', 'tw', 'twMerge'],

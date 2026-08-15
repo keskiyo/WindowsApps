@@ -38,14 +38,17 @@ const localRules = {
 
 export default tseslint.config(
 	{
-		ignores: ['dist', 'coverage', 'graphify-out', 'node_modules', 'src-tauri/target'],
+		ignores: [
+			'dist',
+			'coverage',
+			'graphify-out',
+			'node_modules',
+			'src-tauri/target',
+		],
 	},
 	{
 		files: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}'],
-		extends: [
-			js.configs.recommended,
-			...tseslint.configs.recommended,
-		],
+		extends: [js.configs.recommended, ...tseslint.configs.recommended],
 		languageOptions: {
 			ecmaVersion: 2020,
 			globals: {

@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest'
 const capabilities = JSON.parse(
 	readFileSync('src-tauri/capabilities/default.json', 'utf8'),
 )
-const updaterHook = readFileSync('src/features/update-app/model/useUpdater.ts', 'utf8')
+const updaterHook = readFileSync(
+	'src/features/update-app/model/useUpdater.ts',
+	'utf8',
+)
 
 // The webview is untrusted, so a capability is an attack surface, not a convenience. `*:default`
 // bundles every operation a plugin offers: `process:default` also grants `exit`, and
@@ -28,7 +31,8 @@ describe('Tauri capabilities', () => {
 	it('does not grant a plugin default bundle', () => {
 		const bundles = capabilities.permissions.filter(
 			permission =>
-				permission.endsWith(':default') && !permission.startsWith('core:'),
+				permission.endsWith(':default') &&
+				!permission.startsWith('core:'),
 		)
 
 		expect(bundles).toEqual([])

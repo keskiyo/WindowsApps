@@ -23,7 +23,9 @@ describe('card virtualization styles', () => {
 
 	it('lifts containment while a card menu is open so the popover is not clipped', () => {
 		const rule =
-			stylesheet.match(/\.app-card\[data-menu-open\]\s*\{([^}]*)\}/)?.[1] ?? ''
+			stylesheet.match(
+				/\.app-card\[data-menu-open\]\s*\{([^}]*)\}/,
+			)?.[1] ?? ''
 		expect(rule).toContain('content-visibility: visible')
 		expect(rule).toContain('contain: none')
 	})

@@ -35,7 +35,11 @@ describe('useSystemSettings', () => {
 					...client,
 					getSettings: vi
 						.fn()
-						.mockRejectedValue(new Error('C:\\Users\\Example\\private-settings-detail')),
+						.mockRejectedValue(
+							new Error(
+								'C:\\Users\\Example\\private-settings-detail',
+							),
+						),
 				},
 			}),
 		)

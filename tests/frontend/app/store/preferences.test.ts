@@ -218,7 +218,8 @@ describe('preferences', () => {
 		])
 		const storage = {
 			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => void values.set(key, value),
+			setItem: (key: string, value: string) =>
+				void values.set(key, value),
 		} as unknown as Storage
 
 		const preferences = readPreferences(storage)
@@ -234,9 +235,9 @@ describe('preferences', () => {
 			favoriteAppIds: ['code', 'editor'],
 			experimentalLayout: { density: 'compact' },
 		})
-		expect(JSON.parse(values.get(PREFERENCES_KEY) ?? '{}')).not.toHaveProperty(
-			'unknownFields',
-		)
+		expect(
+			JSON.parse(values.get(PREFERENCES_KEY) ?? '{}'),
+		).not.toHaveProperty('unknownFields')
 	})
 
 	it('keeps only valid category overrides', () => {
@@ -479,7 +480,7 @@ describe('preferences', () => {
 	// A star that names nothing would render a row with no scenario behind it.
 	it('keeps only starred scenarios the document still has', () => {
 		const normalized = normalizePreferences({
-		version: 15,
+			version: 15,
 			scenarios: [{ id: 'work', name: 'Work' }],
 			favoriteScenarioIds: ['work', 'work', 'deleted', '', 42],
 		})
@@ -526,7 +527,11 @@ describe('preferences', () => {
 			scenarios: [
 				{ id: 'a', name: 'Zero', createdAt: 0 },
 				{ id: 'b', name: 'Text', createdAt: 'yesterday' },
-				{ id: 'c', name: 'Infinite', createdAt: Number.POSITIVE_INFINITY },
+				{
+					id: 'c',
+					name: 'Infinite',
+					createdAt: Number.POSITIVE_INFINITY,
+				},
 			],
 		})
 
@@ -578,7 +583,7 @@ describe('preferences', () => {
 				collapsedCategories: ['games', 'invalid'],
 			}),
 		).toEqual({
-		version: 15,
+			version: 15,
 			categories: DEFAULT_PREFERENCES.categories,
 			categoryOrder: [
 				'browsers',
@@ -599,7 +604,7 @@ describe('preferences', () => {
 			installerAppIds: [],
 			installerAppIdentities: [],
 			scenarios: [],
-		favoriteScenarioIds: [],
+			favoriteScenarioIds: [],
 			firstSeenAt: {},
 			legacyCanonicalPreferences: {
 				favorite: [],
@@ -624,7 +629,8 @@ describe('preferences', () => {
 		const values = new Map<string, string>()
 		const storage = {
 			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => void values.set(key, value),
+			setItem: (key: string, value: string) =>
+				void values.set(key, value),
 		} as unknown as Storage
 
 		writePreferences(storage, {
@@ -646,11 +652,18 @@ describe('preferences', () => {
 		const values = new Map<string, string>()
 		const storage = {
 			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => void values.set(key, value),
+			setItem: (key: string, value: string) =>
+				void values.set(key, value),
 		} as unknown as Storage
 
-		writePreferences(storage, { ...DEFAULT_PREFERENCES, hiddenAppIds: ['a'] })
-		writePreferences(storage, { ...DEFAULT_PREFERENCES, hiddenAppIds: ['b'] })
+		writePreferences(storage, {
+			...DEFAULT_PREFERENCES,
+			hiddenAppIds: ['a'],
+		})
+		writePreferences(storage, {
+			...DEFAULT_PREFERENCES,
+			hiddenAppIds: ['b'],
+		})
 
 		expect(readPreferences(storage).hiddenAppIds).toEqual(['b'])
 		expect(
@@ -671,7 +684,8 @@ describe('preferences', () => {
 		const values = new Map<string, string>([[PREFERENCES_KEY, future]])
 		const storage = {
 			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => void values.set(key, value),
+			setItem: (key: string, value: string) =>
+				void values.set(key, value),
 		} as unknown as Storage
 
 		expect(writePreferences(storage, DEFAULT_PREFERENCES)).toBe(true)
@@ -680,11 +694,15 @@ describe('preferences', () => {
 
 	it('writes normally when the stored version is current or older', () => {
 		const values = new Map<string, string>([
-			[PREFERENCES_KEY, JSON.stringify({ version: 5, favoriteAppIds: [] })],
+			[
+				PREFERENCES_KEY,
+				JSON.stringify({ version: 5, favoriteAppIds: [] }),
+			],
 		])
 		const storage = {
 			getItem: (key: string) => values.get(key) ?? null,
-			setItem: (key: string, value: string) => void values.set(key, value),
+			setItem: (key: string, value: string) =>
+				void values.set(key, value),
 		} as unknown as Storage
 
 		writePreferences(storage, {
@@ -727,7 +745,9 @@ describe('preferences', () => {
 				throw new Error('QuotaExceededError')
 			}),
 		} as unknown as Storage
-		expect(() => writePreferences(throwing, DEFAULT_PREFERENCES)).not.toThrow()
+		expect(() =>
+			writePreferences(throwing, DEFAULT_PREFERENCES),
+		).not.toThrow()
 		expect(writePreferences(throwing, DEFAULT_PREFERENCES)).toBe(false)
 	})
 })

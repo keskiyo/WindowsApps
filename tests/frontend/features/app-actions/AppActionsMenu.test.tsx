@@ -50,7 +50,11 @@ function renderMovableMenu(
 	const onMove = vi.fn()
 	render(
 		<>
-			<button ref={anchorRef} type='button' aria-label='Actions menu anchor' />
+			<button
+				ref={anchorRef}
+				type="button"
+				aria-label="Actions menu anchor"
+			/>
 			<AppActionsMenu
 				app={visualStudioCode}
 				categories={categories}
@@ -102,7 +106,9 @@ describe('AppActionsMenu artifacts', () => {
 			/>,
 		)
 
-		expect(screen.queryByRole('menuitem', { name: 'Move to category' })).not.toBeInTheDocument()
+		expect(
+			screen.queryByRole('menuitem', { name: 'Move to category' }),
+		).not.toBeInTheDocument()
 		expect(screen.getByRole('menuitem', { name: 'App info' })).toBeVisible()
 	})
 })
@@ -226,7 +232,10 @@ describe('AppActionsMenu category cascade', () => {
 			.mockImplementation(function (this: HTMLElement) {
 				if (this.getAttribute('aria-label') === 'Actions menu anchor')
 					return anchorBounds
-				if (this.getAttribute('aria-label') === 'Visual Studio Code actions')
+				if (
+					this.getAttribute('aria-label') ===
+					'Visual Studio Code actions'
+				)
 					return staleMenuBounds
 				if (
 					this.getAttribute('aria-label') ===
