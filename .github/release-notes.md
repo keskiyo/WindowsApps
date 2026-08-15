@@ -2,11 +2,12 @@ Windows Apps is a fast, private application catalog and launcher for Windows 10 
 
 ## Highlights
 
-- **Favorites and hidden apps survive every scan** — your choices now persist after scans, updates, and imports.
-- **Better search** — finds matches across sections, supports Russian-to-Latin queries, and makes favorites and recent apps easier to access.
-- **Improved first run and updates** — clearer scan setup and non-intrusive update notifications.
+- **Uninstall stays out of Installers & Docs** — uninstall shortcuts are detected by arguments and grouped with maintenance tools.
+- **Faster scenario setup** — search apps, see categories, add the whole selection at once.
+- **Category-aware search** — category names return matching apps everywhere.
+- **Better classification** — improved System rules, Russian names, and download folders in 11 languages.
 
 ## Install
 
-1. Download `Windows.Apps_0.3.5_x64-setup.exe`.
+1. Download `Windows.Apps_0.3.6_x64-setup.exe`.
 2. Run it. The installer is not Authenticode-signed, so SmartScreen may show **Windows protected your PC**; choose **More info -> Run anyway**.

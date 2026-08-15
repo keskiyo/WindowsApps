@@ -1,29 +1,31 @@
 mod score;
 mod signals;
 mod tables;
+mod vocabulary;
 
+use super::machine::Associations;
 use super::{AppCategory, AppInfo, LaunchKind, SourceKind};
 use signals::Signals;
 use std::path::Path;
 
-pub(crate) fn classify_app(app: &AppInfo) -> AppCategory {
+pub(crate) fn classify_app(app: &AppInfo, associations: &Associations) -> AppCategory {
     if app.source_kind == SourceKind::Steam {
         return AppCategory::Games;
     }
     if is_wsl_start_app(app) {
         return AppCategory::Development;
     }
-    score::best(&Signals::from_app(app))
+    score::best(&Signals::from_app(app, associations))
 }
 
-pub(crate) fn category_reasons(app: &AppInfo) -> Vec<String> {
+pub(crate) fn category_reasons(app: &AppInfo, associations: &Associations) -> Vec<String> {
     if app.source_kind == SourceKind::Steam {
         return vec!["source=steam".into()];
     }
     if is_wsl_start_app(app) {
         return vec!["rule=wsl-start-app".into()];
     }
-    let reasons = score::evidence(&Signals::from_app(app), app.category);
+    let reasons = score::evidence(&Signals::from_app(app, associations), app.category);
     if reasons.is_empty() {
         return vec!["default=no-signal".into()];
     }
@@ -46,10 +48,23 @@ pub(super) fn classify(name: &str, path: &str) -> AppCategory {
 }
 
 #[cfg(test)]
+pub(super) fn category_scores(app: &AppInfo) -> Vec<(AppCategory, i32)> {
+    score::ranked(&Signals::from_app(app, &Associations::empty()))
+}
+
+#[cfg(test)]
 mod tests {
     use super::super::{AppInfo, LaunchKind};
-    use super::{category_reasons, classify_app, AppCategory, SourceKind};
+    use super::{AppCategory, Associations, SourceKind};
     use serde::Deserialize;
+
+    fn classify_app(app: &AppInfo) -> AppCategory {
+        super::classify_app(app, &Associations::empty())
+    }
+
+    fn category_reasons(app: &AppInfo) -> Vec<String> {
+        super::category_reasons(app, &Associations::empty())
+    }
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -130,11 +145,135 @@ mod tests {
         }
     }
 
+    fn scores_for(json: &str) -> Vec<(AppCategory, i32)> {
+        super::category_scores(&build(&serde_json::from_str(json).unwrap()))
+    }
+
+    fn margin(scores: &[(AppCategory, i32)]) -> i32 {
+        match scores {
+            [(_, winner), (_, runner_up), ..] => winner - runner_up,
+            [(_, winner)] => *winner,
+            [] => 0,
+        }
+    }
+
+    #[test]
+    fn the_ranking_and_the_chosen_category_cannot_disagree() {
+        let fixtures: Vec<Fixture> = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/catalog_categories.json"
+        ))
+        .expect("category fixtures parse");
+        for fixture in fixtures.iter().filter(|f| f.source != SourceKind::Steam) {
+            let app = build(fixture);
+            let expected = super::category_scores(&app)
+                .first()
+                .filter(|(_, score)| *score >= super::score::THRESHOLD)
+                .map_or(AppCategory::Other, |(category, _)| *category);
+
+            assert_eq!(classify_app(&app), expected, "{}", fixture.name);
+        }
+    }
+
+    #[test]
+    fn a_localised_name_wins_its_category_outright() {
+        let scores = scores_for(
+            r#"{"name":"Яндекс Музыка","path":"C:\\Users\\U\\AppData\\Local\\Programs\\YandexMusic\\Яндекс Музыка.exe","expected":"media"}"#,
+        );
+
+        assert_eq!(
+            scores.first().map(|(category, _)| *category),
+            Some(AppCategory::Media)
+        );
+        assert!(margin(&scores) > 0, "{scores:?}");
+    }
+
+    #[test]
+    fn a_windows_feature_name_never_matches_a_vendor_install_path() {
+        for json in [
+            r#"{"name":"NVIDIA Control Panel","path":"C:\\Program Files\\NVIDIA Corporation\\Control Panel Client\\nvcplui.exe","publisher":"NVIDIA Corporation","expected":"utilities"}"#,
+            r#"{"name":"Logitech Options Calculator Widget","path":"C:\\Program Files\\Logitech\\Options\\widgets\\calculator\\widget.exe","publisher":"Logitech","expected":"utilities"}"#,
+            r#"{"name":"Notepad++","path":"C:\\Program Files\\Notepad++\\notepad++.exe","expected":"development"}"#,
+        ] {
+            let scores = scores_for(json);
+
+            assert!(
+                !scores
+                    .iter()
+                    .any(|(category, _)| *category == AppCategory::WindowsFeatures),
+                "{json} still scores as a Windows feature: {scores:?}"
+            );
+        }
+    }
+
     #[test]
     fn localised_command_prompt_name_is_classified_without_path_hints() {
         assert_eq!(
-            super::classify("\u{41a}\u{43e}\u{43c}\u{430}\u{43d}\u{434}\u{43d}\u{430} \u{441}\u{442}\u{440}\u{43e}\u{43a}\u{430}", r"D:\\Portable\\app.exe"),
-            AppCategory::System
+            super::classify("\u{41a}\u{43e}\u{43c}\u{430}\u{43d}\u{434}\u{43d}\u{430}\u{44f} \u{441}\u{442}\u{440}\u{43e}\u{43a}\u{430}", r"D:\Portable\app.exe"),
+            AppCategory::WindowsFeatures
+        );
+    }
+
+    #[test]
+    fn a_bitness_qualifier_does_not_hide_a_windows_feature() {
+        assert_eq!(
+            super::classify("Windows PowerShell (x86)", r"D:\Menu\shell.lnk"),
+            AppCategory::WindowsFeatures
+        );
+        assert_eq!(
+            super::classify("Windows PowerShell", r"D:\Menu\shell.lnk"),
+            AppCategory::WindowsFeatures
+        );
+    }
+
+    #[test]
+    fn a_name_that_is_only_a_qualifier_matches_nothing() {
+        assert_eq!(
+            super::classify("(x86)", r"D:\Portable\app.exe"),
+            AppCategory::Other
+        );
+    }
+
+    #[test]
+    fn a_registered_file_type_classifies_a_product_no_table_names() {
+        let app = build(
+            &serde_json::from_str(
+                r#"{"name":"Zvukoved","path":"C:\\Program Files\\Zvukoved\\zvukoved.exe","expected":"media"}"#,
+            )
+            .unwrap(),
+        );
+        let associations =
+            Associations::from_pairs(vec![("zvukoved".into(), vec![".flac".into()])]);
+
+        assert_eq!(super::classify_app(&app, &associations), AppCategory::Media);
+        assert_eq!(classify_app(&app), AppCategory::Other);
+    }
+
+    #[test]
+    fn a_registered_protocol_names_the_purpose_of_an_unknown_client() {
+        let app = build(
+            &serde_json::from_str(
+                r#"{"name":"Pismo","path":"C:\\Program Files\\Pismo\\pismo.exe","expected":"communication"}"#,
+            )
+            .unwrap(),
+        );
+        let associations =
+            Associations::from_pairs(vec![("pismo".into(), vec!["url:mailto".into()])]);
+
+        assert_eq!(
+            super::classify_app(&app, &associations),
+            AppCategory::Communication
+        );
+    }
+
+    #[test]
+    fn a_micro_sign_reads_as_the_latin_letter_it_imitates() {
+        assert_eq!(
+            super::classify("\u{b5}Torrent", r"D:\Portable\app.exe"),
+            AppCategory::FileCloud
+        );
+        assert_eq!(
+            super::classify("\u{3bc}Torrent", r"D:\Portable\app.exe"),
+            AppCategory::FileCloud
         );
     }
 

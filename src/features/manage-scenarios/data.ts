@@ -1,1 +1,0 @@
-export const APP_PICKER_MAX_RESULTS = 50

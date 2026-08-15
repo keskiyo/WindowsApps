@@ -39,14 +39,6 @@ pub(in crate::catalog::visibility) fn is_framework_package(app: &AppInfo) -> boo
     .any(|marker| value.contains(marker))
 }
 
-pub(in crate::catalog::visibility) fn is_uninstall_action_name(app: &AppInfo) -> bool {
-    app.name
-        .to_lowercase()
-        .split(|character: char| !character.is_alphanumeric())
-        .find(|token| !token.is_empty())
-        .is_some_and(|first| matches!(first, "uninstall" | "удалить" | "деинсталляция"))
-}
-
 pub(in crate::catalog::visibility) fn is_steam_prerequisite_depot(app: &AppInfo) -> bool {
     if app.source_kind != SourceKind::Steam {
         return false;

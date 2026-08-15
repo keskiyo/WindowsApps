@@ -1,5 +1,7 @@
 use crate::catalog::fields::{Field, MarkerFields};
-use crate::catalog::filters::is_uninstall_target_path;
+use crate::catalog::filters::{
+    carries_uninstall_switch, is_uninstall_action_name, is_uninstall_target_path,
+};
 use crate::catalog::machine::MachineFacts;
 use crate::catalog::place::Place;
 use crate::catalog::{AppInfo, LaunchKind, SourceKind};
@@ -21,7 +23,10 @@ pub(super) fn is_installation_artifact(
     } else {
         app.resolved_path.as_deref().unwrap_or(&app.path)
     };
-    if is_uninstall_target_path(Path::new(launch_path)) {
+    if is_uninstall_target_path(Path::new(launch_path))
+        || is_uninstall_action_name(&app.name)
+        || carries_uninstall_switch(app.launch_arguments.as_deref())
+    {
         return false;
     }
     if facts.registrations.is_installer_bundle(launch_path) {
@@ -34,8 +39,29 @@ pub(super) fn is_installation_artifact(
     let fields = MarkerFields::from_app(app);
     is_mysql_installer(launch_path)
         || has_installer_description_evidence(app, launch_path, facts)
+        || is_unidentified_transient_drop(app, launch_path, facts)
         || is_runtime_redistributable(&fields)
         || is_self_extracting_stub(&fields)
+}
+
+fn is_unidentified_transient_drop(app: &AppInfo, path: &str, facts: &MachineFacts) -> bool {
+    if facts.places.classify(path) != Place::TransientDrop || is_registered_product(app) {
+        return false;
+    }
+    let blank =
+        |value: &Option<String>| value.as_deref().is_none_or(|value| value.trim().is_empty());
+    let stem = Path::new(path)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    (blank(&app.description) && blank(&app.original_filename)) || carries_version_token(stem)
+}
+
+fn carries_version_token(stem: &str) -> bool {
+    let bytes = stem.as_bytes();
+    bytes
+        .windows(3)
+        .any(|window| window[0].is_ascii_digit() && window[1] == b'.' && window[2].is_ascii_digit())
 }
 
 fn is_self_extracting_stub(fields: &MarkerFields) -> bool {
@@ -427,6 +453,92 @@ mod tests {
     }
 
     #[test]
+    fn a_metadata_poor_download_is_an_installer_and_a_described_one_stays_an_app() {
+        let drop = MachineFacts {
+            places: crate::catalog::place::PlaceIndex::from_roots(vec![(
+                std::path::PathBuf::from(r"D:\1MAIN\Downloads"),
+                crate::catalog::place::Place::TransientDrop,
+            )]),
+            registrations: crate::catalog::machine::Registrations::empty(),
+        };
+
+        let bare = candidate("VanyaVPN", r"D:\1MAIN\Downloads\VanyaVPN.exe");
+        assert_eq!(
+            super::super::classify(&bare, None, &drop),
+            ArtifactKind::Installer
+        );
+
+        let mut described = candidate("Portable Tool", r"D:\1MAIN\Downloads\PortableTool.exe");
+        described.description = Some("Portable Tool".into());
+        assert_eq!(
+            super::super::classify(&described, None, &drop),
+            ArtifactKind::Application
+        );
+
+        let mut registered = candidate("Vendor Agent", r"D:\1MAIN\Downloads\agent.exe");
+        registered.source_kind = SourceKind::Registry;
+        registered.can_uninstall = true;
+        assert_eq!(
+            super::super::classify(&registered, None, &drop),
+            ArtifactKind::Application
+        );
+
+        let elsewhere = candidate("VanyaVPN", r"D:\1MAIN\Archive\VanyaVPN.exe");
+        assert_eq!(
+            super::super::classify(&elsewhere, None, &drop),
+            ArtifactKind::Application
+        );
+    }
+
+    #[test]
+    fn a_version_token_is_read_from_ascii_digits_never_from_utf8_bytes() {
+        assert!(super::carries_version_token("Yandex_Music_x64_5.115.3"));
+        assert!(super::carries_version_token("Git-2.47.0-64-bit"));
+        assert!(!super::carries_version_token("Яндекс Музыка"));
+        assert!(!super::carries_version_token("Загрузки"));
+        assert!(!super::carries_version_token("VanyaVPN"));
+        assert!(!super::carries_version_token("Tool_x64"));
+    }
+
+    #[test]
+    fn a_versioned_download_is_an_installer_even_with_the_product_description() {
+        let drop = MachineFacts {
+            places: crate::catalog::place::PlaceIndex::from_roots(vec![(
+                std::path::PathBuf::from(r"D:\1MAIN\Downloads"),
+                crate::catalog::place::Place::TransientDrop,
+            )]),
+            registrations: crate::catalog::machine::Registrations::empty(),
+        };
+
+        let mut download = candidate(
+            "Яндекс Музыка",
+            r"D:\1MAIN\Downloads\Yandex_Music_x64_5.115.3.exe",
+        );
+        download.description = Some("Персональные рекомендации и музыкальные новинки".into());
+        assert_eq!(
+            super::super::classify(&download, None, &drop),
+            ArtifactKind::Installer
+        );
+
+        let mut installed = candidate(
+            "Яндекс Музыка",
+            r"C:\Users\User\AppData\Local\Programs\YandexMusic\Яндекс Музыка.exe",
+        );
+        installed.description = Some("Персональные рекомендации и музыкальные новинки".into());
+        assert_eq!(
+            super::super::classify(&installed, None, &drop),
+            ArtifactKind::Application
+        );
+
+        let mut unversioned = candidate("Portable Tool", r"D:\1MAIN\Downloads\PortableTool.exe");
+        unversioned.description = Some("Portable Tool".into());
+        assert_eq!(
+            super::super::classify(&unversioned, None, &drop),
+            ArtifactKind::Application
+        );
+    }
+
+    #[test]
     fn a_registered_bundle_cache_is_an_installer_without_any_name_evidence() {
         let bundle = r"C:\ProgramData\Package Cache\{5d3c3229}\AacHal.exe";
         let app = candidate("ENE External Device HAL", bundle);
@@ -444,6 +556,33 @@ mod tests {
             super::super::classify(&app, None, &registered),
             ArtifactKind::Installer
         );
+    }
+
+    #[test]
+    fn an_uninstall_shortcut_through_a_generic_engine_is_not_an_installer() {
+        let mut go = start_menu_shortcut(
+            "Uninstall Go",
+            r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Go Programming Language\Uninstall Go.lnk",
+            r"C:\Windows\System32\msiexec.exe",
+        );
+        go.launch_arguments = Some("/x{8C0F4E5D-1B33-4C1B-9E4C-3C1A2F9E77A1}".into());
+        assert_eq!(classify(&go, None), ArtifactKind::Application);
+
+        let mut assistant = start_menu_shortcut(
+            "Удалить Ассистент",
+            r"C:\Menu\Ассистент\Удалить Ассистент.lnk",
+            r"C:\Users\Example\AppData\Local\Assistant\setup.exe",
+        );
+        assistant.launch_arguments = Some("--uninstall --channel=stable".into());
+        assert_eq!(classify(&assistant, None), ArtifactKind::Application);
+
+        let mut update = start_menu_shortcut(
+            "Установить обновление",
+            r"C:\Menu\Ассистент\Установить обновление.lnk",
+            r"C:\Users\Example\AppData\Local\Assistant\setup.exe",
+        );
+        update.launch_arguments = Some("--channel=stable".into());
+        assert_eq!(classify(&update, None), ArtifactKind::Installer);
     }
 
     #[test]

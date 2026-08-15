@@ -1,14 +1,12 @@
 import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { CatalogAppCard } from '../CatalogAppCard/CatalogAppCard'
-import {
-	CategoryNameEditor,
-	DeleteCategoryDialog,
-} from '../../../../features/manage-category'
+import { CategoryNameEditor } from '../../../../features/manage-category'
+import { useProgressiveList } from '../../../../shared/hooks/useProgressiveList'
 import { CollapsiblePanel } from '../../../../shared/ui/CollapsiblePanel'
+import { ConfirmDialog } from '../../../../shared/ui/ConfirmDialog'
 import { CategoryHeader } from './CategoryHeader'
 import type { CategorySectionProps } from './types'
-import { useProgressiveCards } from './useProgressiveCards'
 
 export function CategorySection({
 	category,
@@ -33,7 +31,7 @@ export function CategorySection({
 	const label = definition.label
 	const [editing, setEditing] = useState(false)
 	const [deleting, setDeleting] = useState(false)
-	const cards = useProgressiveCards(apps)
+	const cards = useProgressiveList(apps)
 	return (
 		<section
 			aria-labelledby={`category-${category}`}
@@ -104,8 +102,12 @@ export function CategorySection({
 				</div>
 			</CollapsiblePanel>
 			{deleting && (
-				<DeleteCategoryDialog
-					name={label}
+				<ConfirmDialog
+					label={`Delete ${label} category`}
+					title={`Delete ${label}?`}
+					description="Applications in this category will return to their detected category."
+					confirmLabel="Delete category"
+					closeLabel="Close category deletion"
 					onClose={() => setDeleting(false)}
 					onConfirm={() => {
 						onDeleteCategory(category)

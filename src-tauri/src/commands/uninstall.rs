@@ -63,7 +63,7 @@ pub(crate) async fn uninstall_app(app: tauri::AppHandle, id: String) -> Result<(
         .path()
         .app_data_dir()
         .map_err(|error| AppError::AppDataDir(error.to_string()))?;
-    tauri::async_runtime::spawn_blocking(move || {
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
         execute_and_record(&app_data_dir, record, |target| {
             uninstaller::execute(Some(target))
         })
@@ -73,6 +73,9 @@ pub(crate) async fn uninstall_app(app: tauri::AppHandle, id: String) -> Result<(
         context: "Uninstall launch",
         source: error.to_string(),
     })??;
+    if outcome == uninstaller::UninstallOutcome::Cancelled {
+        return Err(AppError::UninstallCancelled);
+    }
     Ok(())
 }
 

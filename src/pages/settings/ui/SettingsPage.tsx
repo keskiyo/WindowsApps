@@ -8,6 +8,7 @@ import { AdvancedSettings } from './sections/AdvancedSettings'
 import { GeneralSettings } from './sections/GeneralSettings'
 import { PreferencesBackup } from './sections/PreferencesBackup/PreferencesBackup'
 import { SettingsDiscoveryControls } from './sections/SettingsDiscoveryControls'
+import { UnclassifiedApps } from './sections/UnclassifiedApps/UnclassifiedApps'
 import { UninstallHistory } from './sections/UninstallHistory'
 import type { SettingsPageProps } from '../types'
 
@@ -20,6 +21,10 @@ export function SettingsPage({
 	onForceFullScan,
 	onResetCatalogCache,
 	catalogDiagnostics,
+	unclassifiedApps,
+	categories,
+	categoryOrder,
+	onMoveApp,
 	updater: sharedUpdater,
 }: SettingsPageProps) {
 	const {
@@ -111,6 +116,14 @@ export function SettingsPage({
 					/>
 				)}
 				{areaError('maintenance')}
+				{unclassifiedApps && categories && categoryOrder && onMoveApp && (
+					<UnclassifiedApps
+						apps={unclassifiedApps}
+						categories={categories}
+						categoryOrder={categoryOrder}
+						onMoveApp={onMoveApp}
+					/>
+				)}
 				<UninstallHistory client={client} />
 			</AdvancedSettings>
 		</section>

@@ -24,6 +24,7 @@ export type AppErrorCode =
 	| 'APP_DETAILS_UNAVAILABLE'
 	| 'UNINSTALL_DATA_UNAVAILABLE'
 	| 'UNINSTALL_UNAVAILABLE'
+	| 'UNINSTALL_CANCELLED'
 
 interface AppErrorPayload {
 	code: AppErrorCode
@@ -66,6 +67,7 @@ export const APP_ERROR_CODES = {
 	APP_DETAILS_UNAVAILABLE: true,
 	UNINSTALL_DATA_UNAVAILABLE: true,
 	UNINSTALL_UNAVAILABLE: true,
+	UNINSTALL_CANCELLED: true,
 } as const
 
 function isAppErrorCode(value: unknown): value is AppErrorCode {

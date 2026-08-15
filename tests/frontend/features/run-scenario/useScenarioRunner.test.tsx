@@ -5,7 +5,12 @@ import {
 	MAX_SCENARIO_ENTRIES,
 	type Scenario,
 } from '../../../../src/entities/scenario'
-import type { AppInfo, CloseAppsResult } from '../../../../src/entities/app'
+import type {
+	AppInfo,
+	CloseAppsResult,
+	CloseProgress,
+} from '../../../../src/entities/app'
+import type { ScenarioRunSummary } from '../../../../src/features/run-scenario'
 
 function app(id: string): AppInfo {
 	return {
@@ -44,6 +49,10 @@ function setup(options: {
 	scenarios?: Scenario[]
 	launch?: (app: AppInfo) => Promise<void>
 	closeApps?: (ids: string[]) => Promise<CloseAppsResult>
+	onCloseProgress?: (
+		handler: (progress: CloseProgress) => void,
+	) => Promise<() => void>
+	onFinished?: (summary: ScenarioRunSummary) => void
 }) {
 	const launch = vi.fn(options.launch ?? (async () => undefined))
 	const closeApps = vi.fn(
@@ -55,6 +64,8 @@ function setup(options: {
 			scenarios: options.scenarios ?? [],
 			launch,
 			closeApps,
+			onCloseProgress: options.onCloseProgress,
+			onFinished: options.onFinished,
 		}),
 	)
 	return { view, launch, closeApps }
@@ -98,6 +109,113 @@ describe('useScenarioRunner', () => {
 
 		expect(closeApps).toHaveBeenCalledOnce()
 		expect(closeApps).toHaveBeenCalledWith(['chat', 'mail', 'music'])
+	})
+
+	// Every error used to be swallowed: the progress bar reached the end and the user never learned
+	// that half the scenario had not run.
+	it('reports what happened, failures included', async () => {
+		const summaries: ScenarioRunSummary[] = []
+		const { view } = setup({
+			apps: [app('game'), app('chat'), app('mail')],
+			launch: vi.fn(async (entry: AppInfo) => {
+				if (entry.id === 'chat') throw new Error('private failure')
+			}),
+			closeApps: vi.fn(async () => ({
+				closed: 1,
+				notRunning: 0,
+				unavailable: 0,
+				blocked: 0,
+				failed: 0,
+			})),
+			onFinished: summary => summaries.push(summary),
+		})
+
+		await act(async () => {
+			await view.result.current.run(
+				scenario({
+					launchIdentities: ['game', 'chat'],
+					closeIdentities: ['mail'],
+				}),
+			)
+		})
+
+		expect(summaries).toEqual([
+			{
+				scenarioName: 'Gaming',
+				launched: 1,
+				launchFailed: 1,
+				closed: 1,
+				notRunning: 0,
+				blocked: 0,
+				closeFailed: 0,
+				closeUnavailable: false,
+			},
+		])
+	})
+
+	it('records a close request that never answered', async () => {
+		const summaries: ScenarioRunSummary[] = []
+		const { view } = setup({
+			apps: [app('chat')],
+			closeApps: vi.fn(async () => {
+				throw new Error('private failure')
+			}),
+			onFinished: summary => summaries.push(summary),
+		})
+
+		await act(async () => {
+			await view.result.current.run(scenario({ closeIdentities: ['chat'] }))
+		})
+
+		expect(summaries[0].closeUnavailable).toBe(true)
+	})
+
+	// The five second grace period looks like a freeze unless the interface says what it is doing.
+	it('shows the close stage while a close is running and drops it afterwards', async () => {
+		let publish: ((progress: CloseProgress) => void) | undefined
+		const unsubscribe = vi.fn()
+		const { view } = setup({
+			apps: [app('chat')],
+			closeApps: vi.fn(async () => {
+				publish?.({ stage: 'waiting', running: 0, secondsLeft: 3 })
+				return closed(1)
+			}),
+			onCloseProgress: async handler => {
+				publish = handler
+				return unsubscribe
+			},
+		})
+		await waitFor(() => expect(publish).toBeDefined())
+
+		const seen: (string | undefined)[] = []
+		await act(async () => {
+			const running = view.result.current.run(
+				scenario({ closeIdentities: ['chat'] }),
+			)
+			await running
+			seen.push(view.result.current.progress?.detail)
+		})
+
+		expect(view.result.current.progress).toBeNull()
+
+		view.unmount()
+		expect(unsubscribe).toHaveBeenCalled()
+	})
+
+	it('ignores a close stage that arrives outside a run', async () => {
+		let publish: ((progress: CloseProgress) => void) | undefined
+		const { view } = setup({
+			apps: [app('chat')],
+			onCloseProgress: async handler => {
+				publish = handler
+				return () => {}
+			},
+		})
+		await waitFor(() => expect(publish).toBeDefined())
+
+		act(() => publish?.({ stage: 'waiting', running: 0, secondsLeft: 2 }))
+
+		expect(view.result.current.progress).toBeNull()
 	})
 
 	it('asks for no close at all when the list is empty', async () => {

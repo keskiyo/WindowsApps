@@ -1,4 +1,5 @@
 import type { AppInfo } from '../model/app.types'
+import type { CategoryDefinition } from '../../category'
 import {
 	isWithinOneEdit,
 	queryTokenVariants,
@@ -150,6 +151,29 @@ export function rankAppsByQuery(apps: AppInfo[], query: string): AppInfo[] {
 		.filter(entry => entry.score > 0)
 		.sort(compareRanked)
 		.map(entry => entry.app)
+}
+
+export function rankAppsByQueryAndCategory(
+	apps: AppInfo[],
+	query: string,
+	categories: CategoryDefinition[],
+): AppInfo[] {
+	const ranked = rankAppsByQuery(apps, query)
+	const needle = query.trim().toLocaleLowerCase()
+	if (!needle) return ranked
+	const named = new Set(
+		categories
+			.filter(category => category.label.toLocaleLowerCase().includes(needle))
+			.map(category => category.id),
+	)
+	if (named.size === 0) return ranked
+	const alreadyRanked = new Set(ranked.map(app => app.id))
+	return [
+		...ranked,
+		...apps.filter(
+			app => named.has(app.category) && !alreadyRanked.has(app.id),
+		),
+	]
 }
 
 export function rankAppsByQueryTop(

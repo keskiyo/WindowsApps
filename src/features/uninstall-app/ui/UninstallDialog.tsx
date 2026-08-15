@@ -1,8 +1,6 @@
-import { AlertTriangle, Loader2, Trash2, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../../shared/hooks/useFocusTrap'
-import { DANGER_VARIANT } from '../../../shared/ui/buttonVariants'
+import { Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { ConfirmDialog } from '../../../shared/ui/ConfirmDialog'
 import { SOURCE_LABELS } from '../../../entities/app'
 import { METHOD_LABELS } from '../data'
 import type { UninstallDialogProps } from '../types'
@@ -15,19 +13,8 @@ export function UninstallDialog({
 	onClose,
 	onConfirm,
 }: UninstallDialogProps) {
-	useBodyScrollLock()
 	const [pending, setPending] = useState(false)
-	const cancelRef = useRef<HTMLButtonElement>(null)
-	const dialogRef = useRef<HTMLElement>(null)
-	useFocusTrap(dialogRef)
-	useEffect(() => {
-		cancelRef.current?.focus()
-		function keydown(event: KeyboardEvent) {
-			if (event.key === 'Escape' && !pending) onClose()
-		}
-		document.addEventListener('keydown', keydown)
-		return () => document.removeEventListener('keydown', keydown)
-	}, [onClose, pending])
+
 	async function confirm() {
 		if (!preview || previewError || isPreviewLoading) return
 		setPending(true)
@@ -37,95 +24,42 @@ export function UninstallDialog({
 			setPending(false)
 		}
 	}
+
 	return (
-		<div
-			className="motion-overlay fixed inset-0 z-400 grid place-items-center bg-slate-700/38 p-4 backdrop-blur-[2px]"
-			onClick={event => {
-				if (!pending && event.currentTarget === event.target) onClose()
-			}}
+		<ConfirmDialog
+			label={`Uninstall ${appName}`}
+			title={`Uninstall ${appName}?`}
+			description="Review the registered uninstall route before starting. Application files will never be deleted directly."
+			confirmLabel={pending ? 'Starting…' : 'Confirm uninstall'}
+			closeLabel="Close uninstall confirmation"
+			pending={pending}
+			confirmDisabled={isPreviewLoading || !preview || !!previewError}
+			onClose={onClose}
+			onConfirm={() => void confirm()}
 		>
-			<section
-				ref={dialogRef}
-				role="alertdialog"
-				aria-modal="true"
-				aria-label={`Uninstall ${appName}`}
-				className="motion-panel w-full max-w-lg rounded-2xl border border-red-300/55 bg-slate-50 p-5 text-slate-800 shadow-(--shadow-dialog)"
-			>
-				<header className="flex items-start gap-3">
-					<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-red-100 text-red-700">
-						<AlertTriangle size={20} />
-					</span>
-					<div className="flex-1">
-						<h2 className="font-semibold">Uninstall {appName}?</h2>
-						<p className="mt-2 text-sm leading-6 text-slate-600">
-							Review the registered uninstall route before
-							starting. Application files will never be deleted
-							directly.
-						</p>
-					</div>
-					<button
-						type="button"
-						aria-label="Close uninstall confirmation"
-						onClick={onClose}
-						disabled={pending}
-						className="grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-violet-500"
-					>
-						<X size={16} />
-					</button>
-				</header>
-				<div className="mt-5 rounded-xl border border-slate-200 bg-white/65 p-4">
-					{isPreviewLoading ? (
-						<div className="flex items-center gap-2 text-sm text-slate-600">
-							<Loader2
-								size={15}
-								className="animate-spin text-violet-600"
-								aria-hidden="true"
-							/>
-							Loading uninstall details…
-						</div>
-					) : previewError ? (
-						<p role="alert" className="text-sm text-red-700">
-							{previewError}
-						</p>
-					) : preview ? (
-						<div className="space-y-3">
-							<dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-2 text-sm">
-								<dt className="text-slate-500">Publisher</dt>
-								<dd>{preview.publisher ?? 'Unknown'}</dd>
-								<dt className="text-slate-500">Source</dt>
-								<dd>{SOURCE_LABELS[preview.source]}</dd>
-								<dt className="text-slate-500">Method</dt>
-								<dd>{METHOD_LABELS[preview.mechanism]}</dd>
-							</dl>
-						</div>
-					) : null}
+			{isPreviewLoading ? (
+				<div className="flex items-center gap-2 text-sm text-(--text-muted)">
+					<Loader2
+						size={15}
+						className="animate-spin"
+						aria-hidden="true"
+					/>
+					Loading uninstall details…
 				</div>
-				<div className="mt-5 flex justify-end gap-3">
-					<button
-						ref={cancelRef}
-						type="button"
-						disabled={pending}
-						onClick={onClose}
-						className="rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-violet-100/70 focus-visible:outline-2 focus-visible:outline-violet-500"
-					>
-						Cancel
-					</button>
-					<button
-						type="button"
-						disabled={
-							pending ||
-							isPreviewLoading ||
-							!preview ||
-							!!previewError
-						}
-						onClick={() => void confirm()}
-						className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 ${DANGER_VARIANT}`}
-					>
-						<Trash2 size={16} aria-hidden="true" />
-						{pending ? 'Starting…' : 'Confirm uninstall'}
-					</button>
-				</div>
-			</section>
-		</div>
+			) : previewError ? (
+				<p role="alert" className="text-sm text-(--category-red)">
+					{previewError}
+				</p>
+			) : preview ? (
+				<dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-2 text-sm">
+					<dt className="text-(--text-muted)">Publisher</dt>
+					<dd>{preview.publisher ?? 'Unknown'}</dd>
+					<dt className="text-(--text-muted)">Source</dt>
+					<dd>{SOURCE_LABELS[preview.source]}</dd>
+					<dt className="text-(--text-muted)">Method</dt>
+					<dd>{METHOD_LABELS[preview.mechanism]}</dd>
+				</dl>
+			) : null}
+		</ConfirmDialog>
 	)
 }

@@ -16,6 +16,17 @@ const UNIVERSAL_MARKERS: &[(&str, Place)] = &[
     (r"\microsoft\onedrive\", Place::PackageCache),
     (r"\microsoft visual studio\installer\", Place::PackageCache),
     (r"\downloads\", Place::TransientDrop),
+    (r"\загрузки\", Place::TransientDrop),
+    (r"\завантаження\", Place::TransientDrop),
+    (r"\pobrane\", Place::TransientDrop),
+    (r"\descargas\", Place::TransientDrop),
+    (r"\téléchargements\", Place::TransientDrop),
+    (r"\downloaden\", Place::TransientDrop),
+    (r"\scaricati\", Place::TransientDrop),
+    (r"\transferências\", Place::TransientDrop),
+    (r"\indirilenler\", Place::TransientDrop),
+    (r"\stažené soubory\", Place::TransientDrop),
+    (r"\hämtade filer\", Place::TransientDrop),
 ];
 
 impl PlaceIndex {
@@ -85,6 +96,32 @@ mod tests {
                 Place::TransientDrop,
             ),
         ])
+    }
+
+    #[test]
+    fn a_localised_download_folder_name_is_a_transient_drop() {
+        let empty = PlaceIndex::from_roots(Vec::new());
+
+        assert_eq!(
+            empty.classify(r"D:\1MAIN\Загрузки\VanyaVPN.exe"),
+            Place::TransientDrop
+        );
+        assert_eq!(
+            empty.classify(r"C:\Users\Ola\Pobrane\instalator.exe"),
+            Place::TransientDrop
+        );
+        assert_eq!(
+            empty.classify(r"C:\Users\Mehmet\Indirilenler\kurulum.exe"),
+            Place::TransientDrop
+        );
+        assert_eq!(
+            empty.classify(r"C:\Users\Jan\Stažené soubory\instalace.exe"),
+            Place::TransientDrop
+        );
+        assert_eq!(
+            empty.classify(r"D:\1MAIN\Архив\VanyaVPN.exe"),
+            Place::Unknown
+        );
     }
 
     #[test]

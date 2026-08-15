@@ -6,12 +6,13 @@ import {
 	createMarkLookup,
 	filterVisibleApps,
 	isCatalogArtifact,
-	rankAppsByQuery,
+	rankAppsByQueryAndCategory,
 	selectCatalogCounts,
 	selectCategorizedApps,
 	selectRecentApps,
 	selectSearchScopeCounts,
 } from '../../../entities/app'
+import type { CategoryDefinition } from '../../../entities/category'
 import { resolveScenarioApps, type Scenario } from '../../../entities/scenario'
 import { buildMorePreview } from '../lib/morePreview'
 
@@ -22,6 +23,7 @@ const PALETTE_SUGGESTIONS = 12
 
 interface CatalogViewState extends CategorizedAppsState {
 	activeView: AppView
+	categories: CategoryDefinition[]
 	favoriteAppIds: string[]
 	favoriteAppIdentities: string[]
 	firstSeenAt: Record<string, number>
@@ -79,14 +81,14 @@ export function useCatalogView(state: CatalogViewState) {
 			),
 		[categorizedApps, isHidden],
 	)
-	const paletteApps = useMemo(
+	const primaryApps = useMemo(
 		() => catalogApps.filter(app => app.visibilityClass !== 'auxiliary'),
 		[catalogApps],
 	)
 	const paletteSuggestions = useMemo(() => {
 		const favorites = new Set(state.favoriteAppIds)
-		const starred = paletteApps.filter(app => favorites.has(app.id))
-		const rest = paletteApps.filter(app => !favorites.has(app.id))
+		const starred = primaryApps.filter(app => favorites.has(app.id))
+		const rest = primaryApps.filter(app => !favorites.has(app.id))
 		return [
 			...starred,
 			...selectRecentApps(
@@ -95,11 +97,12 @@ export function useCatalogView(state: CatalogViewState) {
 				PALETTE_SUGGESTIONS,
 			),
 		].slice(0, PALETTE_SUGGESTIONS)
-	}, [paletteApps, state.favoriteAppIds, state.firstSeenAt])
+	}, [primaryApps, state.favoriteAppIds, state.firstSeenAt])
 	const deferredQuery = useDeferredValue(state.query)
 	const filteredApps = useMemo(
-		() => rankAppsByQuery(visibleApps, deferredQuery),
-		[visibleApps, deferredQuery],
+		() =>
+			rankAppsByQueryAndCategory(visibleApps, deferredQuery, state.categories),
+		[visibleApps, deferredQuery, state.categories],
 	)
 	const counts = useMemo(
 		() => selectCatalogCounts(categorizedApps, isHidden, isFavorite),
@@ -169,7 +172,7 @@ export function useCatalogView(state: CatalogViewState) {
 		deferredQuery,
 		filteredApps,
 		morePreview,
-		paletteApps,
+		primaryApps,
 		paletteSuggestions,
 		searchScopeCounts,
 		visibleHydrationIds,

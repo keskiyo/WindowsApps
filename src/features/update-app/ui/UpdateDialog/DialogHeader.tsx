@@ -43,7 +43,7 @@ export function DialogHeader({
 				aria-label="Dismiss update"
 				onClick={onDismiss}
 				disabled={installing}
-				className="grid size-9 shrink-0 place-items-center rounded-lg text-slate-300 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-violet-300 disabled:opacity-40"
+				className="grid size-9 shrink-0 place-items-center rounded-lg text-slate-300 hover:bg-(--surface-raised) hover:text-white focus-visible:outline-2 focus-visible:outline-violet-300 disabled:opacity-40"
 			>
 				<X size={17} aria-hidden="true" />
 			</button>

@@ -14,7 +14,6 @@ import {
 } from '../../../entities/scenario'
 
 const MORE_PREVIEW = 3
-const MORE_SCENARIO_PREVIEW = MORE_PREVIEW - 1
 
 export interface MorePreviewItem {
 	app: AppInfo
@@ -70,8 +69,9 @@ export function buildMorePreview({
 		installersDocs: previewItems(
 			selectRecentApps(area('installers_docs'), firstSeen, MORE_PREVIEW),
 		),
-		scenarios: sortScenariosByNewest(
-			scenarios.map(summarizeScenario),
-		).slice(0, MORE_SCENARIO_PREVIEW),
+		scenarios: sortScenariosByNewest(scenarios.map(summarizeScenario)).slice(
+			0,
+			scenarios.length > MORE_PREVIEW ? MORE_PREVIEW - 1 : MORE_PREVIEW,
+		),
 	}
 }

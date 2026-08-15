@@ -2,6 +2,10 @@ import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { toAppClientError } from '../../shared/api/tauri/errors'
 import type { AppInfo } from '../../entities/app'
+import {
+	scenarioRunSummaryMessage,
+	type ScenarioRunSummary,
+} from '../../features/run-scenario'
 
 interface AppFeedbackOptions {
 	onLaunch(app: AppInfo): Promise<void>
@@ -9,7 +13,7 @@ interface AppFeedbackOptions {
 	onUninstall(id: string): Promise<void>
 }
 
-type UninstallResult = { ok: true } | { ok: false }
+export type UninstallOutcome = 'completed' | 'cancelled' | 'failed'
 
 export function useAppFeedback({
 	onLaunch,
@@ -47,18 +51,34 @@ export function useAppFeedback({
 	}, [onRefresh])
 
 	const uninstall = useCallback(
-		async (app: AppInfo): Promise<UninstallResult> => {
+		async (app: AppInfo): Promise<UninstallOutcome> => {
 			try {
 				await onUninstall(app.id)
 				toast.success(`${app.name} uninstalled`)
-				return { ok: true }
-			} catch {
+				return 'completed'
+			} catch (error) {
+				if (toAppClientError(error).code === 'UNINSTALL_CANCELLED') {
+					toast.info(`Uninstall of ${app.name} cancelled`)
+					return 'cancelled'
+				}
 				toast.error(`Could not uninstall ${app.name}`)
-				return { ok: false }
+				return 'failed'
 			}
 		},
 		[onUninstall],
 	)
 
-	return { launch, refresh, uninstall }
+	const reportScenarioRun = useCallback((summary: ScenarioRunSummary) => {
+		const message = scenarioRunSummaryMessage(summary)
+		if (!message) return
+		const failed =
+			summary.launchFailed ||
+			summary.closeFailed ||
+			summary.blocked ||
+			summary.closeUnavailable
+		if (failed) toast.warning(message)
+		else toast.success(message)
+	}, [])
+
+	return { launch, refresh, uninstall, reportScenarioRun }
 }

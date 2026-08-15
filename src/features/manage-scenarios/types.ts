@@ -1,4 +1,5 @@
 import type { AppInfo, CloseRiskBadge } from '../../entities/app'
+import type { CategoryDefinition } from '../../entities/category'
 import type {
 	Scenario,
 	ScenarioList,
@@ -14,9 +15,12 @@ export interface CloseRiskMark {
 
 export interface AppPickerDialogProps {
 	apps: AppInfo[]
-	label: string
+	categories: CategoryDefinition[]
+	list: ScenarioList
+	scenarioName: string
+	noteOf?(app: AppInfo): string | null
 	markOf?(app: AppInfo): CloseRiskMark | null
-	onSelect(app: AppInfo): void
+	onConfirm(apps: AppInfo[]): void
 	onClose(): void
 }
 
@@ -41,6 +45,8 @@ export interface UnavailableScenarioAppTileProps {
 export interface ScenarioCardProps {
 	scenario: Scenario
 	apps: AppInfo[]
+	selectableApps: AppInfo[]
+	categories: CategoryDefinition[]
 	running: boolean
 	isScenarioRunning: boolean
 	runningStatus?: string

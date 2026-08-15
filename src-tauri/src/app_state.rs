@@ -277,10 +277,13 @@ pub(crate) fn preview_for(record: &UninstallRecord) -> UninstallPreview {
 pub(crate) fn execute_and_record(
     app_data_dir: &Path,
     record: UninstallRecord,
-    executor: impl FnOnce(UninstallTarget) -> Result<(), String>,
-) -> Result<(), String> {
+    executor: impl FnOnce(UninstallTarget) -> Result<uninstaller::UninstallOutcome, String>,
+) -> Result<uninstaller::UninstallOutcome, String> {
     let preview = uninstaller::preview(&record.target);
     let result = executor(record.target);
+    if result == Ok(uninstaller::UninstallOutcome::Cancelled) {
+        return result;
+    }
     let history_result = if result.is_ok() {
         uninstall_history::UninstallResult::Succeeded
     } else {
@@ -542,7 +545,10 @@ mod tests {
     #[test]
     fn records_successful_uninstall_without_command_details() {
         let dir = tempfile::tempdir().unwrap();
-        execute_and_record(dir.path(), uninstall_record("Editor"), |_| Ok(())).unwrap();
+        execute_and_record(dir.path(), uninstall_record("Editor"), |_| {
+            Ok(uninstaller::UninstallOutcome::Completed)
+        })
+        .unwrap();
 
         let history = uninstall_history::read(dir.path());
         assert_eq!(history.len(), 1);
@@ -564,6 +570,20 @@ mod tests {
         assert_eq!(serialized.get("command"), None);
         assert_eq!(serialized.get("path"), None);
         assert_eq!(serialized["mechanism"], "registered_command");
+    }
+
+    // A wizard the user closed did nothing, so the history must not claim an attempt failed.
+    #[test]
+    fn a_cancelled_uninstall_is_not_written_to_history() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let outcome = execute_and_record(dir.path(), uninstall_record("Editor"), |_| {
+            Ok(uninstaller::UninstallOutcome::Cancelled)
+        })
+        .unwrap();
+
+        assert_eq!(outcome, uninstaller::UninstallOutcome::Cancelled);
+        assert!(uninstall_history::read(dir.path()).is_empty());
     }
 
     #[test]

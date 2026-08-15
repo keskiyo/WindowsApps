@@ -1,23 +1,22 @@
-import { useCallback, useRef, useState } from 'react'
-import type { AppInfo, CloseAppsResult } from '../../../entities/app'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { AppInfo, CloseAppsResult, CloseProgress } from '../../../entities/app'
 import {
 	MAX_SCENARIO_ENTRIES,
 	resolveScenarioApps,
 	type Scenario,
 } from '../../../entities/scenario'
-import { toAppClientError } from '../../../shared/api/tauri/errors'
-
-export interface ScenarioRunProgress {
-	phase: 'launching' | 'closing'
-	completed: number
-	total: number
-}
+import { closeStageLabel } from '../lib/closeStageLabel'
+import type { ScenarioRunProgress, ScenarioRunSummary } from '../types'
 
 interface RunnerOptions {
 	apps: AppInfo[]
 	scenarios: Scenario[]
 	launch(app: AppInfo): Promise<void>
 	closeApps(ids: string[]): Promise<CloseAppsResult>
+	onCloseProgress?(
+		handler: (progress: CloseProgress) => void,
+	): Promise<() => void>
+	onFinished?(summary: ScenarioRunSummary): void
 }
 
 export function useScenarioRunner({
@@ -25,10 +24,35 @@ export function useScenarioRunner({
 	scenarios,
 	launch,
 	closeApps,
+	onCloseProgress,
+	onFinished,
 }: RunnerOptions) {
 	const [runningId, setRunningId] = useState<string | null>(null)
 	const [progress, setProgress] = useState<ScenarioRunProgress | null>(null)
 	const activeRef = useRef(false)
+
+	useEffect(() => {
+		if (!onCloseProgress) return
+		let active = true
+		let stop: (() => void) | undefined
+		void onCloseProgress(stage => {
+			if (!active || !activeRef.current) return
+			setProgress(current =>
+				current?.phase === 'closing'
+					? { ...current, detail: closeStageLabel(stage) }
+					: current,
+			)
+		})
+			.then(unsubscribe => {
+				if (active) stop = unsubscribe
+				else unsubscribe()
+			})
+			.catch(() => {})
+		return () => {
+			active = false
+			stop?.()
+		}
+	}, [onCloseProgress])
 
 	const run = useCallback(
 		async (scenario: Scenario) => {
@@ -43,6 +67,16 @@ export function useScenarioRunner({
 				scenario.closeIdentities.slice(0, MAX_SCENARIO_ENTRIES),
 				apps,
 			)
+			const summary: ScenarioRunSummary = {
+				scenarioName: scenario.name,
+				launched: 0,
+				launchFailed: 0,
+				closed: 0,
+				notRunning: 0,
+				blocked: 0,
+				closeFailed: 0,
+				closeUnavailable: false,
+			}
 			setProgress({
 				phase: 'launching',
 				completed: 0,
@@ -52,8 +86,9 @@ export function useScenarioRunner({
 				for (const [index, app] of toLaunch.apps.entries()) {
 					try {
 						await launch(app)
-					} catch (error) {
-						void toAppClientError(error)
+						summary.launched += 1
+					} catch {
+						summary.launchFailed += 1
 					}
 					setProgress({
 						phase: 'launching',
@@ -68,9 +103,15 @@ export function useScenarioRunner({
 						total: toClose.apps.length,
 					})
 					try {
-						await closeApps(toClose.apps.map(app => app.id))
-					} catch (error) {
-						void toAppClientError(error)
+						const result = await closeApps(
+							toClose.apps.map(app => app.id),
+						)
+						summary.closed = result.closed
+						summary.notRunning = result.notRunning
+						summary.blocked = result.blocked ?? 0
+						summary.closeFailed = result.failed
+					} catch {
+						summary.closeUnavailable = true
 					}
 					setProgress({
 						phase: 'closing',
@@ -82,9 +123,10 @@ export function useScenarioRunner({
 				activeRef.current = false
 				setRunningId(null)
 				setProgress(null)
+				onFinished?.(summary)
 			}
 		},
-		[apps, closeApps, launch],
+		[apps, closeApps, launch, onFinished],
 	)
 
 	const runById = useCallback(

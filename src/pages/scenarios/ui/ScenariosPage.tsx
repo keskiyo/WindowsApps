@@ -11,6 +11,8 @@ import type { ScenariosPageProps } from './types'
 export function ScenariosPage({
 	scenarios,
 	apps,
+	selectableApps,
+	categories,
 	runningId,
 	isScenarioRunning,
 	runProgress,
@@ -27,7 +29,12 @@ export function ScenariosPage({
 	const [creating, setCreating] = useState(false)
 	const newestFirst = sortScenariosByNewest(scenarios)
 	const runningStatus = runProgress
-		? `${runProgress.phase === 'launching' ? 'Launching' : 'Closing'} ${runProgress.completed}/${runProgress.total}`
+		? [
+				`${runProgress.phase === 'launching' ? 'Launching' : 'Closing'} ${runProgress.completed}/${runProgress.total}`,
+				runProgress.detail,
+			]
+				.filter(Boolean)
+				.join(' · ')
 		: undefined
 
 	return (
@@ -77,6 +84,8 @@ export function ScenariosPage({
 							key={scenario.id}
 							scenario={scenario}
 							apps={apps}
+							selectableApps={selectableApps}
+							categories={categories}
 							running={runningId === scenario.id}
 							isScenarioRunning={isScenarioRunning}
 							runningStatus={

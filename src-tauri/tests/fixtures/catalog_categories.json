@@ -505,5 +505,438 @@
 		"name": "Realtek Digital Output",
 		"path": "C:\\Realtek\\rtk.exe",
 		"expected": "other"
+	},
+
+	{
+		"name": "VanyaVPN",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\VanyaVPN.lnk",
+		"resolvedPath": "C:\\Program Files (x86)\\VanyaVPN\\VanyaVPN.exe",
+		"installLocation": "C:\\Program Files (x86)\\VanyaVPN",
+		"publisher": "GitHub, Inc.",
+		"productName": "VanyaVPN",
+		"expected": "security"
+	},
+	{
+		"name": "Electron Notes",
+		"path": "C:\\Users\\User\\AppData\\Local\\Programs\\ElectronNotes\\ElectronNotes.exe",
+		"publisher": "GitHub, Inc.",
+		"productName": "Electron Notes",
+		"expected": "other"
+	},
+	{
+		"name": "GitHub Desktop",
+		"path": "C:\\Users\\User\\AppData\\Local\\GitHubDesktop\\GitHubDesktop.exe",
+		"publisher": "GitHub, Inc.",
+		"productName": "GitHub Desktop",
+		"expected": "development"
+	},
+	{
+		"name": "Яндекс Музыка",
+		"path": "C:\\Users\\User\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Яндекс Музыка.lnk",
+		"resolvedPath": "C:\\Users\\User\\AppData\\Local\\Programs\\YandexMusic\\Яндекс Музыка.exe",
+		"installLocation": "C:\\Users\\User\\AppData\\Local\\Programs\\YandexMusic",
+		"publisher": "Яндекс Музыка",
+		"productName": "Яндекс Музыка",
+		"description": "Персональные рекомендации, подборки на любой случай и музыкальные новинки",
+		"expected": "media"
+	},
+	{
+		"name": "VK Музыка",
+		"path": "C:\\Users\\User\\AppData\\Local\\Programs\\VKMusic\\VKMusic.exe",
+		"productName": "VK Музыка",
+		"expected": "media"
+	},
+	{
+		"name": "NVIDIA App",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\NVIDIA Corporation\\NVIDIA App.lnk",
+		"resolvedPath": "C:\\Program Files\\NVIDIA Corporation\\NVIDIA App\\CEF\\NVIDIA App.exe",
+		"publisher": "NVIDIA Corporation",
+		"productName": "NVIDIA App",
+		"expected": "utilities"
+	},
+	{
+		"name": "NVIDIA Broadcast",
+		"path": "C:\\Program Files\\NVIDIA Corporation\\NVIDIA Broadcast\\NVIDIA Broadcast.exe",
+		"publisher": "NVIDIA Corporation",
+		"productName": "NVIDIA Broadcast",
+		"expected": "media"
+	},
+	{
+		"name": "NVIDIA Control Panel",
+		"path": "C:\\Program Files\\NVIDIA Corporation\\Control Panel Client\\nvcplui.exe",
+		"publisher": "NVIDIA Corporation",
+		"expected": "utilities"
+	},
+	{
+		"name": "Adobe Reader",
+		"path": "C:\\Program Files\\Adobe\\Reader\\AcroRd32.exe",
+		"publisher": "Adobe Inc.",
+		"productName": "Adobe Reader",
+		"expected": "productivity"
+	},
+	{
+		"name": "Adobe Photoshop",
+		"path": "C:\\Program Files\\Adobe\\Adobe Photoshop\\Photoshop.exe",
+		"publisher": "Adobe Inc.",
+		"productName": "Adobe Photoshop",
+		"expected": "editors"
+	},
+
+	{
+		"name": "Magnifier",
+		"path": "C:\\Menu\\Magnifier.lnk",
+		"resolvedPath": "C:\\Windows\\System32\\accessibility-host.exe",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Экранная лупа",
+		"path": "C:\\Menu\\Экранная лупа.lnk",
+		"resolvedPath": "C:\\Windows\\System32\\accessibility-host.exe",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Screen Sketch",
+		"path": "Microsoft.ScreenSketch_8wekyb3d8bbwe!App",
+		"source": "start_apps",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Windows Calculator",
+		"path": "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
+		"source": "start_apps",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Snip and capture",
+		"path": "C:\\Windows\\System32\\SnippingTool.exe",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Remote session",
+		"path": "C:\\Windows\\System32\\mstsc.exe",
+		"expected": "windows_features"
+	},
+
+	{
+		"name": "Realtek Audio Console",
+		"path": "C:\\Program Files\\WindowsApps\\RealtekSemiconductorCorp.RealtekAudioControl\\RtkUWP.exe",
+		"publisher": "Realtek Semiconductor Corp.",
+		"expected": "utilities"
+	},
+	{
+		"name": "Logitech Options Calculator Widget",
+		"path": "C:\\Program Files\\Logitech\\Options\\widgets\\calculator\\widget.exe",
+		"publisher": "Logitech",
+		"expected": "utilities"
+	},
+	{
+		"name": "Notepad++",
+		"path": "C:\\Program Files\\Notepad++\\notepad++.exe",
+		"publisher": "Notepad++ Team",
+		"expected": "development"
+	},
+
+	{
+		"name": "Яндекс Браузер",
+		"path": "C:\\Users\\User\\AppData\\Local\\Yandex\\YandexBrowser\\Application\\browser.exe",
+		"expected": "browsers"
+	},
+	{
+		"name": "Яндекс Диск",
+		"path": "C:\\Users\\User\\AppData\\Local\\Yandex\\YandexDisk\\YandexDisk.exe",
+		"expected": "file_cloud"
+	},
+	{
+		"name": "Почта Mail.ru",
+		"path": "C:\\Users\\User\\AppData\\Local\\Mail.Ru\\Agent\\agent.exe",
+		"expected": "communication"
+	},
+	{
+		"name": "Мой Офис Документы",
+		"path": "C:\\Program Files\\MyOffice\\Documents\\myoffice.exe",
+		"expected": "productivity"
+	},
+	{
+		"name": "Кинопоиск",
+		"path": "C:\\Users\\User\\AppData\\Local\\Programs\\Kinopoisk\\kinopoisk.exe",
+		"expected": "other"
+	},
+	{
+		"name": "Домашнее видео",
+		"path": "C:\\Users\\User\\Videos\\player.exe",
+		"expected": "media"
+	},
+	{
+		"name": "Защитник Windows",
+		"path": "C:\\Program Files\\Windows Defender\\MSASCui.exe",
+		"expected": "security"
+	},
+
+	{
+		"name": "Диспетчер задач",
+		"path": "C:\\Windows\\System32\\Taskmgr.exe",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Фотографии",
+		"path": "Microsoft.Windows.Photos_8wekyb3d8bbwe!App",
+		"source": "start_apps",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Видеоредактор Movavi",
+		"path": "C:\\Program Files\\Movavi Video Editor\\VideoEditor.exe",
+		"publisher": "Movavi",
+		"expected": "editors"
+	},
+	{
+		"name": "VMware Workstation Player",
+		"path": "C:\\Program Files (x86)\\VMware\\VMware Player\\vmplayer.exe",
+		"publisher": "VMware, Inc.",
+		"expected": "system"
+	},
+	{
+		"name": "Acronis True Image",
+		"path": "C:\\Program Files\\Acronis\\TrueImageHome\\TrueImage.exe",
+		"publisher": "Acronis International GmbH",
+		"expected": "system"
+	},
+	{
+		"name": "MiniTool Partition Wizard",
+		"path": "C:\\Program Files\\MiniTool Partition Wizard\\partitionwizard.exe",
+		"publisher": "MiniTool Software Limited",
+		"expected": "system"
+	},
+	{
+		"name": "Среда разработки IDLE",
+		"path": "C:\\Python314\\Lib\\idlelib\\idle.exe",
+		"expected": "development"
+	},
+	{
+		"name": "Архиватор 7-Zip",
+		"path": "C:\\Program Files\\7-Zip\\7zFM.exe",
+		"expected": "file_cloud"
+	},
+	{
+		"name": "Мой ассистент ИИ",
+		"path": "C:\\Program Files\\Assistant\\assistant.exe",
+		"expected": "ai"
+	},
+	{
+		"name": "Windows PowerShell (x86)",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Windows PowerShell\\Windows PowerShell (x86).lnk",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Источники данных ODBC (64-разрядная версия)",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Tools\\ODBC.lnk",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Оптимизация дисков",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Tools\\Defrag.lnk",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Голосовой доступ",
+		"path": "MicrosoftWindows.Client.CBS_cw5n1h2txyewy!VoiceAccess",
+		"source": "start_apps",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Начало работы",
+		"path": "MicrosoftCorporationII.Windows.Get.Started_8wekyb3d8bbwe!App",
+		"source": "start_apps",
+		"expected": "windows_features"
+	},
+	{
+		"name": "µTorrent",
+		"path": "C:\\Users\\User\\AppData\\Roaming\\µTorrent\\µTorrent.exe",
+		"expected": "file_cloud"
+	},
+	{
+		"name": "Hard Disk Sentinel",
+		"path": "C:\\Program Files (x86)\\Hard Disk Sentinel\\HDSentinel.exe",
+		"expected": "utilities"
+	},
+	{
+		"name": "HDSentinelTray",
+		"path": "C:\\Program Files (x86)\\Hard Disk Sentinel\\HDSentinelTray.exe",
+		"expected": "utilities"
+	},
+	{
+		"name": "Hard Disk Low Level Format Tool",
+		"path": "C:\\Program Files\\HDDLLF\\HDDLLF.4.40.exe",
+		"expected": "utilities"
+	},
+	{
+		"name": "CrystalDiskInfo",
+		"path": "C:\\Program Files\\CrystalDiskInfo\\DiskInfo64.exe",
+		"expected": "utilities"
+	},
+	{
+		"name": "W10Privacy",
+		"path": "D:\\Portable\\W10Privacy\\W10Privacy.exe",
+		"expected": "security"
+	},
+	{
+		"name": "O&O ShutUp10++",
+		"path": "D:\\Portable\\OOSU10.exe",
+		"expected": "security"
+	},
+	{
+		"name": "Dev Home",
+		"path": "Microsoft.Windows.DevHome_8wekyb3d8bbwe!App",
+		"source": "start_apps",
+		"expected": "development"
+	},
+	{
+		"name": "WSL Settings",
+		"path": "C:\\Program Files\\WSL\\wslsettings\\WslSettings.exe",
+		"expected": "development"
+	},
+	{
+		"name": "SQL Shell (psql)",
+		"path": "D:\\Tools\\SQL Shell (psql).lnk",
+		"expected": "development"
+	},
+	{
+		"name": "Windows App Certification Kit",
+		"path": "C:\\Program Files (x86)\\Windows Kits\\10\\App Certification Kit\\appcert.exe",
+		"expected": "development"
+	},
+	{
+		"name": "Revo Uninstaller Pro (x64)",
+		"path": "C:\\Program Files\\VS Revo Group\\Revo Uninstaller Pro\\RevoUninPro.exe",
+		"publisher": "VS Revo Group",
+		"expected": "utilities"
+	},
+	{
+		"name": "Windows Software Development Kit",
+		"path": "Microsoft.AutoGenerated.{3B6E7DF3-19A3-70DB-96F6-86E65A17E61C}",
+		"source": "start_apps",
+		"resolvedPath": "C:\\Windows\\explorer.exe",
+		"installLocation": "C:\\Windows",
+		"publisher": "Microsoft Corporation",
+		"description": "Проводник",
+		"productName": "Операционная система Microsoft® Windows®",
+		"expected": "other"
+	},
+	{
+		"name": "Проводник",
+		"path": "::{52205FD8-5DFB-447D-801A-D0B52F2E83E1}",
+		"source": "start_apps",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Автоматические субтитры",
+		"path": "MicrosoftWindows.Client.CBS_cw5n1h2txyewy!LiveCaptions",
+		"source": "start_apps",
+		"resolvedPath": "C:\\Windows\\System32\\LiveCaptions.exe",
+		"expected": "windows_features"
+	},
+	{
+		"name": "Действие щелчком",
+		"path": "MicrosoftWindows.Client.CBS_cw5n1h2txyewy!ClickToDo",
+		"source": "start_apps",
+		"resolvedPath": "C:\\Windows\\System32\\ClickToDo.exe",
+		"expected": "windows_features"
+	},
+	{
+		"name": "The curl executable",
+		"path": "C:\\Program Files\\Git\\mingw64\\bin\\curl.exe",
+		"publisher": "curl, https://curl.se/",
+		"expected": "development"
+	},
+	{
+		"name": "The OpenSSL Toolkit",
+		"path": "C:\\Program Files\\Git\\usr\\bin\\openssl.exe",
+		"publisher": "The OpenSSL Project, https://www.openssl.org/",
+		"expected": "development"
+	},
+	{
+		"name": "Rust Compiler",
+		"path": "C:\\Users\\User\\.cargo\\bin\\rustc.exe",
+		"expected": "development"
+	},
+	{
+		"name": "Developer Command Prompt for VS 2019",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Visual Studio 2019\\Developer Command Prompt.lnk",
+		"expected": "development"
+	},
+	{
+		"name": "RTSSSharedMemorySample Application",
+		"path": "C:\\Program Files (x86)\\RivaTuner Statistics Server\\SDK\\RTSSSharedMemorySample.exe",
+		"expected": "utilities"
+	},
+	{
+		"name": "Shared memory data provider for PresentMon API",
+		"path": "C:\\Program Files (x86)\\RivaTuner Statistics Server\\PresentMonDataProvider.exe",
+		"expected": "utilities"
+	},
+	{
+		"name": "AULA F75",
+		"path": "C:\\Program Files (x86)\\AULA F75\\OemDrv.exe",
+		"publisher": "AULA",
+		"expected": "utilities"
+	},
+	{
+		"name": "Устройства Apple",
+		"path": "AppleInc.AppleDevices_nzyj5cx40ttqa!App",
+		"source": "start_apps",
+		"expected": "utilities"
+	},
+	{
+		"name": "Power Automate",
+		"path": "C:\\Program Files (x86)\\Power Automate Desktop\\PAD.Console.Host.exe",
+		"publisher": "Microsoft",
+		"expected": "productivity"
+	},
+	{
+		"name": "Zvuk Pro",
+		"path": "C:\\Program Files\\Neizvestny\\zvukpro.exe",
+		"description": "Музыкальный проигрыватель",
+		"expected": "media"
+	},
+	{
+		"name": "Kraft",
+		"path": "C:\\Program Files\\Kraft\\kraft.exe",
+		"productName": "Graphics editor",
+		"expected": "editors"
+	},
+	{
+		"name": "Nyx",
+		"path": "D:\\Portable\\nyx.exe",
+		"description": "Terminal emulator for Windows",
+		"expected": "development"
+	},
+	{
+		"name": "Fenix",
+		"path": "D:\\Portable\\fenix.exe",
+		"description": "Web browser",
+		"expected": "browsers"
+	},
+	{
+		"name": "Torrenta",
+		"path": "D:\\Portable\\torrenta.exe",
+		"description": "Torrent client",
+		"expected": "file_cloud"
+	},
+	{
+		"name": "Skrepka",
+		"path": "D:\\Portable\\skrepka.exe",
+		"description": "Менеджер паролей",
+		"expected": "security"
+	},
+	{
+		"name": "Puzzle Quest",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Игры\\Puzzle Quest.lnk",
+		"expected": "games"
+	},
+	{
+		"name": "Kodi",
+		"path": "D:\\Portable\\app.exe",
+		"description": "Password manager",
+		"expected": "media"
 	}
 ]

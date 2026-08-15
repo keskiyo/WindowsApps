@@ -1,5 +1,37 @@
 use super::place::{normalized_path, PlaceIndex};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+
+pub(in crate::catalog) struct Associations {
+    by_executable: HashMap<String, Vec<String>>,
+}
+
+impl Associations {
+    pub(in crate::catalog) fn current() -> Self {
+        Self::from_pairs(crate::platform::windows::associations::registered_associations())
+    }
+
+    pub(in crate::catalog) fn from_pairs(pairs: Vec<(String, Vec<String>)>) -> Self {
+        Self {
+            by_executable: pairs
+                .into_iter()
+                .map(|(executable, tokens)| (executable.to_lowercase(), tokens))
+                .collect(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(in crate::catalog) fn empty() -> Self {
+        Self {
+            by_executable: HashMap::new(),
+        }
+    }
+
+    pub(in crate::catalog) fn of(&self, executable_stem: &str) -> &[String] {
+        self.by_executable
+            .get(executable_stem)
+            .map_or(&[], Vec::as_slice)
+    }
+}
 
 pub(in crate::catalog) struct Registrations {
     launchable: HashSet<String>,

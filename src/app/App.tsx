@@ -16,6 +16,7 @@ import { MorePage } from '../pages/more'
 import { ScenariosPage } from '../pages/scenarios'
 import { SettingsPage } from '../pages/settings'
 import { useScenarioRunner } from '../features/run-scenario'
+
 import { filterFavoriteScenarios } from '../entities/scenario'
 import { AppShellChrome } from './layout/AppShellChrome'
 import { Header } from '../widgets/app-header'
@@ -26,7 +27,11 @@ import { AppDialogs } from './layout/AppDialogs'
 import { useCatalogBootstrap } from './model/useCatalogBootstrap'
 import { useDrawer } from './model/useDrawer'
 
-import { INSTALLERS_DOCS_CATEGORY, useIconRecovery } from '../entities/app'
+import {
+	INSTALLERS_DOCS_CATEGORY,
+	selectUnclassifiedApps,
+	useIconRecovery,
+} from '../entities/app'
 import { useGlobalShortcuts } from './model/useGlobalShortcuts'
 import { useStaleCopy } from '../features/stale-copy'
 import { useUpdater } from '../features/update-app'
@@ -53,11 +58,15 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		deferredQuery,
 		filteredApps,
 		morePreview,
-		paletteApps,
+		primaryApps,
 		paletteSuggestions,
 		searchScopeCounts,
 		visibleHydrationIds,
 	} = useCatalogView(state)
+	const unclassifiedApps = useMemo(
+		() => selectUnclassifiedApps(primaryApps),
+		[primaryApps],
+	)
 	const desktopNavigation = useDesktopNavigation()
 	const drawer = useDrawer(desktopNavigation)
 	const [scanPromptDismissed, setScanPromptDismissed] = useState(false)
@@ -100,9 +109,10 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 	})
 	async function confirmUninstall() {
 		if (!dialogs.uninstall.app) return
-		const result = await feedback.uninstall(dialogs.uninstall.app)
-		if (!result.ok) return
+		const outcome = await feedback.uninstall(dialogs.uninstall.app)
+		if (outcome === 'failed') return
 		dialogs.uninstall.select(null)
+		if (outcome === 'cancelled') return
 		try {
 			await state.refresh()
 		} catch (ignored) {
@@ -152,6 +162,8 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		scenarios: state.scenarios,
 		launch: state.launch,
 		closeApps: state.closeApps,
+		onCloseProgress: appsClient.onCloseProgress,
+		onFinished: feedback.reportScenarioRun,
 	})
 
 	const {
@@ -224,7 +236,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 							showMenu={!desktopNavigation}
 						/>
 						<main
-							className={`mx-auto w-full max-w-375 pt-7 pb-12 ${isCatalogView ? 'px-2' : 'px-5 sm:px-8'}`}
+							className="mx-auto w-full max-w-375 px-5 pt-7 pb-12 sm:px-8"
 						>
 							{state.activeView === 'more' && (
 								<MorePage
@@ -252,6 +264,8 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 								<ScenariosPage
 									scenarios={state.scenarios}
 									apps={catalogApps}
+									selectableApps={primaryApps}
+									categories={state.categories}
 									runningId={scenarioRunner.runningId}
 									isScenarioRunning={scenarioRunner.isRunning}
 									runProgress={scenarioRunner.progress}
@@ -288,6 +302,10 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 									catalogDiagnostics={
 										state.catalogDiagnostics
 									}
+									unclassifiedApps={unclassifiedApps}
+									categories={state.categories}
+									categoryOrder={state.categoryOrder}
+									onMoveApp={state.moveApp}
 									updater={updater}
 								/>
 							)}
@@ -375,7 +393,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 					appsClient={appsClient}
 					categories={state.categories}
 					dialogs={dialogs}
-					paletteApps={paletteApps}
+					paletteApps={primaryApps}
 					paletteSuggestions={paletteSuggestions}
 					onConfirmUninstall={confirmUninstall}
 					onError={dialogs.reportFailure}

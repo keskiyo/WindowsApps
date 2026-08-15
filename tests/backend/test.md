@@ -4,11 +4,11 @@ The Rust backend has no external integration-test crate. Tests live next to the
 modules they exercise in `#[cfg(test)]` blocks so they can validate private and
 `pub(crate)` behaviour without widening production APIs.
 
-Snapshot: `v0.3.5`.
+Snapshot: `v0.3.6`.
 
-- Rust: **580 test entries** in **74 source files**; one developer-only timing
-  test is ignored in the normal run, so a green suite reports 579 passed.
-- Frontend: **549 Vitest tests** in **74 files**; it is documented here only to
+- Rust: **607 test entries** in **77 source files**; one developer-only timing
+  test is ignored in the normal run, so a green suite reports 606 passed.
+- Frontend: **600 Vitest tests** in **79 files**; it is documented here only to
   distinguish the two suites.
 - Backend tests must be deterministic. Filesystem/cache tests use
   `tempfile::tempdir()` and never inspect real user directories, registry data,
@@ -42,22 +42,24 @@ document written by a newer schema version.
 | Module                                                                                           |     Tests |
 | ------------------------------------------------------------------------------------------------ | --------: |
 | [`catalog/mod.rs`](../../src-tauri/src/catalog/mod.rs)                                           |        64 |
-| [`catalog/artifact/documentation.rs`](../../src-tauri/src/catalog/artifact/documentation.rs)     |         6 |
-| [`catalog/artifact/installer.rs`](../../src-tauri/src/catalog/artifact/installer.rs)             |        14 |
-| [`catalog/classify/mod.rs`](../../src-tauri/src/catalog/classify/mod.rs)                         |         7 |
+| [`catalog/artifact/documentation.rs`](../../src-tauri/src/catalog/artifact/documentation.rs)     |         7 |
+| [`catalog/artifact/installer.rs`](../../src-tauri/src/catalog/artifact/installer.rs)             |        18 |
+| [`catalog/classify/mod.rs`](../../src-tauri/src/catalog/classify/mod.rs)                         |        15 |
+| [`catalog/classify/tables.rs`](../../src-tauri/src/catalog/classify/tables.rs)                   |         5 |
 | [`catalog/close.rs`](../../src-tauri/src/catalog/close.rs)                                       |         6 |
 | [`catalog/dedup/merge.rs`](../../src-tauri/src/catalog/dedup/merge.rs)                           |         4 |
 | [`catalog/dedup/mod.rs`](../../src-tauri/src/catalog/dedup/mod.rs)                               |        72 |
 | [`catalog/details/cache.rs`](../../src-tauri/src/catalog/details/cache.rs)                       |         1 |
 | [`catalog/details/read.rs`](../../src-tauri/src/catalog/details/read.rs)                         |         4 |
 | [`catalog/details/target.rs`](../../src-tauri/src/catalog/details/target.rs)                     |         6 |
+| [`catalog/filters.rs`](../../src-tauri/src/catalog/filters.rs)                                   |         2 |
 | [`catalog/golden/mod.rs`](../../src-tauri/src/catalog/golden/mod.rs)                             |         5 |
 | [`catalog/golden/properties.rs`](../../src-tauri/src/catalog/golden/properties.rs)               |         7 |
 | [`catalog/golden/timings.rs`](../../src-tauri/src/catalog/golden/timings.rs)                     | 1 ignored |
 | [`catalog/identity.rs`](../../src-tauri/src/catalog/identity.rs)                                 |         4 |
 | [`catalog/machine.rs`](../../src-tauri/src/catalog/machine.rs)                                   |         2 |
 | [`catalog/model.rs`](../../src-tauri/src/catalog/model.rs)                                       |         1 |
-| [`catalog/place.rs`](../../src-tauri/src/catalog/place.rs)                                       |         3 |
+| [`catalog/place.rs`](../../src-tauri/src/catalog/place.rs)                                       |         4 |
 | [`catalog/scan/coordinator.rs`](../../src-tauri/src/catalog/scan/coordinator.rs)                 |         5 |
 | [`catalog/scan/hydration.rs`](../../src-tauri/src/catalog/scan/hydration.rs)                     |         7 |
 | [`catalog/scan/incremental.rs`](../../src-tauri/src/catalog/scan/incremental.rs)                 |        15 |
@@ -100,7 +102,7 @@ uninstall and watcher lifecycle.
 | [`platform/windows/drives.rs`](../../src-tauri/src/platform/windows/drives.rs)                                               |     2 |
 | [`platform/windows/execution/closer/frames.rs`](../../src-tauri/src/platform/windows/execution/closer/frames.rs)             |     2 |
 | [`platform/windows/execution/closer/identity.rs`](../../src-tauri/src/platform/windows/execution/closer/identity.rs)         |    14 |
-| [`platform/windows/execution/closer/mod.rs`](../../src-tauri/src/platform/windows/execution/closer/mod.rs)                   |    10 |
+| [`platform/windows/execution/closer/mod.rs`](../../src-tauri/src/platform/windows/execution/closer/mod.rs)                   |    11 |
 | [`platform/windows/execution/closer/processes.rs`](../../src-tauri/src/platform/windows/execution/closer/processes.rs)       |     1 |
 | [`platform/windows/execution/exec_target.rs`](../../src-tauri/src/platform/windows/execution/exec_target.rs)                 |     6 |
 | [`platform/windows/execution/executable_metadata.rs`](../../src-tauri/src/platform/windows/execution/executable_metadata.rs) |     7 |
@@ -117,7 +119,7 @@ uninstall and watcher lifecycle.
 | [`platform/windows/registry/uninstall_registry.rs`](../../src-tauri/src/platform/windows/registry/uninstall_registry.rs)     |     2 |
 | [`platform/windows/shortcuts/global_shortcut.rs`](../../src-tauri/src/platform/windows/shortcuts/global_shortcut.rs)         |     3 |
 | [`platform/windows/uninstall/uninstall_history.rs`](../../src-tauri/src/platform/windows/uninstall/uninstall_history.rs)     |     3 |
-| [`platform/windows/uninstall/uninstaller.rs`](../../src-tauri/src/platform/windows/uninstall/uninstaller.rs)                 |    17 |
+| [`platform/windows/uninstall/uninstaller.rs`](../../src-tauri/src/platform/windows/uninstall/uninstaller.rs)                 |    18 |
 
 ## Core, IPC and lifecycle
 
@@ -129,7 +131,7 @@ argument is required.
 
 | Module                                                                   | Tests |
 | ------------------------------------------------------------------------ | ----: |
-| [`app_state.rs`](../../src-tauri/src/app_state.rs)                       |    11 |
+| [`app_state.rs`](../../src-tauri/src/app_state.rs)                       |    12 |
 | [`commands/catalog.rs`](../../src-tauri/src/commands/catalog.rs)         |     5 |
 | [`commands/close.rs`](../../src-tauri/src/commands/close.rs)             |     6 |
 | [`commands/details.rs`](../../src-tauri/src/commands/details.rs)         |     1 |

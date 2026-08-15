@@ -17,7 +17,7 @@ pub(crate) use execution::{
 };
 pub(crate) use locale::{os_ui_script, NameScript};
 pub(crate) use registry::{
-    install_registry, registered_targets, steam_registry, uninstall_registry,
+    associations, install_registry, registered_targets, steam_registry, uninstall_registry,
 };
 pub(crate) use shortcuts::{global_shortcut, shortcut};
 pub(crate) use uninstall::{uninstall_history, uninstaller};

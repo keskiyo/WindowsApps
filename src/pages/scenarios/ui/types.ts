@@ -1,10 +1,13 @@
 import type { AppInfo } from '../../../entities/app'
+import type { CategoryDefinition } from '../../../entities/category'
 import type { Scenario, ScenarioList } from '../../../entities/scenario'
 import type { ScenarioRunProgress } from '../../../features/run-scenario'
 
 export interface ScenariosPageProps {
 	scenarios: Scenario[]
 	apps: AppInfo[]
+	selectableApps: AppInfo[]
+	categories: CategoryDefinition[]
 	runningId: string | null
 	isScenarioRunning: boolean
 	runProgress?: ScenarioRunProgress | null

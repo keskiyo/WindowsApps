@@ -23,6 +23,12 @@ pub(crate) struct UninstallTargetPreview {
     pub mechanism: UninstallMechanism,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum UninstallOutcome {
+    Completed,
+    Cancelled,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Validated {
     Process { program: PathBuf, args: Vec<String> },
@@ -128,7 +134,7 @@ pub(crate) fn preview(target: &UninstallTarget) -> UninstallTargetPreview {
     UninstallTargetPreview { mechanism }
 }
 
-pub(crate) fn execute(target: Option<UninstallTarget>) -> Result<(), String> {
+pub(crate) fn execute(target: Option<UninstallTarget>) -> Result<UninstallOutcome, String> {
     let Some(target) = target else {
         return Err("Uninstall is unavailable for this application".into());
     };
@@ -139,7 +145,7 @@ pub(crate) fn execute(target: Option<UninstallTarget>) -> Result<(), String> {
                 .creation_flags(CREATE_NO_WINDOW)
                 .status()
                 .map_err(|error| format!("Could not start the uninstaller: {error}"))?;
-            ensure_success(status.code(), status.success())
+            classify_exit(status.code(), status.success())
         }
         Validated::Msix { package_full_name } => {
             let script = format!("Remove-AppxPackage -Package '{package_full_name}'");
@@ -154,7 +160,7 @@ pub(crate) fn execute(target: Option<UninstallTarget>) -> Result<(), String> {
                 .creation_flags(CREATE_NO_WINDOW)
                 .status()
                 .map_err(|error| format!("Could not start package removal: {error}"))?;
-            ensure_success(status.code(), status.success())
+            classify_exit(status.code(), status.success())
         }
     }
 }
@@ -201,15 +207,17 @@ fn parse_arguments(raw: &str) -> Result<Vec<String>, String> {
     Ok(args)
 }
 
-fn ensure_success(code: Option<i32>, success: bool) -> Result<(), String> {
+fn classify_exit(code: Option<i32>, success: bool) -> Result<UninstallOutcome, String> {
     if success || matches!(code, Some(1641 | 3010)) {
-        Ok(())
-    } else {
-        Err(format!(
-            "The registered uninstaller exited with code {}",
-            code.map_or_else(|| "unknown".into(), |value| value.to_string())
-        ))
+        return Ok(UninstallOutcome::Completed);
     }
+    if matches!(code, Some(1602 | 2)) {
+        return Ok(UninstallOutcome::Cancelled);
+    }
+    Err(format!(
+        "The registered uninstaller exited with code {}",
+        code.map_or_else(|| "unknown".into(), |value| value.to_string())
+    ))
 }
 
 fn is_msiexec(executable: &str) -> bool {
@@ -263,6 +271,34 @@ mod tests {
         UninstallTarget::Msix {
             package_full_name: package.into(),
         }
+    }
+
+    // Closing the wizard is a decision, not a fault: reporting it as a failed uninstall told the
+    // user something went wrong when nothing did.
+    #[test]
+    fn a_user_who_closed_the_wizard_is_not_a_failure() {
+        assert_eq!(
+            classify_exit(Some(0), true),
+            Ok(UninstallOutcome::Completed)
+        );
+        assert_eq!(
+            classify_exit(Some(3010), false),
+            Ok(UninstallOutcome::Completed)
+        );
+        assert_eq!(
+            classify_exit(Some(1641), false),
+            Ok(UninstallOutcome::Completed)
+        );
+        assert_eq!(
+            classify_exit(Some(1602), false),
+            Ok(UninstallOutcome::Cancelled)
+        );
+        assert_eq!(
+            classify_exit(Some(2), false),
+            Ok(UninstallOutcome::Cancelled)
+        );
+        assert!(classify_exit(Some(1), false).is_err());
+        assert!(classify_exit(None, false).is_err());
     }
 
     #[test]

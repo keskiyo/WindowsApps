@@ -102,6 +102,12 @@ export function selectRecentApps(
 		.slice(0, limit)
 }
 
+export function selectUnclassifiedApps(apps: AppInfo[]): AppInfo[] {
+	return apps
+		.filter(app => app.category === 'other')
+		.sort((left, right) => left.name.localeCompare(right.name))
+}
+
 export interface CatalogCounts {
 	visibleCategorizedApps: AppInfo[]
 	navigationCounts: Map<string, number>

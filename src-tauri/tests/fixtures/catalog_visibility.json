@@ -172,5 +172,30 @@
 		"path": "C:\\Menu\\Steam Support Center.lnk",
 		"source": "start_menu",
 		"expected": "auxiliary"
+	},
+	{
+		"name": "Uninstall Go",
+		"path": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Go Programming Language\\Uninstall Go.lnk",
+		"source": "start_menu",
+		"resolvedPath": "C:\\Windows\\System32\\msiexec.exe",
+		"launchArguments": "/x{8C0F4E5D-1B33-4C1B-9E4C-3C1A2F9E77A1}",
+		"expected": "auxiliary"
+	},
+	{
+		"name": "Удалить Ассистент",
+		"path": "C:\\Users\\Example\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Ассистент\\Удалить Ассистент.lnk",
+		"source": "start_menu",
+		"resolvedPath": "C:\\Users\\Example\\AppData\\Local\\Assistant\\setup.exe",
+		"launchArguments": "--uninstall --channel=stable",
+		"expected": "auxiliary"
+	},
+	{
+		"name": "Установить обновление Ассистента",
+		"path": "C:\\Users\\Example\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Ассистент\\Установить обновление.lnk",
+		"source": "start_menu",
+		"resolvedPath": "C:\\Users\\Example\\AppData\\Local\\Assistant\\setup.exe",
+		"launchArguments": "--channel=stable",
+		"kind": "installer",
+		"expected": "primary"
 	}
 ]

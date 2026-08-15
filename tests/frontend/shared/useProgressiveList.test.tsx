@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useProgressiveCards } from '../../../../src/widgets/catalog-content/ui/CategorySection/useProgressiveCards'
+import { useProgressiveList } from '../../../src/shared/hooks/useProgressiveList'
 
 function list(size: number) {
 	return Array.from({ length: size }, (_, index) => `app-${index}`)
@@ -26,9 +26,9 @@ afterEach(() => {
 	vi.unstubAllGlobals()
 })
 
-describe('useProgressiveCards', () => {
+describe('useProgressiveList', () => {
 	it('starts with one batch and reveals more on demand', () => {
-		const view = renderHook(({ items }) => useProgressiveCards(items), {
+		const view = renderHook(({ items }) => useProgressiveList(items), {
 			initialProps: { items: list(200) },
 		})
 
@@ -37,7 +37,7 @@ describe('useProgressiveCards', () => {
 	})
 
 	it('returns everything once the list fits the revealed count', () => {
-		const view = renderHook(({ items }) => useProgressiveCards(items), {
+		const view = renderHook(({ items }) => useProgressiveList(items), {
 			initialProps: { items: list(10) },
 		})
 
@@ -48,7 +48,7 @@ describe('useProgressiveCards', () => {
 	// A narrowed search used to leave the revealed count where scrolling had pushed it, so
 	// clearing the query mounted hundreds of cards at once instead of the first batch.
 	it('drops back to one batch when the list shrinks', () => {
-		const view = renderHook(({ items }) => useProgressiveCards(items), {
+		const view = renderHook(({ items }) => useProgressiveList(items), {
 			initialProps: { items: list(500) },
 		})
 		act(() => view.result.current.sentinelRef(document.createElement('div')))
@@ -64,7 +64,7 @@ describe('useProgressiveCards', () => {
 	})
 
 	it('keeps the revealed count when the catalog only grows', () => {
-		const view = renderHook(({ items }) => useProgressiveCards(items), {
+		const view = renderHook(({ items }) => useProgressiveList(items), {
 			initialProps: { items: list(100) },
 		})
 

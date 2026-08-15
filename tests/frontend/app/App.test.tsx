@@ -193,14 +193,22 @@ describe('App', () => {
 		)
 	})
 
-	it('keeps only a narrow edge around catalog cards', async () => {
+	it('pads every view with the same page margins', async () => {
+		setDesktopNavigation(true)
 		renderApp()
 		const launch = await screen.findByRole('button', {
 			name: 'Launch Steam',
 		})
+		const catalog = launch.closest('main')
 
-		expect(launch.closest('main')).toHaveClass('px-2')
-		expect(launch.closest('main')).not.toHaveClass('sm:px-8')
+		expect(catalog).toHaveClass('px-5', 'pt-7', 'pb-12', 'sm:px-8')
+		expect(catalog).not.toHaveClass('px-2')
+
+		await userEvent.click(screen.getByRole('button', { name: /^More/ }))
+
+		expect(
+			screen.getByRole('heading', { name: 'More' }).closest('main'),
+		).toHaveClass('px-5', 'pt-7', 'pb-12', 'sm:px-8')
 	})
 
 	it('renders the English catalog and category counts', async () => {
@@ -1070,7 +1078,9 @@ describe('App', () => {
 			await userEvent.click(screen.getByRole('button', { name: /^More/ }))
 			return rendered
 		}
-		it('keeps scenario outcomes out of transient notices', async () => {
+		// A run used to end in silence: every launch error was swallowed and the close result was
+		// fetched and dropped, so the user could not tell a finished scenario from a half-run one.
+		it('reports the outcome of a run as one summary notice', async () => {
 			const success = vi.spyOn(toast, 'success').mockClear()
 			const { client } = await withScenario(['steam', 'code'])
 
@@ -1081,11 +1091,15 @@ describe('App', () => {
 			await waitFor(() =>
 				expect(client.launchApp).toHaveBeenCalledTimes(2),
 			)
-			expect(success).not.toHaveBeenCalled()
+			await waitFor(() =>
+				expect(success).toHaveBeenCalledWith('Gaming: 2 launched'),
+			)
+			expect(success).toHaveBeenCalledTimes(1)
 		})
-		it('keeps failed scenario outcomes out of transient notices', async () => {
+		it('reports a run that failed as a warning rather than an error', async () => {
 			const errors = vi.spyOn(toast, 'error').mockClear()
 			const success = vi.spyOn(toast, 'success').mockClear()
+			const warnings = vi.spyOn(toast, 'warning').mockClear()
 			await withScenario(['steam', 'code'], {
 				launchApp: vi
 					.fn()
@@ -1096,7 +1110,12 @@ describe('App', () => {
 				screen.getByRole('button', { name: 'Run Gaming' }),
 			)
 
-			await waitFor(() => expect(errors).not.toHaveBeenCalled())
+			await waitFor(() =>
+				expect(warnings).toHaveBeenCalledWith(
+					'Gaming: 2 could not start',
+				),
+			)
+			expect(errors).not.toHaveBeenCalled()
 			expect(success).not.toHaveBeenCalled()
 		})
 	})

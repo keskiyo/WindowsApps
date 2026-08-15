@@ -78,6 +78,20 @@ Scenario close actions accept catalog IDs only. The trusted catalog classifies
 close targets; only `Safe` targets may be added or executed. Critical Windows
 processes and session components are counted as blocked rather than terminated.
 
+A close asks every matching window to shut down, waits five seconds, then ends
+whatever stayed open; unsaved work in those processes is lost. The wait is
+reported to the interface as coarse stages over `close://progress` — asking,
+a per-second countdown, then terminating — so the pause reads as deliberate
+rather than as a hang. A scenario run ends in a single summary notice counting
+launches, failures, closures and refusals; nothing is discarded silently.
+
+An uninstall runs the registered uninstaller and waits for it. Exit codes are
+read rather than assumed: `0`, `1641` and `3010` are completions, `1602` and `2`
+are the user closing the wizard, and everything else is a failure. A cancelled
+uninstall returns `UNINSTALL_CANCELLED`, is reported as information rather than
+an error, and is not written to the uninstall history, because nothing was
+uninstalled.
+
 The native logger starts before application setup and retains `Info`-level
 production diagnostics in Tauri's platform log directory. A root React error
 boundary replaces render failures with a static recovery screen; exception
@@ -196,10 +210,113 @@ Before the first scan the catalog shows what will be scanned, that nothing runs
 automatically at startup, and that the data stays on the device, with the scan
 action and a link to folder settings on the same card.
 
+A scenario list is filled from a modal picker that searches the catalog and
+switches on several applications at once, each row naming the category the
+application sits in and carrying its switch on the right. The dialog is portalled
+to `document.body` at a fixed size, so a transformed ancestor cannot become its
+containing block and push it off the window. It states which list is being
+filled — launch or close — and for which scenario, since both lists open the
+same dialog. It offers exactly the applications the All apps
+view shows: hidden records, installers and auxiliary tools stay out, while an
+entry already stored in a scenario still resolves against the whole catalog so
+it keeps its name and icon. Candidates are ordered by name, case-insensitively
+and with digits compared as numbers, until a query replaces that order with
+relevance ranking; a query that names a category also brings in the applications
+of that category, after the entries the query matched by name. Rows arrive a
+batch at a time — revealed by scrolling to the end of the list or by a control
+that names how many are left — and skip layout and paint off-screen through the
+same `content-visibility` mechanism the catalog cards use; the footer counts the
+whole result set, not the rendered batch.
+Applications the list
+already holds are not offered, and an application held by the opposite list of
+the same scenario is shown locked with the reason rather than accepted and
+rejected afterwards. Confirming adds the whole set in one step; every close
+target that carries a risk warning still costs its own separate confirmation,
+and declining one leaves the rest of the set intact. Deleting a scenario is
+confirmed in its own dialog, since the delete control sits beside rename and the
+configuration it removes cannot be recovered.
+
+Every destructive confirmation — uninstall, delete category, delete scenario —
+is the one `shared/ui/ConfirmDialog`: same layout, same wording positions, same
+Cancel and named danger action, painted from tokens and portalled to
+`document.body`. It dismisses only through Cancel or its close control: neither
+Escape nor a click on the backdrop discards it, so a confirmation cannot be lost
+to a stray keystroke while it is being read. Cancel takes focus on open, which
+keeps the keyboard exit one keystroke away, and focus returns to the control that
+opened the dialog. Optional detail — the uninstall route, for instance — renders
+in a block between the description and the actions.
+
+The More page previews every scenario while they all fit its card and spends the
+last slot on a "View all" row only once a scenario is left out of the preview.
+
 Classification decisions are explainable in the interface, not only in source:
 the application information dialog reports the discovery source, where the
 record is shown and why, the recorded launch-target check where one applies,
 and the signal that chose its category.
+
+An entry that removes software is never an installation artifact, however
+generic its target: a shortcut is read as an uninstall action when its first
+word says so (`Uninstall …`, `Удалить …`, `Деинсталляция …`) or when its launch
+arguments carry an uninstall switch (`/x{…}`, `--uninstall`, `REMOVE=ALL`).
+Both checks live in `catalog::filters` beside the uninstall-target path rule,
+so the artifact classifier and the visibility rules read the same definition.
+Product names built from the same words — Revo Uninstaller, IObit Uninstaller —
+stay applications, because only the first word counts.
+
+Windows built-in tools are recognised by their whole name rather than by a
+substring, so a vendor product can never inherit the category by containing the
+word. A trailing qualifier does not defeat that rule: the comparison also runs
+against the name with its parenthetical suffixes removed, which is what files
+`Windows PowerShell (x86)` and `Источники данных ODBC (64-разрядная версия)`
+with the tools they are variants of. A name that consists of nothing but a
+qualifier matches no rule at all.
+
+Characters that imitate a Latin letter are folded before any signal is read, so
+the micro sign in `µTorrent` is compared as `u` and the record reaches the same
+rule as its ASCII spelling.
+
+Shell binaries are not category evidence. A Start Menu folder shortcut resolves
+to `explorer.exe`, so the executable of a Windows feature is read from the tools
+that are only ever themselves; `Проводник` is recognised by its name instead.
+
+An entry generated for a `file://` target is documentation whenever the target
+is a document, so a registered `…/doc/index.html` is filed with the other
+documentation rather than as an application of the product it documents.
+
+### Signals that do not depend on knowing the product
+
+A table of product names can only recognise software it already lists, so three
+signals carry records the table has never seen:
+
+- **What the system registered.** `catalog::machine::Associations` reads the file
+  types and URL protocols an executable claims — `Applications\<exe>\SupportedTypes`
+  and the `Capabilities` of every entry in `RegisteredApplications`. An
+  application that owns `.flac` is a player and one that owns `mailto:` is a mail
+  client, whatever it calls itself. Extensions are a closed, standardised set,
+  unlike product names. The map is a machine fact read once per scan and is never
+  persisted, so no cached record can go stale against it.
+- **What the vendor wrote about itself.** `catalog::classify::vocabulary` holds
+  plain purpose words in Russian and English — `media player`, `графический
+  редактор`, `terminal emulator` — matched against the description and the
+  ProductName of the binary. Its weight sits between the threshold and a
+  product-name match: a description alone leaves `Other`, but never outranks a
+  named product. Two independent generic matches do.
+- **Where the entry lives.** Start Menu groups and vendor folders (`\Игры\`,
+  `\Development\`) score at path weight, the weakest evidence of the three.
+
+`WindowsFeatures` is deliberately excluded from the vocabulary: it is recognised
+by whole values only, so a third-party shortcut described as «Проводник» cannot
+inherit it.
+
+Records that still match nothing are listed under Settings → Advanced with every
+signal the classifier read, so a machine with unfamiliar software shows what the
+tables are missing rather than a silent pile in `Other`. One action copies the
+whole list — signals, source, artifact, visibility and the recorded reason — as
+plain text, so an unfamiliar machine can be reported without retyping it.
+
+A query that names a category also returns the applications filed under it,
+after the entries matched by name. The catalog search and the scenario picker
+share one implementation so both answer the same question the same way.
 
 The golden catalog harness under `src-tauri/src/catalog/golden/` protects
 identity, launch descriptor, category, visibility and dedup contracts with

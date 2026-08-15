@@ -2,6 +2,7 @@ import { renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { useCatalogView } from '../../../../src/widgets/catalog-content/model/useCatalogView'
 import type { AppInfo, AppView } from '../../../../src/entities/app'
+import { DEFAULT_CATEGORIES } from '../../../../src/entities/category'
 import type { Scenario } from '../../../../src/entities/scenario'
 
 function app(id: string, artifactKind?: AppInfo['artifactKind']): AppInfo {
@@ -37,6 +38,7 @@ function view(state: { activeView?: AppView; apps?: AppInfo[]; scenarios?: Scena
 		useCatalogView({
 			activeView: state.activeView ?? 'all',
 			apps: state.apps ?? [],
+			categories: DEFAULT_CATEGORIES,
 			categoryOverrideIdentities: {},
 			categoryOverrides: {},
 			favoriteAppIds: [],
@@ -64,7 +66,7 @@ describe('useCatalogView', () => {
 			],
 		})
 
-		expect(result.current.paletteApps.map(item => item.id)).toEqual(['Editor'])
+		expect(result.current.primaryApps.map(item => item.id)).toEqual(['Editor'])
 	})
 
 	describe('icon hydration', () => {
@@ -132,9 +134,9 @@ describe('useCatalogView', () => {
 	})
 
 	describe('More preview', () => {
-		// One row fewer than the app cards, because this card also carries a "View all" row and
-		// shares a two-column grid with cards that do not.
-		it('previews the two scenarios the user made most recently, newest first', () => {
+		// Three scenarios fit the card exactly, so hiding one behind a "View all" row that leads to
+		// the same three is pure noise. The row only earns its slot once something is left out.
+		it('previews every scenario while they all fit, newest first', () => {
 			const { result } = view({
 				scenarios: [
 					scenario({ id: 'oldest', createdAt: 1_000 }),
@@ -145,8 +147,24 @@ describe('useCatalogView', () => {
 
 			expect(
 				result.current.morePreview.scenarios.map(entry => entry.id),
-			).toEqual(['newest', 'middle'])
+			).toEqual(['newest', 'middle', 'oldest'])
 			expect(result.current.morePreview.auxiliary).toHaveLength(0)
+		})
+
+		// The fourth scenario costs the third slot, which the "View all" row then takes.
+		it('gives up a slot to the view-all row once one scenario is left out', () => {
+			const { result } = view({
+				scenarios: [
+					scenario({ id: 'oldest', createdAt: 1_000 }),
+					scenario({ id: 'newest', createdAt: 4_000 }),
+					scenario({ id: 'middle', createdAt: 2_000 }),
+					scenario({ id: 'later', createdAt: 3_000 }),
+				],
+			})
+
+			expect(
+				result.current.morePreview.scenarios.map(entry => entry.id),
+			).toEqual(['newest', 'later'])
 		})
 
 		it('previews three apps for the areas that have no extra row', () => {

@@ -9,7 +9,10 @@ import type { AppState } from './store/appStore'
 export interface AppProps {
 	store: StoreApi<AppState>
 	systemClient: SystemClient
-	appsClient: Pick<AppsClient, 'getAppDetails' | 'openAppFolder'>
+	appsClient: Pick<
+		AppsClient,
+		'getAppDetails' | 'openAppFolder' | 'onCloseProgress'
+	>
 }
 
 export interface AppShellChromeProps {

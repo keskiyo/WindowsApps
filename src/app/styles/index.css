@@ -168,6 +168,7 @@
 	.lucide-trash2,
 	.lucide-folder-x,
 	.lucide-power,
+	.lucide-power-off,
 	.lucide-x {
 		color: var(--category-red);
 	}
@@ -210,6 +211,7 @@
 
 	/* Information, files and catalog overviews. */
 	.lucide-info,
+	.lucide-circle-help,
 	.lucide-file-text,
 	.lucide-external-link,
 	.lucide-download,
@@ -235,6 +237,7 @@
 	.lucide-menu,
 	.lucide-box,
 	.lucide-copy,
+	.lucide-clipboard-copy,
 	.lucide-square,
 	.lucide-chevron-down,
 	.lucide-chevron-right {
@@ -690,6 +693,16 @@ button {
 .app-card[data-menu-open] {
 	content-visibility: visible;
 	contain: none;
+}
+
+/*
+ * The scenario picker offers the whole catalog rather than a page of it, so its rows carry the
+ * same off-screen skip as the cards. The intrinsic size is the real row height, which keeps the
+ * scrollbar honest while the list is still unpainted.
+ */
+.picker-row {
+	content-visibility: auto;
+	contain-intrinsic-size: auto 3.25rem;
 }
 
 /*

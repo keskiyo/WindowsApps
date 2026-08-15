@@ -8,6 +8,7 @@ import type {
 	CatalogDiagnostics,
 	CatalogSnapshot,
 	CloseAppsResult,
+	CloseProgress,
 	LaunchStatus,
 	ScanProgress,
 	UninstallPreview,
@@ -77,5 +78,8 @@ export const tauriAppsClient: AppsClient = {
 	},
 	async onLaunchStatus(handler) {
 		return listenIfTauri<LaunchStatus>('launch://status', handler)
+	},
+	async onCloseProgress(handler) {
+		return listenIfTauri<CloseProgress>('close://progress', handler)
 	},
 }

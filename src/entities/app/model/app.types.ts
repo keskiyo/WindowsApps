@@ -180,6 +180,12 @@ export interface CloseAppsResult {
 	failed: number
 }
 
+export interface CloseProgress {
+	stage: 'asking' | 'waiting' | 'terminating'
+	running: number
+	secondsLeft: number
+}
+
 export interface AppsClient {
 	getApps(): Promise<CatalogSnapshot>
 	refreshApps(): Promise<AppInfo[]>
@@ -211,5 +217,8 @@ export interface AppsClient {
 	): Promise<() => void>
 	onLaunchStatus?(
 		handler: (status: LaunchStatus) => void,
+	): Promise<() => void>
+	onCloseProgress?(
+		handler: (progress: CloseProgress) => void,
 	): Promise<() => void>
 }

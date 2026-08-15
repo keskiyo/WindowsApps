@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import {
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+	within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -178,6 +184,60 @@ describe('UX quality — first impressions', () => {
 		expect(
 			await screen.findByText('Visual Studio Code uninstalled'),
 		).toBeInTheDocument()
+	})
+
+	// The card has to leave the catalog on its own: a finished uninstall is followed by a rescan,
+	// so the user never has to press Refresh to stop seeing something they removed.
+	it('rescans the catalog after a finished uninstall', async () => {
+		const { client } = renderApp()
+		await userEvent.click(
+			await screen.findByRole('button', {
+				name: 'Manage Visual Studio Code',
+			}),
+		)
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Uninstall' }),
+		)
+		const before = (client.refreshApps as ReturnType<typeof vi.fn>).mock.calls
+			.length
+
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Confirm uninstall' }),
+		)
+
+		await waitFor(() =>
+			expect(client.refreshApps).toHaveBeenCalledTimes(before + 1),
+		)
+	})
+
+	// Nothing was removed, so rescanning would be work for no reason and the wizard's own dialog
+	// should simply go away.
+	it('does not rescan when the user closed the uninstall wizard', async () => {
+		const { client } = renderApp({
+			uninstallApp: vi.fn().mockRejectedValue({
+				code: 'UNINSTALL_CANCELLED',
+				message: 'The uninstall was cancelled.',
+			}),
+		})
+		await userEvent.click(
+			await screen.findByRole('button', {
+				name: 'Manage Visual Studio Code',
+			}),
+		)
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Uninstall' }),
+		)
+		const before = (client.refreshApps as ReturnType<typeof vi.fn>).mock.calls
+			.length
+
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Confirm uninstall' }),
+		)
+
+		expect(
+			await screen.findByText('Uninstall of Visual Studio Code cancelled'),
+		).toBeInTheDocument()
+		expect(client.refreshApps).toHaveBeenCalledTimes(before)
 	})
 
 	// Issue 3: uninstall error toast names the app

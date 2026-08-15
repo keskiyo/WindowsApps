@@ -13,7 +13,7 @@ export function MoreScenarioRow({
 		: `Run ${scenario.name}`
 
 	return (
-		<li className="flex min-w-0 items-center gap-3 border-t border-(--border-neutral) px-5 py-2.5 first:border-t-0">
+		<li className="flex min-w-0 flex-auto items-center gap-3 border-t border-(--border-neutral) px-5 py-2.5 first:border-t-0">
 			<span className="grid size-8 shrink-0 place-items-center rounded-lg bg-(--surface-inset)">
 				<ListChecks size={16} aria-hidden="true" />
 			</span>

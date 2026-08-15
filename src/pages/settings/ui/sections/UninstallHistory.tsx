@@ -71,6 +71,37 @@ export function UninstallHistory({ client }: UninstallHistoryProps) {
 				</button>
 			</div>
 
+			{confirmClear && (
+				<div
+					role="dialog"
+					aria-label="Confirm clear uninstall history"
+					className="danger-panel mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300/70 bg-red-50 p-4"
+				>
+					<p className="text-sm text-red-800">
+						Clear the local uninstall history?
+					</p>
+					<div className="flex gap-2">
+						<button
+							type="button"
+							disabled={clearing}
+							onClick={() => setConfirmClear(false)}
+							className="rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-violet-100/70 disabled:opacity-50"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							disabled={clearing}
+							onClick={() => void clearHistory()}
+							className="danger-button inline-flex items-center gap-2 rounded-xl border border-red-300/70 px-3 py-2 text-sm text-red-700 hover:bg-red-100 disabled:opacity-50"
+						>
+							<Trash2 size={14} aria-hidden="true" />
+							{clearing ? 'Clearing…' : 'Confirm clear'}
+						</button>
+					</div>
+				</div>
+			)}
+
 			{loading ? (
 				<p className="mt-4 text-sm text-slate-600">Loading history…</p>
 			) : error ? (
@@ -107,36 +138,6 @@ export function UninstallHistory({ client }: UninstallHistoryProps) {
 				</p>
 			)}
 
-			{confirmClear && (
-				<div
-					role="dialog"
-					aria-label="Confirm clear uninstall history"
-					className="danger-panel mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300/70 bg-red-50 p-4"
-				>
-					<p className="text-sm text-red-800">
-						Clear the local uninstall history?
-					</p>
-					<div className="flex gap-2">
-						<button
-							type="button"
-							disabled={clearing}
-							onClick={() => setConfirmClear(false)}
-							className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-violet-100/70"
-						>
-							Cancel
-						</button>
-						<button
-							type="button"
-							disabled={clearing}
-							onClick={() => void clearHistory()}
-							className="icon-follows-color inline-flex items-center gap-2 rounded-lg bg-red-500 px-3 py-2 text-sm font-medium text-white hover:bg-red-400 disabled:opacity-50"
-						>
-							<Trash2 size={14} aria-hidden="true" />
-							{clearing ? 'Clearing…' : 'Confirm clear'}
-						</button>
-					</div>
-				</div>
-			)}
 		</div>
 	)
 }

@@ -362,6 +362,32 @@ describe('MorePage', () => {
 		expect(dialog.parentElement?.parentElement).toBe(document.body)
 	})
 
+	// A row that opens a dialog listing the same scenarios already on the card is a dead click,
+	// and it costs the card a slot it could have spent on a scenario.
+	it('drops the view-all row when the card already shows every scenario', () => {
+		renderPage(vi.fn(), {
+			...emptyPreview,
+			scenarios: [
+				{
+					id: 'gaming',
+					name: 'Gaming',
+					launchCount: 1,
+					closeCount: 0,
+					createdAt: null,
+				},
+				{
+					id: 'work',
+					name: 'Work',
+					launchCount: 2,
+					closeCount: 1,
+					createdAt: null,
+				},
+			],
+		})
+
+		expect(screen.queryByRole('button', { name: /^View all/ })).toBeNull()
+	})
+
 	it('omits the preview list for an empty area', () => {
 		renderPage()
 

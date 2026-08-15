@@ -6,11 +6,11 @@ import {
 	closeRiskReason,
 	closeRiskWarning,
 } from '../../../entities/app'
-import type { ScenarioList } from '../../../entities/scenario'
+import type { Scenario, ScenarioList } from '../../../entities/scenario'
 import type { CloseRiskMark, ScenarioNameResult } from '../types'
 
 interface PickerOptions {
-	scenarioId: string
+	scenario: Scenario
 	onAddApp(
 		id: string,
 		list: ScenarioList,
@@ -18,17 +18,29 @@ interface PickerOptions {
 	): ScenarioNameResult
 }
 
-export function useScenarioAppPicker({
-	scenarioId,
-	onAddApp,
-}: PickerOptions) {
+const OTHER_LIST_NOTE: Record<ScenarioList, string> = {
+	launch: 'Already in the close list',
+	close: 'Already in the launch list',
+}
+
+export function useScenarioAppPicker({ scenario, onAddApp }: PickerOptions) {
 	const [picking, setPicking] = useState<ScenarioList | null>(null)
-	const [confirming, setConfirming] = useState<AppInfo | null>(null)
+	const [pending, setPending] = useState<AppInfo[]>([])
 	const [error, setError] = useState<string | null>(null)
 
-	function commit(list: ScenarioList, app: AppInfo) {
-		const result = onAddApp(scenarioId, list, appIdentity(app))
-		setError(result.ok ? null : result.error)
+	function identitiesOf(list: ScenarioList) {
+		return list === 'launch'
+			? scenario.launchIdentities
+			: scenario.closeIdentities
+	}
+
+	function commit(list: ScenarioList, apps: AppInfo[]) {
+		let failure: string | null = null
+		for (const app of apps) {
+			const result = onAddApp(scenario.id, list, appIdentity(app))
+			if (!result.ok && !failure) failure = result.error
+		}
+		setError(failure)
 	}
 
 	function markOf(app: AppInfo): CloseRiskMark | null {
@@ -39,27 +51,39 @@ export function useScenarioAppPicker({
 
 	return {
 		picking,
-		confirming,
 		error,
 		markOf,
 		open: setPicking,
 		dismissPicker: () => setPicking(null),
-		cancelConfirmation: () => setConfirming(null),
-		confirmationMessage: confirming ? closeRiskWarning(confirming) : null,
-		select(app: AppInfo) {
+		candidates(apps: AppInfo[]) {
+			if (!picking) return []
+			const added = new Set(identitiesOf(picking))
+			return apps.filter(app => !added.has(appIdentity(app)))
+		},
+		noteOf(app: AppInfo): string | null {
+			if (!picking) return null
+			const other = picking === 'launch' ? 'close' : 'launch'
+			return identitiesOf(other).includes(appIdentity(app))
+				? OTHER_LIST_NOTE[picking]
+				: null
+		},
+		confirming: pending[0] ?? null,
+		confirmationMessage: pending[0] ? closeRiskWarning(pending[0]) : null,
+		cancelConfirmation: () => setPending(queue => queue.slice(1)),
+		confirm(selected: AppInfo[]) {
 			const list = picking
 			setPicking(null)
 			if (!list) return
-			if (list === 'close' && closeRiskWarning(app)) {
-				setError(null)
-				setConfirming(app)
-				return
-			}
-			commit(list, app)
+			if (list === 'launch') return commit('launch', selected)
+			commit(
+				'close',
+				selected.filter(app => !closeRiskWarning(app)),
+			)
+			setPending(selected.filter(app => closeRiskWarning(app)))
 		},
 		acceptConfirmation() {
-			if (confirming) commit('close', confirming)
-			setConfirming(null)
+			if (pending[0]) commit('close', [pending[0]])
+			setPending(queue => queue.slice(1))
 		},
 	}
 }

@@ -8,11 +8,11 @@ const DOCUMENT_EXTENSIONS: &[&str] = &[
 pub(super) fn is_documentation_shortcut(app: &AppInfo) -> bool {
     if app.source_kind == SourceKind::StartApps
         && app.launch_kind == LaunchKind::AppUserModelId
-        && (is_absolute_http_url(&app.path)
+        && (opens_a_document_target(&app.path)
             || app
                 .resolved_path
                 .as_deref()
-                .is_some_and(is_absolute_http_url))
+                .is_some_and(opens_a_document_target))
     {
         return true;
     }
@@ -153,6 +153,24 @@ mod tests {
         app.source_kind = SourceKind::StartMenu;
         app.launch_kind = LaunchKind::Shortcut;
         assert_eq!(classify(&app, None), ArtifactKind::Application);
+    }
+
+    #[test]
+    fn a_file_url_to_a_document_is_documentation_like_its_start_menu_twin() {
+        let mut app = candidate(
+            "PostgreSQL documentation",
+            r"file://C:\Program Files\PostgreSQL\15/doc/postgresql/html/index.html",
+        );
+        app.source_kind = SourceKind::StartApps;
+        app.launch_kind = LaunchKind::AppUserModelId;
+        app.resolved_path = Some(app.path.clone());
+        assert_eq!(classify(&app, None), ArtifactKind::Documentation);
+
+        let mut program = candidate("Vendor tool", r"file://C:\Program Files\Vendor\tool.exe");
+        program.source_kind = SourceKind::StartApps;
+        program.launch_kind = LaunchKind::AppUserModelId;
+        program.resolved_path = Some(program.path.clone());
+        assert_eq!(classify(&program, None), ArtifactKind::Application);
     }
 
     #[test]

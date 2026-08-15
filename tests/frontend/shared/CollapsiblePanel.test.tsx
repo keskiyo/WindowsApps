@@ -60,6 +60,30 @@ describe('CollapsiblePanel', () => {
 		expect(screen.queryByText('Details')).not.toBeInTheDocument()
 	})
 
+	it('collapses its own padding and slides the content with the height', () => {
+		function Padded() {
+			const [open, setOpen] = useState(false)
+			return (
+				<>
+					<button type="button" onClick={() => setOpen(true)}>
+						Toggle details
+					</button>
+					<CollapsiblePanel open={open} className="pt-5">
+						<button type="button">Details</button>
+					</CollapsiblePanel>
+				</>
+			)
+		}
+		render(<Padded />)
+
+		fireEvent.click(screen.getByRole('button', { name: 'Toggle details' }))
+		const content = screen.getByText('Details').parentElement
+
+		expect(content).toHaveClass('pt-5', 'overflow-hidden')
+		expect(content).toHaveClass('transition-transform')
+		expect(content?.parentElement).not.toHaveClass('pt-5')
+	})
+
 	it('makes closing content inert before its transition ends', () => {
 	render(<Example />)
 		fireEvent.click(screen.getByRole('button', { name: 'Toggle details' }))

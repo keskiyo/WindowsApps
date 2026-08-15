@@ -45,7 +45,7 @@ export function MoreCard({ destination, onSelect }: MoreCardProps) {
 			{preview.items.length > 0 && (
 				<ul
 					aria-label={`Recently added to ${destination.label}`}
-					className="border-t border-(--border-neutral) pb-1"
+					className="flex flex-auto flex-col border-t border-(--border-neutral) pb-1"
 				>
 					{preview.kind === 'apps'
 						? preview.items.map(entry => (
@@ -65,16 +65,17 @@ export function MoreCard({ destination, onSelect }: MoreCardProps) {
 							))}
 				</ul>
 			)}
-			{preview.kind === 'scenarios' && preview.items.length > 0 && (
-				<button
-					type="button"
-					onClick={preview.onViewAll}
-					className="flex items-center justify-center gap-1.5 border-t border-(--border-neutral) px-5 py-2.5 text-sm font-medium text-(--text-muted) transition-colors hover:bg-(--surface-raised) hover:text-(--text-primary) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--accent-strong) motion-reduce:transition-none"
-				>
-					View all
-					<ChevronRight size={15} aria-hidden="true" />
-				</button>
-			)}
+			{preview.kind === 'scenarios' &&
+				destination.count > preview.items.length && (
+					<button
+						type="button"
+						onClick={preview.onViewAll}
+						className="mt-auto flex items-center justify-center gap-1.5 border-t border-(--border-neutral) px-5 py-2.5 text-sm font-medium text-(--text-muted) transition-colors hover:bg-(--surface-raised) hover:text-(--text-primary) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--accent-strong) motion-reduce:transition-none"
+					>
+						View all
+						<ChevronRight size={15} aria-hidden="true" />
+					</button>
+				)}
 		</section>
 	)
 }

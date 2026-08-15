@@ -260,9 +260,10 @@ fn filter_maintenance(apps: Vec<AppInfo>) -> Vec<AppInfo> {
 }
 
 pub(crate) fn sanitize(apps: Vec<AppInfo>) -> Vec<AppInfo> {
+    let associations = machine::Associations::current();
     dedup::deduplicate(
         filter_maintenance(apps),
-        classify::classify_app,
+        |app| classify::classify_app(app, &associations),
         crate::platform::windows::os_ui_script(),
     )
 }
@@ -272,9 +273,10 @@ pub(crate) fn sanitize_reported(apps: Vec<AppInfo>) -> Vec<AppInfo> {
     if dedup::dev_report_enabled() {
         dedup::write_dev_report(&filtered);
     }
+    let associations = machine::Associations::current();
     dedup::deduplicate(
         filtered,
-        classify::classify_app,
+        |app| classify::classify_app(app, &associations),
         crate::platform::windows::os_ui_script(),
     )
 }
@@ -285,9 +287,10 @@ pub(in crate::catalog) fn sanitize_pinned(
     registrations: &machine::Registrations,
     os_script: crate::platform::windows::NameScript,
 ) -> Vec<AppInfo> {
+    let associations = machine::Associations::empty();
     dedup::deduplicate(
         retain_visible(classify_entries(apps, registrations)),
-        classify::classify_app,
+        |app| classify::classify_app(app, &associations),
         os_script,
     )
 }
@@ -401,8 +404,9 @@ pub(crate) fn retain_present_targets(
 }
 
 pub(crate) fn attach_category_reasons(apps: &mut [AppInfo]) {
+    let associations = machine::Associations::current();
     for app in apps {
-        app.category_reasons = classify::category_reasons(app);
+        app.category_reasons = classify::category_reasons(app, &associations);
     }
 }
 
@@ -424,20 +428,25 @@ fn legacy_target_is_present(app: &AppInfo) -> bool {
 
 #[cfg(test)]
 fn deduplicate(apps: Vec<AppInfo>) -> Vec<AppInfo> {
+    let associations = machine::Associations::empty();
     dedup::deduplicate(
         apps,
-        classify::classify_app,
+        |app| classify::classify_app(app, &associations),
         crate::platform::windows::NameScript::Latin,
     )
 }
 
 #[cfg(test)]
 mod tests {
-    use super::classify::{classify, classify_app};
+    use super::classify::classify;
     use super::filters::*;
     use super::naming::*;
     use super::*;
     use std::path::PathBuf;
+
+    fn classify_app(app: &AppInfo) -> AppCategory {
+        super::classify::classify_app(app, &machine::Associations::empty())
+    }
 
     fn facts() -> machine::MachineFacts {
         machine::MachineFacts::empty()

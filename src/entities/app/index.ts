@@ -14,6 +14,7 @@ export type {
 	CatalogDiagnostics,
 	CatalogSnapshot,
 	CloseAppsResult,
+	CloseProgress,
 	LaunchStatus,
 	ScanProgress,
 	SourceErrorKind,
@@ -32,6 +33,7 @@ export {
 	selectCatalogCounts,
 	selectCategorizedApps,
 	selectRecentApps,
+	selectUnclassifiedApps,
 	selectSearchScopeCounts,
 	type SearchScopeCounts,
 } from './model/catalogSelectors'
@@ -74,6 +76,7 @@ export {
 export {
 	filterAppsByQuery,
 	rankAppsByQuery,
+	rankAppsByQueryAndCategory,
 	rankAppsByQueryTop,
 } from './lib/catalogSearch'
 export { AppCard } from './ui/AppCard/AppCard'

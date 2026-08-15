@@ -30,6 +30,28 @@ pub(super) fn is_maintenance_path(path: &str) -> bool {
     is_structural_path(path, true)
 }
 
+pub(super) fn is_uninstall_action_name(name: &str) -> bool {
+    name.to_lowercase()
+        .split(|character: char| !character.is_alphanumeric())
+        .find(|token| !token.is_empty())
+        .is_some_and(|first| matches!(first, "uninstall" | "удалить" | "деинсталляция"))
+}
+
+pub(super) fn carries_uninstall_switch(arguments: Option<&str>) -> bool {
+    let Some(arguments) = arguments else {
+        return false;
+    };
+    arguments
+        .to_lowercase()
+        .split(|character: char| character.is_whitespace() || character == '"')
+        .map(|token| token.trim_start_matches(['/', '-']))
+        .any(|token| {
+            matches!(token, "x" | "uninstall" | "remove")
+                || token.starts_with("x{")
+                || token.starts_with("remove=all")
+        })
+}
+
 pub(super) fn is_uninstall_target_path(path: &Path) -> bool {
     if !path
         .extension()
@@ -143,4 +165,54 @@ pub(crate) fn is_installer_file_name(stem: &str) -> bool {
     ["setup", "install", "uninstall"]
         .iter()
         .any(|marker| lower.ends_with(marker))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_uninstall_action_is_named_by_its_first_word_never_by_a_product_name() {
+        for name in [
+            "Uninstall Go",
+            "Удалить Ассистент",
+            "Деинсталляция Foo",
+            "uninstall example editor",
+        ] {
+            assert!(is_uninstall_action_name(name), "{name}");
+        }
+        for name in [
+            "Revo Uninstaller",
+            "IObit Uninstaller",
+            "Uninstaller Pro",
+            "Total Uninstall",
+        ] {
+            assert!(!is_uninstall_action_name(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn an_uninstall_switch_is_read_as_a_whole_token() {
+        for arguments in [
+            "/x{8C0F4E5D-1B33-4C1B-9E4C-3C1A2F9E77A1}",
+            "/X {8C0F4E5D-1B33-4C1B-9E4C-3C1A2F9E77A1}",
+            "--uninstall --channel=stable",
+            "-uninstall",
+            "/uninstall /silent",
+            "/qn REMOVE=ALL",
+            "/remove",
+        ] {
+            assert!(carries_uninstall_switch(Some(arguments)), "{arguments}");
+        }
+        for arguments in [
+            "--channel=stable",
+            "/xyz",
+            "-max-fps 60",
+            "--extract-to \"C:\\Temp\"",
+            "",
+        ] {
+            assert!(!carries_uninstall_switch(Some(arguments)), "{arguments}");
+        }
+        assert!(!carries_uninstall_switch(None));
+    }
 }

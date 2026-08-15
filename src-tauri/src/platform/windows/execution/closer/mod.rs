@@ -8,9 +8,16 @@ use identity::is_instance_of;
 use processes::{image_path_of, running_images, terminate};
 use std::collections::HashSet;
 
-const GRACE_PERIOD_MS: u64 = 5000;
+const GRACE_SECONDS: u64 = 5;
 const TERMINATION_RECHECKS: usize = 4;
 const TERMINATION_RECHECK_DELAY_MS: u64 = 250;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CloseStage {
+    Asking { running: usize },
+    Waiting { seconds_left: u64 },
+    Terminating,
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CloseOutcome {
@@ -27,7 +34,10 @@ fn processes_of(target: &CloseTarget, running: &[(u32, String)]) -> Vec<u32> {
         .collect()
 }
 
-pub(crate) fn close_processes(targets: &[CloseTarget]) -> CloseOutcome {
+pub(crate) fn close_processes(
+    targets: &[CloseTarget],
+    progress: impl Fn(CloseStage),
+) -> CloseOutcome {
     if targets.is_empty() {
         return CloseOutcome::default();
     }
@@ -44,10 +54,17 @@ pub(crate) fn close_processes(targets: &[CloseTarget]) -> CloseOutcome {
             failed: 0,
         };
     }
+    progress(CloseStage::Asking {
+        running: matched.iter().filter(|pids| !pids.is_empty()).count(),
+    });
     for window in frames::windows_of(live) {
         frames::ask_to_close(window);
     }
-    std::thread::sleep(std::time::Duration::from_millis(GRACE_PERIOD_MS));
+    for seconds_left in (1..=GRACE_SECONDS).rev() {
+        progress(CloseStage::Waiting { seconds_left });
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
+    progress(CloseStage::Terminating);
     finish(targets, &matched)
 }
 
@@ -145,15 +162,32 @@ mod tests {
 
     #[test]
     fn reports_nothing_for_an_empty_request() {
-        assert_eq!(close_processes(&[]), CloseOutcome::default());
+        assert_eq!(close_processes(&[], |_| {}), CloseOutcome::default());
+    }
+
+    // Nothing is running, so nothing is asked, waited for or terminated: a scenario that closes
+    // idle applications must not show the user a five second countdown over no work.
+    #[test]
+    fn an_idle_target_reports_no_stages() {
+        let stages = Cell::new(0);
+
+        close_processes(
+            &[target(r"C:\Nowhere\this-executable-does-not-exist.exe")],
+            |_| stages.set(stages.get() + 1),
+        );
+
+        assert_eq!(stages.get(), 0);
     }
 
     #[test]
     fn reports_targets_that_are_not_running() {
-        let outcome = close_processes(&[
-            target(r"C:\Nowhere\this-executable-does-not-exist.exe"),
-            target(r"C:\Nowhere\neither-does-this-one.exe"),
-        ]);
+        let outcome = close_processes(
+            &[
+                target(r"C:\Nowhere\this-executable-does-not-exist.exe"),
+                target(r"C:\Nowhere\neither-does-this-one.exe"),
+            ],
+            |_| {},
+        );
 
         assert_eq!(
             outcome,

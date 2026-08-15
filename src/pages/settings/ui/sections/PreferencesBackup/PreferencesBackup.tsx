@@ -83,7 +83,7 @@ export function PreferencesBackup(props: PreferencesBackupProps) {
 						<button
 							type="button"
 							onClick={() => setPending(null)}
-							className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200/70 focus-visible:outline-2 focus-visible:outline-violet-500"
+							className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-(--surface-raised) focus-visible:outline-2 focus-visible:outline-violet-500"
 						>
 							Cancel
 						</button>

@@ -1,16 +1,17 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ScenariosPage } from '../../../../src/pages/scenarios'
 import type { Scenario } from '../../../../src/entities/scenario'
 import type { AppInfo } from '../../../../src/entities/app'
+import { DEFAULT_CATEGORIES } from '../../../../src/entities/category'
 
-function app(id: string, name: string): AppInfo {
+function app(id: string, name: string, category = 'other'): AppInfo {
 	return {
 		id,
 		name,
 		path: `C:\\Apps\\${id}.exe`,
-		category: 'other',
+		category,
 		iconBase64: null,
 		launchKind: 'executable',
 		sourceKind: 'registry',
@@ -27,13 +28,18 @@ const explorer: AppInfo = {
 	closeRisk: 'close.session',
 }
 
-const catalog = [app('game', 'Backpack Battles'), app('chat', 'Discord')]
+const catalog = [
+	app('game', 'Backpack Battles', 'games'),
+	app('chat', 'Discord', 'communication'),
+]
 const catalogWithShell = [...catalog, explorer]
 
 function props(scenarios: Scenario[] = [], favoriteScenarioIds: string[] = []) {
 	return {
 		scenarios,
 		apps: catalog,
+		selectableApps: catalog,
+		categories: DEFAULT_CATEGORIES,
 		runningId: null,
 		isScenarioRunning: false,
 		favoriteScenarioIds,
@@ -64,13 +70,39 @@ const work: Scenario = {
 	createdAt: null,
 }
 
-// The picker keeps its highlighted row in view; jsdom has no scroller to do it with.
-beforeAll(() => {
-	Object.defineProperty(Element.prototype, 'scrollIntoView', {
-		configurable: true,
-		value: vi.fn(),
+const empty: Scenario = {
+	id: 'empty',
+	name: 'Empty',
+	launchIdentities: [],
+	closeIdentities: [],
+	createdAt: null,
+}
+
+const unclosable: AppInfo = {
+	...app('run', 'Выполнить'),
+	closeRisk: 'close.not_closable',
+}
+
+async function openPicker(list: 'Launch' | 'Close', scenario: string) {
+	await userEvent.click(
+		screen.getByRole('button', {
+			name: `Add an app to the ${list} list of ${scenario}`,
+		}),
+	)
+	return screen.getByRole('dialog', {
+		name: `Add an app to the ${list.toLowerCase()} list of ${scenario}`,
 	})
-})
+}
+
+async function check(picker: HTMLElement, name: RegExp) {
+	await userEvent.click(within(picker).getByRole('switch', { name }))
+}
+
+async function confirmPicker(picker: HTMLElement) {
+	await userEvent.click(
+		within(picker).getByRole('button', { name: 'Add selected apps' }),
+	)
+}
 
 describe('ScenariosPage', () => {
 	it('titles the view, counts scenarios and returns to More', async () => {
@@ -127,20 +159,99 @@ describe('ScenariosPage', () => {
 		const view = props([gaming])
 		render(<ScenariosPage {...view} />)
 
-		await userEvent.click(
-			screen.getByRole('button', {
-				name: 'Add an app to the Close list of Gaming',
-			}),
-		)
-		const picker = screen.getByRole('dialog', {
-			name: 'Add an app to the close list of Gaming',
-		})
-		await userEvent.click(within(picker).getByRole('button', { name: /Discord/ }))
+		const picker = await openPicker('Close', 'Gaming')
+		await check(picker, /Discord/)
+		await confirmPicker(picker)
 
 		expect(view.onAddApp).toHaveBeenCalledWith('gaming', 'close', 'chat')
 		expect(
 			screen.queryByRole('dialog', { name: /Add an app/ }),
 		).not.toBeInTheDocument()
+	})
+
+	// Adding one app per trip through the dialog was the whole complaint: a scenario is built from
+	// several apps at once, so the dialog closes once and the whole checked set goes in.
+	it('adds every checked app in a single pass', async () => {
+		const view = props([empty])
+		render(<ScenariosPage {...view} />)
+
+		const picker = await openPicker('Launch', 'Empty')
+		await check(picker, /Backpack Battles/)
+		await check(picker, /Discord/)
+		await confirmPicker(picker)
+
+		expect(view.onAddApp.mock.calls).toEqual([
+			['empty', 'launch', 'game'],
+			['empty', 'launch', 'chat'],
+		])
+	})
+
+	// The category is the context that makes a name recognisable; the picker reads it from the
+	// catalog rather than asking the reader to remember.
+	it('shows the category of every offered app', async () => {
+		render(<ScenariosPage {...props([empty])} />)
+
+		const picker = await openPicker('Launch', 'Empty')
+
+		expect(
+			within(picker).getByRole('switch', { name: /Backpack Battles/ }),
+		).toHaveAccessibleName(/Games/)
+		expect(
+			within(picker).getByRole('switch', { name: /Discord/ }),
+		).toHaveAccessibleName(/Communication/)
+	})
+
+	// The picker offered the whole catalog, tools and Windows components included, so it listed
+	// far more entries than All apps ever shows. It now offers exactly that view, while an entry
+	// already sitting in a scenario still resolves against the wider catalog.
+	it('offers only what All apps shows and still resolves the rest', async () => {
+		const tool: AppInfo = {
+			...app('backup', 'Архивация Windows', 'windows_features'),
+			visibilityClass: 'auxiliary',
+		}
+		render(
+			<ScenariosPage
+				{...props([{ ...empty, launchIdentities: ['backup'] }])}
+				apps={[...catalog, tool]}
+				selectableApps={catalog}
+			/>,
+		)
+
+		expect(
+			screen.getByRole('list', { name: 'Launch list of Empty' }),
+		).toHaveTextContent('Архивация Windows')
+		const picker = await openPicker('Close', 'Empty')
+		expect(
+			within(picker).queryByRole('switch', { name: /Архивация Windows/ }),
+		).not.toBeInTheDocument()
+		expect(within(picker).getAllByRole('switch')).toHaveLength(2)
+	})
+
+	it('leaves out an app the list already holds', async () => {
+		render(<ScenariosPage {...props([gaming])} />)
+
+		const picker = await openPicker('Launch', 'Gaming')
+
+		expect(
+			within(picker).queryByRole('switch', { name: /Backpack Battles/ }),
+		).not.toBeInTheDocument()
+		expect(
+			within(picker).getByRole('switch', { name: /Discord/ }),
+		).toBeEnabled()
+	})
+
+	// The store refuses an app that both launches and closes; the dialog says so instead of
+	// letting the user check a box that turns into an error.
+	it('locks an app that already sits in the other list', async () => {
+		render(<ScenariosPage {...props([gaming])} />)
+
+		const picker = await openPicker('Close', 'Gaming')
+		const locked = within(picker).getByRole('switch', {
+			name: /Backpack Battles/,
+		})
+
+		expect(locked).toBeDisabled()
+		expect(locked).toHaveAccessibleName(/Already in the launch list/)
 	})
 
 	// The badge has to name the consequence, not the category: "Windows component" told the reader
@@ -149,54 +260,33 @@ describe('ScenariosPage', () => {
 	it('labels a shell-ending entry and an unclosable one differently', async () => {
 		const view = {
 			...props([gaming]),
-			apps: [
-				...catalogWithShell,
-				{
-					...app('run', 'Выполнить'),
-					closeRisk: 'close.not_closable',
-				} as AppInfo,
-			],
+			apps: [...catalogWithShell, unclosable],
+			selectableApps: [...catalogWithShell, unclosable],
 		}
 		render(<ScenariosPage {...view} />)
 
-		await userEvent.click(
-			screen.getByRole('button', {
-				name: 'Add an app to the Close list of Gaming',
-			}),
-		)
-		const picker = screen.getByRole('dialog', {
-			name: 'Add an app to the close list of Gaming',
-		})
+		const picker = await openPicker('Close', 'Gaming')
 
 		expect(
-			within(picker).getByRole('button', { name: /Проводник/ }),
-		).toHaveTextContent('Danger')
+			within(picker).getByRole('switch', { name: /Проводник/ }),
+		).toHaveAccessibleName(/Danger/)
 		expect(
-			within(picker).getByRole('button', { name: /Выполнить/ }),
-		).toHaveTextContent('Cannot close')
+			within(picker).getByRole('switch', { name: /Выполнить/ }),
+		).toHaveAccessibleName(/Cannot close/)
 		expect(
-			within(picker).getByRole('button', { name: /Discord/ }),
-		).not.toHaveTextContent(/Danger|Cannot close/)
+			within(picker).getByRole('switch', { name: /Discord/ }),
+		).not.toHaveAccessibleName(/Danger|Cannot close/)
 	})
 
 	// Closing the shell is recoverable but never something to trigger by accident, so it costs one
 	// deliberate confirmation and nothing reaches the scenario until that is given.
 	it('asks before putting a Windows desktop component in the close list', async () => {
-		const view = { ...props([gaming]), apps: catalogWithShell }
+		const view = { ...props([gaming]), apps: catalogWithShell, selectableApps: catalogWithShell }
 		render(<ScenariosPage {...view} />)
 
-		await userEvent.click(
-			screen.getByRole('button', {
-				name: 'Add an app to the Close list of Gaming',
-			}),
-		)
-		await userEvent.click(
-			within(
-				screen.getByRole('dialog', {
-					name: 'Add an app to the close list of Gaming',
-				}),
-			).getByRole('button', { name: /Проводник/ }),
-		)
+		const picker = await openPicker('Close', 'Gaming')
+		await check(picker, /Проводник/)
+		await confirmPicker(picker)
 
 		expect(view.onAddApp).not.toHaveBeenCalled()
 		const warning = screen.getByRole('alertdialog', {
@@ -211,47 +301,116 @@ describe('ScenariosPage', () => {
 	})
 
 	it('leaves the list untouched when the warning is dismissed', async () => {
-		const view = { ...props([gaming]), apps: catalogWithShell }
+		const view = { ...props([gaming]), apps: catalogWithShell, selectableApps: catalogWithShell }
 		render(<ScenariosPage {...view} />)
 
-		await userEvent.click(
-			screen.getByRole('button', {
-				name: 'Add an app to the Close list of Gaming',
-			}),
-		)
-		await userEvent.click(
-			within(
-				screen.getByRole('dialog', {
-					name: 'Add an app to the close list of Gaming',
-				}),
-			).getByRole('button', { name: /Проводник/ }),
-		)
+		const picker = await openPicker('Close', 'Gaming')
+		await check(picker, /Проводник/)
+		await confirmPicker(picker)
 		await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
 		expect(view.onAddApp).not.toHaveBeenCalled()
 		expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
 	})
 
-	// Starting Explorer is ordinary; only ending it is not.
-	it('adds the same component to the launch list without asking', async () => {
-		const view = { ...props([gaming]), apps: catalogWithShell }
+	// One confirmation per risky app: checking several at once must not turn a single click into
+	// blanket consent for all of them.
+	it('asks once per risky app and adds the safe ones straight away', async () => {
+		const view = {
+			...props([empty]),
+			apps: [...catalogWithShell, unclosable],
+			selectableApps: [...catalogWithShell, unclosable],
+		}
 		render(<ScenariosPage {...view} />)
 
+		const picker = await openPicker('Close', 'Empty')
+		await check(picker, /Discord/)
+		await check(picker, /Проводник/)
+		await check(picker, /Выполнить/)
+		await confirmPicker(picker)
+
+		expect(view.onAddApp.mock.calls).toEqual([['empty', 'close', 'chat']])
 		await userEvent.click(
-			screen.getByRole('button', {
-				name: 'Add an app to the Launch list of Gaming',
-			}),
+			within(
+				screen.getByRole('alertdialog', {
+					name: 'Add Проводник to the close list',
+				}),
+			).getByRole('button', { name: 'Add anyway' }),
 		)
 		await userEvent.click(
 			within(
-				screen.getByRole('dialog', {
-					name: 'Add an app to the launch list of Gaming',
+				screen.getByRole('alertdialog', {
+					name: 'Add Выполнить to the close list',
 				}),
-			).getByRole('button', { name: /Проводник/ }),
+			).getByRole('button', { name: 'Cancel' }),
 		)
+
+		expect(view.onAddApp.mock.calls).toEqual([
+			['empty', 'close', 'chat'],
+			['empty', 'close', 'explorer'],
+		])
+		expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+	})
+
+	// Starting Explorer is ordinary; only ending it is not.
+	it('adds the same component to the launch list without asking', async () => {
+		const view = { ...props([gaming]), apps: catalogWithShell, selectableApps: catalogWithShell }
+		render(<ScenariosPage {...view} />)
+
+		const picker = await openPicker('Launch', 'Gaming')
+		await check(picker, /Проводник/)
+		await confirmPicker(picker)
 
 		expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
 		expect(view.onAddApp).toHaveBeenCalledWith('gaming', 'launch', 'explorer')
+	})
+
+	// Delete sits next to Rename and wipes a configured scenario outright, so a mis-click on the
+	// wrong icon used to cost the whole thing with no way back.
+	it('asks before deleting a scenario and does nothing when refused', async () => {
+		const view = props([gaming])
+		render(<ScenariosPage {...view} />)
+
+		await userEvent.click(screen.getByRole('button', { name: 'Delete Gaming' }))
+
+		const confirm = screen.getByRole('alertdialog', {
+			name: 'Delete Gaming scenario',
+		})
+		expect(view.onDelete).not.toHaveBeenCalled()
+
+		await userEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }))
+		expect(view.onDelete).not.toHaveBeenCalled()
+		expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+	})
+
+	it('deletes the scenario once the confirmation is given', async () => {
+		const view = props([gaming])
+		render(<ScenariosPage {...view} />)
+
+		await userEvent.click(screen.getByRole('button', { name: 'Delete Gaming' }))
+		await userEvent.click(
+			screen.getByRole('button', { name: 'Delete scenario' }),
+		)
+
+		expect(view.onDelete).toHaveBeenCalledWith('gaming')
+		expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+	})
+
+	// Rename sat between the star and Run, so the primary action was the one control that moved
+	// as the header grew. It now anchors the row and the pencil follows it.
+	it('keeps the rename control to the right of the run button', () => {
+		render(<ScenariosPage {...props([gaming])} />)
+
+		const labels = within(screen.getByRole('region', { name: 'Gaming' }))
+			.getAllByRole('button')
+			.map(button => button.getAttribute('aria-label'))
+
+		expect(labels.indexOf('Run Gaming')).toBeLessThan(
+			labels.indexOf('Rename Gaming'),
+		)
+		expect(labels.indexOf('Rename Gaming')).toBeLessThan(
+			labels.indexOf('Delete Gaming'),
+		)
 	})
 
 	it('runs a scenario and blocks a second run while it is going', async () => {

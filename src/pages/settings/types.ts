@@ -2,10 +2,12 @@ import type { ReactNode } from 'react'
 import type { MaintenanceConfirmation } from '../../features/edit-settings'
 import type { UpdaterState } from '../../features/update-app'
 import type {
+	AppInfo,
 	CatalogDiagnostics,
 	SourceHealth,
 	TargetAvailabilityDiff,
 } from '../../entities/app'
+import type { AppCategory, CategoryDefinition } from '../../entities/category'
 import type {
 	ScanSettings,
 	SystemClient,
@@ -29,6 +31,10 @@ export interface SettingsPageProps {
 	onForceFullScan?: () => Promise<void>
 	onResetCatalogCache?: () => Promise<void>
 	catalogDiagnostics?: CatalogDiagnostics | null
+	unclassifiedApps?: AppInfo[]
+	categories?: CategoryDefinition[]
+	categoryOrder?: AppCategory[]
+	onMoveApp?(appId: string, category: AppCategory): void
 	updater?: UpdaterState
 }
 

@@ -5,9 +5,39 @@ use crate::platform::windows::closer;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::PathBuf;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 const MAX_CLOSE_BATCH: usize = 32;
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CloseProgressPayload {
+    stage: &'static str,
+    running: usize,
+    seconds_left: u64,
+}
+
+impl From<closer::CloseStage> for CloseProgressPayload {
+    fn from(stage: closer::CloseStage) -> Self {
+        match stage {
+            closer::CloseStage::Asking { running } => Self {
+                stage: "asking",
+                running,
+                seconds_left: 0,
+            },
+            closer::CloseStage::Waiting { seconds_left } => Self {
+                stage: "waiting",
+                running: 0,
+                seconds_left,
+            },
+            closer::CloseStage::Terminating => Self {
+                stage: "terminating",
+                running: 0,
+                seconds_left: 0,
+            },
+        }
+    }
+}
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -65,8 +95,11 @@ pub(crate) async fn close_apps(
         resolve_close_targets(&state, ids)?
     };
     let targets = request.targets;
+    let emitter = app.clone();
     let outcome = super::run_blocking("Application close", move || {
-        closer::close_processes(&targets)
+        closer::close_processes(&targets, |stage| {
+            let _ = emitter.emit("close://progress", CloseProgressPayload::from(stage));
+        })
     })
     .await?;
     Ok(CloseAppsResponse {

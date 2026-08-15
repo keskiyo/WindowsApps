@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.5"><img src="https://img.shields.io/badge/version-0.3.5-7C3AED?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/keskiyo/WindowsApps/releases/tag/v0.3.6"><img src="https://img.shields.io/badge/version-0.3.6-7C3AED?style=flat-square" alt="Version"></a>
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square&amp;logo=windows11&amp;logoColor=white" alt="Windows">
   <img src="https://img.shields.io/badge/architecture-x64-334155?style=flat-square" alt="Architecture">
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&amp;logo=tauri&amp;logoColor=white" alt="Tauri">
@@ -48,8 +48,16 @@ When the same application is discovered from more than one source, it appears on
 ### Search the catalog
 
 Find applications by name, publisher, description or path, including typo-tolerant search.
-Typing a name in Russian letters finds the Latin one, and when a match sits in another
-section the results say so and link straight to it.
+Typing a name in Russian letters finds the Latin one, naming a category returns everything
+filed under it, and when a match sits in another section the results say so and link
+straight to it.
+
+### Sort software it has never seen
+
+Categories do not rely on a list of known products. Windows Apps reads the file types and
+protocols an application registered with Windows, the purpose the vendor wrote into the file
+description, and the Start Menu group the shortcut lives in — so an unfamiliar player, editor or
+mail client still lands where it belongs.
 
 ### Keep one card per application
 
@@ -74,6 +82,11 @@ Star applications for quick access, or run a Scenario that opens one group of ap
 ![Scenarios page with launch and close lists](.github/images/scenarios.png)
 
 Each Scenario shows the applications it will launch and the applications it will close before you run it.
+Applications are added from a searchable picker that names the category of every entry and
+takes the whole selection in one pass. While a Scenario runs it reports each step — asking
+applications to close, counting down the five seconds before anything is forced — and ends
+with one summary of what launched, closed and refused. Closing is not a polite request
+only: whatever ignores it is ended, and unsaved work in those applications is lost.
 If an application later disappears from Windows, its saved name and icon remain visible as
 **Unavailable** so it can be removed without deleting the whole Scenario.
 
@@ -93,14 +106,16 @@ Inspect local file details, architecture, signature status and installation stat
 
 ![Settings page with startup, shortcut, Windows apps, updates and Advanced controls](.github/images/settings.png)
 
-Everyday settings stay visible. Scanning, backups and maintenance live under Advanced. Settings
+Everyday settings stay visible. Scanning, backups and maintenance live under Advanced, together
+with the applications no rule recognised: each one lists the signals the classifier read, can be
+moved to a category on the spot, and the whole list copies as plain text. Settings
 export contains preferences only, and import reports an error if Windows Apps cannot persist the
 restored data. When Windows startup is enabled, Windows Apps starts in the system tray; choose
 **Open Windows Apps** from the tray menu when you need the window.
 
 ## Install
 
-1. Download [**`Windows.Apps_0.3.5_x64-setup.exe`**](https://github.com/keskiyo/WindowsApps/releases/latest).
+1. Download [**`Windows.Apps_0.3.6_x64-setup.exe`**](https://github.com/keskiyo/WindowsApps/releases/latest).
 2. Run the installer.
 3. Start Windows Apps and choose **Scan for apps**.
 

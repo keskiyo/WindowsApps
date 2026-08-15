@@ -88,6 +88,7 @@ describe('tauri app client browser fallback', () => {
 			'SCAN_CANCELLED',
 			'SCAN_COALESCED',
 			'SCAN_PATH_NOT_ABSOLUTE',
+			'UNINSTALL_CANCELLED',
 			'UNINSTALL_DATA_UNAVAILABLE',
 			'UNINSTALL_UNAVAILABLE',
 		]

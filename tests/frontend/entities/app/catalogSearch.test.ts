@@ -2,8 +2,45 @@ import { describe, expect, it } from 'vitest'
 import {
 	filterAppsByQuery,
 	rankAppsByQuery,
+	rankAppsByQueryAndCategory,
 } from '../../../../src/entities/app/lib/catalogSearch'
 import type { AppInfo } from '../../../../src/entities/app'
+import { DEFAULT_CATEGORIES } from '../../../../src/entities/category'
+
+describe('rankAppsByQueryAndCategory', () => {
+	const browser = app({ id: 'firefox', name: 'Firefox', category: 'browsers' })
+	const chat = app({ id: 'discord', name: 'Discord', category: 'communication' })
+
+	// A reader who remembers the shelf but not the label should still find the app.
+	it('answers a category name with the apps filed under it', () => {
+		expect(
+			rankAppsByQueryAndCategory(
+				[browser, chat],
+				'brow',
+				DEFAULT_CATEGORIES,
+			).map(entry => entry.id),
+		).toEqual(['firefox'])
+	})
+
+	it('keeps name matches ahead of the apps the category name pulls in', () => {
+		const named = app({ id: 'player', name: 'Media Player', category: 'other' })
+		const filed = app({ id: 'songbird', name: 'Songbird', category: 'media' })
+
+		expect(
+			rankAppsByQueryAndCategory(
+				[named, filed],
+				'media',
+				DEFAULT_CATEGORIES,
+			).map(entry => entry.id),
+		).toEqual(['player', 'songbird'])
+	})
+
+	it('leaves an empty query alone', () => {
+		expect(
+			rankAppsByQueryAndCategory([browser, chat], '  ', DEFAULT_CATEGORIES),
+		).toEqual([browser, chat])
+	})
+})
 
 function app(
 	value: Partial<AppInfo> & Pick<AppInfo, 'id' | 'name'>,
