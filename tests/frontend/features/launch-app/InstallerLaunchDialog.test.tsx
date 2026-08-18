@@ -45,4 +45,50 @@ describe('InstallerLaunchDialog', () => {
 		fireEvent.keyDown(document, { key: 'Escape' })
 		expect(onCancel).toHaveBeenCalledOnce()
 	})
+
+	// Starting the installer re-renders the dialog with new callbacks, which is exactly when a
+	// focus owner that re-reads the active element loses track of the card that opened it.
+	it('returns focus to the opener even after the installer starts', () => {
+		render(<button type="button">Launch Editor Setup</button>)
+		const opener = screen.getByRole('button', {
+			name: 'Launch Editor Setup',
+		})
+		opener.focus()
+
+		const view = render(
+			<InstallerLaunchDialog
+				app={app}
+				pending={false}
+				onCancel={vi.fn()}
+				onConfirm={vi.fn()}
+			/>,
+		)
+		view.rerender(
+			<InstallerLaunchDialog
+				app={app}
+				pending
+				onCancel={vi.fn()}
+				onConfirm={vi.fn()}
+			/>,
+		)
+
+		view.unmount()
+		expect(opener).toHaveFocus()
+	})
+
+	it('ignores Escape while the installer is starting', () => {
+		const onCancel = vi.fn()
+		render(
+			<InstallerLaunchDialog
+				app={app}
+				pending
+				onCancel={onCancel}
+				onConfirm={vi.fn()}
+			/>,
+		)
+
+		fireEvent.keyDown(document, { key: 'Escape' })
+
+		expect(onCancel).not.toHaveBeenCalled()
+	})
 })

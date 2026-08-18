@@ -72,14 +72,6 @@ pub(crate) fn system_msiexec() -> PathBuf {
     system_root().join("System32").join("msiexec.exe")
 }
 
-pub(crate) fn system_powershell() -> PathBuf {
-    system_root()
-        .join("System32")
-        .join("WindowsPowerShell")
-        .join("v1.0")
-        .join("powershell.exe")
-}
-
 fn system_root() -> PathBuf {
     std::env::var("SystemRoot")
         .or_else(|_| std::env::var("windir"))
@@ -206,11 +198,8 @@ mod tests {
     }
 
     #[test]
-    fn system_interpreters_resolve_under_the_windows_directory() {
-        let root = system_root();
-        assert!(system_powershell().starts_with(&root));
-        assert!(system_msiexec().starts_with(&root));
-        assert!(system_powershell().is_absolute());
+    fn the_installer_host_resolves_under_the_windows_directory() {
+        assert!(system_msiexec().starts_with(system_root()));
         assert!(system_msiexec().is_absolute());
     }
 }

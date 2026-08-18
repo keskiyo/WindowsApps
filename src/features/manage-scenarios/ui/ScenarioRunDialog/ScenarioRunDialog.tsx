@@ -1,9 +1,8 @@
 import { ListChecks, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { sortScenariosByNewest } from '../../../../entities/scenario'
-import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap'
+import { useModalDialog } from '../../../../shared/hooks/useModalDialog'
 import { DIALOG_LABEL } from './data'
 import { ScenarioRunRow } from './ScenarioRunRow'
 import type { ScenarioRunDialogProps } from './types'
@@ -16,20 +15,10 @@ export function ScenarioRunDialog({
 	onRun,
 	onClose,
 }: ScenarioRunDialogProps) {
-	useBodyScrollLock()
 	const dialogRef = useRef<HTMLDivElement>(null)
 	const closeRef = useRef<HTMLButtonElement>(null)
 	const [expanded, setExpanded] = useState<string[]>([])
-	useFocusTrap(dialogRef)
-
-	useEffect(() => {
-		const trigger = document.activeElement
-		closeRef.current?.focus()
-		return () => {
-			if (trigger instanceof HTMLElement && trigger.isConnected)
-				trigger.focus()
-		}
-	}, [])
+	useModalDialog({ ref: dialogRef, initialFocusRef: closeRef })
 
 	function toggle(id: string) {
 		setExpanded(open =>

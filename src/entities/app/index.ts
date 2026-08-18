@@ -9,6 +9,7 @@ export type {
 	AppSourceKind,
 	AppsClient,
 	AppView,
+	CatalogArtifactKind,
 	CatalogChangeSummary,
 	CatalogDelta,
 	CatalogDiagnostics,

@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap'
+import { useRef } from 'react'
+import { useModalDialog } from '../../../../shared/hooks/useModalDialog'
 import { AdditionalInformation } from './AdditionalInformation'
 import { AppIdentityHeader } from './AppIdentityHeader'
 import { AppInformationCards } from './AppInformationCards'
@@ -15,12 +14,13 @@ export function AppInfoDialog({
 	appsClient,
 	onClose,
 }: AppInfoDialogProps) {
-	useBodyScrollLock()
 	const dialogRef = useRef<HTMLElement>(null)
-	const [closeButton, setCloseButton] = useState<HTMLButtonElement | null>(
-		null,
-	)
-	useFocusTrap(dialogRef)
+	const closeRef = useRef<HTMLButtonElement>(null)
+	useModalDialog({
+		ref: dialogRef,
+		initialFocusRef: closeRef,
+		onDismiss: onClose,
+	})
 	const { details, error, isLoading, retry } = useAppDetails(
 		app.id,
 		appsClient,
@@ -29,14 +29,6 @@ export function AppInfoDialog({
 	const hasKnownPackageInstallLocation =
 		app.sourceKind === 'msix' && Boolean(app.installLocation?.trim())
 	const hasPackageLaunchTarget = app.launchKind === 'app_user_model_id'
-	useEffect(() => {
-		closeButton?.focus()
-		function keydown(event: KeyboardEvent) {
-			if (event.key === 'Escape') onClose()
-		}
-		document.addEventListener('keydown', keydown)
-		return () => document.removeEventListener('keydown', keydown)
-	}, [closeButton, onClose])
 	return (
 		<div
 			className="motion-overlay fixed inset-0 z-400 grid place-items-center bg-[color-mix(in_oklab,var(--surface-canvas)_72%,transparent)] p-3 backdrop-blur-[3px] sm:p-5"
@@ -55,7 +47,7 @@ export function AppInfoDialog({
 					app={app}
 					categories={categories}
 					details={details}
-					closeRef={setCloseButton}
+					closeRef={closeRef}
 					onClose={onClose}
 				/>
 				<div className="mt-5 space-y-4">

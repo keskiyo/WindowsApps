@@ -5,7 +5,7 @@ import type {
 	ReactNode,
 	RefObject,
 } from 'react'
-import type { AppInfo } from '../../../../entities/app'
+import type { AppInfo, CatalogArtifactKind } from '../../../../entities/app'
 import type {
 	AppCategory,
 	CategoryDefinition,
@@ -16,7 +16,11 @@ export interface AppActionsMenuProps {
 	categories: CategoryDefinition[]
 	categoryOrder: AppCategory[]
 	onClose(): void
-	onMove(id: string, category: AppCategory): void
+	onMove(
+		id: string,
+		category: AppCategory,
+		artifact?: CatalogArtifactKind,
+	): void
 	onInfo(app: AppInfo): void
 	onUninstall(app: AppInfo): void
 	isHidden?: boolean
@@ -43,6 +47,16 @@ export interface CategorySubmenuProps {
 	categoryOrder: AppCategory[]
 	activeCategory: AppCategory
 	onSelect(category: AppCategory): void
+	onExpand(category: AppCategory): void
+	expandedCategory: AppCategory | null
+	menuRef: RefObject<HTMLDivElement>
+	position: Pick<CSSProperties, 'left' | 'top'>
+	onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>): void
+	label: string
+}
+
+export interface ArtifactSubmenuProps {
+	onSelect(kind: CatalogArtifactKind): void
 	menuRef: RefObject<HTMLDivElement>
 	position: Pick<CSSProperties, 'left' | 'top'>
 	onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>): void

@@ -3,7 +3,7 @@ import {
 	parsePreferenceImport,
 	readPreferenceBackup,
 	serializePreferences,
-	type AppPreferencesV15,
+	type AppPreferencesV16,
 	type PreferenceTransferResult,
 } from './preferences'
 import { reconcileMarks } from './reconciliation'
@@ -29,9 +29,9 @@ type PreferenceTransferActions = Pick<
 	| 'restorePreferencesBackup'
 >
 
-function preferencesFromState(state: AppState): AppPreferencesV15 {
+function preferencesFromState(state: AppState): AppPreferencesV16 {
 	return {
-		version: 15,
+		version: 16,
 		categories: state.categories,
 		categoryOrder: state.categoryOrder,
 		favoriteAppIds: state.favoriteAppIds,
@@ -45,6 +45,8 @@ function preferencesFromState(state: AppState): AppPreferencesV15 {
 		promotedAppIdentities: state.promotedAppIdentities,
 		installerAppIds: state.installerAppIds,
 		installerAppIdentities: state.installerAppIdentities,
+		documentAppIds: state.documentAppIds,
+		documentAppIdentities: state.documentAppIdentities,
 		scenarios: state.scenarios,
 		favoriteScenarioIds: state.favoriteScenarioIds,
 		firstSeenAt: state.firstSeenAt,
@@ -53,7 +55,7 @@ function preferencesFromState(state: AppState): AppPreferencesV15 {
 	}
 }
 
-function preferenceState(preferences: AppPreferencesV15) {
+function preferenceState(preferences: AppPreferencesV16) {
 	return {
 		categories: preferences.categories,
 		categoryOrder: preferences.categoryOrder,
@@ -68,6 +70,8 @@ function preferenceState(preferences: AppPreferencesV15) {
 		promotedAppIdentities: preferences.promotedAppIdentities,
 		installerAppIds: preferences.installerAppIds,
 		installerAppIdentities: preferences.installerAppIdentities,
+		documentAppIds: preferences.documentAppIds,
+		documentAppIdentities: preferences.documentAppIdentities,
 		scenarios: preferences.scenarios,
 		favoriteScenarioIds: preferences.favoriteScenarioIds,
 		firstSeenAt: preferences.firstSeenAt,
@@ -83,7 +87,7 @@ export function createPreferenceTransferActions({
 	storage,
 }: PreferenceTransferOptions): PreferenceTransferActions {
 	function applyPreferences(
-		preferences: AppPreferencesV15,
+		preferences: AppPreferencesV16,
 	): PreferenceTransferResult {
 		if (hasNewerStoredPreferences(storage)) {
 			return {

@@ -48,7 +48,8 @@ $sliced = @("pages", "widgets", "features", "entities")
 
 # The one deliberate upward edge. The store is a single root store, so a per-card launching
 # subscription has to reach it; splitting the store into per-domain slices is the fix, and
-# until then this stays a named exception rather than a silent one. See src/AGENTS.md.
+# until then this stays a named exception rather than a silent one. A second entry belongs
+# here only after that split, never as a shortcut around the layering.
 $allowedUpward = @{
   "src/features/launch-app/model/useIsLaunching.ts" = "src/app/store/appStoreContext"
 }

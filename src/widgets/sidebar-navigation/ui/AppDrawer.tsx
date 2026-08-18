@@ -1,28 +1,18 @@
 import { X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
-import { useBodyScrollLock } from '../../../shared/hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../../shared/hooks/useFocusTrap'
+import { useModalDialog } from '../../../shared/hooks/useModalDialog'
 import type { AppDrawerProps } from '../types'
 import { AppNavigation } from './AppNavigation/AppNavigation'
 import { NavigationIdentity } from './NavigationIdentity'
 
 export function AppDrawer(props: AppDrawerProps) {
 	const panelRef = useRef<HTMLElement>(null)
-	useBodyScrollLock()
-	useFocusTrap(panelRef)
 	const { onClose, onExited, open, triggerRef } = props
-	useEffect(() => {
-		const trigger = triggerRef.current
-		panelRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
-		function keydown(event: KeyboardEvent) {
-			if (event.key === 'Escape') onClose()
-		}
-		document.addEventListener('keydown', keydown)
-		return () => {
-			document.removeEventListener('keydown', keydown)
-			trigger?.focus()
-		}
-	}, [onClose, triggerRef])
+	useModalDialog({
+		ref: panelRef,
+		restoreFocusTo: triggerRef,
+		onDismiss: onClose,
+	})
 	useEffect(() => {
 		if (open) return
 		const timeout = window.setTimeout(onExited, 240)

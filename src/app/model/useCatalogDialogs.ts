@@ -5,17 +5,22 @@ import { useUninstallFlow } from '../../features/uninstall-app'
 import { useAppInfoDialog } from '../../features/view-app-details'
 import type { AppInfo, UninstallPreview } from '../../entities/app'
 import type { SystemClient } from '../../entities/system'
+import type { UninstallOutcome } from './useAppFeedback'
 
 interface DialogOptions {
 	systemClient: Pick<SystemClient, 'logClientError'>
 	getUninstallPreview(id: string): Promise<UninstallPreview>
 	onLaunch(app: AppInfo): Promise<void>
+	onUninstall(app: AppInfo): Promise<UninstallOutcome>
+	onRefresh(): Promise<void>
 }
 
 export function useCatalogDialogs({
 	systemClient,
 	getUninstallPreview,
 	onLaunch,
+	onUninstall,
+	onRefresh,
 }: DialogOptions) {
 	const [paletteOpen, setPaletteOpen] = useState(false)
 	const appInfo = useAppInfoDialog()
@@ -32,8 +37,23 @@ export function useCatalogDialogs({
 		[systemClient],
 	)
 
+	const confirmUninstall = useCallback(async () => {
+		const app = uninstall.app
+		if (!app) return
+		const outcome = await onUninstall(app)
+		if (outcome === 'failed') return
+		uninstall.select(null)
+		if (outcome === 'cancelled') return
+		try {
+			await onRefresh()
+		} catch (ignored) {
+			void ignored
+		}
+	}, [onRefresh, onUninstall, uninstall])
+
 	return {
 		appInfo,
+		confirmUninstall,
 		installerLaunch,
 		uninstall,
 		palette: {

@@ -64,6 +64,36 @@ Main source areas:
 | `src-tauri/src/platform/windows/`             | Windows-native boundary                                       |
 | `tests/frontend/`                             | Frontend tests mirroring source ownership                     |
 
+Two shared pieces own behaviour that used to be copied per call site, so a
+change to either is a change everywhere it applies:
+
+| Owner                                                        | Owns                                                                                                                                                                                               |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/shared/hooks/useModalDialog.ts`                         | Modal lifecycle: body-scroll lock, focus trap, initial focus, focus restoration, and the optional Escape listener. Composes `useBodyScrollLock` and `useFocusTrap` rather than reimplementing them |
+| `src/pages/settings/ui/components/SettingsSectionHeader.tsx` | The icon tile, heading and description shared by every settings card                                                                                                                               |
+
+`useModalDialog` captures the opening element once, on mount, so a dialog that
+re-renders mid-flight — an installer that starts, an update that begins
+downloading — still returns focus to the control the reader came from. A dialog
+passes `onDismiss` only when the shared hook should own Escape; the command
+palette, app picker and scenario-run dialog keep Escape in their own key
+handler because it belongs to the same arrow-key navigation contract, and
+`ConfirmDialog` deliberately has no Escape at all: a destructive confirmation
+dismisses only through a control the reader aimed at.
+
+The backend groups each large module by reason to change rather than by file
+size. `catalog/sync/` splits source scanning (`scan_sources.rs`), per-source
+health (`health.rs`), the catalog delta (`delta.rs`) and cache assembly
+(`assemble.rs`), leaving `synchronize` as orchestration. `catalog/scan/`
+separates the filesystem walk from the index model and executable fingerprints,
+and hydration from icon extraction. `app_state/` separates catalog memory,
+launch-wait limiting and uninstall history. `platform/windows/icon_extractor/`
+separates image decoding, GDI bitmap encoding, shell icons and AppUserModelId
+lookups, so each `unsafe` block sits next to the ownership rules it depends on.
+`platform/windows/uninstall/validate.rs` holds the whole uninstall-argument
+validation surface, which is the boundary that keeps a registry-supplied
+command from becoming an arbitrary process.
+
 ## 4. IPC, events, and errors
 
 Command families cover catalog reads and scans, icon hydration, launch/close,
@@ -146,7 +176,17 @@ retains a bounded 32 KiB name/icon snapshot per app identity so unavailable
 entries remain identifiable and removable; it is presentation data, never a
 launch target.
 
-Marks — favorites, hidden, promoted and installer placements — and category
+Filing an application into Installers & Docs by hand records which half it
+belongs to. The category holds one bucket per artifact kind, so a placement that
+only said "Installers & Docs" had to pick installer, and a reference document
+filed by hand landed beside setup programs with no way back. The menu therefore
+opens a third level under that row — Installers or Docs — and the choice is
+persisted as its own placement. The scanner's own verdict is unchanged: an entry
+it already recognised as an installer or a document is not offered a move, and
+upgrading a document written before this split leaves every existing placement an
+installer.
+
+Marks — favorites, hidden, promoted and manual artifact placements — and category
 overrides are reconciled against the catalog on every full replacement, not only
 at startup. The initial load, a refresh, a forced scan, an `apps://updated`
 snapshot, a `catalog://delta` and a preferences import all run the same
@@ -182,6 +222,19 @@ Normal startup is cache-first. Background validation and incremental scans keep
 the UI usable while source work runs. A force scan explicitly bypasses the
 previous filesystem index. Scan work is cancellable, generation-aware and
 bounded; no stale result may overwrite a newer generation.
+
+Scanning starts no interpreter. Start Apps and packaged applications are read
+through the shell itself: `platform/windows/apps_folder.rs` enumerates
+`shell:AppsFolder` over `IShellItem`/`IEnumShellItems` and reads each entry's
+display name, parsing name, `System.Link.TargetParsingPath` and — for packaged
+entries — `System.AppUserModel.PackageFullName` and `PackageInstallPath`. The
+executable behind a packaged entry comes from the read-only application map in
+`platform/windows/registry/package_registry.rs`. Nothing about this path spawns
+`powershell.exe`, so a scan no longer looks like a process launching a hidden
+interpreter — behaviour that reputation-based antivirus scores against unsigned
+binaries. The package map is best-effort: when it cannot be read, packaged
+entries keep their name, publisher, version, install location and uninstall
+target and lose only the resolved executable.
 
 | Stage          | Invariant                                                                                                  |
 | -------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -246,6 +299,14 @@ keeps the keyboard exit one keystroke away, and focus returns to the control tha
 opened the dialog. Optional detail — the uninstall route, for instance — renders
 in a block between the description and the actions.
 
+Returning focus is not specific to confirmations: every dialog hands it back to
+the control that opened it, so closing one never drops the keyboard at the top
+of the catalog. The application information dialog used to be the exception and
+left focus on `<body>`; it now goes through the same shared modal lifecycle as
+the rest, and a regression test opens it from a control and asserts the control
+has focus again after it closes. The navigation drawer restores focus to its
+menu button explicitly, because the burger outlives the panel.
+
 The More page previews every scenario while they all fit its card and spends the
 last slot on a "View all" row only once a scenario is left out of the preview.
 
@@ -283,6 +344,25 @@ An entry generated for a `file://` target is documentation whenever the target
 is a document, so a registered `…/doc/index.html` is filed with the other
 documentation rather than as an application of the product it documents.
 
+Category rules are applied twice, and the second pass is the one that matters.
+A source records a first guess from the name and path it has; assembly re-runs
+`classify_app` over the finished record, where the publisher, product name,
+description and resolved executable are available and outweigh the name. A rule
+that needs vendor evidence therefore belongs on those fields, and measuring a
+source's output in isolation understates the result: on a 432-record scan of
+three sources, 51 entries carried no category, while the assembled catalog of
+217 left 5.
+
+A component shipped as part of Windows is recognised by its publisher, not by
+where it is installed. Store packages live under `Program Files\WindowsApps`
+whether Microsoft ships them with the operating system or sells them alongside
+everyone else's, so treating that tree as evidence swept Xbox, the Game Bar, Dev
+Home, To Do and Power Automate into Windows Features. The package publisher id
+`cw5n1h2txyewy` is the identity of `CN=Microsoft Windows` and belongs only to
+genuine shell components; first-party applications that are still part of a
+Windows installation, such as Calculator or Maps, stay on the explicit
+package-name list beside it.
+
 ### Signals that do not depend on knowing the product
 
 A table of product names can only recognise software it already lists, so three
@@ -306,13 +386,74 @@ signals carry records the table has never seen:
 
 `WindowsFeatures` is deliberately excluded from the vocabulary: it is recognised
 by whole values only, so a third-party shortcut described as «Проводник» cannot
-inherit it.
+inherit it. Its one substring field is the install path, which carries the two
+machine facts that need no product name: a component living under
+`\Windows\System32`, `\SysWOW64`, `\Windows\Speech` or `\Windows\SystemApps\`, and
+a Store package whose family starts `\WindowsApps\Microsoft.`. A Store package
+from any other publisher is untouched by that rule.
+
+Two kinds of reported metadata are treated as no evidence at all rather than as
+weak evidence, because scoring them is worse than ignoring them:
+
+- **Localized resource stubs.** Windows reports `MSPAINT.EXE.MUI` as the original
+  file name, and dropping only the last extension leaves `mspaint.exe`, which
+  matches no executable rule. The `.mui` suffix is removed before the stem is
+  taken.
+- **Packaging-toolkit metadata.** An InstallShield shortcut reports publisher
+  `Acresso Software Inc.`, product and description `InstallShield`, and
+  `_IsIcoRes.exe` as the binary — all describing the installer, not the product.
+  Those values are blanked, so the product name in the shortcut's own title is
+  what the rules read. The same applies to Inno Setup, NSIS and Nullsoft
+  defaults.
+
+One more install path carries a product without naming it. An MSI-advertised
+shortcut reports the Windows Installer cache — `C:\Windows\Installer\{GUID}` —
+instead of a program folder, so neither the name nor the path says what the
+product is. Microsoft registers Office under a fixed product-code family, so
+`\Installer\{90120000`, `{90140000`, `{90150000` and `{90160000` file the whole
+suite at once: `Access 2016` and `Publisher 2016` carry no other evidence and
+would otherwise stay unclassified for the same reason as their telemetry and
+language companions.
 
 Records that still match nothing are listed under Settings → Advanced with every
 signal the classifier read, so a machine with unfamiliar software shows what the
 tables are missing rather than a silent pile in `Other`. One action copies the
 whole list — signals, source, artifact, visibility and the recorded reason — as
 plain text, so an unfamiliar machine can be reported without retyping it.
+
+That report is how the rules above were derived rather than guessed. A copied
+list of 60 unrecognised records from an unfamiliar Windows install was replayed
+through the classifier: 13 were reachable from machine facts alone (Windows
+paths, Store package families, the `.mui` and packaging-metadata fixes), and the
+remaining product names were added only where the record itself carried an
+unambiguous signal — a vendor's own product family, a driver standard, a shared
+install root. 48 of the 60 now classify and four more are recognised as
+components; the rest stay in `Other` on purpose, because a rule that fitted them
+would fit only that one machine. Every one of those records is a fixture in
+`catalog_categories.json` or `catalog_visibility.json`, including guards that
+must **not** match: a Store package from a non-Microsoft publisher is not a
+Windows feature, and a product named after a maintenance verb is still a
+product.
+
+A second report, 29 records from an unrelated Windows install, was replayed the
+same way. Five needed nothing: four Microsoft Store packages were already
+answered by the package-family path, and the catalog recognised itself by
+publisher. The other 24 fell into three shapes. A versioned vendor tree names a
+family its executables never do — `1cestart`, `1cv8`, `1cv8c` and `1cv8s` say
+nothing, while `\1cv8\` and the publisher spelled in both Cyrillic and Latin say
+1C:Enterprise. A component names its own install root instead of itself:
+`Unload kernel module` and `Peace` are only a verb and an author until the
+`Cheat Engine` and `EqualizerAPO` trees they sit in answer for them. And a
+localized name can drop every product word it had — `Кнопки сервисов Яндекса на
+панели задач` leaves only `YandexPin.exe` to read, and it must not be read as
+the browser whose folder it shares.
+
+That last shape is why a shared install root scores below a vendor. A dongle
+driver installer ships inside the 1C tree, so the tree would file it as business
+software; its own publisher and executable outrank the path and keep it with the
+maintenance tools. The reverse guard already existed for Windows features, and
+this is the same rule seen from the other side: a path answers only for a record
+that has nothing else to say.
 
 A query that names a category also returns the applications filed under it,
 after the entries matched by name. The catalog search and the scenario picker
@@ -347,6 +488,20 @@ by the Steam installation directory, so games remain explicit Scenario entries.
 Uninstall previews expose only application identity, publisher, source and safe
 removal mechanism. Execution requires confirmation and uses a validated,
 Rust-owned target. History excludes paths, command lines and internal errors.
+
+Removing a packaged application goes through
+`Windows.Management.Deployment.PackageManager` in
+`platform/windows/uninstall/msix.rs`, not through an interpreter. Removal is
+silent, as before. The call runs on a thread the module spawns for it and joins:
+that thread enters a multithreaded apartment, because the blocking wait on the
+deployment operation pumps no messages and would deadlock a completion
+marshalled into the process's single-threaded apartment. Failures are reported
+as the deployment error code alone, without a package name or path.
+
+The product no longer starts `powershell.exe` anywhere. `cargo clippy` enforces
+it: removing the last call site left `exec_target::system_powershell` unused and
+failed the build under `-D warnings`, so the helper is gone and a new caller
+would have to reintroduce it deliberately.
 
 ### Windows integration and updates
 
@@ -384,19 +539,37 @@ Rust-owned target. History excludes paths, command lines and internal errors.
 - Native process execution uses a fixed executable plus argument vector, never
   a shell string. Registry, shortcuts, filesystem entries and IPC payloads are
   untrusted.
+- A launched executable starts in its own directory, the way Explorer starts it.
+  Leaving the shell's working directory unset handed the child this process's
+  own directory, so anything it wrote relative to it landed in the catalog's
+  folder — Rufus dropped its `rufus.com` console companion there. Shortcuts keep
+  the working directory recorded in the `.lnk`; AppUserModelIds and `steam://`
+  URIs have no directory of their own and pass none.
 - Signature checks do not show Windows UI or fetch network data. Logs and
   diagnostics exclude credentials, file contents and unnecessary personal paths.
 - Unsafe Windows code is confined to `platform/windows`; every unsafe block has
   an adjacent `// SAFETY:` rationale.
 - The installer is not Authenticode-signed and can show SmartScreen; updater
   package integrity is protected by its separate signature.
+- Because the binary is unsigned and every release starts at zero reputation,
+  behaviour that reputation-based antivirus scores heavily is avoided on
+  purpose: no interpreter is started, and `mainBinaryName` ships the executable
+  as `WindowsApps.exe` rather than the Cargo package's generic `app.exe`. The
+  NSIS template records `MainBinaryName` in the uninstall key and deletes the
+  previously installed binary when the name changes, so an update from a build
+  that shipped `app.exe` leaves nothing behind. The Windows startup value is
+  rewritten to the running executable on every start of an installed copy, so a
+  renamed, moved or updated copy never leaves a startup entry pointing at a
+  path that no longer exists.
 
 ## 14. Repository workflow
 
-Read the nearest `AGENTS.md` before modifying a layer. Follow existing seams;
-do not add dependencies, broad package updates, comments in production source,
-path aliases, global utility folders, raw Tauri imports outside the approved
-integration modules, or relaxed checks without explicit approval.
+Follow existing seams; do not add dependencies, broad package updates, comments
+in production source, path aliases, global utility folders, raw Tauri imports
+outside the approved integration modules, or relaxed checks without explicit
+approval. §3 above states which layer owns what, and the boundary scripts in
+`scripts/` fail the `contracts` job when a change crosses one — those two are
+the reference a clone actually carries.
 
 New frontend behavior receives a lowest-level regression test. Frontend tests
 use typed complete client fakes and query observable behavior. Rust unit tests
@@ -409,15 +582,25 @@ Development commands are defined by `package.json`:
 npm run dev
 npm run tauri dev
 npm run lint
+npm run format:check
 npm run typecheck
 npm test
 npm run build
 ```
 
+Formatting is owned by Prettier through `prettier.config.mjs` and `.prettierignore`.
+`endOfLine` is `auto` because `core.autocrlf` is enabled on Windows checkouts while
+the hosted runners are not; pinning it to `lf` would make `format:check` disagree
+with itself across platforms. Generated files — `package-lock.json`, the golden
+catalog baselines re-recorded by `serde_json`, `THIRD_PARTY_NOTICES.md`,
+`.github/release-notes.md` and the SHA-pinned workflows — stay ignored so their
+generators remain the only writers.
+
 ## 16. Verification and releases
 
-For frontend production changes run lint, typecheck, relevant tests, the full
-suite for shared behavior, and production build. For backend changes run format,
+For frontend production changes run lint, formatting check, typecheck, relevant
+tests, the full suite for shared behavior, and production build. For backend
+changes run format,
 Clippy with warnings denied, and relevant/full Rust tests:
 
 ```powershell
@@ -428,7 +611,8 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 `verify.yml` runs on pull requests and `master`:
 
-- frontend: `npm ci`, lint, typecheck, coverage test run and production build;
+- frontend: `npm ci`, lint, formatting check, typecheck, coverage test run and
+  production build;
 - backend: tests on `windows-latest` and `windows-2022`, plus format and Clippy;
 - MSRV: compile at the `rust-version` declared in `src-tauri/Cargo.toml`;
 - contracts: frontend/platform boundaries, release-script tests and dependency

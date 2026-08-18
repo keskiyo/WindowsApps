@@ -1,169 +1,15 @@
 use crate::catalog::{icon_cache, icon_source_candidates, AppInfo, LaunchKind, SourceKind};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
-use serde::Serialize;
-use std::collections::{HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AppHydrationPatch {
-    pub id: String,
-    pub generation: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub icon_base64: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub publisher: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub product_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub original_filename: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub install_location: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub can_uninstall: Option<bool>,
-}
-
-pub(crate) struct HydrationOutcome {
-    pub patch: AppHydrationPatch,
-    pub written_icon: Option<(String, String)>,
-}
-
-pub(crate) fn hydrate_one(app_data_dir: &Path, app: &AppInfo, generation: u64) -> HydrationOutcome {
-    hydrate_app(app_data_dir, app, generation)
-}
-
 #[derive(Default)]
-pub(crate) struct HydrationQueue {
-    generation: u64,
-    foreground: VecDeque<String>,
-    background: VecDeque<String>,
-    queued: HashSet<String>,
-    running: bool,
+pub(super) struct HydratedIcon {
+    pub(super) data_url: Option<String>,
+    pub(super) written_fingerprint: Option<String>,
 }
 
-impl HydrationQueue {
-    pub(crate) fn enqueue(
-        &mut self,
-        generation: u64,
-        ids: impl IntoIterator<Item = String>,
-        priority: bool,
-    ) -> bool {
-        if self.generation != generation {
-            self.generation = generation;
-            self.foreground.clear();
-            self.background.clear();
-            self.queued.clear();
-            self.running = false;
-        }
-        for id in ids {
-            if !self.queued.insert(id.clone()) {
-                if priority {
-                    let was_background = self.background.iter().any(|queued| queued == &id);
-                    self.background.retain(|queued| queued != &id);
-                    if was_background && !self.foreground.iter().any(|queued| queued == &id) {
-                        self.foreground.push_back(id);
-                    }
-                }
-                continue;
-            }
-            if priority {
-                self.foreground.push_back(id);
-            } else {
-                self.background.push_back(id);
-            }
-        }
-        if self.running || self.queued.is_empty() {
-            false
-        } else {
-            self.running = true;
-            true
-        }
-    }
-
-    pub(crate) fn pop(&mut self, generation: u64) -> Option<String> {
-        if self.generation != generation {
-            return None;
-        }
-        self.foreground
-            .pop_front()
-            .or_else(|| self.background.pop_front())
-    }
-
-    pub(crate) fn complete(&mut self, generation: u64, id: &str) {
-        if self.generation == generation {
-            self.queued.remove(id);
-        }
-    }
-
-    pub(crate) fn finish(&mut self, generation: u64) {
-        if self.generation == generation {
-            self.running = false;
-        }
-    }
-}
-
-fn hydrate_app(app_data_dir: &Path, app: &AppInfo, generation: u64) -> HydrationOutcome {
-    let target = app.resolved_path.as_deref().unwrap_or(&app.path);
-    let metadata = Path::new(target)
-        .extension()
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
-        .then(|| crate::platform::windows::executable_metadata::read(Path::new(target)));
-    let icon = hydrate_icon(app_data_dir, app);
-    let icon_base64 = icon.data_url;
-    let patch = AppHydrationPatch {
-        id: app.id.clone(),
-        generation,
-        icon_base64,
-        description: app.description.clone().or_else(|| {
-            metadata
-                .as_ref()
-                .and_then(|value| value.description.clone())
-        }),
-        version: app
-            .version
-            .clone()
-            .or_else(|| metadata.as_ref().and_then(|value| value.version.clone())),
-        publisher: app
-            .publisher
-            .clone()
-            .or_else(|| metadata.as_ref().and_then(|value| value.publisher.clone())),
-        product_name: app.product_name.clone().or_else(|| {
-            metadata
-                .as_ref()
-                .and_then(|value| value.product_name.clone())
-        }),
-        original_filename: app.original_filename.clone().or_else(|| {
-            metadata
-                .as_ref()
-                .and_then(|value| value.original_filename.clone())
-        }),
-        install_location: app.install_location.clone().or_else(|| {
-            Path::new(target)
-                .parent()
-                .map(|path| path.to_string_lossy().into_owned())
-        }),
-        can_uninstall: Some(app.uninstall.is_some()),
-    };
-    HydrationOutcome {
-        patch,
-        written_icon: icon
-            .written_fingerprint
-            .map(|fingerprint| (app.id.clone(), fingerprint)),
-    }
-}
-
-#[derive(Default)]
-struct HydratedIcon {
-    data_url: Option<String>,
-    written_fingerprint: Option<String>,
-}
-
-fn hydrate_icon(app_data_dir: &Path, app: &AppInfo) -> HydratedIcon {
+pub(super) fn hydrate_icon(app_data_dir: &Path, app: &AppInfo) -> HydratedIcon {
     let mut candidates = icon_source_candidates(app);
     if candidates.is_empty() {
         candidates.push(app.path.clone());
@@ -343,36 +189,5 @@ mod tests {
         }
 
         assert_eq!(steam_icon_file(cache, "999"), None);
-    }
-
-    #[test]
-    fn queue_prioritizes_visible_ids_and_deduplicates_requests() {
-        let mut queue = HydrationQueue::default();
-        assert!(queue.enqueue(1, ["a".into(), "b".into(), "c".into()], false));
-        assert!(!queue.enqueue(1, ["c".into(), "b".into()], true));
-        assert_eq!(queue.pop(1).as_deref(), Some("c"));
-        queue.complete(1, "c");
-        assert_eq!(queue.pop(1).as_deref(), Some("b"));
-        queue.complete(1, "b");
-        assert_eq!(queue.pop(1).as_deref(), Some("a"));
-    }
-
-    #[test]
-    fn new_generation_discards_stale_hydration_work() {
-        let mut queue = HydrationQueue::default();
-        assert!(queue.enqueue(1, ["old".into()], false));
-        assert!(queue.enqueue(2, ["new".into()], true));
-        assert_eq!(queue.pop(1), None);
-        assert_eq!(queue.pop(2).as_deref(), Some("new"));
-    }
-
-    #[test]
-    fn visible_request_does_not_duplicate_an_in_flight_id() {
-        let mut queue = HydrationQueue::default();
-        assert!(queue.enqueue(1, ["app".into()], false));
-        assert_eq!(queue.pop(1).as_deref(), Some("app"));
-        assert!(!queue.enqueue(1, ["app".into()], true));
-        queue.complete(1, "app");
-        assert_eq!(queue.pop(1), None);
     }
 }

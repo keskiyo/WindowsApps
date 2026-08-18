@@ -1,8 +1,7 @@
 import { TriangleAlert, Trash2, X } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useBodyScrollLock } from '../hooks/useBodyScrollLock'
-import { useFocusTrap } from '../hooks/useFocusTrap'
+import { useModalDialog } from '../hooks/useModalDialog'
 import type { ConfirmDialogProps } from './types'
 
 export function ConfirmDialog({
@@ -17,19 +16,9 @@ export function ConfirmDialog({
 	onConfirm,
 	onClose,
 }: ConfirmDialogProps) {
-	useBodyScrollLock()
 	const dialogRef = useRef<HTMLElement>(null)
 	const cancelRef = useRef<HTMLButtonElement>(null)
-	useFocusTrap(dialogRef)
-
-	useEffect(() => {
-		const trigger = document.activeElement
-		cancelRef.current?.focus()
-		return () => {
-			if (trigger instanceof HTMLElement && trigger.isConnected)
-				trigger.focus()
-		}
-	}, [])
+	useModalDialog({ ref: dialogRef, initialFocusRef: cancelRef })
 
 	return createPortal(
 		<div className="motion-overlay fixed inset-0 z-500 grid place-items-center bg-slate-700/40 p-4 backdrop-blur-[2px]">

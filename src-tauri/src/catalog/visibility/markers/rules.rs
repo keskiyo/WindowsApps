@@ -95,6 +95,9 @@ const MAINTENANCE_NAMES: &[&str] = &[
 
 const COMPONENT_FILE_NAMES: &[&str] = &[
     "crashpad_handler",
+    "crash_reporter",
+    "crashreporter",
+    "dpinst.exe",
     "broker.exe",
     "pwa_launcher",
     "util.exe",
@@ -118,6 +121,7 @@ const COMPONENT_PROSE: &[&str] = &[
     "web helper",
     "subprocess",
     " daemon",
+    " module",
 ];
 
 const LOCAL_COMPONENT_FILE_NAMES: &[&str] = &["iconv.exe", "intelliphp.ls"];

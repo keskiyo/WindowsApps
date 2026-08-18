@@ -1,99 +1,8 @@
+use crate::app_state::{AppState, CloseTarget, LaunchTarget, UninstallRecord};
 use crate::catalog::cache::CachedAppDetails;
-use crate::catalog::scan_coordinator::ScanCoordinator;
-use crate::catalog::{self, AppDetailsTarget, AppInfo, LaunchKind, SourceKind, UninstallTarget};
-use crate::platform::windows::{uninstall_history, uninstaller};
-use serde::Serialize;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use crate::catalog::{self, AppDetailsTarget, AppInfo};
+use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
-
-const MAX_CONCURRENT_LAUNCH_WAITS: usize = 8;
-
-pub(crate) struct LaunchWaitLimiter {
-    active: AtomicUsize,
-}
-
-impl Default for LaunchWaitLimiter {
-    fn default() -> Self {
-        Self {
-            active: AtomicUsize::new(0),
-        }
-    }
-}
-
-impl LaunchWaitLimiter {
-    pub(crate) fn acquire(self: &Arc<Self>) -> Option<LaunchWaitPermit> {
-        self.active
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |active| {
-                (active < MAX_CONCURRENT_LAUNCH_WAITS).then_some(active + 1)
-            })
-            .ok()
-            .map(|_| LaunchWaitPermit {
-                limiter: Arc::clone(self),
-            })
-    }
-}
-
-pub(crate) struct LaunchWaitPermit {
-    limiter: Arc<LaunchWaitLimiter>,
-}
-
-impl Drop for LaunchWaitPermit {
-    fn drop(&mut self) {
-        self.limiter.active.fetch_sub(1, Ordering::AcqRel);
-    }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct UninstallRecord {
-    pub(crate) app_name: String,
-    pub(crate) publisher: Option<String>,
-    pub(crate) source_kind: SourceKind,
-    pub(crate) target: UninstallTarget,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct UninstallPreview {
-    pub(crate) app_name: String,
-    pub(crate) publisher: Option<String>,
-    pub(crate) source: SourceKind,
-    pub(crate) mechanism: uninstaller::UninstallMechanism,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct CloseTarget {
-    pub(crate) path: String,
-    pub(crate) install_root: Option<String>,
-    pub(crate) blocked: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct LaunchTarget {
-    pub(crate) kind: LaunchKind,
-    pub(crate) path: String,
-    pub(crate) arguments: Option<String>,
-}
-
-#[derive(Default)]
-pub(crate) struct AppState {
-    pub(crate) catalog_ids: Mutex<HashSet<String>>,
-    pub(crate) uninstall_targets: Mutex<HashMap<String, UninstallRecord>>,
-    pub(crate) launch_targets: Mutex<HashMap<String, LaunchTarget>>,
-    pub(crate) close_targets: Mutex<HashMap<String, CloseTarget>>,
-    pub(crate) app_details_targets: Mutex<HashMap<String, AppDetailsTarget>>,
-    pub(crate) app_details_cache: Mutex<HashMap<String, CachedAppDetails>>,
-    pub(crate) launch_waits: Arc<LaunchWaitLimiter>,
-    pub(crate) sync_lock: Mutex<()>,
-    pub(crate) scan_coordinator: ScanCoordinator<Vec<AppInfo>>,
-    pub(crate) hydration_queue: Mutex<catalog::hydration::HydrationQueue>,
-    pub(crate) change_watcher:
-        Mutex<Option<crate::platform::windows::change_watcher::WatcherGuard>>,
-    pub(crate) global_shortcut:
-        Mutex<Option<crate::platform::windows::global_shortcut::ShortcutGuard>>,
-    pub(crate) shortcut_status: Mutex<crate::platform::windows::global_shortcut::Status>,
-}
 
 pub(crate) fn remember_catalog(state: &AppState, apps: &[AppInfo]) {
     remember_catalog_ids(state, apps);
@@ -121,7 +30,7 @@ pub(crate) fn known_catalog_ids(state: &AppState, ids: Vec<String>) -> Vec<Strin
         .collect()
 }
 
-pub(crate) fn remember_uninstall_targets(state: &AppState, apps: &[AppInfo]) {
+fn remember_uninstall_targets(state: &AppState, apps: &[AppInfo]) {
     let targets = apps
         .iter()
         .filter_map(|app| {
@@ -143,7 +52,7 @@ pub(crate) fn remember_uninstall_targets(state: &AppState, apps: &[AppInfo]) {
     }
 }
 
-pub(crate) fn remember_launch_targets(state: &AppState, apps: &[AppInfo]) {
+fn remember_launch_targets(state: &AppState, apps: &[AppInfo]) {
     let targets = apps
         .iter()
         .map(|app| {
@@ -162,7 +71,7 @@ pub(crate) fn remember_launch_targets(state: &AppState, apps: &[AppInfo]) {
     }
 }
 
-pub(crate) fn remember_close_targets(state: &AppState, apps: &[AppInfo]) {
+fn remember_close_targets(state: &AppState, apps: &[AppInfo]) {
     let targets = apps
         .iter()
         .filter_map(|app| {
@@ -264,84 +173,11 @@ pub(crate) fn cached_details_for_catalog(
     current
 }
 
-pub(crate) fn preview_for(record: &UninstallRecord) -> UninstallPreview {
-    let target = uninstaller::preview(&record.target);
-    UninstallPreview {
-        app_name: record.app_name.clone(),
-        publisher: record.publisher.clone(),
-        source: record.source_kind,
-        mechanism: target.mechanism,
-    }
-}
-
-pub(crate) fn execute_and_record(
-    app_data_dir: &Path,
-    record: UninstallRecord,
-    executor: impl FnOnce(UninstallTarget) -> Result<uninstaller::UninstallOutcome, String>,
-) -> Result<uninstaller::UninstallOutcome, String> {
-    let preview = uninstaller::preview(&record.target);
-    let result = executor(record.target);
-    if result == Ok(uninstaller::UninstallOutcome::Cancelled) {
-        return result;
-    }
-    let history_result = if result.is_ok() {
-        uninstall_history::UninstallResult::Succeeded
-    } else {
-        uninstall_history::UninstallResult::Failed
-    };
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |duration| duration.as_secs());
-    let _ = uninstall_history::append(
-        app_data_dir,
-        uninstall_history::UninstallHistoryEntry {
-            id: String::new(),
-            timestamp,
-            app_name: record.app_name,
-            publisher: record.publisher,
-            mechanism: preview.mechanism,
-            result: history_result,
-        },
-    );
-    result
-}
-
-#[cfg(test)]
-pub(crate) fn cached_app(name: &str, path: &str) -> AppInfo {
-    AppInfo {
-        id: path.into(),
-        name: name.into(),
-        path: path.into(),
-        icon_base64: None,
-        artifact_kind: Default::default(),
-        category: catalog::AppCategory::Other,
-        launch_kind: LaunchKind::Executable,
-        source_kind: SourceKind::Registry,
-        description: None,
-        version: None,
-        publisher: None,
-        product_name: None,
-        original_filename: None,
-        install_location: None,
-        can_uninstall: false,
-        uninstall: None,
-        resolved_path: None,
-        shortcut_icon_path: None,
-        launch_arguments: None,
-        canonical_identity: None,
-        preference_identity: None,
-        visibility_class: Default::default(),
-        visibility_score: 0,
-        visibility_reasons: Vec::new(),
-        target_availability: None,
-        category_reasons: Vec::new(),
-        close_risk: None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app_state::cached_app;
+    use crate::catalog::LaunchKind;
 
     #[test]
     fn launch_targets_only_resolve_known_catalog_ids() {
@@ -476,9 +312,6 @@ mod tests {
 
     #[test]
     fn keeps_current_memory_details_for_the_next_catalog_cache_write() {
-        use crate::catalog::cache::CachedAppDetails;
-        use std::collections::BTreeMap;
-
         let mut app = cached_app("Editor", r"C:\Editor\editor.exe");
         app.id = "editor".into();
         let state = AppState::default();
@@ -514,91 +347,5 @@ mod tests {
         assert_eq!(merged.len(), 1);
         assert_eq!(merged["editor"].fingerprint, "current");
         assert_eq!(merged["editor"].details.file_size_bytes, Some(42));
-    }
-
-    #[test]
-    fn launch_wait_capacity_is_app_scoped() {
-        let first = AppState::default();
-        let second = AppState::default();
-        let permits = (0..8)
-            .map(|_| first.launch_waits.acquire().unwrap())
-            .collect::<Vec<_>>();
-
-        assert!(first.launch_waits.acquire().is_none());
-        assert!(second.launch_waits.acquire().is_some());
-        drop(permits);
-        assert!(first.launch_waits.acquire().is_some());
-    }
-
-    fn uninstall_record(name: &str) -> UninstallRecord {
-        UninstallRecord {
-            app_name: name.into(),
-            publisher: Some("Publisher".into()),
-            source_kind: SourceKind::Registry,
-            target: UninstallTarget::Command {
-                executable: "uninstall.exe".into(),
-                arguments: "/quiet".into(),
-            },
-        }
-    }
-
-    #[test]
-    fn records_successful_uninstall_without_command_details() {
-        let dir = tempfile::tempdir().unwrap();
-        execute_and_record(dir.path(), uninstall_record("Editor"), |_| {
-            Ok(uninstaller::UninstallOutcome::Completed)
-        })
-        .unwrap();
-
-        let history = uninstall_history::read(dir.path());
-        assert_eq!(history.len(), 1);
-        assert_eq!(history[0].app_name, "Editor");
-        assert_eq!(
-            history[0].result,
-            uninstall_history::UninstallResult::Succeeded
-        );
-        let serialized = serde_json::to_value(&history[0]).unwrap();
-        assert!(serialized.get("command").is_none());
-        assert!(serialized.get("path").is_none());
-        assert!(serialized.get("error").is_none());
-    }
-
-    #[test]
-    fn uninstall_preview_excludes_command_details() {
-        let serialized = serde_json::to_value(preview_for(&uninstall_record("Editor"))).unwrap();
-
-        assert_eq!(serialized.get("command"), None);
-        assert_eq!(serialized.get("path"), None);
-        assert_eq!(serialized["mechanism"], "registered_command");
-    }
-
-    // A wizard the user closed did nothing, so the history must not claim an attempt failed.
-    #[test]
-    fn a_cancelled_uninstall_is_not_written_to_history() {
-        let dir = tempfile::tempdir().unwrap();
-
-        let outcome = execute_and_record(dir.path(), uninstall_record("Editor"), |_| {
-            Ok(uninstaller::UninstallOutcome::Cancelled)
-        })
-        .unwrap();
-
-        assert_eq!(outcome, uninstaller::UninstallOutcome::Cancelled);
-        assert!(uninstall_history::read(dir.path()).is_empty());
-    }
-
-    #[test]
-    fn records_failed_uninstall_and_returns_original_error() {
-        let dir = tempfile::tempdir().unwrap();
-        let error = execute_and_record(dir.path(), uninstall_record("Editor"), |_| {
-            Err("boom".into())
-        })
-        .unwrap_err();
-
-        let history = uninstall_history::read(dir.path());
-        assert_eq!(error, "boom");
-        assert_eq!(
-            history[0].result,
-            uninstall_history::UninstallResult::Failed
-        );
     }
 }

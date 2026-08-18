@@ -61,17 +61,18 @@ impl Signals {
             } else {
                 resolved
             });
-        let exe_stem = exe_stem(exe_source);
+        let exe_stem = product_evidence(exe_stem(exe_source));
+        let product = product_evidence(fold(app.product_name.as_deref().unwrap_or_default()));
         Self {
             associations: associations.of(&exe_stem).to_vec(),
             name_exact: normalize(&app.name),
             name_base: normalize(strip_qualifiers(&app.name)),
             name_tokens: tokenize(&app.name),
-            product_tokens: tokenize(app.product_name.as_deref().unwrap_or_default()),
+            product_tokens: tokenize(&product),
             exe_stem,
             path_blob,
-            description: fold(app.description.as_deref().unwrap_or_default()),
-            publisher: fold(app.publisher.as_deref().unwrap_or_default()),
+            description: product_evidence(fold(app.description.as_deref().unwrap_or_default())),
+            publisher: product_evidence(fold(app.publisher.as_deref().unwrap_or_default())),
         }
     }
 
@@ -150,11 +151,86 @@ fn all_words_present(needle: &str, tokens: &HashSet<String>) -> bool {
     parts.peek().is_some() && parts.all(|part| tokens.contains(part))
 }
 
+const PACKAGING_METADATA: &[&str] = &[
+    "installshield",
+    "acresso",
+    "flexera",
+    "inno setup",
+    "nullsoft",
+    "nsis",
+    "_isicores",
+];
+
+fn product_evidence(value: String) -> String {
+    if PACKAGING_METADATA
+        .iter()
+        .any(|toolkit| value.contains(toolkit))
+    {
+        return String::new();
+    }
+    value
+}
+
 fn exe_stem(value: &str) -> String {
+    let trimmed = value.trim().trim_matches('"');
+    let carrier = if trimmed.len() > 4 && trimmed[trimmed.len() - 4..].eq_ignore_ascii_case(".mui")
+    {
+        &trimmed[..trimmed.len() - 4]
+    } else {
+        trimmed
+    };
     fold(
-        Path::new(value.trim().trim_matches('"'))
+        Path::new(carrier)
             .file_stem()
             .and_then(|stem| stem.to_str())
             .unwrap_or_default(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app_state::cached_app;
+
+    // Windows reports a localized resource stub as the original file name, and taking the last
+    // extension off `MSPAINT.EXE.MUI` leaves `mspaint.exe`, which matches no executable rule.
+    #[test]
+    fn a_localized_resource_stub_still_names_its_executable() {
+        assert_eq!(exe_stem("MSPAINT.EXE.MUI"), "mspaint");
+        assert_eq!(exe_stem("sapisvr.exe.mui"), "sapisvr");
+        assert_eq!(exe_stem("DPInst.exe.Mui"), "dpinst");
+        assert_eq!(exe_stem("ClientConsole.EXE"), "clientconsole");
+        assert_eq!(exe_stem(r"C:\Program Files\App\editor.exe"), "editor");
+    }
+
+    // An InstallShield shortcut reports the packaging toolkit as publisher, product and
+    // description, so scoring it would file every such product under whatever the toolkit says.
+    #[test]
+    fn packaging_toolkit_metadata_is_not_product_evidence() {
+        let mut app = cached_app("ABBYY FineReader PDF 15", r"C:\Menu\FineReader.lnk");
+        app.publisher = Some("Acresso Software Inc.".into());
+        app.product_name = Some("InstallShield".into());
+        app.description = Some("InstallShield".into());
+        app.original_filename = Some("_IsIcoRes.exe".into());
+
+        let signals = Signals::from_app(&app, &Associations::empty());
+
+        assert!(!signals.matches(Field::Publisher, "acresso"));
+        assert!(!signals.matches(Field::Product, "installshield"));
+        assert!(!signals.matches(Field::Desc, "installshield"));
+        assert!(!signals.matches(Field::ExeContains, "isicores"));
+    }
+
+    #[test]
+    fn ordinary_metadata_still_counts() {
+        let mut app = cached_app("Editor", r"C:\Program Files\Editor\editor.exe");
+        app.publisher = Some("Example Corp".into());
+        app.product_name = Some("Example Editor".into());
+
+        let signals = Signals::from_app(&app, &Associations::empty());
+
+        assert!(signals.matches(Field::Publisher, "example corp"));
+        assert!(signals.matches(Field::Product, "example editor"));
+        assert!(signals.matches(Field::ExeEq, "editor"));
+    }
 }

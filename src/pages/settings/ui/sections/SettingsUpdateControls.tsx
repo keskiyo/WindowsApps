@@ -1,6 +1,7 @@
 import { ExternalLink, RefreshCw, Send } from 'lucide-react'
 import { GithubIcon } from '../../../../shared/ui/GithubIcon'
 import type { SettingsUpdateControlsProps } from '../../types'
+import { SettingsSectionHeader } from '../components/SettingsSectionHeader'
 import { updateStatusText } from './updateStatusText'
 
 export function SettingsUpdateControls({
@@ -11,17 +12,15 @@ export function SettingsUpdateControls({
 	return (
 		<>
 			<div className="flex flex-wrap items-center gap-4 border-b border-slate-200 p-5">
-				<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner">
-					<GithubIcon size={19} aria-hidden="true" />
-				</span>
-				<div className="min-w-60 flex-1">
-					<h2 className="font-medium">Updates and source</h2>
-					<p className="mt-1 text-sm text-slate-600">
-						{updater.update
+				<SettingsSectionHeader
+					icon={GithubIcon}
+					title="Updates and source"
+					description={
+						updater.update
 							? `Version ${updater.update.version} is available.`
-							: updateStatusText(updater.status)}
-					</p>
-				</div>
+							: updateStatusText(updater.status)
+					}
+				/>
 				<div className="ml-auto grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
 					<button
 						type="button"

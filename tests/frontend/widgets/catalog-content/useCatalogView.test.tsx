@@ -54,6 +54,8 @@ function view(state: {
 			promotedAppIdentities: [],
 			installerAppIds: [],
 			installerAppIdentities: [],
+			documentAppIds: [],
+			documentAppIdentities: [],
 			promotedAppIds: [],
 			query: '',
 		}),

@@ -209,6 +209,34 @@ describe('App', () => {
 		).toHaveClass('px-5', 'pt-7', 'pb-12', 'sm:px-8')
 	})
 
+	// A merged record keeps its canonical identity but can lose its preference identity, and the
+	// first-seen map is keyed by the whole fallback chain rather than by the raw catalog id.
+	it('shows a record identified only by its canonical identity among the recently added', async () => {
+		setDesktopNavigation(true)
+		const merged = app({
+			id: 'merged-tool',
+			name: 'Merged Tool',
+			path: 'C:\\Merged.exe',
+			category: 'utilities',
+			canonicalIdentity: 'identity:merged-tool',
+		})
+		renderApp({
+			getApps: vi
+				.fn()
+				.mockResolvedValue({ apps: [...apps, merged], hasCache: true }),
+		})
+		await screen.findByRole('button', { name: 'Launch Steam' })
+
+		await userEvent.click(screen.getByRole('button', { name: /^More/ }))
+
+		const recentlyAdded = screen
+			.getByRole('heading', { name: 'Recently added' })
+			.closest('section')
+		expect(
+			within(recentlyAdded as HTMLElement).getByText('Merged Tool'),
+		).toBeInTheDocument()
+	})
+
 	it('renders the English catalog and category counts', async () => {
 		renderApp()
 		expect(
@@ -571,9 +599,10 @@ describe('App', () => {
 		await userEvent.click(
 			screen.getByRole('menuitem', { name: 'Installers & Docs' }),
 		)
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Installers' }),
+		)
 
-		// It leaves the catalog and shows up under Installers — never under Docs, which stays the
-		// scanner's own verdict.
 		expect(
 			screen.queryByRole('button', { name: 'Launch Steam' }),
 		).not.toBeInTheDocument()
@@ -599,6 +628,33 @@ describe('App', () => {
 
 		expect(store.getState().installerAppIds).toEqual([])
 		expect(store.getState().categoryOverrides.steam).toBe('games')
+	})
+
+	// Filing by hand used to have one destination, so a reference book landed under Installers
+	// beside real setup programs. The third level is the only way to say which half it belongs to.
+	it('files an app into Docs and keeps it out of Installers', async () => {
+		const { store } = renderApp()
+		await userEvent.click(
+			await screen.findByRole('button', { name: 'Manage Steam' }),
+		)
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Move to category' }),
+		)
+		await userEvent.click(
+			screen.getByRole('menuitem', { name: 'Installers & Docs' }),
+		)
+		await userEvent.click(screen.getByRole('menuitem', { name: 'Docs' }))
+
+		expect(store.getState().documentAppIds).toEqual(['steam'])
+		expect(store.getState().installerAppIds).toEqual([])
+		store.getState().setActiveView('installers_docs')
+		const docs = await screen.findByRole('region', { name: 'Docs 1' })
+		expect(
+			within(docs).getByRole('button', { name: 'Launch Steam' }),
+		).toBeInTheDocument()
+		expect(
+			screen.queryByRole('region', { name: /^Installers \d/ }),
+		).not.toBeInTheDocument()
 	})
 
 	it('hides an app and restores it from the Hidden view', async () => {

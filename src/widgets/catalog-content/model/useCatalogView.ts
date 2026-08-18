@@ -44,6 +44,8 @@ export function useCatalogView(state: CatalogViewState) {
 				promotedAppIdentities: state.promotedAppIdentities,
 				installerAppIds: state.installerAppIds,
 				installerAppIdentities: state.installerAppIdentities,
+				documentAppIds: state.documentAppIds,
+				documentAppIdentities: state.documentAppIdentities,
 			}),
 		[
 			state.apps,
@@ -53,6 +55,8 @@ export function useCatalogView(state: CatalogViewState) {
 			state.promotedAppIdentities,
 			state.installerAppIds,
 			state.installerAppIdentities,
+			state.documentAppIds,
+			state.documentAppIdentities,
 		],
 	)
 	const isHidden = useMemo(

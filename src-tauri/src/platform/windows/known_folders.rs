@@ -1,7 +1,6 @@
-use std::ffi::c_void;
+use crate::platform::windows::com::CoTaskString;
 use std::path::PathBuf;
-use windows::core::{GUID, PWSTR};
-use windows::Win32::System::Com::CoTaskMemFree;
+use windows::core::GUID;
 use windows::Win32::UI::Shell::{
     FOLDERID_Desktop, FOLDERID_Downloads, SHGetKnownFolderPath, KF_FLAG_DEFAULT,
 };
@@ -25,30 +24,11 @@ fn known_folder(id: &GUID) -> Option<PathBuf> {
     // SAFETY: `id` points at a `FOLDERID_*` constant that lives for the whole program, so the
     // pointer is valid for the call. `KF_FLAG_DEFAULT` requests the current path without creating
     // anything, and passing no access token means "the calling user", which is the process owner.
-    // On success the API allocates a null-terminated UTF-16 string that the caller owns; `CoTaskMem`
-    // takes that ownership immediately, so it is released exactly once on every path out of this
-    // function. On failure nothing is allocated and there is nothing to release.
+    // On success the API allocates a null-terminated UTF-16 string that the caller owns;
+    // `CoTaskString::own` takes that ownership immediately, so it is released exactly once on every
+    // path out of this function. On failure nothing is allocated and there is nothing to release.
     let path = unsafe { SHGetKnownFolderPath(id, KF_FLAG_DEFAULT, None) }.ok()?;
-    let owned = CoTaskMem(path);
-    // SAFETY: `owned.0` is the string the call above allocated and has not been freed yet — the
-    // guard outlives this statement. The API contract guarantees it is null-terminated UTF-16.
-    let value = unsafe { owned.0.to_string() }.ok()?;
-    let trimmed = value.trim();
-    (!trimmed.is_empty()).then(|| PathBuf::from(trimmed))
-}
-
-struct CoTaskMem(PWSTR);
-
-impl Drop for CoTaskMem {
-    fn drop(&mut self) {
-        if self.0.is_null() {
-            return;
-        }
-        // SAFETY: the pointer came from `SHGetKnownFolderPath`, whose documented deallocator is
-        // `CoTaskMemFree`. This type is the only owner and is not `Clone`, so the pointer is freed
-        // exactly once.
-        unsafe { CoTaskMemFree(Some(self.0 .0 as *const c_void)) };
-    }
+    CoTaskString::own(path).to_trimmed().map(PathBuf::from)
 }
 
 #[cfg(test)]

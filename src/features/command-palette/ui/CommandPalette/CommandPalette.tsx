@@ -1,7 +1,6 @@
 import { Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap'
+import { useModalDialog } from '../../../../shared/hooks/useModalDialog'
 import { rankAppsByQueryTop } from '../../../../entities/app'
 import { MAX_RESULTS } from './data'
 import { ResultItem } from './ResultItem'
@@ -13,13 +12,12 @@ export function CommandPalette({
 	onLaunch,
 	onClose,
 }: CommandPaletteProps) {
-	useBodyScrollLock()
 	const dialogRef = useRef<HTMLDivElement>(null)
 	const inputRef = useRef<HTMLInputElement>(null)
 	const listRef = useRef<HTMLUListElement>(null)
 	const [query, setQuery] = useState('')
 	const [selected, setSelected] = useState(0)
-	useFocusTrap(dialogRef)
+	useModalDialog({ ref: dialogRef, initialFocusRef: inputRef })
 
 	const results = useMemo(
 		() =>
@@ -28,15 +26,6 @@ export function CommandPalette({
 				: suggestions.slice(0, MAX_RESULTS),
 		[apps, query, suggestions],
 	)
-
-	useEffect(() => {
-		const trigger = document.activeElement
-		inputRef.current?.focus()
-		return () => {
-			if (trigger instanceof HTMLElement && trigger.isConnected)
-				trigger.focus()
-		}
-	}, [])
 
 	useEffect(() => {
 		setSelected(value => (value >= results.length ? 0 : value))

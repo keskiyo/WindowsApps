@@ -86,7 +86,7 @@ pub(crate) fn open_installed_copy(app: tauri::AppHandle) -> Result<(), AppError>
     let binary = std::env::current_exe()
         .ok()
         .and_then(|path| path.file_name().map(|name| name.to_os_string()))
-        .unwrap_or_else(|| "app.exe".into());
+        .unwrap_or_else(|| "WindowsApps.exe".into());
     let target = std::path::Path::new(&info.install_location).join(binary);
     let target = exec_target::validate_executable_path(&target.to_string_lossy())
         .map_err(|_| AppError::LaunchUnavailable)?;

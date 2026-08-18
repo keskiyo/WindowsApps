@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import type { AppDetails, AppInfo, AppsClient } from '../../../../entities/app'
 import type { CategoryDefinition } from '../../../../entities/category'
 
@@ -21,7 +21,7 @@ export interface AppIdentityHeaderProps {
 	app: AppInfo
 	categories: CategoryDefinition[]
 	details: AppDetails | null
-	closeRef(node: HTMLButtonElement | null): void
+	closeRef: RefObject<HTMLButtonElement>
 	onClose(): void
 }
 

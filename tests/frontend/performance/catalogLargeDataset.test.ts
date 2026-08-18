@@ -62,6 +62,8 @@ describe('large catalog selector behavior', () => {
 			promotedAppIdentities: [],
 			installerAppIds: [],
 			installerAppIdentities: [],
+			documentAppIds: [],
+			documentAppIdentities: [],
 		})
 		expect(before[0]).toBe(apps[0])
 
@@ -78,6 +80,8 @@ describe('large catalog selector behavior', () => {
 			promotedAppIdentities: [],
 			installerAppIds: [],
 			installerAppIdentities: [],
+			documentAppIds: [],
+			documentAppIdentities: [],
 		})
 		const changed = after.filter((entry, index) => entry !== before[index])
 		expect(changed).toHaveLength(1)

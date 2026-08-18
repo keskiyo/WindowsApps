@@ -1,7 +1,6 @@
 import { AlertTriangle, Loader2, X } from 'lucide-react'
-import { useEffect, useRef } from 'react'
-import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap'
+import { useRef } from 'react'
+import { useModalDialog } from '../../../../shared/hooks/useModalDialog'
 import type { InstallerLaunchDialogProps } from './types'
 
 export function InstallerLaunchDialog({
@@ -10,22 +9,14 @@ export function InstallerLaunchDialog({
 	onCancel,
 	onConfirm,
 }: InstallerLaunchDialogProps) {
-	useBodyScrollLock()
 	const dialogRef = useRef<HTMLElement>(null)
 	const cancelRef = useRef<HTMLButtonElement>(null)
-	useFocusTrap(dialogRef)
-	useEffect(() => {
-		const previous = document.activeElement as HTMLElement | null
-		cancelRef.current?.focus()
-		function keydown(event: KeyboardEvent) {
-			if (event.key === 'Escape' && !pending) onCancel()
-		}
-		document.addEventListener('keydown', keydown)
-		return () => {
-			document.removeEventListener('keydown', keydown)
-			previous?.focus()
-		}
-	}, [onCancel, pending])
+	useModalDialog({
+		ref: dialogRef,
+		initialFocusRef: cancelRef,
+		onDismiss: onCancel,
+		dismissible: !pending,
+	})
 	return (
 		<div
 			className="motion-overlay fixed inset-0 z-400 grid place-items-center bg-black/35 p-4 backdrop-blur-[2px]"

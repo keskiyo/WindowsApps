@@ -175,6 +175,8 @@ export interface CategorizedAppsState {
 	promotedAppIdentities: string[]
 	installerAppIds: string[]
 	installerAppIdentities: string[]
+	documentAppIds: string[]
+	documentAppIdentities: string[]
 }
 
 export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
@@ -182,6 +184,8 @@ export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 	const promotedIdentities = new Set(state.promotedAppIdentities)
 	const installerIds = new Set(state.installerAppIds)
 	const installerIdentities = new Set(state.installerAppIdentities)
+	const documentIds = new Set(state.documentAppIds)
+	const documentIdentities = new Set(state.documentAppIdentities)
 	return deduplicateVisibleApps(
 		state.apps.map(app => {
 			if (isCatalogArtifact(app)) {
@@ -189,15 +193,20 @@ export function selectCategorizedApps(state: CategorizedAppsState): AppInfo[] {
 					? app
 					: { ...app, category: INSTALLERS_DOCS_CATEGORY }
 			}
-			if (
+			const placedAs =
 				installerIds.has(app.id) ||
 				installerIdentities.has(appIdentity(app))
-			)
+					? ('installer' as const)
+					: documentIds.has(app.id) ||
+						  documentIdentities.has(appIdentity(app))
+						? ('documentation' as const)
+						: null
+			if (placedAs)
 				return {
 					...app,
-					artifactKind: 'installer' as const,
+					artifactKind: placedAs,
 					category: INSTALLERS_DOCS_CATEGORY,
-					userInstaller: true,
+					userPlacedArtifact: true,
 				}
 			const category =
 				state.categoryOverrideIdentities[appIdentity(app)] ??

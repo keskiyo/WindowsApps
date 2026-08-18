@@ -27,6 +27,7 @@ skills-lock.json
 ReleaseInfo.md
 Release.md
 INFO.md
+gf_detect.py
 
 # AI-agent instructions — local working files, never committed
 /AGENTS.md

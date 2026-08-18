@@ -7,6 +7,7 @@ import type {
 	AppHydrationPatch,
 	AppInfo,
 	AppView,
+	CatalogArtifactKind,
 	CatalogChangeSummary,
 	CatalogDelta,
 	CatalogDiagnostics,
@@ -39,6 +40,8 @@ export interface AppState {
 	promotedAppIdentities: string[]
 	installerAppIds: string[]
 	installerAppIdentities: string[]
+	documentAppIds: string[]
+	documentAppIdentities: string[]
 	scenarios: Scenario[]
 	favoriteScenarioIds: string[]
 	firstSeenAt: Record<string, number>
@@ -97,7 +100,11 @@ export interface AppState {
 	promoteAuxiliary(id: string): void
 	demoteAuxiliary(id: string): void
 	reorderCategory(active: AppCategory, over: AppCategory): void
-	moveApp(id: string, category: AppCategory): void
+	moveApp(
+		id: string,
+		category: AppCategory,
+		artifact?: CatalogArtifactKind,
+	): void
 	toggleCategory(category: AppCategory): void
 	replaceApps(apps: AppInfo[]): void
 	applyDelta(delta: CatalogDelta): void

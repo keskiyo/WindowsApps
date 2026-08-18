@@ -16,6 +16,17 @@ import type {
 
 export type ScanPathKind = 'includedPaths' | 'excludedPaths'
 
+export type SettingsSectionIcon = (props: {
+	size?: number
+	'aria-hidden'?: boolean | 'true' | 'false'
+}) => ReactNode
+
+export interface SettingsSectionHeaderProps {
+	icon: SettingsSectionIcon
+	title: string
+	description: ReactNode
+}
+
 export interface SettingsPageProps {
 	client: SystemClient
 	onExportPreferences?: () => string

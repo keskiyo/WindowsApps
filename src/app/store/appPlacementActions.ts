@@ -12,18 +12,52 @@ export function createAppPlacementActions({
 	persist,
 }: AppPlacementOptions): Pick<AppState, 'moveApp'> {
 	return {
-		moveApp(id, category) {
+		moveApp(id, category, artifact = 'installer') {
 			set(state => {
 				const app = state.apps.find(item => item.id === id)
 				if (app && isCatalogArtifact(app)) return state
 				const identity = app ? identityOf(app) : id
+				const withoutInstaller = {
+					installerAppIds: state.installerAppIds.filter(
+						appId => appId !== id,
+					),
+					installerAppIdentities: state.installerAppIdentities.filter(
+						item => item !== identity,
+					),
+				}
+				const withoutDocument = {
+					documentAppIds: state.documentAppIds.filter(
+						appId => appId !== id,
+					),
+					documentAppIdentities: state.documentAppIdentities.filter(
+						item => item !== identity,
+					),
+				}
 				if (category === INSTALLERS_DOCS_CATEGORY)
 					return {
-						installerAppIds: addUnique(state.installerAppIds, id),
-						installerAppIdentities: addUnique(
-							state.installerAppIdentities,
-							identity,
-						),
+						...withoutInstaller,
+						...withoutDocument,
+						...(artifact === 'documentation'
+							? {
+									documentAppIds: addUnique(
+										withoutDocument.documentAppIds,
+										id,
+									),
+									documentAppIdentities: addUnique(
+										withoutDocument.documentAppIdentities,
+										identity,
+									),
+								}
+							: {
+									installerAppIds: addUnique(
+										withoutInstaller.installerAppIds,
+										id,
+									),
+									installerAppIdentities: addUnique(
+										withoutInstaller.installerAppIdentities,
+										identity,
+									),
+								}),
 						favoriteAppIds: state.favoriteAppIds.filter(
 							appId => appId !== id,
 						),
@@ -33,12 +67,8 @@ export function createAppPlacementActions({
 							),
 					}
 				return {
-					installerAppIds: state.installerAppIds.filter(
-						appId => appId !== id,
-					),
-					installerAppIdentities: state.installerAppIdentities.filter(
-						item => item !== identity,
-					),
+					...withoutInstaller,
+					...withoutDocument,
 					categoryOverrides: {
 						...state.categoryOverrides,
 						[id]: category,

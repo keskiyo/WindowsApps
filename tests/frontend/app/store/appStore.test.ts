@@ -128,7 +128,7 @@ describe('app store', () => {
 			importedField: 'kept',
 		})
 		expect(JSON.parse(store.getState().exportPreferences())).toMatchObject({
-			version: 15,
+			version: 16,
 			favoriteAppIds: ['code'],
 			hiddenAppIds: ['chrome'],
 			importedField: 'kept',
@@ -164,7 +164,7 @@ describe('app store', () => {
 
 	it('refuses import and restore when local preferences use a newer schema', () => {
 		const future = JSON.stringify({
-			version: 16,
+			version: 17,
 			favoriteAppIds: ['keep'],
 		})
 		const values = new Map<string, string>([
@@ -1223,8 +1223,8 @@ describe('app store', () => {
 
 	// Marks are stored twice: by catalog id and by durable identity. The id is derived from the
 	// path, so a reinstall, a moved shortcut or a source change gives the same application a new
-	// one. Reconciling only in `load()` meant every rescan — including the background scan the
-	// watcher starts whenever anything is installed — silently unfavourited and unhid entries.
+	// one. Reconciling only in `load()` meant every rescan РІР‚вЂќ including the background scan the
+	// watcher starts whenever anything is installed РІР‚вЂќ silently unfavourited and unhid entries.
 	describe('marks survive a rescan that changes catalog ids', () => {
 		const moved = app({
 			id: 'code-moved',

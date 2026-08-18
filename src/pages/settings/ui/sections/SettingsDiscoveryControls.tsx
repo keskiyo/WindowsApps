@@ -3,6 +3,7 @@ import { FolderPlus, FolderX, HardDrive } from 'lucide-react'
 import { useState } from 'react'
 import { PathEditor } from '../components/PathEditor'
 import type { SettingsDiscoveryControlsProps } from '../../types'
+import { SettingsSectionHeader } from '../components/SettingsSectionHeader'
 
 export function SettingsDiscoveryControls({
 	settings,
@@ -19,16 +20,11 @@ export function SettingsDiscoveryControls({
 	return (
 		<div className="settings-surface rounded-2xl border border-white/85 bg-white/58 p-5">
 			<div className="flex items-start gap-4">
-				<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner">
-					<HardDrive size={19} aria-hidden="true" />
-				</span>
-				<div className="min-w-0 flex-1">
-					<h2 className="font-medium">Application discovery</h2>
-					<p className="mt-1 text-sm leading-6 text-slate-600">
-						Scan permanent local drives and Steam libraries.
-						Removable and network drives are ignored.
-					</p>
-				</div>
+				<SettingsSectionHeader
+					icon={HardDrive}
+					title="Application discovery"
+					description="Scan permanent local drives and Steam libraries. Removable and network drives are ignored."
+				/>
 				<SettingsToggle
 					label="Scan all fixed local drives"
 					checked={

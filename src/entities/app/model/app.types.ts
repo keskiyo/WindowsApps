@@ -6,6 +6,8 @@ export type AppSourceKind =
 export type UninstallMechanism = 'registered_command' | 'msi' | 'msix'
 export type AppVisibilityClass = 'primary' | 'auxiliary' | 'rejected'
 export type AppArtifactKind = 'application' | 'installer' | 'documentation'
+
+export type CatalogArtifactKind = Exclude<AppArtifactKind, 'application'>
 export type AppArchitecture =
 	'x86' | 'x64' | 'arm64' | 'notApplicable' | 'unknown'
 export type AppSignatureStatus = 'verified' | 'unsigned' | 'unavailable'
@@ -49,7 +51,7 @@ export interface AppInfo {
 	canonicalIdentity?: string | null
 	preferenceIdentity?: string | null
 	userPromoted?: boolean
-	userInstaller?: boolean
+	userPlacedArtifact?: boolean
 	visibilityClass?: AppVisibilityClass
 	visibilityScore?: number
 	visibilityReasons?: AppVisibilityReason[]

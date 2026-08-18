@@ -197,5 +197,30 @@
 		"launchArguments": "--channel=stable",
 		"kind": "installer",
 		"expected": "primary"
+	},
+	{
+		"name": "crash_reporter Module",
+		"path": "C:\\DevLine\\DevLine\\Linia SKW\\crash_reporter.exe",
+		"source": "portable",
+		"productName": "crash_reporter Module",
+		"description": "crash_reporter Module",
+		"expected": "auxiliary"
+	},
+	{
+		"name": "LiniaSysInfo Module",
+		"path": "C:\\DevLine\\DevLine\\Linia SKW\\LiniaSysInfo.exe",
+		"source": "portable",
+		"productName": "LiniaSysInfo Module",
+		"description": "LiniaSysInfo Module",
+		"expected": "auxiliary"
+	},
+	{
+		"name": "Driver Package Installer (DPInst)",
+		"path": "C:\\DevLine\\DevLine\\Linia SKW\\drivers\\amd64\\DPInst.exe",
+		"source": "portable",
+		"publisher": "Microsoft Corporation",
+		"productName": "Driver Package Installer (DPInst)",
+		"description": "Driver Package Installer",
+		"expected": "auxiliary"
 	}
 ]

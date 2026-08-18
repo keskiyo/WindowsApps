@@ -2,6 +2,7 @@ import { RefreshCw, RotateCcw, ScanSearch } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { MaintenanceConfirmation } from '../../../../features/edit-settings'
 import { ScanDiagnostics } from './ScanDiagnostics'
+import { SettingsSectionHeader } from '../components/SettingsSectionHeader'
 import { DANGER_VARIANT } from '../../../../shared/ui/buttonVariants'
 import {
 	ACTION_BUTTON,
@@ -38,17 +39,11 @@ export function CatalogMaintenance({
 	return (
 		<div className="settings-surface rounded-2xl border border-white/85 bg-white/58 p-5">
 			<div className="flex items-start gap-4">
-				<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner">
-					<RefreshCw size={19} aria-hidden="true" />
-				</span>
-				<div className="min-w-0 flex-1">
-					<h2 className="font-medium">Catalog maintenance</h2>
-					<p className="mt-1 text-sm leading-6 text-slate-600">
-						Discard the incremental scan index and inspect every
-						configured location again. Categories, Favorites and
-						Hidden apps are preserved.
-					</p>
-				</div>
+				<SettingsSectionHeader
+					icon={RefreshCw}
+					title="Catalog maintenance"
+					description="Discard the incremental scan index and inspect every configured location again. Categories, Favorites and Hidden apps are preserved."
+				/>
 			</div>
 			<div className={`mt-4 ${ACTION_ROW}`}>
 				<button

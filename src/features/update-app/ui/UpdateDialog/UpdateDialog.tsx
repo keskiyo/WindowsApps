@@ -1,6 +1,6 @@
 import { AlertTriangle } from 'lucide-react'
-import { useEffect, useRef } from 'react'
-import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
+import { useRef } from 'react'
+import { useModalDialog } from '../../../../shared/hooks/useModalDialog'
 import { DialogFooter } from './DialogFooter'
 import { DialogHeader } from './DialogHeader'
 import { formatReleaseDate } from './format'
@@ -43,46 +43,12 @@ export function UpdateDialog({
 							? 'Restarting...'
 							: 'Update & restart'
 
-	useBodyScrollLock()
-	useEffect(() => {
-		const previousFocus = document.activeElement
-		closeButtonRef.current?.focus()
-
-		function focusableElements() {
-			return Array.from(
-				dialogRef.current?.querySelectorAll<HTMLElement>(
-					'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-				) ?? [],
-			).filter(element => !element.hasAttribute('aria-hidden'))
-		}
-
-		function onKeyDown(event: KeyboardEvent) {
-			if (event.key === 'Escape' && !installing) {
-				event.preventDefault()
-				onDismiss()
-				return
-			}
-			if (event.key !== 'Tab') return
-
-			const elements = focusableElements()
-			if (!elements.length) return
-			const first = elements[0]
-			const last = elements[elements.length - 1]
-			if (event.shiftKey && document.activeElement === first) {
-				event.preventDefault()
-				last.focus()
-			} else if (!event.shiftKey && document.activeElement === last) {
-				event.preventDefault()
-				first.focus()
-			}
-		}
-
-		document.addEventListener('keydown', onKeyDown)
-		return () => {
-			document.removeEventListener('keydown', onKeyDown)
-			if (previousFocus instanceof HTMLElement) previousFocus.focus()
-		}
-	}, [installing, onDismiss])
+	useModalDialog({
+		ref: dialogRef,
+		initialFocusRef: closeButtonRef,
+		onDismiss,
+		dismissible: !installing,
+	})
 
 	return (
 		<div className="update-modal-backdrop fixed inset-0 z-500 grid place-items-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">

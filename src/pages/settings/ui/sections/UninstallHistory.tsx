@@ -7,6 +7,7 @@ import {
 	timestampFormatter,
 } from '../../data'
 import type { UninstallHistoryProps } from '../../types'
+import { SettingsSectionHeader } from '../components/SettingsSectionHeader'
 
 export function UninstallHistory({ client }: UninstallHistoryProps) {
 	const [entries, setEntries] = useState<UninstallHistoryEntry[]>([])
@@ -51,16 +52,11 @@ export function UninstallHistory({ client }: UninstallHistoryProps) {
 	return (
 		<div className="settings-surface rounded-2xl border border-white/85 bg-white/58 p-5">
 			<div className="flex items-start gap-4">
-				<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner">
-					<ShieldCheck size={19} aria-hidden="true" />
-				</span>
-				<div className="min-w-0 flex-1">
-					<h2 className="font-medium">Uninstall history</h2>
-					<p className="mt-1 text-sm leading-6 text-slate-600">
-						Last 100 uninstall attempts. Commands, paths, arguments,
-						errors and usernames are not stored.
-					</p>
-				</div>
+				<SettingsSectionHeader
+					icon={ShieldCheck}
+					title="Uninstall history"
+					description="Last 100 uninstall attempts. Commands, paths, arguments, errors and usernames are not stored."
+				/>
 				<button
 					type="button"
 					disabled={!entries.length || clearing}

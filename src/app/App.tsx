@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { toast, Toaster } from 'sonner'
 import { useStore } from 'zustand'
 import {
@@ -11,27 +11,20 @@ import {
 	useCatalogNavigation,
 	useDesktopNavigation,
 } from '../widgets/sidebar-navigation'
-import { CatalogPage } from '../pages/catalog'
-import { MorePage } from '../pages/more'
-import { ScenariosPage } from '../pages/scenarios'
-import { SettingsPage } from '../pages/settings'
 import { useScenarioRunner } from '../features/run-scenario'
 
-import { filterFavoriteScenarios } from '../entities/scenario'
 import { AppShellChrome } from './layout/AppShellChrome'
 import { Header } from '../widgets/app-header'
 import { useAppFeedback } from './model/useAppFeedback'
 import { useActivityStatus } from './model/useActivityStatus'
+import { useAppDerivations } from './model/useAppDerivations'
 import { useCatalogDialogs } from './model/useCatalogDialogs'
 import { AppDialogs } from './layout/AppDialogs'
+import { AppViews } from './layout/AppViews'
 import { useCatalogBootstrap } from './model/useCatalogBootstrap'
 import { useDrawer } from './model/useDrawer'
 
-import {
-	INSTALLERS_DOCS_CATEGORY,
-	selectUnclassifiedApps,
-	useIconRecovery,
-} from '../entities/app'
+import { useIconRecovery } from '../entities/app'
 import { useGlobalShortcuts } from './model/useGlobalShortcuts'
 import { useStaleCopy } from '../features/stale-copy'
 import { useUpdater } from '../features/update-app'
@@ -52,46 +45,23 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		isRefreshing,
 		preferencesPersisted,
 	} = state
+	const catalog = useCatalogView(state)
 	const {
 		catalogApps,
 		counts,
-		deferredQuery,
 		filteredApps,
-		morePreview,
 		primaryApps,
-		paletteSuggestions,
-		searchScopeCounts,
 		visibleHydrationIds,
-	} = useCatalogView(state)
-	const unclassifiedApps = useMemo(
-		() => selectUnclassifiedApps(primaryApps),
-		[primaryApps],
-	)
+	} = catalog
+	const derivations = useAppDerivations({
+		catalogApps,
+		primaryApps,
+		firstSeenAt: state.firstSeenAt,
+		scenarios: state.scenarios,
+		favoriteScenarioIds: state.favoriteScenarioIds,
+	})
 	const desktopNavigation = useDesktopNavigation()
 	const drawer = useDrawer(desktopNavigation)
-	const [scanPromptDismissed, setScanPromptDismissed] = useState(false)
-	const recentApps = useMemo(
-		() =>
-			catalogApps
-				.map(app => ({
-					app,
-					firstSeenAt:
-						state.firstSeenAt[app.preferenceIdentity ?? app.id] ??
-						null,
-				}))
-				.filter(entry => entry.firstSeenAt !== null)
-				.sort(
-					(left, right) =>
-						(right.firstSeenAt ?? 0) - (left.firstSeenAt ?? 0),
-				)
-				.slice(0, 20),
-		[catalogApps, state.firstSeenAt],
-	)
-	const favoriteScenarios = useMemo(
-		() =>
-			filterFavoriteScenarios(state.scenarios, state.favoriteScenarioIds),
-		[state.favoriteScenarioIds, state.scenarios],
-	)
 	const menuButtonRef = useRef<HTMLButtonElement>(null)
 	const searchInputRef = useRef<HTMLInputElement>(null)
 	const feedback = useAppFeedback({
@@ -103,6 +73,8 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		systemClient,
 		getUninstallPreview,
 		onLaunch: feedback.launch,
+		onUninstall: feedback.uninstall,
+		onRefresh: state.refresh,
 	})
 	const navigation = useCatalogNavigation({
 		collapsedCategories: state.collapsedCategories,
@@ -112,18 +84,6 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		closeDrawer: drawer.close,
 		isCatalogReady: !isLoading && activeView === 'all',
 	})
-	async function confirmUninstall() {
-		if (!dialogs.uninstall.app) return
-		const outcome = await feedback.uninstall(dialogs.uninstall.app)
-		if (outcome === 'failed') return
-		dialogs.uninstall.select(null)
-		if (outcome === 'cancelled') return
-		try {
-			await state.refresh()
-		} catch (ignored) {
-			void ignored
-		}
-	}
 
 	useCatalogBootstrap({
 		initialize,
@@ -171,22 +131,16 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 		onFinished: feedback.reportScenarioRun,
 	})
 
-	const {
-		auxiliaryCount,
-		favoriteCount,
-		hiddenCount,
-		navigationCounts,
-		visibleCategorizedApps,
-	} = counts
-	const hasQuery = deferredQuery.trim().length > 0
+	const { auxiliaryCount, favoriteCount, navigationCounts } = counts
+	const appCount = counts.visibleCategorizedApps.length
 	const navigationProps = {
 		categoryOrder: state.categoryOrder,
 		categories: state.categories,
 		counts: navigationCounts,
 		activeView: state.activeView,
-		appCount: visibleCategorizedApps.length,
+		appCount,
 		favoriteCount,
-		favoriteScenarioCount: favoriteScenarios.length,
+		favoriteScenarioCount: derivations.favoriteScenarios.length,
 		onSelectView: navigation.selectView,
 		onSelectCategory: navigation.selectCategory,
 		onReorderCategory: state.reorderCategory,
@@ -226,7 +180,7 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 						className="app-panel flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto rounded-2xl"
 					>
 						<Header
-							primaryAppCount={visibleCategorizedApps.length}
+							primaryAppCount={appCount}
 							auxiliaryToolCount={auxiliaryCount}
 							visibleCount={filteredApps.length}
 							query={state.query}
@@ -240,161 +194,25 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 							onOpenNavigation={drawer.onOpen}
 							showMenu={!desktopNavigation}
 						/>
-						<main className="mx-auto w-full max-w-375 px-5 pt-7 pb-12 sm:px-8">
-							{state.activeView === 'more' && (
-								<MorePage
-									auxiliaryCount={auxiliaryCount}
-									hiddenCount={hiddenCount}
-									installersDocsCount={
-										navigationCounts.get(
-											INSTALLERS_DOCS_CATEGORY,
-										) ?? 0
-									}
-									scenarioCount={state.scenarios.length}
-									recentApps={recentApps}
-									preview={morePreview}
-									scenarioRun={{
-										scenarios: state.scenarios,
-										apps: catalogApps,
-										runningId: scenarioRunner.runningId,
-										isScenarioRunning:
-											scenarioRunner.isRunning,
-										onRun: scenarioRunner.runById,
-									}}
-									onSelectView={navigation.selectView}
-								/>
-							)}
-							{state.activeView === 'scenarios' && (
-								<ScenariosPage
-									scenarios={state.scenarios}
-									apps={catalogApps}
-									selectableApps={primaryApps}
-									categories={state.categories}
-									runningId={scenarioRunner.runningId}
-									isScenarioRunning={scenarioRunner.isRunning}
-									runProgress={scenarioRunner.progress}
-									favoriteScenarioIds={
-										state.favoriteScenarioIds
-									}
-									onBack={() => navigation.selectView('more')}
-									onCreate={state.createScenario}
-									onRename={state.renameScenario}
-									onDelete={state.deleteScenario}
-									onAddApp={state.addScenarioApp}
-									onRemoveApp={state.removeScenarioApp}
-									onRun={scenarioRunner.run}
-									onToggleFavorite={
-										state.toggleFavoriteScenario
-									}
-								/>
-							)}
-							{state.activeView === 'settings' && (
-								<SettingsPage
-									client={systemClient}
-									onExportPreferences={
-										state.exportPreferences
-									}
-									onValidatePreferencesImport={
-										state.validatePreferencesImport
-									}
-									onImportPreferences={
-										state.importPreferences
-									}
-									onRestorePreferencesBackup={
-										state.restorePreferencesBackup
-									}
-									onForceFullScan={state.forceFullScan}
-									onResetCatalogCache={
-										state.resetCatalogCache
-									}
-									catalogDiagnostics={
-										state.catalogDiagnostics
-									}
-									unclassifiedApps={unclassifiedApps}
-									categories={state.categories}
-									categoryOrder={state.categoryOrder}
-									onMoveApp={state.moveApp}
-									updater={updater}
-								/>
-							)}
-							{isCatalogView && (
-								<CatalogPage
-									showScanPrompt={
-										!state.isLoading &&
-										!state.hasCache &&
-										!state.apps.length &&
-										!scanPromptDismissed
-									}
-									scanPrompt={{
-										isScanning: state.isRefreshing,
-										onDismiss: () =>
-											setScanPromptDismissed(true),
-										onScan: feedback.refresh,
-										onConfigureFolders: () =>
-											navigation.selectView('settings'),
-									}}
-									grid={{
-										apps: filteredApps,
-										isLoading: state.isLoading,
-										hasQuery,
-										activeView: state.activeView,
-										searchScopeCounts,
-										onSelectView: navigation.selectView,
-										onBack: () =>
-											navigation.selectView('more'),
-										categoryOrder: state.categoryOrder,
-										categories: state.categories,
-										collapsedCategories:
-											state.collapsedCategories,
-										favoriteAppIds: state.favoriteAppIds,
-										favoriteScenarios: {
-											scenarios: favoriteScenarios,
-											apps: catalogApps,
-											runningId: scenarioRunner.runningId,
-											isScenarioRunning:
-												scenarioRunner.isRunning,
-											onRun: scenarioRunner.runById,
-											onToggleFavorite:
-												state.toggleFavoriteScenario,
-										},
-										onToggleCategory: state.toggleCategory,
-										onToggleFavorite: state.toggleFavorite,
-										onMoveApp: state.moveApp,
-										onLaunch:
-											dialogs.installerLaunch
-												.requestLaunch,
-										onInfo: dialogs.appInfo.open,
-										onUninstall: dialogs.uninstall.select,
-										onHide: state.hideApp,
-										onRestore: state.restoreApp,
-										onPromoteAuxiliary:
-											state.promoteAuxiliary,
-										onDemoteAuxiliary:
-											state.demoteAuxiliary,
-										onRenameCategory: state.renameCategory,
-										onDeleteCategory: state.deleteCategory,
-									}}
-								/>
-							)}
-						</main>
+						<AppViews
+							state={state}
+							catalog={catalog}
+							derivations={derivations}
+							navigation={navigation}
+							scenarioRunner={scenarioRunner}
+							dialogs={dialogs}
+							updater={updater}
+							systemClient={systemClient}
+							onRefresh={feedback.refresh}
+						/>
 					</div>
 				</div>
 				{drawer.mounted && !desktopNavigation && (
 					<AppDrawer
+						{...navigationProps}
 						open={drawer.open}
-						counts={navigationCounts}
-						categoryOrder={state.categoryOrder}
-						categories={state.categories}
-						activeView={state.activeView}
-						appCount={visibleCategorizedApps.length}
-						favoriteCount={favoriteCount}
-						favoriteScenarioCount={favoriteScenarios.length}
 						triggerRef={menuButtonRef}
 						onGoHome={navigation.goHome}
-						onSelectView={navigation.selectView}
-						onSelectCategory={navigation.selectCategory}
-						onReorderCategory={state.reorderCategory}
-						onCreateCategory={state.createCategory}
 						onClose={drawer.close}
 						onExited={drawer.onExited}
 					/>
@@ -404,8 +222,8 @@ export function App({ store, systemClient, appsClient }: AppProps) {
 					categories={state.categories}
 					dialogs={dialogs}
 					paletteApps={primaryApps}
-					paletteSuggestions={paletteSuggestions}
-					onConfirmUninstall={confirmUninstall}
+					paletteSuggestions={catalog.paletteSuggestions}
+					onConfirmUninstall={dialogs.confirmUninstall}
 					onError={dialogs.reportFailure}
 				/>
 				<Toaster

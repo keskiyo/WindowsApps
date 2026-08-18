@@ -2,17 +2,23 @@ Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 root = fso.GetParentFolderName(WScript.ScriptFullName)
 quote = Chr(34)
-primaryExe = root & "\src-tauri\target\release\app.exe"
-alternateExe = root & "\.cargo-target\release\app.exe"
+
+
+candidates = Array( _
+  root & "\src-tauri\target\release\WindowsApps.exe", _
+  root & "\.cargo-target\release\WindowsApps.exe", _
+  root & "\src-tauri\target\release\app.exe", _
+  root & "\.cargo-target\release\app.exe")
 exe = ""
-If fso.FileExists(primaryExe) Then exe = primaryExe
-If fso.FileExists(alternateExe) Then
-  If exe = "" Then
-    exe = alternateExe
-  ElseIf fso.GetFile(alternateExe).DateLastModified > fso.GetFile(primaryExe).DateLastModified Then
-    exe = alternateExe
+For Each candidate In candidates
+  If fso.FileExists(candidate) Then
+    If exe = "" Then
+      exe = candidate
+    ElseIf fso.GetFile(candidate).DateLastModified > fso.GetFile(exe).DateLastModified Then
+      exe = candidate
+    End If
   End If
-End If
+Next
 If exe <> "" Then
   shell.Run quote & exe & quote, 1, False
 Else

@@ -68,6 +68,8 @@ pub(super) static MEDIA: &[&str] = &[
     "audio player",
     "media center",
     "video converter",
+    "audio converter",
+    "tag editor",
     "audio editor",
     "медиаплеер",
     "медиапроигрыватель",

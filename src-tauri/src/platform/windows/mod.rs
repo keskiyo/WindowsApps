@@ -1,3 +1,4 @@
+pub(crate) mod apps_folder;
 pub(crate) mod autostart;
 pub(crate) mod change_watcher;
 pub(crate) mod com;
@@ -17,7 +18,8 @@ pub(crate) use execution::{
 };
 pub(crate) use locale::{os_ui_script, NameScript};
 pub(crate) use registry::{
-    associations, install_registry, registered_targets, steam_registry, uninstall_registry,
+    associations, install_registry, package_registry, registered_targets, steam_registry,
+    uninstall_registry,
 };
 pub(crate) use shortcuts::{global_shortcut, shortcut};
 pub(crate) use uninstall::{uninstall_history, uninstaller};

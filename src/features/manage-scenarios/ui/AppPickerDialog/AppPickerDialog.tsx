@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { categoryLabel } from '../../../../entities/category'
-import { useBodyScrollLock } from '../../../../shared/hooks/useBodyScrollLock'
-import { useFocusTrap } from '../../../../shared/hooks/useFocusTrap'
+import { useModalDialog } from '../../../../shared/hooks/useModalDialog'
 import { useProgressiveList } from '../../../../shared/hooks/useProgressiveList'
 import type { AppPickerDialogProps } from '../../types'
 import { AppPickerHeader } from './AppPickerHeader'
@@ -22,26 +21,16 @@ export function AppPickerDialog({
 	onConfirm,
 	onClose,
 }: AppPickerDialogProps) {
-	useBodyScrollLock()
 	const dialogRef = useRef<HTMLDivElement>(null)
 	const inputRef = useRef<HTMLInputElement>(null)
 	const [query, setQuery] = useState('')
 	const selection = useAppPickerSelection()
-	useFocusTrap(dialogRef)
+	useModalDialog({ ref: dialogRef, initialFocusRef: inputRef })
 
 	const label = `Add an app to the ${list} list of ${scenarioName}`
 	const results = usePickerResults(apps, categories, query)
 	const rows = useProgressiveList(results)
 	const count = selection.selected.length
-
-	useEffect(() => {
-		const trigger = document.activeElement
-		inputRef.current?.focus()
-		return () => {
-			if (trigger instanceof HTMLElement && trigger.isConnected)
-				trigger.focus()
-		}
-	}, [])
 
 	return createPortal(
 		<div

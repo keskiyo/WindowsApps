@@ -2,6 +2,7 @@ import { DatabaseBackup, Download, History, Upload } from 'lucide-react'
 import { usePreferencesBackup } from './usePreferencesBackup'
 import type { PreferencesBackupProps } from './types'
 import { ACTION_BUTTON, ACTION_ROW } from '../../../data'
+import { SettingsSectionHeader } from '../../components/SettingsSectionHeader'
 
 const NEUTRAL_BUTTON =
 	'border border-slate-300 bg-slate-100 text-slate-700 hover:border-violet-400/45 hover:bg-violet-100/75 focus-visible:outline-violet-500'
@@ -23,17 +24,11 @@ export function PreferencesBackup(props: PreferencesBackupProps) {
 	return (
 		<section className="settings-surface rounded-2xl border border-white/85 bg-white/58 p-5">
 			<div className="flex items-start gap-4">
-				<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-200/70 text-violet-700 shadow-inner">
-					<DatabaseBackup size={19} aria-hidden="true" />
-				</span>
-				<div className="min-w-0 flex-1">
-					<h2 className="font-medium">Backup &amp; restore</h2>
-					<p className="mt-1 text-sm leading-6 text-slate-600">
-						Export categories, Favorites, Hidden apps, and
-						scenarios. A local fallback copy is created before each
-						saved change.
-					</p>
-				</div>
+				<SettingsSectionHeader
+					icon={DatabaseBackup}
+					title="Backup & restore"
+					description="Export categories, Favorites, Hidden apps, and scenarios. A local fallback copy is created before each saved change."
+				/>
 			</div>
 			<div className={`mt-4 ${ACTION_ROW}`}>
 				<button

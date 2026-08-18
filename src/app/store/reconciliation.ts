@@ -14,6 +14,8 @@ export interface CatalogMarks {
 	promotedAppIdentities: string[]
 	installerAppIds: string[]
 	installerAppIdentities: string[]
+	documentAppIds: string[]
+	documentAppIdentities: string[]
 	categoryOverrides: Record<string, AppCategory>
 	categoryOverrideIdentities: Record<string, AppCategory>
 	legacyCanonicalPreferences: LegacyCanonicalPreferences
@@ -47,6 +49,8 @@ function marksEqual(left: CatalogMarks, right: CatalogMarks): boolean {
 		sameOrder(left.promotedAppIdentities, right.promotedAppIdentities) &&
 		sameOrder(left.installerAppIds, right.installerAppIds) &&
 		sameOrder(left.installerAppIdentities, right.installerAppIdentities) &&
+		sameOrder(left.documentAppIds, right.documentAppIds) &&
+		sameOrder(left.documentAppIdentities, right.documentAppIdentities) &&
 		sameCategories(left.categoryOverrides, right.categoryOverrides) &&
 		sameCategories(
 			left.categoryOverrideIdentities,
@@ -67,6 +71,10 @@ function marksEqual(left: CatalogMarks, right: CatalogMarks): boolean {
 		sameOrder(
 			left.legacyCanonicalPreferences.installer,
 			right.legacyCanonicalPreferences.installer,
+		) &&
+		sameOrder(
+			left.legacyCanonicalPreferences.document,
+			right.legacyCanonicalPreferences.document,
 		) &&
 		sameCategories(
 			left.legacyCanonicalPreferences.categoryOverrides,
@@ -105,6 +113,12 @@ export function reconcileMarks(
 		current.installerAppIdentities,
 		legacy.installer,
 	)
+	const documents = reconcileSelection(
+		apps,
+		current.documentAppIds,
+		current.documentAppIdentities,
+		legacy.document,
+	)
 	const overrides = reconcileOverrides(
 		apps,
 		current.categoryOverrides,
@@ -120,6 +134,8 @@ export function reconcileMarks(
 		promotedAppIdentities: promoted.identities,
 		installerAppIds: installers.ids,
 		installerAppIdentities: installers.identities,
+		documentAppIds: documents.ids,
+		documentAppIdentities: documents.identities,
 		categoryOverrides: overrides.overrides,
 		categoryOverrideIdentities: overrides.overrideIdentities,
 		legacyCanonicalPreferences: {
@@ -127,6 +143,7 @@ export function reconcileMarks(
 			hidden: hidden.unresolvedLegacy,
 			promoted: promoted.unresolvedLegacy,
 			installer: installers.unresolvedLegacy,
+			document: documents.unresolvedLegacy,
 			categoryOverrides: overrides.unresolvedLegacy,
 		},
 	}
@@ -176,7 +193,7 @@ function groupByCanonicalIdentity(apps: AppInfo[]): Map<string, AppInfo[]> {
 	return groups
 }
 
-export function reconcileSelection(
+function reconcileSelection(
 	apps: AppInfo[],
 	ids: string[],
 	identities: string[],
@@ -209,7 +226,7 @@ export function reconcileSelection(
 	}
 }
 
-export function reconcileOverrides(
+function reconcileOverrides(
 	apps: AppInfo[],
 	idOverrides: Record<string, AppCategory>,
 	identityOverrides: Record<string, AppCategory>,

@@ -40,6 +40,8 @@ function state(
 	categoryOverrideIdentities: Record<string, AppCategory> = {},
 	installerAppIds: string[] = [],
 	installerAppIdentities: string[] = [],
+	documentAppIds: string[] = [],
+	documentAppIdentities: string[] = [],
 ) {
 	return {
 		apps,
@@ -49,6 +51,8 @@ function state(
 		promotedAppIdentities: [] as string[],
 		installerAppIds,
 		installerAppIdentities,
+		documentAppIds,
+		documentAppIdentities,
 	}
 }
 
@@ -155,7 +159,7 @@ describe('categorized app identity', () => {
 		// app invisible in the bucket the user just moved it to.
 		expect(result[2].artifactKind).toBe('installer')
 		expect(result[2].category).toBe('installers_docs')
-		expect(result[2].userInstaller).toBe(true)
+		expect(result[2].userPlacedArtifact).toBe(true)
 		expect(
 			filterVisibleApps(result, 'installers_docs', none, none),
 		).toEqual([result[2]])

@@ -1,100 +1,61 @@
 use crate::catalog::{AppInfo, SourceKind, UninstallTarget};
-use serde::Deserialize;
+use crate::platform::windows::apps_folder::PackageIdentity;
 use std::collections::HashMap;
 use std::path::{Component, Path};
 
-pub(super) const QUERY: &str = r#"
-Get-AppxPackage | ForEach-Object {
-    $package = $_
-    $applications = @()
-    try {
-        $applications = @(
-            (Get-AppxPackageManifest -Package $package.PackageFullName -ErrorAction Stop).Package.Applications.Application |
-                ForEach-Object { [pscustomobject]@{ Id = [string]$_.Id; Executable = [string]$_.Executable } }
-        )
-    } catch {}
-    [pscustomobject]@{
-        PackageFullName = $package.PackageFullName
-        PackageFamilyName = $package.PackageFamilyName
-        Name = $package.Name
-        Publisher = $package.Publisher
-        Version = [string]$package.Version
-        InstallLocation = $package.InstallLocation
-        Applications = $applications
-    }
-} | ConvertTo-Json -Compress -Depth 5
-"#;
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct PackageApplicationRow {
-    id: String,
-    #[serde(default)]
-    executable: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-struct PackageRow {
-    package_full_name: String,
-    package_family_name: String,
-    name: String,
-    publisher: Option<String>,
-    version: Option<String>,
-    install_location: Option<String>,
-    #[serde(default)]
-    applications: Vec<PackageApplicationRow>,
-}
-
-pub(super) fn enrich_packages(apps: &mut [AppInfo], json: &str) {
-    let packages: Vec<PackageRow> = super::parse_rows(json).unwrap_or_default();
-    let by_family = packages
-        .iter()
-        .map(|package| (package.package_family_name.to_lowercase(), package))
-        .collect::<HashMap<_, _>>();
-
-    for app in apps {
-        let Some((family, application_id)) = app.path.rsplit_once('!') else {
-            continue;
-        };
-        let family = family.to_lowercase();
-        let application_id = application_id.to_string();
-        let Some(package) = by_family.get(&family) else {
-            continue;
-        };
-        apply_package_metadata(app, package, &application_id);
-    }
-}
-
-fn apply_package_metadata(app: &mut AppInfo, package: &PackageRow, application_id: &str) {
+pub(super) fn apply(
+    app: &mut AppInfo,
+    package: &PackageIdentity,
+    executables: &HashMap<String, String>,
+) {
+    let name = package_name(&package.full_name);
     app.source_kind = SourceKind::Msix;
-    app.publisher = display_publisher(&package.name, package.publisher.clone());
-    app.version = non_empty(package.version.clone());
-    app.install_location = non_empty(package.install_location.clone());
-    app.description = Some(package.name.clone());
-    app.product_name = Some(package.name.clone());
+    app.publisher = display_publisher(&name);
+    app.version = package_version(&package.full_name);
+    app.install_location = package.install_location.clone();
+    app.description = Some(name.clone());
+    app.product_name = Some(name);
     app.can_uninstall = true;
     app.uninstall = Some(UninstallTarget::Msix {
-        package_full_name: package.package_full_name.clone(),
+        package_full_name: package.full_name.clone(),
     });
 
     let Some(install_location) = app.install_location.as_deref() else {
         return;
     };
-    let Some(application) = package
-        .applications
-        .iter()
-        .find(|application| application.id.eq_ignore_ascii_case(application_id))
-    else {
+    let Some(executable) = executables.get(&app.path.to_lowercase()) else {
         return;
     };
-    if let Some(executable) = contained_executable(install_location, &application.executable) {
-        app.resolved_path = Some(executable);
+    if let Some(path) = contained_executable(install_location, executable) {
+        app.resolved_path = Some(path);
     }
 }
 
-fn non_empty(value: Option<String>) -> Option<String> {
-    value.filter(|value| !value.trim().is_empty())
+fn package_name(full_name: &str) -> String {
+    full_name
+        .split('_')
+        .next()
+        .unwrap_or(full_name)
+        .trim()
+        .to_string()
+}
+
+fn package_version(full_name: &str) -> Option<String> {
+    full_name
+        .split('_')
+        .nth(1)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+pub(super) fn display_publisher(package_name: &str) -> Option<String> {
+    package_name
+        .split('.')
+        .next()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 fn contained_executable(install_location: &str, executable: &str) -> Option<String> {
@@ -125,18 +86,44 @@ fn contained_executable(install_location: &str, executable: &str) -> Option<Stri
     Some(candidate.to_string_lossy().into_owned())
 }
 
-pub(super) fn display_publisher(package_name: &str, publisher: Option<String>) -> Option<String> {
-    let publisher = non_empty(publisher.map(|value| value.trim().to_string()));
-    if publisher
-        .as_deref()
-        .is_some_and(|value| value.starts_with("CN="))
-    {
-        return package_name
-            .split('.')
-            .next()
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_string);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn splits_a_package_full_name_into_vendor_and_version() {
+        let full_name = "OpenAI.Codex_26.727.4816.0_x64__2p2nqsd0c76g0";
+
+        assert_eq!(package_name(full_name), "OpenAI.Codex");
+        assert_eq!(package_version(full_name).as_deref(), Some("26.727.4816.0"));
+        assert_eq!(display_publisher("OpenAI.Codex").as_deref(), Some("OpenAI"));
     }
-    publisher
+
+    #[test]
+    fn rejects_escaping_and_non_executable_manifest_targets() {
+        for executable in [r"..\Outside.exe", r"C:\Outside.exe", "app/readme.txt", ""] {
+            assert_eq!(
+                contained_executable(r"C:\Program Files\WindowsApps\Codex", executable),
+                None,
+                "unsafe manifest target was accepted: {executable}"
+            );
+        }
+    }
+
+    #[test]
+    fn joins_a_relative_manifest_target_onto_the_install_root() {
+        assert_eq!(
+            contained_executable(r"C:\Program Files\WindowsApps\Codex", "app/ChatGPT.exe")
+                .as_deref(),
+            Some(r"C:\Program Files\WindowsApps\Codex\app\ChatGPT.exe")
+        );
+    }
+
+    #[test]
+    fn rejects_a_network_install_root() {
+        assert_eq!(
+            contained_executable(r"\\server\share\Codex", "app/ChatGPT.exe"),
+            None
+        );
+    }
 }

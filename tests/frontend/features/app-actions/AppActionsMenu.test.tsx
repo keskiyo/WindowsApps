@@ -36,6 +36,11 @@ function rect(left: number, top: number, width: number, height: number) {
 	} as DOMRect
 }
 
+const withArtifacts: CategoryDefinition[] = [
+	{ id: 'games', label: 'Games', builtIn: true },
+	{ id: 'installers_docs', label: 'Installers & Docs', builtIn: true },
+]
+
 const threeCategories: CategoryDefinition[] = [
 	{ id: 'games', label: 'Games', builtIn: true },
 	{ id: 'development', label: 'Development', builtIn: true },
@@ -45,6 +50,7 @@ const threeCategories: CategoryDefinition[] = [
 function renderMovableMenu(
 	anchorRef = createRef<HTMLButtonElement>(),
 	categories = threeCategories,
+	placement: { isUserPromoted?: boolean } = {},
 ) {
 	const onClose = vi.fn()
 	const onMove = vi.fn()
@@ -67,6 +73,7 @@ function renderMovableMenu(
 				onRestore={vi.fn()}
 				onDemote={vi.fn()}
 				anchorRef={anchorRef}
+				{...placement}
 			/>
 		</>,
 	)
@@ -138,6 +145,83 @@ describe('AppActionsMenu category cascade', () => {
 		expect(label.compareDocumentPosition(arrow!)).toBe(
 			Node.DOCUMENT_POSITION_FOLLOWING,
 		)
+	})
+
+	it('names the demotion in full for assistive technology while showing a label that fits one line', () => {
+		renderMovableMenu(createRef<HTMLButtonElement>(), threeCategories, {
+			isUserPromoted: true,
+		})
+
+		const demote = screen.getByRole('menuitem', {
+			name: 'Move back to Auxiliary tools',
+		})
+		const visible = within(demote).getByText('Move back', {
+			selector: '[aria-hidden="true"]',
+		})
+		expect(visible).toBeInTheDocument()
+		expect(demote.querySelector('svg')).toHaveClass('lucide-wrench')
+	})
+
+	it('opens installers and docs as a third level instead of filing immediately', async () => {
+		const user = userEvent.setup()
+		const { onMove, onClose } = renderMovableMenu(
+			createRef<HTMLButtonElement>(),
+			withArtifacts,
+		)
+
+		await user.click(
+			screen.getByRole('menuitem', { name: 'Move to category' }),
+		)
+		const branch = screen.getByRole('menuitem', {
+			name: 'Installers & Docs',
+		})
+		expect(branch).toHaveAttribute('aria-haspopup', 'menu')
+		expect(branch).toHaveAttribute('aria-expanded', 'false')
+
+		await user.click(branch)
+
+		expect(onMove).not.toHaveBeenCalled()
+		expect(branch).toHaveAttribute('aria-expanded', 'true')
+		const third = screen.getByRole('menu', {
+			name: 'Move Visual Studio Code to installers or docs',
+		})
+		expect(
+			within(third).getByRole('menuitem', { name: 'Installers' }),
+		).toBeInTheDocument()
+
+		await user.click(within(third).getByRole('menuitem', { name: 'Docs' }))
+
+		expect(onMove).toHaveBeenCalledWith(
+			visualStudioCode.id,
+			'installers_docs',
+			'documentation',
+		)
+		expect(onClose).toHaveBeenCalled()
+	})
+
+	it('reaches the third level with the arrow keys and dismisses it with the rest', async () => {
+		const user = userEvent.setup()
+		const { onClose } = renderMovableMenu(
+			createRef<HTMLButtonElement>(),
+			withArtifacts,
+		)
+
+		await user.click(
+			screen.getByRole('menuitem', { name: 'Move to category' }),
+		)
+		await user.click(
+			screen.getByRole('menuitem', { name: 'Installers & Docs' }),
+		)
+		const docs = screen.getByRole('menuitem', { name: 'Docs' })
+
+		docs.focus()
+		await user.keyboard('{ArrowUp}')
+		expect(document.activeElement).toBe(
+			screen.getByRole('menuitem', { name: 'Installers' }),
+		)
+
+		await user.pointer({ target: document.body, keys: '[MouseLeft]' })
+		expect(onClose).toHaveBeenCalled()
 	})
 
 	it('opens every category in a labelled sibling menu and keeps arrow navigation continuous', async () => {
@@ -215,6 +299,67 @@ describe('AppActionsMenu category cascade', () => {
 		await user.pointer({ target: document.body, keys: '[MouseLeft]' })
 
 		expect(onClose).toHaveBeenCalledTimes(1)
+	})
+
+	// The third level used to be placed against the category panel, so a row near the bottom of a
+	// long list opened its submenu at the very top of the screen, nowhere near the pointer.
+	it('opens the third level beside the row that owns it, not beside the panel top', async () => {
+		const user = userEvent.setup()
+		const viewport = {
+			width: Object.getOwnPropertyDescriptor(window, 'innerWidth'),
+			height: Object.getOwnPropertyDescriptor(window, 'innerHeight'),
+		}
+		const categoryBounds = rect(328, 136, 224, 400)
+		const getBoundingClientRect = vi
+			.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+			.mockImplementation(function (this: HTMLElement) {
+				const label = this.getAttribute('aria-label')
+				if (label === 'Actions menu anchor')
+					return rect(100, 100, 32, 32)
+				if (label === 'Visual Studio Code actions')
+					return rect(100, 136, 224, 200)
+				if (label === 'Move Visual Studio Code to category')
+					return categoryBounds
+				if (label === 'Move Visual Studio Code to installers or docs')
+					return rect(0, 0, 224, 80)
+				if (this.getAttribute('aria-haspopup') === 'menu')
+					return rect(336, 436, 208, 36)
+				return rect(0, 0, 0, 0)
+			})
+		Object.defineProperty(window, 'innerWidth', {
+			configurable: true,
+			value: 1200,
+		})
+		Object.defineProperty(window, 'innerHeight', {
+			configurable: true,
+			value: 800,
+		})
+
+		try {
+			renderMovableMenu(createRef<HTMLButtonElement>(), withArtifacts)
+			await user.click(
+				screen.getByRole('menuitem', { name: 'Move to category' }),
+			)
+			await user.click(
+				screen.getByRole('menuitem', { name: 'Installers & Docs' }),
+			)
+			const categories = screen.getByRole('menu', {
+				name: 'Move Visual Studio Code to category',
+			})
+			const artifacts = screen.getByRole('menu', {
+				name: 'Move Visual Studio Code to installers or docs',
+			})
+
+			expect(categories).toHaveStyle({ left: '328px', top: '136px' })
+			expect(artifacts).toHaveStyle({ left: '556px', top: '436px' })
+			expect(artifacts.style.top).not.toBe(categories.style.top)
+		} finally {
+			getBoundingClientRect.mockRestore()
+			if (viewport.width)
+				Object.defineProperty(window, 'innerWidth', viewport.width)
+			if (viewport.height)
+				Object.defineProperty(window, 'innerHeight', viewport.height)
+		}
 	})
 
 	it('keeps the category panel four pixels from the menu after resize changes its viewport', async () => {

@@ -62,8 +62,6 @@ export default tseslint.config(
 				{ argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
 			],
 			'@typescript-eslint/no-explicit-any': 'error',
-			// Release builds register no log sink, so console output is a dead end;
-			// user-facing problems belong in the UI. See src/AGENTS_frontend.md.
 			'no-console': 'error',
 			'react-hooks/rules-of-hooks': 'error',
 			'react-hooks/exhaustive-deps': 'error',
@@ -78,10 +76,6 @@ export default tseslint.config(
 		},
 	},
 	{
-		// Architectural boundary, not a preference: the Tauri runtime is reached only through
-		// the four integration modules listed in `ignores`, so presentation, state, entity
-		// logic and shared utilities stay testable without the desktop runtime.
-		// See AGENTS.md §4 and src/AGENTS.md §1.
 		files: ['src/**/*.{ts,tsx}'],
 		ignores: [
 			'src/shared/api/tauri/client.ts',
@@ -105,8 +99,6 @@ export default tseslint.config(
 		},
 	},
 	{
-		// Colors come from the token layer in src/app/styles/index.css, never from a literal
-		// next to the markup that uses it.
 		files: ['src/**/*.{ts,tsx}'],
 		plugins: {
 			local: localRules,

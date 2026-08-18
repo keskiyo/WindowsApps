@@ -31,6 +31,11 @@ jobs:
             - name: Lint
               run: npm run lint
 
+            # `endOfLine: 'auto'` in prettier.config.mjs keeps this green on a Windows checkout
+            # with core.autocrlf=true as well as on a Linux runner; do not pin it back to 'lf'.
+            - name: Check formatting
+              run: npm run format:check
+
             - name: Type-check
               run: npm run typecheck
 
@@ -157,6 +162,13 @@ jobs:
             - name: Test release notes preparation
               shell: pwsh
               run: powershell -NoProfile -File scripts/test-release-notes.ps1
+
+            # The soak harness itself is a manual pre-release procedure, but the contract it
+            # enforces — bind to one exact PID and executable, never touch anything else — is
+            # what keeps that manual run safe, so the test guarding it belongs in CI.
+            - name: Test release soak harness
+              shell: pwsh
+              run: powershell -NoProfile -File scripts/test-run-release-soak.ps1
 
             - name: Test updater signature verification
               shell: pwsh

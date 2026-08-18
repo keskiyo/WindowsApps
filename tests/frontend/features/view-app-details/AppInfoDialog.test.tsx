@@ -344,4 +344,31 @@ describe('AppInfoDialog', () => {
 		await screen.findByText('Application')
 		expect(screen.getByText('publisher “jetbrains”')).toBeVisible()
 	})
+
+	// Closing the window used to drop focus on the document body, so the next Tab restarted from
+	// the top of the catalog instead of the card the reader came from.
+	it('hands focus back to the control that opened it', async () => {
+		render(<button type="button">Show info</button>)
+		const opener = screen.getByRole('button', { name: 'Show info' })
+		opener.focus()
+
+		const view = render(
+			<AppInfoDialog
+				app={app}
+				categories={categories}
+				appsClient={{
+					getAppDetails: vi.fn().mockResolvedValue(details),
+					openAppFolder: vi.fn().mockResolvedValue(undefined),
+				}}
+				onClose={vi.fn()}
+			/>,
+		)
+		await screen.findByText('Application')
+		expect(
+			screen.getByRole('button', { name: 'Close app information' }),
+		).toHaveFocus()
+
+		view.unmount()
+		expect(opener).toHaveFocus()
+	})
 })

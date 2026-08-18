@@ -44,16 +44,37 @@ pub(crate) fn launch(
         LaunchKind::AppUserModelId => apps_folder_target(target),
         LaunchKind::Executable | LaunchKind::Shortcut => target.to_string(),
     };
-    shell_execute_with_handle(&shell_target, parameters_for(kind, target, arguments))
+    shell_execute_with_handle(
+        &shell_target,
+        parameters_for(kind, target, arguments),
+        working_directory(kind, target).as_deref(),
+    )
+}
+
+fn working_directory(kind: LaunchKind, target: &str) -> Option<String> {
+    if kind != LaunchKind::Executable || is_launch_uri(target) {
+        return None;
+    }
+    Path::new(target)
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .map(|parent| parent.to_string_lossy().into_owned())
 }
 
 fn shell_execute_with_handle(
     target: &str,
     parameters: Option<&str>,
+    directory: Option<&str>,
 ) -> Result<Option<OwnedProcessHandle>, String> {
     let operation: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
     let file: Vec<u16> = OsStr::new(target).encode_wide().chain(Some(0)).collect();
     let parameters = parameters.map(|value| {
+        OsStr::new(value)
+            .encode_wide()
+            .chain(Some(0))
+            .collect::<Vec<_>>()
+    });
+    let directory = directory.map(|value| {
         OsStr::new(value)
             .encode_wide()
             .chain(Some(0))
@@ -67,12 +88,16 @@ fn shell_execute_with_handle(
         lpParameters: parameters
             .as_ref()
             .map_or(PCWSTR::null(), |value| PCWSTR(value.as_ptr())),
+        lpDirectory: directory
+            .as_ref()
+            .map_or(PCWSTR::null(), |value| PCWSTR(value.as_ptr())),
         nShow: SW_SHOWNORMAL.0,
         ..Default::default()
     };
     // SAFETY: `info` is fully initialized (`cbSize` set to its own size, remaining fields
-    // defaulted), and its `lpVerb`/`lpFile`/`lpParameters` point at `operation`, `file`, and the
-    // optional NUL-terminated UTF-16 parameter buffer owned by this frame that outlive the call.
+    // defaulted), and its `lpVerb`/`lpFile`/`lpParameters`/`lpDirectory` point at `operation`,
+    // `file`, and the optional NUL-terminated UTF-16 parameter and directory buffers owned by this
+    // frame that outlive the call.
     // `ShellExecuteExW`
     // writes back into `info` through the exclusive `&mut`, and `SEE_MASK_NOCLOSEPROCESS` makes
     // any returned `hProcess` ours to close — which `OwnedProcessHandle` then does exactly once.
@@ -102,18 +127,26 @@ fn parameters_for<'a>(
 pub(crate) fn shell_execute(target: &str) -> Result<(), String> {
     let operation: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
     let file: Vec<u16> = OsStr::new(target).encode_wide().chain(Some(0)).collect();
-    // SAFETY: both `PCWSTR`s point at NUL-terminated UTF-16 buffers owned by this frame that
-    // outlive the call; the remaining pointer arguments are explicitly null, which
-    // `ShellExecuteW` documents as "no parameters" and "no working directory". No handle is
-    // returned to own — this variant does not set `SEE_MASK_NOCLOSEPROCESS` — so the result is
-    // only an error code, checked by `validate_shell_result`.
+    let directory = working_directory(LaunchKind::Executable, target).map(|value| {
+        OsStr::new(&value)
+            .encode_wide()
+            .chain(Some(0))
+            .collect::<Vec<_>>()
+    });
+    // SAFETY: every `PCWSTR` here points at a NUL-terminated UTF-16 buffer owned by this frame that
+    // outlives the call, and the parameter argument is explicitly null, which `ShellExecuteW`
+    // documents as "no parameters". No handle is returned to own — this variant does not set
+    // `SEE_MASK_NOCLOSEPROCESS` — so the result is only an error code, checked by
+    // `validate_shell_result`.
     let result = unsafe {
         ShellExecuteW(
             None,
             PCWSTR(operation.as_ptr()),
             PCWSTR(file.as_ptr()),
             PCWSTR::null(),
-            PCWSTR::null(),
+            directory
+                .as_ref()
+                .map_or(PCWSTR::null(), |value| PCWSTR(value.as_ptr())),
             SW_SHOWNORMAL,
         )
     };
@@ -175,6 +208,33 @@ mod tests {
             "",
         ] {
             assert!(!is_launch_uri(target), "{target}");
+        }
+    }
+
+    // A launched program used to inherit this process's working directory, so anything it wrote
+    // relative to it landed in the catalog's own folder: Rufus dropped its `rufus.com` console
+    // companion into `src-tauri` instead of its own directory.
+    #[test]
+    fn an_executable_starts_in_its_own_directory() {
+        assert_eq!(
+            working_directory(LaunchKind::Executable, r"D:\Tools\rufus-4.11p.exe").as_deref(),
+            Some(r"D:\Tools")
+        );
+        assert_eq!(
+            working_directory(LaunchKind::Executable, r"C:\Program Files\App\app.exe").as_deref(),
+            Some(r"C:\Program Files\App")
+        );
+    }
+
+    #[test]
+    fn targets_without_a_directory_of_their_own_keep_none() {
+        for (kind, target) in [
+            (LaunchKind::Shortcut, r"C:\Menu\Editor.lnk"),
+            (LaunchKind::AppUserModelId, "Contoso.App_abc!App"),
+            (LaunchKind::Executable, "steam://rungameid/2183900"),
+            (LaunchKind::Executable, "app.exe"),
+        ] {
+            assert_eq!(working_directory(kind, target), None, "{target}");
         }
     }
 

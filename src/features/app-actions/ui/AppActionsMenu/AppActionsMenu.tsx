@@ -8,7 +8,11 @@ import {
 } from 'lucide-react'
 import { useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { isCatalogArtifact } from '../../../../entities/app'
+import {
+	INSTALLERS_DOCS_CATEGORY,
+	isCatalogArtifact,
+} from '../../../../entities/app'
+import { ArtifactSubmenu } from './ArtifactSubmenu'
 import { CategorySubmenu } from './CategorySubmenu'
 import { MenuItem } from './MenuItem'
 import type { AppActionsMenuProps } from './types'
@@ -30,17 +34,21 @@ export function AppActionsMenu({
 	anchorRef,
 }: AppActionsMenuProps) {
 	const [showCategories, setShowCategories] = useState(false)
-	const artifact = isCatalogArtifact(app) && !app.userInstaller
+	const [showArtifacts, setShowArtifacts] = useState(false)
+	const artifact = isCatalogArtifact(app) && !app.userPlacedArtifact
 	const {
 		menuRef,
 		categoryMenuRef,
+		artifactMenuRef,
 		position,
 		categoryPosition,
+		artifactPosition,
 		onMenuKeyDown,
 	} = useActionsMenu({
 		anchorRef,
 		onClose,
 		showCategories,
+		showArtifacts,
 	})
 	return createPortal(
 		<>
@@ -63,7 +71,10 @@ export function AppActionsMenu({
 						<MenuItem
 							trailingIcon={ArrowRight}
 							label="Move to category"
-							onClick={() => setShowCategories(value => !value)}
+							onClick={() => {
+								setShowCategories(value => !value)
+								setShowArtifacts(false)
+							}}
 						/>
 						<div
 							role="separator"
@@ -84,11 +95,18 @@ export function AppActionsMenu({
 						isHidden ? RotateCcw : isUserPromoted ? Wrench : EyeOff
 					}
 					label={
-						isHidden
-							? 'Restore to catalog'
-							: isUserPromoted
-								? 'Move back to Auxiliary tools'
-								: 'Hide from catalog'
+						isHidden ? (
+							'Restore to catalog'
+						) : isUserPromoted ? (
+							<>
+								<span aria-hidden="true">Move back</span>
+								<span className="sr-only">
+									Move back to Auxiliary tools
+								</span>
+							</>
+						) : (
+							'Hide from catalog'
+						)
 					}
 					onClick={() => {
 						if (isHidden) onRestore(app.id)
@@ -126,12 +144,28 @@ export function AppActionsMenu({
 					categories={categories}
 					categoryOrder={categoryOrder}
 					activeCategory={app.category}
+					expandedCategory={
+						showArtifacts ? INSTALLERS_DOCS_CATEGORY : null
+					}
 					menuRef={categoryMenuRef}
 					position={categoryPosition}
 					onKeyDown={onMenuKeyDown}
 					label={`Move ${app.name} to category`}
+					onExpand={() => setShowArtifacts(value => !value)}
 					onSelect={category => {
 						onMove(app.id, category)
+						onClose()
+					}}
+				/>
+			)}
+			{!isHidden && !artifact && showCategories && showArtifacts && (
+				<ArtifactSubmenu
+					menuRef={artifactMenuRef}
+					position={artifactPosition}
+					onKeyDown={onMenuKeyDown}
+					label={`Move ${app.name} to installers or docs`}
+					onSelect={kind => {
+						onMove(app.id, INSTALLERS_DOCS_CATEGORY, kind)
 						onClose()
 					}}
 				/>
